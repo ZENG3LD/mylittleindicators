@@ -524,6 +524,32 @@ pub enum BarIndicatorId {
 
 }
 
+impl BarIndicatorId {
+    /// True if this indicator accepts a `MovingAverageType` parameter
+    /// (i.e. its smoother is configurable). Used by the optimizer to decide
+    /// whether to expand `ma_type` as an axis in the parameter cube.
+    pub fn supports_ma_type(self) -> bool {
+        matches!(
+            self,
+            BarIndicatorId::Atr
+                | BarIndicatorId::Atrbw
+                | BarIndicatorId::Atrp
+                | BarIndicatorId::Atrz
+                | BarIndicatorId::AvVidya
+                | BarIndicatorId::BbPeriod
+                | BarIndicatorId::MacdHistZ
+                | BarIndicatorId::Pressure
+                | BarIndicatorId::RangeAtr
+                | BarIndicatorId::SweepRev
+                | BarIndicatorId::Tmf
+                | BarIndicatorId::VhfMa
+                | BarIndicatorId::Volts
+                | BarIndicatorId::VoltsAtr
+        )
+    }
+}
+
+
 // Original variants: 482
 // Added long aliases: 155
 // Total: 637

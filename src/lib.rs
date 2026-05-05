@@ -14,6 +14,11 @@ pub mod bar_indicators;
 // Catalog system
 pub mod catalog;
 
+// Legacy re-export: old MLQ path was `mlq_indicators::indicator_key::IndicatorKey`.
+// MLC layout moved it to `catalog::indicator_key`. Keep the old path working
+// so 12+ warmup callers don't need import rewrites.
+pub use catalog::indicator_key;
+
 // Signal system — signal types, conditions, detectors
 pub mod signals;
 
