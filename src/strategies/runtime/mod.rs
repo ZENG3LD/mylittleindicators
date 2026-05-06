@@ -19,5 +19,11 @@
 
 pub mod signal;
 pub mod detectors;
+pub mod config;
+pub mod profile;
+pub mod engine;
 
 pub use signal::Signal;
+pub use config::{DetectorConfig, DetectorType, DetectorParams, ValueSource};
+pub use profile::SignalProfile;
+pub use engine::SignalEngine;

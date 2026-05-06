@@ -4,8 +4,8 @@
 //! Uses BarIndicatorId for type-safe indicator identification.
 
 use crate::bar_indicators::bar_indicator_id::BarIndicatorId;
-use super::config::{DetectorConfig, ValueSource};
-use super::profile::SignalProfile;
+use crate::strategies::runtime::config::{DetectorConfig, ValueSource};
+use crate::strategies::runtime::profile::SignalProfile;
 
 // ============================================================================
 // Template helpers

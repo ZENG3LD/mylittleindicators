@@ -1,18 +1,23 @@
 //! Conditions — атомарные предикаты.
 //!
-//! Berется из MLI `signals/conditions.rs` (12 enum'ов). Это словарь предикатов
-//! который используют и runtime detectors, и codegen-templates.
+//! Словарь предикатов, используемый и runtime detectors, и codegen-templates.
+//! Migrated from `signals/conditions.rs`.
 //!
-//! Roadmap:
-//! - `threshold.rs`    — ThresholdCondition (Above/Below/Between/...)
-//! - `crossover.rs`    — CrossoverType (BullishCross, BearishCross, ZeroCross)
-//! - `compare.rs`      — CompareCondition (GT/LT/EQ/NE с tolerance)
-//! - `trend.rs`        — TrendCondition (Rising/Falling/Sideways)
-//! - `divergence.rs`   — DivergenceType (Regular Bull/Bear, Hidden Bull/Bear) +
-//!                       спецификация ArrayVec<32> детектора (MLI ведущий)
-//! - `channel.rs`      — ChannelPosition / ZoneEnter / ZoneExit (MLI + MLQ объединены)
-//! - `pattern.rs`      — PatternState (Forming/Confirmed/Broken) + CandlePattern
-//! - `volatility.rs`   — VolatilityRegime (Squeeze/Expansion/Normal)
-//! - `volume.rs`       — VolumeCharacter (Climax/Surge/Dry)
-//! - `logic.rs`        — LogicOp (And/Or/Not) + ConfirmationRequirement
-//!                       (Immediate/NextBar/WithinBars(N)/CloseConfirmation)
+//! Roadmap (все enum'ы пока в `atoms.rs`, по мере роста разнесём):
+//! - ThresholdCondition (Above/Below/InRange/OutOfRange/Near)
+//! - CrossoverType (CrossUp/CrossDown/CrossAny)
+//! - CompareCondition (GT/LT/EQ/NE с tolerance)
+//! - TrendCondition (Rising/Falling/Sideways)
+//! - DivergenceType (RegularBull/RegularBear/HiddenBull/HiddenBear)
+//!   — спецификация ArrayVec<32> детектора в `runtime/detectors/divergence.rs`
+//! - ChannelPosition (BelowLower/AboveUpper/Inside/...)
+//! - PatternState (Forming/Confirmed/Broken)
+//! - CandlePattern
+//! - VolatilityRegime (Squeeze/Expansion/Normal)
+//! - VolumeCharacter (Climax/Surge/Dry)
+//! - LogicOp (And/Or/Not) + ConfirmationRequirement
+//!   (Immediate/NextBar/WithinBars(N)/CloseConfirmation)
+
+pub mod atoms;
+
+pub use atoms::*;
