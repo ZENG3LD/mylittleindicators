@@ -34,3 +34,9 @@ pub mod shapes;
 pub mod multi_tf;
 pub mod defaults;
 pub mod runtime;
+pub mod spec;
+
+pub use spec::{
+    RoleSpec, StateVar, Transition, StateSpec,
+    ValidationRuleSpec, ActionMap, TfArity, StrategySpec,
+};

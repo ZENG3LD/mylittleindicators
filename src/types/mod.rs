@@ -5,7 +5,9 @@
 mod bar;
 mod calendar;
 mod time_service;
+mod timeframe;
 
 pub use bar::{Bar, Tick};
 pub use calendar::CalendarService;
 pub use time_service::TimeService;
+pub use timeframe::ResearchTimeframe;
