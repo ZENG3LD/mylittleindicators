@@ -1,21 +1,18 @@
 //! Events — что и как распознаётся.
 //!
 //! Объединяет MLI taxonomy событий (SignalKind с подтипами, BarConfirmation,
-//! Direction, SignalSource) с MLQ codegen осями (Strictness, OperatorClass,
-//! Operand, Window).
-//!
-//! Roadmap:
-//! - `kind.rs`         ✅ SignalKind + 10 sub-enums (из MLI signals/catalog.rs)
-//! - `direction.rs`    ✅ Direction + SignalSource (MLI)
-//! - `confirmation.rs` ✅ BarConfirmation Pending/Closed/WickOnly (MLI)
-//! - `strictness.rs`   TODO OnEdge/Persistent/FirstTime/NBarsConfirmed (MLQ axes)
-//! - `operator.rs`     TODO OperatorClass: Cross/Threshold/ZoneExit/Divergence/NBarExtreme
-//! - `operand.rs`      TODO Role/Constant/PriceField (MLQ axes)
-//! - `window.rs`       TODO Window::Sliding/PivotLR (MLQ)
+//! Direction, SignalSource) с MLQ codegen осями (OperatorClass, Operand,
+//! Window, EventDirection, и сам Event как атом стратегии).
 
 pub mod kind;
 pub mod direction;
 pub mod confirmation;
+pub mod operator;
+pub mod operand;
+pub mod window;
+pub mod event_direction;
+pub mod event;
+pub mod signal_type;
 
 pub use kind::{
     SignalKind, SignalCategory,
@@ -24,3 +21,9 @@ pub use kind::{
 };
 pub use direction::{Direction, SignalSource};
 pub use confirmation::BarConfirmation;
+pub use operator::{OperatorClass, Strictness, strictness_for};
+pub use operand::{Operand, BarField, AggregateOp, DerivedOp, ArithmeticOp};
+pub use window::Window;
+pub use event_direction::EventDirection;
+pub use event::Event;
+pub use signal_type::{SignalType, signal_type_for};
