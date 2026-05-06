@@ -22,6 +22,11 @@ pub use catalog::indicator_key;
 // Signal system — signal types, conditions, detectors
 pub mod signals;
 
+// Strategies — unified taxonomy of events / conditions / composition / shapes
+// / defaults / runtime. Skeleton — content migrates from `signals/*` (MLI) and
+// `mlq-strategies-codegen/*` (MLQ) here over time.
+pub mod strategies;
+
 // Re-exports for convenience
 pub use bar_indicators::{
     bar_indicator_id::BarIndicatorId,
