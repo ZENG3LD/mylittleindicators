@@ -17,4 +17,7 @@
 //!     - `volume.rs` / `swing.rs`
 //!     - `multi_signal.rs` — vote-based для UI Composite::Strong/Conflict
 
+pub mod signal;
 pub mod detectors;
+
+pub use signal::Signal;
