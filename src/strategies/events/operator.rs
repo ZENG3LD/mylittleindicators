@@ -27,6 +27,11 @@ pub enum OperatorClass {
     ///
     /// Requires stateful arming: slot0 arms the machine, slot1 fires the signal.
     Sequence,
+    /// Volatility regime shift — z-score / percentile-based transition between
+    /// vol regimes (Squeeze / Breakout / Extreme / Shift).
+    VolatilityRegime,
+    /// Volume event — Spike / Climax / Delta shift relative to average / history.
+    VolumeEvent,
 }
 
 /// How the condition must hold over time.
@@ -60,6 +65,8 @@ pub fn strictness_for(op: OperatorClass) -> Strictness {
         OperatorClass::CandlePattern => Strictness::OnEdge,
         OperatorClass::RegimeGate => Strictness::Persistent,
         OperatorClass::Sequence => Strictness::OnEdge,
+        OperatorClass::VolatilityRegime => Strictness::FirstTime,
+        OperatorClass::VolumeEvent => Strictness::OnEdge,
     }
 }
 

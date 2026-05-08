@@ -108,6 +108,9 @@ pub fn signal_type_for(op: OperatorClass, role_kind_hint: Option<RoleKind>) -> S
         },
 
         OperatorClass::Sequence => SignalType::PriceAction,
+
+        OperatorClass::VolatilityRegime => SignalType::BollingerSqueeze,
+        OperatorClass::VolumeEvent => SignalType::VolumeSpike,
     }
 }
 

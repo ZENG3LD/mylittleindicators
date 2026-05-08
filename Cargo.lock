@@ -57,6 +57,7 @@ version = "0.1.0"
 dependencies = [
  "arrayvec",
  "once_cell",
+ "proc-macro2",
  "rayon",
  "serde",
  "serde_json",

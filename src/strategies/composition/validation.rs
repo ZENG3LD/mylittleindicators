@@ -196,6 +196,18 @@ pub fn validate_event(e: &Event) -> Result<(), String> {
                 _ => return Err("sequence: window_n must be NBars(n) with n > 0".into()),
             }
         }
+
+        OperatorClass::VolatilityRegime => {
+            // Vol regime shift: left = vol metric (z-score, ATR), right = optional threshold.
+            e.left_operand.as_ref()
+                .ok_or("volatility_regime: left_operand (vol metric role) is required")?;
+        }
+
+        OperatorClass::VolumeEvent => {
+            // Volume event: left = volume (or vol-derived), right = avg/threshold.
+            e.left_operand.as_ref()
+                .ok_or("volume_event: left_operand (volume role) is required")?;
+        }
     }
 
     Ok(())
