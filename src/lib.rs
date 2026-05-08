@@ -1,33 +1,31 @@
-//! mylittleindicators — shared indicator library extracted from mylittlechart.
+//! mylittleindicators — shared indicator + event factory.
 //!
-//! Provides 480+ technical indicators across 23 categories, plus catalog metadata,
-//! signal primitives, and core types (Bar, Tick, time/calendar services).
+//! 480+ технических индикаторов (23 категории) + типы событий, conditions,
+//! composition, shapes, spec — основа для построения стратегий и runtime
+//! детекторов в крейтах-потребителях (mylittlequant, mylittlechart).
 //!
-//! Render layer (`managers/`) intentionally not included — that lives in mylittlechart.
+//! Здесь нет runtime-логики (детекторов, signal-engine, рендера) и нет
+//! domain-данных (defaults). Это чистая фабрика типов и индикаторов.
 
-// Core types (bar, tick, time, calendar)
+// Core types (bar, tick, time, calendar, timeframe)
 pub mod types;
 
-// Core indicator types
+// Bar indicators
 pub mod bar_indicators;
 
-// Catalog system
+// Catalog system (signatures, constraints, param values, indicator key)
 pub mod catalog;
 
 // Legacy re-export: old MLQ path was `mlq_indicators::indicator_key::IndicatorKey`.
-// MLC layout moved it to `catalog::indicator_key`. Keep the old path working
-// so 12+ warmup callers don't need import rewrites.
+// Keep the old path working so warmup callers don't need import rewrites.
 pub use catalog::indicator_key;
 
-// Signal system — signal types, conditions, detectors
-pub mod signals;
-
-// Strategies — unified taxonomy of events / conditions / composition / shapes
-// / defaults / runtime. Skeleton — content migrates from `signals/*` (MLI) and
-// `mlq-strategies-codegen/*` (MLQ) here over time.
+// Strategies — taxonomy of events / conditions / composition / shapes / spec.
+// Pure types, no runtime. Consumers (mlq, mlc) build their own detectors,
+// engines, and codegen on top of these.
 pub mod strategies;
 
-// Re-exports for convenience
+// Convenience re-exports
 pub use bar_indicators::{
     bar_indicator_id::BarIndicatorId,
     indicator_value::IndicatorValue,
@@ -43,16 +41,15 @@ pub use catalog::{
 
 pub use types::{Bar, Tick, CalendarService, TimeService};
 
-// Signal system re-exports
-pub use signals::{
+// Strategy / event taxonomy re-exports
+pub use strategies::events::{
     SignalKind, SignalCategory,
     ThresholdSub, HistogramSub, ChannelSub, DivergenceSub, TrendSub,
     VolatilitySub, VolumeSub, StructureSub, PatternSub, CompositeSub,
+    Direction, SignalSource, BarConfirmation,
+};
+pub use strategies::conditions::{
     ThresholdCondition, CrossoverType, CompareCondition, TrendCondition,
     DivergenceType, ChannelPosition, PatternState, CandlePattern,
     VolatilityRegime, VolumeCharacter, LogicOp, ConfirmationRequirement,
-    CrossoverDetector, ThresholdMonitor, ZeroCrossDetector, HistogramDetector,
-    ChannelDetector, DivergenceDetector, TrendDetector, VolatilityDetector,
-    VolumeDetector, SwingDetector, MultiSignalDetector,
-    Signal, Direction, BarConfirmation, SignalSource,
 };
