@@ -1,11 +1,11 @@
 //! mylittleindicators — shared indicator + event factory.
 //!
 //! 480+ технических индикаторов (23 категории) + типы событий, conditions,
-//! composition, shapes, spec — основа для построения стратегий и runtime
-//! детекторов в крейтах-потребителях (mylittlequant, mylittlechart).
+//! composition, role_kind — низкоуровневый клей для построения стратегий и
+//! runtime детекторов в крейтах-потребителях (mylittlequant, mylittlechart).
 //!
-//! Здесь нет runtime-логики (детекторов, signal-engine, рендера) и нет
-//! domain-данных (defaults). Это чистая фабрика типов и индикаторов.
+//! Здесь нет runtime-логики (детекторов, engine, рендера), нет defaults,
+//! нет StrategySpec. Только индикаторы и пограничные типы событий.
 
 // Core types (bar, tick, time, calendar, timeframe)
 pub mod types;
@@ -16,14 +16,11 @@ pub mod bar_indicators;
 // Catalog system (signatures, constraints, param values, indicator key)
 pub mod catalog;
 
-// Legacy re-export: old MLQ path was `mlq_indicators::indicator_key::IndicatorKey`.
-// Keep the old path working so warmup callers don't need import rewrites.
+// Legacy re-export: old MLQ path `mlq_indicators::indicator_key::IndicatorKey`.
 pub use catalog::indicator_key;
 
-// Strategies — taxonomy of events / conditions / composition / shapes / spec.
-// Pure types, no runtime. Consumers (mlq, mlc) build their own detectors,
-// engines, and codegen on top of these.
-pub mod strategies;
+// Core event/condition/composition glue — нужно и MLQ оптимайзеру, и MLC чарту.
+pub mod core;
 
 // Convenience re-exports
 pub use bar_indicators::{
@@ -41,14 +38,14 @@ pub use catalog::{
 
 pub use types::{Bar, Tick, CalendarService, TimeService};
 
-// Strategy / event taxonomy re-exports
-pub use strategies::events::{
+// Event taxonomy re-exports
+pub use core::events::{
     SignalKind, SignalCategory,
     ThresholdSub, HistogramSub, ChannelSub, DivergenceSub, TrendSub,
     VolatilitySub, VolumeSub, StructureSub, PatternSub, CompositeSub,
     Direction, SignalSource, BarConfirmation,
 };
-pub use strategies::conditions::{
+pub use core::conditions::{
     ThresholdCondition, CrossoverType, CompareCondition, TrendCondition,
     DivergenceType, ChannelPosition, PatternState, CandlePattern,
     VolatilityRegime, VolumeCharacter, LogicOp, ConfirmationRequirement,

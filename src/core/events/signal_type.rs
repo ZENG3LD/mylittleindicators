@@ -4,8 +4,8 @@
 //! an event to the semantic `SignalType` used by the backtester for
 //! recording and filtering.
 
-use crate::strategies::events::operator::OperatorClass;
-use crate::strategies::shapes::role_kind::RoleKind;
+use crate::core::events::operator::OperatorClass;
+use crate::core::shapes::role_kind::RoleKind;
 
 use serde::{Deserialize, Serialize};
 

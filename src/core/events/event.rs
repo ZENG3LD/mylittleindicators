@@ -4,14 +4,11 @@
 //! breach, candle pattern, etc.) that can be composed into buy/sell logic
 //! via `CompositionSpec`.
 
-// validation moved to crate::strategies::composition::validation
-// signal_type moved to crate::strategies::events::signal_type
-
-use crate::strategies::events::operator::OperatorClass;
-use crate::strategies::events::operand::Operand;
-use crate::strategies::events::event_direction::EventDirection;
-use crate::strategies::events::window::Window;
-use crate::strategies::composition::guard::Guard;
+use crate::core::events::operator::OperatorClass;
+use crate::core::events::operand::Operand;
+use crate::core::events::event_direction::EventDirection;
+use crate::core::events::window::Window;
+use crate::core::composition::guard::Guard;
 
 /// Zone bounds for `ZoneEnter` / `ZoneExit` operator classes.
 ///

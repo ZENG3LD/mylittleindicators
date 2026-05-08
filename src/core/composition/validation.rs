@@ -3,10 +3,10 @@
 //! Call `validate_event` before storing or generating code from an event.
 //! Call `validate_composition` on the root of a `buy_when` / `sell_when` tree.
 
-use crate::strategies::composition::spec::CompositionSpec;
-use crate::strategies::events::operator::OperatorClass;
-use crate::strategies::events::window::Window;
-use crate::strategies::events::event::Event;
+use crate::core::composition::spec::CompositionSpec;
+use crate::core::events::operator::OperatorClass;
+use crate::core::events::window::Window;
+use crate::core::events::event::Event;
 
 /// Validate an `Event` against the operand / structure rules for its
 /// `operator_class`.

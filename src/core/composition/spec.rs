@@ -1,6 +1,6 @@
 //! Composition axis — how multiple events combine into a signal condition.
 
-use crate::strategies::events::event::Event;
+use crate::core::events::event::Event;
 
 /// Recursive composition of event conditions.
 ///
