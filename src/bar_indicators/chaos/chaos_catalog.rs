@@ -7,6 +7,7 @@ use crate::catalog::{
     IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
     IndicatorRoleKind,
 };
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -50,6 +51,7 @@ pub fn signature_chaos_oscillator() -> IndicatorSignature {
         .metadata("interpretation", "0.0 = ordered market, 1.0 = maximum chaos")
         .machine_id(BarIndicatorId::ChaosOsc) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
         // Note: "CHAOS_OSC" is already the main ID, no need for alias
         .alias("ChaosOsc")
@@ -100,6 +102,7 @@ pub fn signature_dfa() -> IndicatorSignature {
         .metadata("interpretation", "alpha < 0.5 = anti-persistent, 0.5 = random walk, > 0.5 = persistent")
         .machine_id(BarIndicatorId::Dfa)
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 2.0)
         // Note: "DFA" is already the main ID, no need for alias
         .alias("Dfa")
@@ -151,6 +154,7 @@ pub fn signature_dfa_percentile() -> IndicatorSignature {
         .metadata("interpretation", "Percentile rank of current DFA alpha in recent history")
         .machine_id(BarIndicatorId::DfaPct) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
         // Note: "DFA_PCT" is already the main ID, no need for alias
         .alias("DfaPct")
@@ -181,6 +185,7 @@ pub fn signature_fractal_dimension() -> IndicatorSignature {
         .metadata("interpretation", "1.0 = strong trend, 1.5 = random walk, 2.0 = maximum noise")
         .machine_id(BarIndicatorId::FractalDim) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(1.0, 2.0)
         // Note: "FRACTAL_DIM" is already the main ID, no need for alias
         .alias("FractalDim")
@@ -204,6 +209,7 @@ pub fn signature_hurst_exponent() -> IndicatorSignature {
         .metadata("interpretation", "< 0.5 = mean reversion, 0.5 = random walk, > 0.5 = trending")
         .machine_id(BarIndicatorId::Hurst) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
         // Note: "HURST" is already the main ID, no need for alias
         .alias("Hurst")
@@ -234,6 +240,7 @@ pub fn signature_hurst_percentile() -> IndicatorSignature {
         .metadata("interpretation", "Percentile rank of current Hurst exponent in recent history")
         .machine_id(BarIndicatorId::HurstPct) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
         // Note: "HURST_PCT" is already the main ID, no need for alias
         .alias("HurstPct")
@@ -258,6 +265,7 @@ pub fn signature_williams_alligator() -> IndicatorSignature {
         .metadata("interpretation", "Aligned lines = trend, intertwined = range")
         .machine_id(BarIndicatorId::Alligator)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Triple)
         // Note: "ALLIGATOR" is already the main ID, no need for alias
         .alias("Alligator")
         .alias("alligator")
@@ -281,6 +289,7 @@ pub fn signature_williams_awesome_oscillator() -> IndicatorSignature {
         .metadata("interpretation", "Positive = bullish momentum, negative = bearish momentum")
         .machine_id(BarIndicatorId::Ao) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "AO" is already the main ID, no need for alias
         .alias("Ao")
         .alias("ao")
@@ -303,6 +312,7 @@ pub fn signature_williams_ac() -> IndicatorSignature {
         .metadata("interpretation", "Positive = acceleration, negative = deceleration")
         .machine_id(BarIndicatorId::Ac) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "AC" is already the main ID, no need for alias
         .alias("Ac")
         .alias("ac")
@@ -325,6 +335,7 @@ pub fn signature_williams_mfi() -> IndicatorSignature {
         .metadata("bar_types", "Green=acceleration, Fade=deceleration, Fake=false breakout, Squat=accumulation")
         .machine_id(BarIndicatorId::WilliamsMfi) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "WILLIAMS_MFI" is already the main ID, no need for alias
         .alias("WilliamsMfi")
         .alias("williams_mfi")
@@ -347,6 +358,7 @@ pub fn signature_williams_fractals() -> IndicatorSignature {
         .metadata("interpretation", "Up fractal = potential resistance, down fractal = potential support")
         .machine_id(BarIndicatorId::Fractals) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::DoubleFlag)
         // Note: "FRACTALS" is already the main ID, no need for alias
         .alias("Fractals")
         .alias("fractals")

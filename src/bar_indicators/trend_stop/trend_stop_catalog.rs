@@ -8,6 +8,7 @@ use crate::catalog::{
     IndicatorRoleKind,
 };
 use crate::bar_indicators::average::moving_average::MovingAverageType;
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -31,6 +32,7 @@ pub fn signature_atr_trailing_stop() -> IndicatorSignature {
         .metadata("complexity", "O(1)")
         .machine_id(BarIndicatorId::Atrts) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "ATRTS" is already the main ID, no need for alias
         .alias("Atrts")
         .alias("atrts")
@@ -54,6 +56,7 @@ pub fn signature_chandelier_stop() -> IndicatorSignature {
         .metadata("author", "Chuck LeBeau")
         .machine_id(BarIndicatorId::Chand) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "CHAND" is already the main ID, no need for alias
         .alias("Chand")
         .alias("chand")
@@ -102,6 +105,7 @@ pub fn signature_chande_kroll_stop() -> IndicatorSignature {
         .metadata("author", "Tushar Chande and Stanley Kroll")
         .machine_id(BarIndicatorId::Cks) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "CKS" is already the main ID, no need for alias
         .alias("Cks")
         .alias("cks")
@@ -148,6 +152,7 @@ pub fn signature_donchian_stop() -> IndicatorSignature {
         .metadata("author", "Richard Donchian")
         .machine_id(BarIndicatorId::Dons) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "DONS" is already the main ID, no need for alias
         .alias("Dons")
         .alias("dons")
@@ -170,6 +175,7 @@ pub fn signature_donchian_breakout() -> IndicatorSignature {
         .metadata("output", "[-1, 0, 1]")
         .machine_id(BarIndicatorId::Donbo) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::Signal)
         // Note: "DONBO" is already the main ID, no need for alias
         .alias("Donbo")
         .alias("donbo")
@@ -197,6 +203,7 @@ pub fn signature_keltner_stop() -> IndicatorSignature {
         .metadata("atr_ma_desc", "ATR smoothing MA type")
         .machine_id(BarIndicatorId::Kelts) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "KELTS" is already the main ID, no need for alias
         .alias("Kelts")
         .alias("kelts")
@@ -239,6 +246,7 @@ pub fn signature_psar_stop() -> IndicatorSignature {
         .metadata("type", "parabolic")
         .machine_id(BarIndicatorId::Psars) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "PSARS" is already the main ID, no need for alias
         .alias("Psars")
         .alias("psars")
@@ -262,6 +270,7 @@ pub fn signature_supertrend_stop() -> IndicatorSignature {
         .metadata("complexity", "O(1)")
         .machine_id(BarIndicatorId::Supts) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "SUPTS" is already the main ID, no need for alias
         .alias("Supts")
         .alias("supts")
@@ -308,6 +317,7 @@ pub fn signature_swing_stop() -> IndicatorSignature {
         .metadata("type", "swing")
         .machine_id(BarIndicatorId::TsSwings)
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "TS_SWINGS" is already the main ID, no need for alias
         .alias("TsSwings")
         .alias("ts_swings")
@@ -340,6 +350,7 @@ pub fn signature_volatility_stop() -> IndicatorSignature {
         .metadata("volatility_types", "0=StandardDeviation, 1=ATR, 2=Range")
         .machine_id(BarIndicatorId::Volts) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "VOLTS" is already the main ID, no need for alias
         .alias("Volts")
         .alias("volts")
@@ -363,6 +374,7 @@ pub fn signature_volatility_stop_atr() -> IndicatorSignature {
         .metadata("volatility_measure", "ATR")
         .machine_id(BarIndicatorId::VoltsAtr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "VOLTS_ATR" is already the main ID, no need for alias
         .alias("VoltsAtr")
         .alias("volts_atr")

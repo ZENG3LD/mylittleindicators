@@ -6,6 +6,7 @@
 use crate::catalog::{
     IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue, IndicatorRoleKind,
 };
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -48,6 +49,7 @@ pub fn signature_arima() -> IndicatorSignature {
         .metadata("min_observations", "30+")
         .machine_id(BarIndicatorId::Arima)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "ARIMA" is already the main ID, no need for alias
         .alias("Arima")
         .alias("arima")
@@ -91,6 +93,7 @@ pub fn signature_arimax() -> IndicatorSignature {
         .metadata("min_observations", "30+")
         .machine_id(BarIndicatorId::Arimax) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "ARIMAX" is already the main ID, no need for alias
         .alias("Arimax")
         .alias("arimax")
@@ -122,6 +125,7 @@ pub fn signature_egarch() -> IndicatorSignature {
         .metadata("author", "Nelson (1991)")
         .machine_id(BarIndicatorId::Egarch) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "EGARCH" is already the main ID, no need for alias
         .alias("Egarch")
         .alias("egarch")
@@ -152,6 +156,7 @@ pub fn signature_garch() -> IndicatorSignature {
         .metadata("min_observations", "50+")
         .machine_id(BarIndicatorId::Garch)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "GARCH" is already the main ID, no need for alias
         .alias("Garch")
         .alias("garch")
@@ -175,6 +180,7 @@ pub fn signature_polynomial_regression() -> IndicatorSignature {
         .metadata("min_observations", "10+")
         .machine_id(BarIndicatorId::PolyReg) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "POLY_REG" is already the main ID, no need for alias
         .alias("PolyReg")
         .alias("poly_reg")
@@ -212,6 +218,7 @@ pub fn signature_var() -> IndicatorSignature {
         .metadata("author", "Sims (1980)")
         .machine_id(BarIndicatorId::Var)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "VAR" is already the main ID, no need for alias
         .alias("Var")
         .alias("var")

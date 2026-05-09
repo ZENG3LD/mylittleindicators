@@ -8,6 +8,7 @@ use crate::catalog::{
     IndicatorRoleKind,
 };
 use crate::bar_indicators::average::moving_average::MovingAverageType;
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
 use super::super::bar_indicator_id::BarIndicatorId;
 
@@ -30,6 +31,7 @@ pub fn signature_adaptive_bollinger_bands() -> IndicatorSignature {
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .machine_id(BarIndicatorId::Abb) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ABB" is already the main ID, no need for alias
         .alias("Abb")
@@ -51,6 +53,7 @@ pub fn signature_adaptive_volatility_regime() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .machine_id(BarIndicatorId::Avr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "AVR" is already the main ID, no need for alias
         .alias("Avr")
@@ -76,6 +79,7 @@ pub fn signature_atr() -> IndicatorSignature {
         .metadata("note", "Traditionally uses Simple MA, but can optimize with any type")
         .machine_id(BarIndicatorId::Atr)
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ATR" is already the main ID, no need for alias
         .alias("Atr")
@@ -98,6 +102,7 @@ pub fn signature_atr_bandwidth() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::RMA))
         .machine_id(BarIndicatorId::Atrbw) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ATRBW" is already the main ID, no need for alias
         .alias("Atrbw")
@@ -120,6 +125,7 @@ pub fn signature_atr_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::multiplier(0.5, 10.0, 2.0))
         .machine_id(BarIndicatorId::Atrc) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Channel3)
         .validated()
         // Note: "ATRC" is already the main ID, no need for alias
         .alias("Atrc")
@@ -142,6 +148,7 @@ pub fn signature_atr_percentile() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::RMA))
         .machine_id(BarIndicatorId::Atrp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ATRP" is already the main ID, no need for alias
         .alias("Atrp")
@@ -170,6 +177,7 @@ pub fn signature_atr_percentile_trend() -> IndicatorSignature {
         )
         .machine_id(BarIndicatorId::Atrpt) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ATRPT" is already the main ID, no need for alias
         .alias("Atrpt")
@@ -192,6 +200,7 @@ pub fn signature_atr_zscore() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::RMA))
         .machine_id(BarIndicatorId::Atrz) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ATRZ" is already the main ID, no need for alias
         .alias("Atrz")
@@ -214,6 +223,7 @@ pub fn signature_bipower_variance() -> IndicatorSignature {
         .metadata("category", "realized_volatility")
         .machine_id(BarIndicatorId::Bpv) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "BPV" is already the main ID, no need for alias
         .alias("Bpv")
@@ -246,6 +256,7 @@ pub fn signature_chaikin_volatility() -> IndicatorSignature {
         .metadata("ma_note", "Original default: EMA")
         .machine_id(BarIndicatorId::Cv) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "CV" is already the main ID, no need for alias
         .alias("Cv")
@@ -268,6 +279,7 @@ pub fn signature_choppiness_index() -> IndicatorSignature {
         .metadata("range", "0-100")
         .machine_id(BarIndicatorId::Chop) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 100.0)
         .default_thresholds(38.2, 61.8)
         .validated()
@@ -291,6 +303,7 @@ pub fn signature_close_to_close_vol_percentile() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(10, 200, 20))
         .machine_id(BarIndicatorId::C2cvp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "C2CVP" is already the main ID, no need for alias
         .alias("C2cvp")
@@ -312,6 +325,7 @@ pub fn signature_dc() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .machine_id(BarIndicatorId::VoDc)
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Triple)
         .validated()
         // Note: "VO_DC" is already the main ID, no need for alias
         .alias("VoDc")
@@ -333,6 +347,7 @@ pub fn signature_dynamic_volatility_regime() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(10, 100, 20))
         .machine_id(BarIndicatorId::Dvr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "DVR" is already the main ID, no need for alias
         .alias("Dvr")
@@ -354,6 +369,7 @@ pub fn signature_fuzzy() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 14))
         .machine_id(BarIndicatorId::Fuzzy) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::FuzzyCandle)
         .validated()
         // Note: "FUZZY" is already the main ID, no need for alias
         .alias("Fuzzy")
@@ -376,6 +392,7 @@ pub fn signature_har_rv() -> IndicatorSignature {
         .metadata("category", "realized_volatility")
         .machine_id(BarIndicatorId::Har) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "HAR" is already the main ID, no need for alias
         .alias("Har")
@@ -397,6 +414,7 @@ pub fn signature_hv_c2c() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(10, 200, 20))
         .machine_id(BarIndicatorId::Hvc2c) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "HVC2C" is already the main ID, no need for alias
         .alias("Hvc2c")
@@ -419,6 +437,7 @@ pub fn signature_kc() -> IndicatorSignature {
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .machine_id(BarIndicatorId::VoKc)
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Channel3)
         .validated()
         // Note: "VO_KC" is already the main ID, no need for alias
         .alias("VoKc")
@@ -447,6 +466,7 @@ pub fn signature_kp() -> IndicatorSignature {
         )
         .machine_id(BarIndicatorId::Kp)
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "KP" is already the main ID, no need for alias
         .alias("Kp")
@@ -475,6 +495,7 @@ pub fn signature_mass_index() -> IndicatorSignature {
         )
         .machine_id(BarIndicatorId::VoMi)
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "VO_MI" is already the main ID, no need for alias
         .alias("VoMi")
@@ -496,6 +517,7 @@ pub fn signature_natr() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::Natr)
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "NATR" is already the main ID, no need for alias
         .alias("Natr")
@@ -517,6 +539,7 @@ pub fn signature_nr_range() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(4, 20, 7))
         .machine_id(BarIndicatorId::Nr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "NR" is already the main ID, no need for alias
         .alias("Nr")
@@ -539,6 +562,7 @@ pub fn signature_park_gk_rs_yz() -> IndicatorSignature {
         .metadata("category", "realized_volatility")
         .machine_id(BarIndicatorId::Pgry) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "PGRY" is already the main ID, no need for alias
         .alias("Pgry")
@@ -567,6 +591,7 @@ pub fn signature_range_compression_burst() -> IndicatorSignature {
         )
         .machine_id(BarIndicatorId::Rcb) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RCB" is already the main ID, no need for alias
         .alias("Rcb")
@@ -588,6 +613,7 @@ pub fn signature_range_percentile() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(10, 200, 50))
         .machine_id(BarIndicatorId::Rp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RP" is already the main ID, no need for alias
         .alias("Rp")
@@ -610,6 +636,7 @@ pub fn signature_rbv_jump_test() -> IndicatorSignature {
         .metadata("category", "jump_detection")
         .machine_id(BarIndicatorId::Rbvj) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RBVJ" is already the main ID, no need for alias
         .alias("Rbvj")
@@ -632,6 +659,7 @@ pub fn signature_realized_quarticity() -> IndicatorSignature {
         .metadata("category", "realized_volatility")
         .machine_id(BarIndicatorId::Rq) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RQ" is already the main ID, no need for alias
         .alias("Rq")
@@ -654,6 +682,7 @@ pub fn signature_realized_vol() -> IndicatorSignature {
         .metadata("category", "realized_volatility")
         .machine_id(BarIndicatorId::Rv) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RV" is already the main ID, no need for alias
         .alias("Rv")
@@ -675,6 +704,7 @@ pub fn signature_realized_vol_zscore() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(10, 200, 20))
         .machine_id(BarIndicatorId::Rvz) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RVZ" is already the main ID, no need for alias
         .alias("Rvz")
@@ -705,6 +735,7 @@ pub fn signature_rvi() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .machine_id(BarIndicatorId::Rvi)
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RVI" is already the main ID, no need for alias
         .alias("Rvi")
@@ -734,6 +765,7 @@ pub fn signature_squeeze_momentum() -> IndicatorSignature {
         .metadata("author", "John Carter")
         .machine_id(BarIndicatorId::Sqmom) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::ValueFlag)
         .validated()
         // Note: "SQMOM" is already the main ID, no need for alias
         .alias("Sqmom")
@@ -756,6 +788,7 @@ pub fn signature_true_range() -> IndicatorSignature {
         .metadata("parameters", "none")
         .machine_id(BarIndicatorId::Tr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "TR" is already the main ID, no need for alias
         .alias("Tr")
@@ -778,6 +811,7 @@ pub fn signature_ulcer_index() -> IndicatorSignature {
         .metadata("category", "downside_risk")
         .machine_id(BarIndicatorId::Ui) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "UI" is already the main ID, no need for alias
         .alias("Ui")
@@ -806,6 +840,7 @@ pub fn signature_vol_of_vol() -> IndicatorSignature {
         )
         .machine_id(BarIndicatorId::Vov) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "VOV" is already the main ID, no need for alias
         .alias("Vov")
@@ -827,6 +862,7 @@ pub fn signature_vol_of_vol_percentile() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(10, 100, 50))
         .machine_id(BarIndicatorId::Vovp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "VOVP" is already the main ID, no need for alias
         .alias("Vovp")
@@ -855,6 +891,7 @@ pub fn signature_vol_of_vol_percentile_trend() -> IndicatorSignature {
         )
         .machine_id(BarIndicatorId::Vovpt) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "VOVPT" is already the main ID, no need for alias
         .alias("Vovpt")
@@ -883,6 +920,7 @@ pub fn signature_volatility_break_exp() -> IndicatorSignature {
         )
         .machine_id(BarIndicatorId::Vbexp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "VBEXP" is already the main ID, no need for alias
         .alias("Vbexp")
@@ -911,6 +949,7 @@ pub fn signature_volatility_breakout_detector() -> IndicatorSignature {
         )
         .machine_id(BarIndicatorId::Vbd) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Signal)
         .validated()
         // Note: "VBD" is already the main ID, no need for alias
         .alias("Vbd")
@@ -946,6 +985,7 @@ pub fn signature_volatility_percentile_rank_bands() -> IndicatorSignature {
         )
         .machine_id(BarIndicatorId::Vprb) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Channel3)
         .validated()
         // Note: "VPRB" is already the main ID, no need for alias
         .alias("Vprb")
@@ -980,6 +1020,7 @@ pub fn signature_vr() -> IndicatorSignature {
         )
         .machine_id(BarIndicatorId::VoVr)
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "VO_VR" is already the main ID, no need for alias
         .alias("VoVr")
@@ -1002,6 +1043,7 @@ pub fn signature_wvf() -> IndicatorSignature {
         .metadata("author", "Larry Williams")
         .machine_id(BarIndicatorId::Wvf)
         .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "WVF" is already the main ID, no need for alias
         .alias("Wvf")

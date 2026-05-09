@@ -7,6 +7,7 @@ use crate::catalog::{
     IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
     IndicatorRoleKind,
 };
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -29,6 +30,7 @@ pub fn signature_adf_proxy() -> IndicatorSignature {
         .metadata("null_hypothesis", "unit root (non-stationary)")
         .machine_id(BarIndicatorId::Adf) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ADF" is already the main ID, no need for alias
         .alias("Adf")
@@ -52,6 +54,7 @@ pub fn signature_kpss_proxy() -> IndicatorSignature {
         .metadata("null_hypothesis", "stationary")
         .machine_id(BarIndicatorId::Kpss) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "KPSS" is already the main ID, no need for alias
         .alias("Kpss")
@@ -75,6 +78,7 @@ pub fn signature_kpss_trend_proxy() -> IndicatorSignature {
         .metadata("trend", "true")
         .machine_id(BarIndicatorId::KpssTrend) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "KPSS_TREND" is already the main ID, no need for alias
         .alias("KpssTrend")
@@ -97,6 +101,7 @@ pub fn signature_kpss_z_proxy() -> IndicatorSignature {
         .metadata("test_type", "stationarity")
         .machine_id(BarIndicatorId::KpssZ) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "KPSS_Z" is already the main ID, no need for alias
         .alias("KpssZ")
@@ -120,6 +125,7 @@ pub fn signature_adf_kpss_composite() -> IndicatorSignature {
         .metadata("composite", "true")
         .machine_id(BarIndicatorId::AdfKpss) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ADF_KPSS" is already the main ID, no need for alias
         .alias("AdfKpss")
@@ -142,6 +148,7 @@ pub fn signature_phillips_perron_proxy() -> IndicatorSignature {
         .metadata("test_type", "stationarity")
         .machine_id(BarIndicatorId::Pp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "PP" is already the main ID, no need for alias
         .alias("Pp")
@@ -164,6 +171,7 @@ pub fn signature_zivot_andrews_proxy() -> IndicatorSignature {
         .metadata("test_type", "structural_break")
         .machine_id(BarIndicatorId::Za) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ZA" is already the main ID, no need for alias
         .alias("Za")
@@ -192,6 +200,7 @@ pub fn signature_arch_lm_proxy() -> IndicatorSignature {
         .metadata("test_type", "heteroskedasticity")
         .machine_id(BarIndicatorId::ArchLm) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ARCH_LM" is already the main ID, no need for alias
         .alias("ArchLm")
@@ -215,6 +224,7 @@ pub fn signature_arch_lm_pvalue_proxy() -> IndicatorSignature {
         .metadata("output", "p-value")
         .machine_id(BarIndicatorId::ArchLmPval) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
         .validated()
         // Note: "ARCH_LM_PVAL" is already the main ID, no need for alias
@@ -244,6 +254,7 @@ pub fn signature_ljung_box() -> IndicatorSignature {
         .metadata("test_type", "autocorrelation")
         .machine_id(BarIndicatorId::LjungBox)
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "LJUNG_BOX" is already the main ID, no need for alias
         .alias("LjungBox")
@@ -272,6 +283,7 @@ pub fn signature_pacf() -> IndicatorSignature {
         .metadata("test_type", "autocorrelation")
         .machine_id(BarIndicatorId::Pacf)
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(-1.0, 1.0)
         .validated()
         // Note: "PACF" is already the main ID, no need for alias
@@ -295,6 +307,7 @@ pub fn signature_engle_granger_proxy() -> IndicatorSignature {
         .metadata("test_type", "cointegration")
         .machine_id(BarIndicatorId::EgCoint) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "EG_COINT" is already the main ID, no need for alias
         .alias("EgCoint")
@@ -317,6 +330,7 @@ pub fn signature_engle_granger_adf_proxy() -> IndicatorSignature {
         .metadata("test_type", "cointegration")
         .machine_id(BarIndicatorId::EgAdf) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Double)
         .validated()
         // Note: "EG_ADF" is already the main ID, no need for alias
         .alias("EgAdf")
@@ -340,6 +354,7 @@ pub fn signature_engle_granger_trend_proxy() -> IndicatorSignature {
         .metadata("trend", "true")
         .machine_id(BarIndicatorId::EgTrend) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "EG_TREND" is already the main ID, no need for alias
         .alias("EgTrend")
@@ -362,6 +377,7 @@ pub fn signature_cointegration_proxy() -> IndicatorSignature {
         .metadata("test_type", "cointegration")
         .machine_id(BarIndicatorId::Coint) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "COINT" is already the main ID, no need for alias
         .alias("Coint")
@@ -384,6 +400,7 @@ pub fn signature_half_life_mr() -> IndicatorSignature {
         .metadata("test_type", "mean_reversion")
         .machine_id(BarIndicatorId::HalfLifeMr)
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "HALF_LIFE_MR" is already the main ID, no need for alias
         .alias("HalfLifeMr")
@@ -407,6 +424,7 @@ pub fn signature_residual_stationarity() -> IndicatorSignature {
         .metadata("residual_based", "true")
         .machine_id(BarIndicatorId::ResidStat) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RESID_STAT" is already the main ID, no need for alias
         .alias("ResidStat")
@@ -435,6 +453,7 @@ pub fn signature_variance_ratio() -> IndicatorSignature {
         .metadata("test_type", "random_walk")
         .machine_id(BarIndicatorId::Vr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "VR" is already the main ID, no need for alias
         .alias("Vr")
@@ -458,6 +477,7 @@ pub fn signature_variance_ratio_aggregate() -> IndicatorSignature {
         .metadata("aggregate", "true")
         .machine_id(BarIndicatorId::VrAgg) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "VR_AGG" is already the main ID, no need for alias
         .alias("VrAgg")
@@ -481,6 +501,7 @@ pub fn signature_variance_ratio_z_aggregate() -> IndicatorSignature {
         .metadata("output", "z-statistic")
         .machine_id(BarIndicatorId::VrZAgg) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "VR_Z_AGG" is already the main ID, no need for alias
         .alias("VrZAgg")
@@ -503,6 +524,7 @@ pub fn signature_cusum_break_detector() -> IndicatorSignature {
         .metadata("test_type", "structural_break")
         .machine_id(BarIndicatorId::StCusum)
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Signal)
         .validated()
         // Note: "ST_CUSUM" is already the main ID, no need for alias
         .alias("StCusum")
@@ -526,6 +548,7 @@ pub fn signature_bai_perron_cusum() -> IndicatorSignature {
         .metadata("multiple_breaks", "true")
         .machine_id(BarIndicatorId::BpCusum) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "BP_CUSUM" is already the main ID, no need for alias
         .alias("BpCusum")
@@ -548,6 +571,7 @@ pub fn signature_price_volume_coherence_proxy() -> IndicatorSignature {
         .metadata("test_type", "coherence")
         .machine_id(BarIndicatorId::PvCoherence) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
         .validated()
         // Note: "PV_COHERENCE" is already the main ID, no need for alias
@@ -571,6 +595,7 @@ pub fn signature_price_zscore() -> IndicatorSignature {
         .metadata("test_type", "normalization")
         .machine_id(BarIndicatorId::PriceZscore) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "PRICE_ZSCORE" is already the main ID, no need for alias
         .alias("PriceZscore")
@@ -593,6 +618,7 @@ pub fn signature_r_squared() -> IndicatorSignature {
         .metadata("test_type", "goodness_of_fit")
         .machine_id(BarIndicatorId::RSquared) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
         .validated()
         // Note: "R_SQUARED" is already the main ID, no need for alias

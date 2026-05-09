@@ -7,6 +7,7 @@
 use crate::catalog::{
     IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue, IndicatorRoleKind,
 };
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -50,6 +51,7 @@ pub fn signature_zigzag_atr() -> IndicatorSignature {
         .metadata("uses_atr", "true")
         .machine_id(BarIndicatorId::ZigzagAtr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Level)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "ZIGZAG_ATR" is already the main ID, no need for alias
         .alias("ZigzagAtr")
         .alias("zigzag_atr")
@@ -78,6 +80,7 @@ pub fn signature_zigzag_candle() -> IndicatorSignature {
         .metadata("method", "candle_pattern")
         .machine_id(BarIndicatorId::ZigzagCandle) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Level)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "ZIGZAG_CANDLE" is already the main ID, no need for alias
         .alias("ZigzagCandle")
         .alias("zigzag_candle")
@@ -111,6 +114,7 @@ pub fn signature_zigzag_classic() -> IndicatorSignature {
         .metadata("note", "Either threshold_percent or threshold_abs can be used")
         .machine_id(BarIndicatorId::ZigzagClassic) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Level)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "ZIGZAG_CLASSIC" is already the main ID, no need for alias
         .alias("ZigzagClassic")
         .alias("zigzag_classic")
@@ -139,6 +143,7 @@ pub fn signature_zigzag_lookahead() -> IndicatorSignature {
         .metadata("note", "Introduces lag due to confirmation period")
         .machine_id(BarIndicatorId::ZigzagLookahead) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Level)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "ZIGZAG_LOOKAHEAD" is already the main ID, no need for alias
         .alias("ZigzagLookahead")
         .alias("zigzag_lookahead")
@@ -167,6 +172,7 @@ pub fn signature_zigzag_time() -> IndicatorSignature {
         .metadata("method", "time_based")
         .machine_id(BarIndicatorId::ZigzagTime) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Level)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "ZIGZAG_TIME" is already the main ID, no need for alias
         .alias("ZigzagTime")
         .alias("zigzag_time")

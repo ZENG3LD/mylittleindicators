@@ -8,6 +8,7 @@ use crate::catalog::{
     IndicatorRoleKind,
 };
 use crate::bar_indicators::average::moving_average::MovingAverageType;
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -29,6 +30,7 @@ pub fn signature_adx_slope() -> IndicatorSignature {
         .metadata("based_on", "ADX")
         .machine_id(BarIndicatorId::AdxSlope)
         .role_kind(IndicatorRoleKind::Regime)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ADX_SLOPE" is already the main ID, no need for alias
         .alias("AdxSlope")
@@ -72,6 +74,7 @@ pub fn signature_didi_index() -> IndicatorSignature {
         .metadata("ma_note", "Original default: EMA")
         .machine_id(BarIndicatorId::Didi) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Regime)
+        .output_kind(IndicatorValueKind::Double)
         .validated()
         // Note: "DIDI" is already the main ID, no need for alias
         .alias("Didi")
@@ -95,6 +98,7 @@ pub fn signature_efficiency_ratio() -> IndicatorSignature {
         .metadata("range", "0-1")
         .machine_id(BarIndicatorId::TrEr)
         .role_kind(IndicatorRoleKind::Regime)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "TR_ER" is already the main ID, no need for alias
         .alias("TrEr")
@@ -117,6 +121,7 @@ pub fn signature_ehlers_instantaneous_trendline() -> IndicatorSignature {
         .metadata("author", "John Ehlers")
         .machine_id(BarIndicatorId::Eit) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "EIT" is already the main ID, no need for alias
         .alias("Eit")
@@ -139,6 +144,7 @@ pub fn signature_gann_hilo_activator() -> IndicatorSignature {
         .metadata("author", "W.D. Gann")
         .machine_id(BarIndicatorId::GannHilo) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::ValueFlag)
         .validated()
         // Note: "GANN_HILO" is already the main ID, no need for alias
         .alias("GannHilo")
@@ -164,6 +170,7 @@ pub fn signature_gmma_compression() -> IndicatorSignature {
         .metadata("author", "Daryl Guppy")
         .machine_id(BarIndicatorId::Gmma) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Regime)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "GMMA" is already the main ID, no need for alias
         .alias("Gmma")
@@ -185,6 +192,7 @@ pub fn signature_heikin_ashi_trend() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 100, 5))
         .machine_id(BarIndicatorId::HaTrend) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Regime)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "HA_TREND" is already the main ID, no need for alias
         .alias("HaTrend")
@@ -221,6 +229,7 @@ pub fn signature_kama_slope() -> IndicatorSignature {
         .metadata("based_on", "KAMA")
         .machine_id(BarIndicatorId::KamaSlope) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "KAMA_SLOPE" is already the main ID, no need for alias
         .alias("KamaSlope")
@@ -240,6 +249,7 @@ pub fn signature_lr_slope() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .machine_id(BarIndicatorId::LrSlope) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "LR_SLOPE" is already the main ID, no need for alias
         .alias("LrSlope")
@@ -278,6 +288,7 @@ pub fn signature_ravi() -> IndicatorSignature {
         .metadata("ma_note", "Original default: EMA")
         .machine_id(BarIndicatorId::Ravi)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RAVI" is already the main ID, no need for alias
         .alias("Ravi")
@@ -301,6 +312,7 @@ pub fn signature_slope_direction_line() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .machine_id(BarIndicatorId::Sdl) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SDL" is already the main ID, no need for alias
         .alias("Sdl")
@@ -325,6 +337,7 @@ pub fn signature_ssl_channel() -> IndicatorSignature {
         .metadata("outputs", "ssl_up, ssl_down")
         .machine_id(BarIndicatorId::Ssl) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Channel)
+        .output_kind(IndicatorValueKind::Double)
         .validated()
         // Note: "SSL" is already the main ID, no need for alias
         .alias("Ssl")
@@ -348,6 +361,7 @@ pub fn signature_supertrend() -> IndicatorSignature {
         .metadata("formula", "(High+Low)/2 ± (Multiplier × ATR)")
         .machine_id(BarIndicatorId::Supertrend)
         .role_kind(IndicatorRoleKind::TrendStop)
+        .output_kind(IndicatorValueKind::ValueFlag)
         .validated()
         // Note: "SUPERTREND" is already the main ID, no need for alias
         .alias("Supertrend")
@@ -364,6 +378,7 @@ pub fn signature_trend_intensity_index() -> IndicatorSignature {
         .metadata("range", "0-100")
         .machine_id(BarIndicatorId::Tii) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "TII" is already the main ID, no need for alias
         .alias("Tii")
@@ -386,6 +401,7 @@ pub fn signature_zl_sma() -> IndicatorSignature {
         .metadata("feature", "reduced lag")
         .machine_id(BarIndicatorId::Zlsma) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ZLSMA" is already the main ID, no need for alias
         .alias("Zlsma")

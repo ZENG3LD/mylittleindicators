@@ -6,6 +6,7 @@
 use crate::catalog::{
     IndicatorSignature, IndicatorCategory, IndicatorRoleKind, ParamConstraint, ParamType, ParamValue,
 };
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -28,6 +29,7 @@ pub fn signature_heikin_ashi() -> IndicatorSignature {
         .metadata("complexity", "O(1)")
         .machine_id(BarIndicatorId::Heikinashi) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Candle)
         // Note: "HEIKINASHI" is already the main ID, no need for alias
         .alias("Heikinashi")
         .alias("heikinashi")
@@ -54,6 +56,7 @@ pub fn signature_candle_anatomy() -> IndicatorSignature {
         .metadata("complexity", "O(1)")
         .machine_id(BarIndicatorId::Candleanatomy) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::CandleAnatomy)
         // Note: "CANDLEANATOMY" is already the main ID, no need for alias
         .alias("Candleanatomy")
         .alias("candleanatomy")
@@ -98,6 +101,7 @@ pub fn signature_pattern_recognition() -> IndicatorSignature {
         .metadata("complexity", "O(1) per pattern check")
         .machine_id(BarIndicatorId::Patternrec) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Signal)
         // Note: "PATTERNREC" is already the main ID, no need for alias
         .alias("Patternrec")
         .alias("patternrec")
@@ -121,6 +125,7 @@ pub fn signature_sfp_detector() -> IndicatorSignature {
         .metadata("complexity", "O(1) with ring buffer")
         .machine_id(BarIndicatorId::Sfp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "SFP" is already the main ID, no need for alias
         .alias("Sfp")
         .alias("sfp")
@@ -144,6 +149,7 @@ pub fn signature_wick_spike() -> IndicatorSignature {
         .metadata("complexity", "O(n) per update")
         .machine_id(BarIndicatorId::Wickspike) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "WICKSPIKE" is already the main ID, no need for alias
         .alias("Wickspike")
         .alias("wickspike")
@@ -175,6 +181,7 @@ pub fn signature_doji() -> IndicatorSignature {
         .metadata("signal", "Reversal or continuation")
         .machine_id(BarIndicatorId::Doji) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "DOJI" is already the main ID, no need for alias
         .alias("Doji")
         .alias("doji")
@@ -202,6 +209,7 @@ pub fn signature_hammer() -> IndicatorSignature {
         .metadata("bearish", "Hanging Man at resistance")
         .machine_id(BarIndicatorId::Hammer) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "HAMMER" is already the main ID, no need for alias
         .alias("Hammer")
         .alias("hammer")
@@ -229,6 +237,7 @@ pub fn signature_shooting_star() -> IndicatorSignature {
         .metadata("bullish", "Inverted Hammer at support")
         .machine_id(BarIndicatorId::Shootingstar) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "SHOOTINGSTAR" is already the main ID, no need for alias
         .alias("Shootingstar")
         .alias("shootingstar")
@@ -257,6 +266,7 @@ pub fn signature_engulfing() -> IndicatorSignature {
         .metadata("variants", "Bullish, Bearish")
         .machine_id(BarIndicatorId::Engulfing) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "ENGULFING" is already the main ID, no need for alias
         .alias("Engulfing")
         .alias("engulfing")
@@ -279,6 +289,7 @@ pub fn signature_harami() -> IndicatorSignature {
         .metadata("variants", "Bullish, Bearish")
         .machine_id(BarIndicatorId::Harami) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "HARAMI" is already the main ID, no need for alias
         .alias("Harami")
         .alias("harami")
@@ -307,6 +318,7 @@ pub fn signature_morning_star() -> IndicatorSignature {
         .metadata("variants", "Morning Star, Morning Doji Star")
         .machine_id(BarIndicatorId::Morningstar) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "MORNINGSTAR" is already the main ID, no need for alias
         .alias("Morningstar")
         .alias("morningstar")
@@ -333,6 +345,7 @@ pub fn signature_evening_star() -> IndicatorSignature {
         .metadata("variants", "Evening Star, Evening Doji Star")
         .machine_id(BarIndicatorId::Eveningstar) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "EVENINGSTAR" is already the main ID, no need for alias
         .alias("Eveningstar")
         .alias("eveningstar")
@@ -358,6 +371,7 @@ pub fn signature_three_white_soldiers() -> IndicatorSignature {
         .metadata("signal", "Strong bullish continuation")
         .machine_id(BarIndicatorId::Threewhitesoldiers) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "THREEWHITESOLDIERS" is already the main ID, no need for alias
         .alias("Threewhitesoldiers")
         .alias("threewhitesoldiers")
@@ -383,6 +397,7 @@ pub fn signature_three_black_crows() -> IndicatorSignature {
         .metadata("signal", "Strong bearish continuation")
         .machine_id(BarIndicatorId::Threeblackcrows) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "THREEBLACKCROWS" is already the main ID, no need for alias
         .alias("Threeblackcrows")
         .alias("threeblackcrows")
@@ -408,6 +423,7 @@ pub fn signature_marubozu() -> IndicatorSignature {
         .metadata("variants", "White (bullish), Black (bearish)")
         .machine_id(BarIndicatorId::Marubozu) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "MARUBOZU" is already the main ID, no need for alias
         .alias("Marubozu")
         .alias("marubozu")
@@ -423,6 +439,7 @@ pub fn signature_piercing_pattern() -> IndicatorSignature {
         .metadata("signal", "Bullish reversal")
         .machine_id(BarIndicatorId::Piercingpattern) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "PIERCINGPATTERN" is already the main ID, no need for alias
         .alias("Piercingpattern")
         .alias("piercingpattern")
@@ -442,6 +459,7 @@ pub fn signature_dark_cloud_cover() -> IndicatorSignature {
         .metadata("signal", "Bearish reversal")
         .machine_id(BarIndicatorId::Darkcloudcover) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "DARKCLOUDCOVER" is already the main ID, no need for alias
         .alias("Darkcloudcover")
         .alias("darkcloudcover")
@@ -468,6 +486,7 @@ pub fn signature_tweezer() -> IndicatorSignature {
         .metadata("variants", "Tweezer Top (bearish), Tweezer Bottom (bullish)")
         .machine_id(BarIndicatorId::Tweezer) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Flag)
         // Note: "TWEEZER" is already the main ID, no need for alias
         .alias("Tweezer")
         .alias("tweezer")

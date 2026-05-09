@@ -7,6 +7,7 @@ use crate::catalog::{
     IndicatorSignature, IndicatorCategory, ParamConstraint, IndicatorRoleKind,
 };
 use crate::bar_indicators::average::moving_average::MovingAverageType;
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -30,6 +31,7 @@ pub fn signature_efficiency_ratio() -> IndicatorSignature {
         .metadata("description", "Ratio of net price change to sum of absolute price changes")
         .machine_id(BarIndicatorId::Er) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
         // Note: "ER" is already the main ID, no need for alias
         .alias("Er")
@@ -54,6 +56,7 @@ pub fn signature_efficiency_ratio_ring() -> IndicatorSignature {
         .metadata("implementation", "fixed memory ring buffer")
         .machine_id(BarIndicatorId::ErRing) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
         // Note: "ER_RING" is already the main ID, no need for alias
         .alias("ErRing")
@@ -78,6 +81,7 @@ pub fn signature_range_to_atr() -> IndicatorSignature {
         .metadata("note", "Traditionally uses Wilder MA for ATR, but can optimize with any type")
         .machine_id(BarIndicatorId::RangeAtr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "RANGE_ATR" is already the main ID, no need for alias
         .alias("RangeAtr")
         .alias("range_atr")
@@ -100,6 +104,7 @@ pub fn signature_spread_analyzer() -> IndicatorSignature {
         .metadata("uses_market_data", "bid/ask")
         .machine_id(BarIndicatorId::SpreadAnalyzer)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "SPREAD_ANALYZER" is already the main ID, no need for alias
         .alias("SpreadAnalyzer")
         .alias("spread_analyzer")

@@ -12,6 +12,7 @@ use crate::catalog::{
     IndicatorRoleKind,
 };
 use crate::bar_indicators::average::moving_average::MovingAverageType;
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -34,6 +35,7 @@ pub fn signature_sma() -> IndicatorSignature {
         .metadata("author", "Classic TA")
         .machine_id(BarIndicatorId::Sma)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "SMA" is already the main ID, no need for alias
         .alias("Sma")
         .alias("sma")
@@ -56,6 +58,7 @@ pub fn signature_ema() -> IndicatorSignature {
         .metadata("author", "Classic TA")
         .machine_id(BarIndicatorId::Ema)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "EMA" is already the main ID, no need for alias
         .alias("Ema")
         .alias("ema")
@@ -77,6 +80,7 @@ pub fn signature_wma() -> IndicatorSignature {
         .metadata("max_period", "256")
         .machine_id(BarIndicatorId::Wma)  // Canonical name for optimized WMA
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "WMA" is already the main ID, no need for alias
         .alias("Wma")
         .alias("wma")
@@ -99,6 +103,7 @@ pub fn signature_hma() -> IndicatorSignature {
         .metadata("formula", "WMA(2*WMA(n/2) - WMA(n), sqrt(n))")
         .machine_id(BarIndicatorId::Hma)  // Canonical name for optimized HMA
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "HMA" is already the main ID, no need for alias
         .alias("Hma")
         .alias("hma")
@@ -120,6 +125,7 @@ pub fn signature_dema() -> IndicatorSignature {
         .metadata("formula", "2*EMA - EMA(EMA)")
         .machine_id(BarIndicatorId::Dema)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "DEMA" is already the main ID, no need for alias
         .alias("Dema")
         .alias("dema")
@@ -141,6 +147,7 @@ pub fn signature_tema() -> IndicatorSignature {
         .metadata("formula", "3*EMA - 3*EMA(EMA) + EMA(EMA(EMA))")
         .machine_id(BarIndicatorId::Tema)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "TEMA" is already the main ID, no need for alias
         .alias("Tema")
         .alias("tema")
@@ -163,6 +170,7 @@ pub fn signature_rma() -> IndicatorSignature {
         .metadata("aka", "Wilder's Moving Average")
         .machine_id(BarIndicatorId::Rma)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "RMA" is already the main ID, no need for alias
         .alias("Rma")
         .alias("rma")
@@ -186,6 +194,7 @@ pub fn signature_vwap() -> IndicatorSignature {
         .source_type(SourceType::PriceAndVolume)
         .machine_id(BarIndicatorId::Vwap)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "VWAP" is already the main ID, no need for alias
         .alias("Vwap")
         .alias("vwap")
@@ -207,6 +216,7 @@ pub fn signature_tma() -> IndicatorSignature {
         .metadata("formula", "SMA of SMA")
         .machine_id(BarIndicatorId::Tma)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "TMA" is already the main ID, no need for alias
         .alias("Tma")
         .alias("tma")
@@ -249,6 +259,7 @@ pub fn signature_ama() -> IndicatorSignature {
         .metadata("complexity", "Uses Efficiency Ratio")
         .machine_id(BarIndicatorId::Ama)  // Canonical name for optimized AMA
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "AMA" is already the main ID, no need for alias
         .alias("Ama")
         .alias("ama")
@@ -270,6 +281,7 @@ pub fn signature_frama() -> IndicatorSignature {
         .metadata("author", "John Ehlers")
         .machine_id(BarIndicatorId::AvFrama)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "AV_FRAMA" is already the main ID, no need for alias
         .alias("AvFrama")
         .alias("av_frama")
@@ -292,6 +304,7 @@ pub fn signature_frama_advanced() -> IndicatorSignature {
         .metadata("variant", "advanced")
         .machine_id(BarIndicatorId::Framaadv) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "FRAMAADV" is already the main ID, no need for alias
         .alias("Framaadv")
         .alias("framaadv")
@@ -313,6 +326,7 @@ pub fn signature_lr() -> IndicatorSignature {
         .metadata("aka", "Linear Regression Line")
         .machine_id(BarIndicatorId::Lr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "LR" is already the main ID, no need for alias
         .alias("Lr")
         .alias("lr")
@@ -334,6 +348,7 @@ pub fn signature_ehlers_fractal_adaptive_ma() -> IndicatorSignature {
         .metadata("author", "John Ehlers")
         .machine_id(BarIndicatorId::Ehlersfa) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "EHLERSFA" is already the main ID, no need for alias
         .alias("Ehlersfa")
         .alias("ehlersfa")
@@ -356,6 +371,7 @@ pub fn signature_ehlers_zero_lag_ema() -> IndicatorSignature {
         .metadata("feature", "reduced lag")
         .machine_id(BarIndicatorId::Ehlersz) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "EHLERSZ" is already the main ID, no need for alias
         .alias("Ehlersz")
         .alias("ehlersz")
@@ -389,6 +405,7 @@ pub fn signature_alma() -> IndicatorSignature {
         .metadata("author", "Arnaud Legoux")
         .machine_id(BarIndicatorId::Alma)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "ALMA" is already the main ID, no need for alias
         .alias("Alma")
         .alias("alma")
@@ -416,6 +433,7 @@ pub fn signature_jurik_ma() -> IndicatorSignature {
         .metadata("author", "Mark Jurik")
         .machine_id(BarIndicatorId::Jma) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "JMA" is already the main ID, no need for alias
         .alias("Jma")
         .alias("jma")
@@ -438,6 +456,7 @@ pub fn signature_mcginley_dynamic() -> IndicatorSignature {
         .metadata("feature", "auto-adjusting")
         .machine_id(BarIndicatorId::Mcginley) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "MCGINLEY" is already the main ID, no need for alias
         .alias("Mcginley")
         .alias("mcginley")
@@ -465,6 +484,7 @@ pub fn signature_t3() -> IndicatorSignature {
         .metadata("author", "Tim Tillson")
         .machine_id(BarIndicatorId::T3) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "T3" is already the main ID, no need for alias
         .alias("t3")
         .alias("T3MOVINGAVERAGE")
@@ -484,6 +504,7 @@ pub fn signature_trima() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .machine_id(BarIndicatorId::Trima)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "TRIMA" is already the main ID, no need for alias
         .alias("Trima")
         .alias("trima")
@@ -508,6 +529,7 @@ pub fn signature_vidya() -> IndicatorSignature {
         .metadata("note", "VIDYA uses CMO for volatility and smooths with configurable MA type")
         .machine_id(BarIndicatorId::AvVidya)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "AV_VIDYA" is already the main ID, no need for alias
         .alias("AvVidya")
         .alias("av_vidya")
@@ -530,6 +552,7 @@ pub fn signature_vwma() -> IndicatorSignature {
         .source_type(SourceType::PriceAndVolume)
         .machine_id(BarIndicatorId::Vwma)
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         // Note: "VWMA" is already the main ID, no need for alias
         .alias("Vwma")
         .alias("vwma")

@@ -8,6 +8,7 @@ use crate::catalog::{
     IndicatorRoleKind,
 };
 use crate::bar_indicators::average::moving_average::MovingAverageType;
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -36,6 +37,7 @@ pub fn signature_autocorr() -> IndicatorSignature {
         .metadata("category", "correlation")
         .machine_id(BarIndicatorId::Autocorr)
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "AUTOCORR" is already the main ID, no need for alias
         .alias("Autocorr")
@@ -63,6 +65,7 @@ pub fn signature_butterworth() -> IndicatorSignature {
         .metadata("category", "filter")
         .machine_id(BarIndicatorId::Butter) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "BUTTER" is already the main ID, no need for alias
         .alias("Butter")
@@ -100,6 +103,7 @@ pub fn signature_chebyshev() -> IndicatorSignature {
         .metadata("category", "filter")
         .machine_id(BarIndicatorId::Cheby) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "CHEBY" is already the main ID, no need for alias
         .alias("Cheby")
@@ -128,6 +132,7 @@ pub fn signature_cusum_filter() -> IndicatorSignature {
         .metadata("category", "change_detection")
         .machine_id(BarIndicatorId::Cusum) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "CUSUM" is already the main ID, no need for alias
         .alias("Cusum")
@@ -151,6 +156,7 @@ pub fn signature_cyber_cycle() -> IndicatorSignature {
         .metadata("category", "cycle")
         .machine_id(BarIndicatorId::Cyber) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "CYBER" is already the main ID, no need for alias
         .alias("Cyber")
@@ -174,6 +180,7 @@ pub fn signature_decycler() -> IndicatorSignature {
         .metadata("category", "filter")
         .machine_id(BarIndicatorId::Decyc) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "DECYC" is already the main ID, no need for alias
         .alias("Decyc")
@@ -194,6 +201,7 @@ pub fn signature_ehlers_sinewave() -> IndicatorSignature {
         .metadata("category", "cycle")
         .machine_id(BarIndicatorId::Esine) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Double)
         .validated()
         // Note: "ESINE" is already the main ID, no need for alias
         .alias("Esine")
@@ -217,6 +225,7 @@ pub fn signature_ehlers_super_smoother() -> IndicatorSignature {
         .metadata("category", "filter")
         .machine_id(BarIndicatorId::Ess) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ESS" is already the main ID, no need for alias
         .alias("Ess")
@@ -240,6 +249,7 @@ pub fn signature_fft() -> IndicatorSignature {
         .metadata("complexity", "O(n log n)")
         .machine_id(BarIndicatorId::Fft) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "FFT" is already the main ID, no need for alias
         .alias("Fft")
@@ -269,6 +279,7 @@ pub fn signature_hampel_filter() -> IndicatorSignature {
         .metadata("category", "filter")
         .machine_id(BarIndicatorId::Hampel) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "HAMPEL" is already the main ID, no need for alias
         .alias("Hampel")
@@ -291,6 +302,7 @@ pub fn signature_higher_moments() -> IndicatorSignature {
         .metadata("category", "statistical")
         .machine_id(BarIndicatorId::Hmom) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Double)
         .validated()
         // Note: "HMOM" is already the main ID, no need for alias
         .alias("Hmom")
@@ -313,6 +325,7 @@ pub fn signature_hilbert() -> IndicatorSignature {
         .metadata("category", "transform")
         .machine_id(BarIndicatorId::Hilb) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Other)
+        .output_kind(IndicatorValueKind::Hilbert)
         .validated()
         // Note: "HILB" is already the main ID, no need for alias
         .alias("Hilb")
@@ -336,6 +349,7 @@ pub fn signature_hilbert_dominant_cycle() -> IndicatorSignature {
         .metadata("category", "cycle")
         .machine_id(BarIndicatorId::Hdc) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Other)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "HDC" is already the main ID, no need for alias
         .alias("Hdc")
@@ -371,6 +385,7 @@ pub fn signature_hysteresis_gate() -> IndicatorSignature {
         .metadata("category", "gate")
         .machine_id(BarIndicatorId::Hyst) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Other)
+        .output_kind(IndicatorValueKind::Flag)
         .validated()
         // Note: "HYST" is already the main ID, no need for alias
         .alias("Hyst")
@@ -393,6 +408,7 @@ pub fn signature_lempel_ziv() -> IndicatorSignature {
         .metadata("category", "complexity")
         .machine_id(BarIndicatorId::Lz) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "LZ" is already the main ID, no need for alias
         .alias("Lz")
@@ -415,6 +431,7 @@ pub fn signature_and_gate() -> IndicatorSignature {
         .metadata("operation", "AND")
         .machine_id(BarIndicatorId::Logicand)
         .role_kind(IndicatorRoleKind::Other)
+        .output_kind(IndicatorValueKind::Flag)
         .validated()
         // Note: "LOGICAND" is already the main ID, no need for alias
         .alias("Logicand")
@@ -436,6 +453,7 @@ pub fn signature_or_gate() -> IndicatorSignature {
         .metadata("operation", "OR")
         .machine_id(BarIndicatorId::Logicor)
         .role_kind(IndicatorRoleKind::Other)
+        .output_kind(IndicatorValueKind::Flag)
         .validated()
         // Note: "LOGICOR" is already the main ID, no need for alias
         .alias("Logicor")
@@ -457,6 +475,7 @@ pub fn signature_xor_gate() -> IndicatorSignature {
         .metadata("operation", "XOR")
         .machine_id(BarIndicatorId::Logicxor)
         .role_kind(IndicatorRoleKind::Other)
+        .output_kind(IndicatorValueKind::Flag)
         .validated()
         // Note: "LOGICXOR" is already the main ID, no need for alias
         .alias("Logicxor")
@@ -478,6 +497,7 @@ pub fn signature_sign_combiner() -> IndicatorSignature {
         .metadata("operation", "SignCombiner")
         .machine_id(BarIndicatorId::Logicsign)
         .role_kind(IndicatorRoleKind::Other)
+        .output_kind(IndicatorValueKind::Signal)
         .validated()
         // Note: "LOGICSIGN" is already the main ID, no need for alias
         .alias("Logicsign")
@@ -499,6 +519,7 @@ pub fn signature_market_regime_filter() -> IndicatorSignature {
         .metadata("category", "regime")
         .machine_id(BarIndicatorId::Mrf) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Regime)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "MRF" is already the main ID, no need for alias
         .alias("Mrf")
@@ -521,6 +542,7 @@ pub fn signature_regime_composite() -> IndicatorSignature {
         .metadata("category", "regime")
         .machine_id(BarIndicatorId::Rc) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Regime)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RC" is already the main ID, no need for alias
         .alias("Rc")
@@ -545,6 +567,7 @@ pub fn signature_regime_composite_v2() -> IndicatorSignature {
         .metadata("note", "Uses ATR with configurable MA type (default Wilder)")
         .machine_id(BarIndicatorId::Rc2) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Regime)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RC2" is already the main ID, no need for alias
         .alias("Rc2")
@@ -567,6 +590,7 @@ pub fn signature_regime_composite_v3() -> IndicatorSignature {
         .metadata("category", "regime")
         .machine_id(BarIndicatorId::Rc3) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Regime)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RC3" is already the main ID, no need for alias
         .alias("Rc3")
@@ -589,6 +613,7 @@ pub fn signature_regime_composite_v4() -> IndicatorSignature {
         .metadata("category", "regime")
         .machine_id(BarIndicatorId::Rc4) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Regime)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "RC4" is already the main ID, no need for alias
         .alias("Rc4")
@@ -612,6 +637,7 @@ pub fn signature_roofing_filter() -> IndicatorSignature {
         .metadata("category", "filter")
         .machine_id(BarIndicatorId::Roof) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ROOF" is already the main ID, no need for alias
         .alias("Roof")
@@ -642,6 +668,7 @@ pub fn signature_savitzky_golay() -> IndicatorSignature {
         .metadata("category", "filter")
         .machine_id(BarIndicatorId::Sg) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SG" is already the main ID, no need for alias
         .alias("Sg")
@@ -664,6 +691,7 @@ pub fn signature_spectral_bandpower() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sbp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SBP" is already the main ID, no need for alias
         .alias("Sbp")
@@ -686,6 +714,7 @@ pub fn signature_spectral_bandpower_ratio_hl() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sbprhl) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SBPRHL" is already the main ID, no need for alias
         .alias("Sbprhl")
@@ -708,6 +737,7 @@ pub fn signature_spectral_bandwidth_feature() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sbwf) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SBWF" is already the main ID, no need for alias
         .alias("Sbwf")
@@ -730,6 +760,7 @@ pub fn signature_spectral_centroid_feature() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Scf) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SCF" is already the main ID, no need for alias
         .alias("Scf")
@@ -752,6 +783,7 @@ pub fn signature_spectral_crest() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Screst) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SCREST" is already the main ID, no need for alias
         .alias("Screst")
@@ -781,6 +813,7 @@ pub fn signature_spectral_crest_percentile() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Screstp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SCRESTP" is already the main ID, no need for alias
         .alias("Screstp")
@@ -803,6 +836,7 @@ pub fn signature_spectral_energy_ratio() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Ser) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SER" is already the main ID, no need for alias
         .alias("Ser")
@@ -825,6 +859,7 @@ pub fn signature_spectral_entropy() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sent) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SENT" is already the main ID, no need for alias
         .alias("Sent")
@@ -847,6 +882,7 @@ pub fn signature_spectral_entropy_of_entropy() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sentent) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SENTENT" is already the main ID, no need for alias
         .alias("Sentent")
@@ -869,6 +905,7 @@ pub fn signature_spectral_entropy_rate() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sentr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SENTR" is already the main ID, no need for alias
         .alias("Sentr")
@@ -891,6 +928,7 @@ pub fn signature_spectral_flatness() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sflat) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SFLAT" is already the main ID, no need for alias
         .alias("Sflat")
@@ -920,6 +958,7 @@ pub fn signature_spectral_flatness_percentile() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sflatp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SFLATP" is already the main ID, no need for alias
         .alias("Sflatp")
@@ -942,6 +981,7 @@ pub fn signature_spectral_flux_proxy() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sflux) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SFLUX" is already the main ID, no need for alias
         .alias("Sflux")
@@ -964,6 +1004,7 @@ pub fn signature_spectral_high_mid_power_ratio() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Shmpr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SHMPR" is already the main ID, no need for alias
         .alias("Shmpr")
@@ -986,6 +1027,7 @@ pub fn signature_spectral_low_mid_power_ratio() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Slmpr) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SLMPR" is already the main ID, no need for alias
         .alias("Slmpr")
@@ -1008,6 +1050,7 @@ pub fn signature_spectral_rolloff() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sroll) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SROLL" is already the main ID, no need for alias
         .alias("Sroll")
@@ -1030,6 +1073,7 @@ pub fn signature_spectral_rolloff_95() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sroll95) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SROLL95" is already the main ID, no need for alias
         .alias("Sroll95")
@@ -1059,6 +1103,7 @@ pub fn signature_spectral_rolloff_percentile() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Srollp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SROLLP" is already the main ID, no need for alias
         .alias("Srollp")
@@ -1088,6 +1133,7 @@ pub fn signature_spectral_rolloff_robust_percentile() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Srollrp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SROLLRP" is already the main ID, no need for alias
         .alias("Srollrp")
@@ -1110,6 +1156,7 @@ pub fn signature_spectral_slope() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sslope) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SSLOPE" is already the main ID, no need for alias
         .alias("Sslope")
@@ -1139,6 +1186,7 @@ pub fn signature_spectral_slope_percentile() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sslopep) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SSLOPEP" is already the main ID, no need for alias
         .alias("Sslopep")
@@ -1168,6 +1216,7 @@ pub fn signature_spectral_slope_robust_percentile() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Ssloperp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SSLOPERP" is already the main ID, no need for alias
         .alias("Ssloperp")
@@ -1197,6 +1246,7 @@ pub fn signature_spectral_slope_zscore() -> IndicatorSignature {
         .metadata("category", "spectral")
         .machine_id(BarIndicatorId::Sslopez) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "SSLOPEZ" is already the main ID, no need for alias
         .alias("Sslopez")
@@ -1226,6 +1276,7 @@ pub fn signature_stft_features() -> IndicatorSignature {
         .metadata("category", "transform")
         .machine_id(BarIndicatorId::Stft) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "STFT" is already the main ID, no need for alias
         .alias("Stft")
@@ -1254,6 +1305,7 @@ pub fn signature_threshold_gate() -> IndicatorSignature {
         .metadata("category", "gate")
         .machine_id(BarIndicatorId::Thresh) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Other)
+        .output_kind(IndicatorValueKind::Flag)
         .validated()
         // Note: "THRESH" is already the main ID, no need for alias
         .alias("Thresh")
@@ -1275,6 +1327,7 @@ pub fn signature_time_encoders() -> IndicatorSignature {
         .metadata("category", "encoding")
         .machine_id(BarIndicatorId::Tenc) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Other)
+        .output_kind(IndicatorValueKind::Double)
         .validated()
         // Note: "TENC" is already the main ID, no need for alias
         .alias("Tenc")
@@ -1304,6 +1357,7 @@ pub fn signature_wavelet() -> IndicatorSignature {
         .metadata("category", "transform")
         .machine_id(BarIndicatorId::Wave) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "WAVE" is already the main ID, no need for alias
         .alias("Wave")
@@ -1326,6 +1380,7 @@ pub fn signature_weighted_composite() -> IndicatorSignature {
         .metadata("category", "composite")
         .machine_id(BarIndicatorId::Wcomp) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "WCOMP" is already the main ID, no need for alias
         .alias("Wcomp")
@@ -1348,6 +1403,7 @@ pub fn signature_zscore_price_mad() -> IndicatorSignature {
         .metadata("category", "statistical")
         .machine_id(BarIndicatorId::Zmad) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
         .validated()
         // Note: "ZMAD" is already the main ID, no need for alias
         .alias("Zmad")

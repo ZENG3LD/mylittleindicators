@@ -6,6 +6,7 @@
 use crate::catalog::{
     IndicatorSignature, IndicatorCategory, IndicatorRoleKind, ParamConstraint, ParamType, ParamValue,
 };
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -29,6 +30,7 @@ pub fn signature_book_imbalance_ratio() -> IndicatorSignature {
         .metadata("interpretation", "Closer to 0 = ask pressure, closer to 1 = bid pressure")
         .machine_id(BarIndicatorId::BookImb) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "BOOK_IMB" is already the main ID, no need for alias
         .alias("BookImb")
@@ -52,6 +54,7 @@ pub fn signature_order_book_slope() -> IndicatorSignature {
         .metadata("interpretation", "Higher values indicate steeper order book")
         .machine_id(BarIndicatorId::BookSlope) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "BOOK_SLOPE" is already the main ID, no need for alias
         .alias("BookSlope")
@@ -89,6 +92,7 @@ pub fn signature_order_flow_imbalance() -> IndicatorSignature {
         .metadata("interpretation", "Positive = buy pressure, negative = sell pressure")
         .machine_id(BarIndicatorId::Ofi) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "OFI" is already the main ID, no need for alias
         .alias("Ofi")
@@ -113,6 +117,7 @@ pub fn signature_queue_imbalance() -> IndicatorSignature {
         .metadata("interpretation", "Positive = buying pressure, negative = selling pressure")
         .machine_id(BarIndicatorId::QueueImb) // TODO: Add to enum
         .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "QUEUE_IMB" is already the main ID, no need for alias
         .alias("QueueImb")
