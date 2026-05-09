@@ -7,9 +7,6 @@
 //! Здесь нет runtime-логики (детекторов, engine, рендера), нет defaults,
 //! нет StrategySpec. Только индикаторы и пограничные типы событий.
 
-// Core types (bar, tick, time, calendar, timeframe)
-pub mod types;
-
 // Bar indicators
 pub mod bar_indicators;
 
@@ -19,8 +16,11 @@ pub mod catalog;
 // Legacy re-export: old MLQ path `mlq_indicators::indicator_key::IndicatorKey`.
 pub use catalog::indicator_key;
 
-// Core event/condition/composition glue — нужно и MLQ оптимайзеру, и MLC чарту.
+// All base types: market data (Bar/Tick/...), events, conditions, composition, shapes.
 pub mod core;
+
+// Backwards-compat: `crate::types::*` was the old path before types/ moved into core/.
+pub use core::types;
 
 // Convenience re-exports
 pub use bar_indicators::{
@@ -36,7 +36,7 @@ pub use catalog::{
     param_value::ParamValue,
 };
 
-pub use types::{Bar, Tick, CalendarService, TimeService};
+pub use core::types::{Bar, Tick, CalendarService, TimeService};
 
 // Event taxonomy re-exports
 pub use core::events::{
