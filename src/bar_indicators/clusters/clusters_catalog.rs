@@ -5,7 +5,7 @@
 //! Organized alphabetically for easy navigation.
 
 use crate::catalog::{
-    IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
+    IndicatorSignature, IndicatorCategory, IndicatorRoleKind, ParamConstraint, ParamType, ParamValue,
 };
 use super::super::bar_indicator_id::BarIndicatorId;
 
@@ -28,6 +28,8 @@ pub fn signature_market_microstructure() -> IndicatorSignature {
         .metadata("outputs", "liquidity_score, efficiency_score, execution_score, microstructure_score")
         .metadata("metrics", "spread, depth, price_impact, discovery_speed, volatility_clustering")
         .machine_id(BarIndicatorId::MarketMicro) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
         // Note: "MARKET_MICRO" is already the main ID, no need for alias
         .alias("MarketMicro")
         .alias("market_micro")
@@ -48,6 +50,8 @@ pub fn signature_order_book_slope() -> IndicatorSignature {
         .metadata("formula", "ln(volume) / (high - low)")
         .metadata("proxy", "true")
         .machine_id(BarIndicatorId::OrderBookSlope) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
         // Note: "ORDER_BOOK_SLOPE" is already the main ID, no need for alias
         .alias("OrderBookSlope")
         .alias("order_book_slope")
@@ -72,6 +76,8 @@ pub fn signature_order_flow_imbalance() -> IndicatorSignature {
         .metadata("outputs", "total_imbalance, avg_imbalance, dominant_side, imbalance_strength")
         .metadata("uses_volume", "true")
         .machine_id(BarIndicatorId::OrderFlowImb) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
         // Note: "ORDER_FLOW_IMB" is already the main ID, no need for alias
         .alias("OrderFlowImb")
         .alias("order_flow_imb")
@@ -92,6 +98,8 @@ pub fn signature_queue_imbalance() -> IndicatorSignature {
         .metadata("formula", "(close - mid) / range")
         .metadata("proxy", "true")
         .machine_id(BarIndicatorId::ClQueueImb)
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
         // Note: "CL_QUEUE_IMB" is already the main ID, no need for alias
         .alias("ClQueueImb")
         .alias("cl_queue_imb")
@@ -114,6 +122,8 @@ pub fn signature_tick_volume_analyzer() -> IndicatorSignature {
         .metadata("uses_volume", "true")
         .metadata("uses_ticks", "true")
         .machine_id(BarIndicatorId::TickVolume) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
         // Note: "TICK_VOLUME" is already the main ID, no need for alias
         .alias("TickVolume")
         .alias("tick_volume")
@@ -141,6 +151,8 @@ pub fn signature_volume_weighted_price_levels() -> IndicatorSignature {
         .metadata("outputs", "vwap, support_levels, resistance_levels, high_volume_nodes")
         .metadata("uses_volume", "true")
         .machine_id(BarIndicatorId::VwapLevels) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
         // Note: "VWAP_LEVELS" is already the main ID, no need for alias
         .alias("VwapLevels")
         .alias("vwap_levels")

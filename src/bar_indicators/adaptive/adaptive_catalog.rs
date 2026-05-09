@@ -5,6 +5,7 @@
 
 use crate::catalog::{
     IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
+    IndicatorRoleKind,
 };
 use super::super::bar_indicator_id::BarIndicatorId;
 
@@ -48,6 +49,7 @@ pub fn signature_kama() -> IndicatorSignature {
         .metadata("complexity", "Efficiency Ratio based")
         .metadata("adaptive_type", "efficiency")
         .machine_id(BarIndicatorId::Kama) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Smoother)
         // Note: "KAMA" is already the main ID, no need for alias
         .alias("Kama")
         .alias("kama")
@@ -71,6 +73,7 @@ pub fn signature_frama() -> IndicatorSignature {
         .metadata("adaptive_type", "fractal")
         .metadata("methods", "Standard, Improved, Dynamic, Robust")
         .machine_id(BarIndicatorId::Frama)
+        .role_kind(IndicatorRoleKind::Smoother)
         // Note: "FRAMA" is already the main ID, no need for alias
         .alias("Frama")
         .alias("frama")
@@ -94,6 +97,7 @@ pub fn signature_vidya() -> IndicatorSignature {
         .metadata("adaptive_type", "volatility")
         .metadata("cmo_types", "Simple, Exponential, Linear, Triangular")
         .machine_id(BarIndicatorId::Vidya)
+        .role_kind(IndicatorRoleKind::Smoother)
         // Note: "VIDYA" is already the main ID, no need for alias
         .alias("Vidya")
         .alias("vidya")
@@ -130,6 +134,7 @@ pub fn signature_mama() -> IndicatorSignature {
         .metadata("adaptive_type", "cycle")
         .metadata("method", "MESA (Maximum Entropy Spectral Analysis)")
         .machine_id(BarIndicatorId::Mama) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Smoother)
         // Note: "MAMA" is already the main ID, no need for alias
         .alias("Mama")
         .alias("mama")
@@ -153,6 +158,7 @@ pub fn signature_adaptive_ma() -> IndicatorSignature {
         .metadata("modes", "Volatility, Volume, Trend, Momentum, Combined, Market")
         .metadata("efficiency_methods", "Kaufman, Fractal, DirectionalMovement, TrendStrength, NoiseRatio")
         .machine_id(BarIndicatorId::Adaptivema) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Smoother)
         // Note: "ADAPTIVEMA" is already the main ID, no need for alias
         .alias("Adaptivema")
         .alias("adaptivema")

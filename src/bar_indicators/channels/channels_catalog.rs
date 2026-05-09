@@ -5,6 +5,7 @@
 
 use crate::catalog::{
     IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
+    IndicatorRoleKind,
 };
 use crate::bar_indicators::average::moving_average::MovingAverageType;
 use super::super::bar_indicator_id::BarIndicatorId;
@@ -66,6 +67,8 @@ pub fn signature_adaptive_bollinger_bands() -> IndicatorSignature {
         .metadata("min_multiplier_desc", "Minimum adaptive multiplier (manual mode)")
         .metadata("max_multiplier_desc", "Maximum adaptive multiplier (manual mode)")
         .machine_id(BarIndicatorId::Adaptivebb)
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         .alias("Adaptivebb")
         .alias("adaptivebb")
         .alias("ADAPTIVEBOLLINGERBANDS")
@@ -86,6 +89,8 @@ pub fn signature_adaptive_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .metadata("adaptive", "true")
         .machine_id(BarIndicatorId::Adaptivechan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "ADAPTIVECHAN" is already the main ID, no need for alias
         .alias("Adaptivechan")
         .alias("adaptivechan")
@@ -112,6 +117,8 @@ pub fn signature_atr_channels() -> IndicatorSignature {
         .metadata("center_ma_desc", "Center line MA type")
         .metadata("atr_ma_desc", "ATR smoothing MA type")
         .machine_id(BarIndicatorId::Atrchan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "ATRCHAN" is already the main ID, no need for alias
         .alias("Atrchan")
         .alias("atrchan")
@@ -138,6 +145,8 @@ pub fn signature_bollinger_bands() -> IndicatorSignature {
         .metadata("author", "John Bollinger")
         .metadata("outputs", "upper, middle, lower, bandwidth, percent_b")
         .machine_id(BarIndicatorId::Bb) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "BB" is already the main ID, no need for alias
         .alias("Bb")
         .alias("bb")
@@ -158,6 +167,8 @@ pub fn signature_bollinger_metrics() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("outputs", "bandwidth, percent_b, squeeze")
         .machine_id(BarIndicatorId::Bbmetrics) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
+        .validated()
         // Note: "BBMETRICS" is already the main ID, no need for alias
         .alias("Bbmetrics")
         .alias("bbmetrics")
@@ -179,6 +190,8 @@ pub fn signature_darvas_box() -> IndicatorSignature {
         .metadata("author", "Nicolas Darvas")
         .metadata("trend_following", "true")
         .machine_id(BarIndicatorId::Darvas) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "DARVAS" is already the main ID, no need for alias
         .alias("Darvas")
         .alias("darvas")
@@ -200,6 +213,8 @@ pub fn signature_donchian_channel() -> IndicatorSignature {
         .metadata("author", "Richard Donchian")
         .metadata("outputs", "upper, middle, lower")
         .machine_id(BarIndicatorId::Dc) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "DC" is already the main ID, no need for alias
         .alias("Dc")
         .alias("dc")
@@ -220,6 +235,8 @@ pub fn signature_donchian_channel_metrics() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("outputs", "width, position")
         .machine_id(BarIndicatorId::Dcmetrics) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
+        .validated()
         // Note: "DCMETRICS" is already the main ID, no need for alias
         .alias("Dcmetrics")
         .alias("dcmetrics")
@@ -240,6 +257,8 @@ pub fn signature_donchian_position() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("range", "0-1")
         .machine_id(BarIndicatorId::Dcpos) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "DCPOS" is already the main ID, no need for alias
         .alias("Dcpos")
         .alias("dcpos")
@@ -259,6 +278,8 @@ pub fn signature_donchian_width() -> IndicatorSignature {
         .description("Width of Donchian Channel as percentage")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .machine_id(BarIndicatorId::Dcwidth) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
+        .validated()
         // Note: "DCWIDTH" is already the main ID, no need for alias
         .alias("Dcwidth")
         .alias("dcwidth")
@@ -279,6 +300,8 @@ pub fn signature_dpo_bands() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .machine_id(BarIndicatorId::Dpobands) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "DPOBANDS" is already the main ID, no need for alias
         .alias("Dpobands")
         .alias("dpobands")
@@ -304,6 +327,8 @@ pub fn signature_envelope_bandwidth() -> IndicatorSignature {
                 .with_default(ParamValue::F64(2.5))
         )
         .machine_id(BarIndicatorId::Envbw) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
+        .validated()
         // Note: "ENVBW" is already the main ID, no need for alias
         .alias("Envbw")
         .alias("envbw")
@@ -330,6 +355,8 @@ pub fn signature_envelope_channels() -> IndicatorSignature {
         )
         .metadata("outputs", "upper, middle, lower")
         .machine_id(BarIndicatorId::Envelope) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "ENVELOPE" is already the main ID, no need for alias
         .alias("Envelope")
         .alias("envelope")
@@ -350,6 +377,8 @@ pub fn signature_fibonacci_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 50))
         .metadata("fibonacci", "true")
         .machine_id(BarIndicatorId::Fibochan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "FIBOCHAN" is already the main ID, no need for alias
         .alias("Fibochan")
         .alias("fibochan")
@@ -388,6 +417,8 @@ pub fn signature_ichimoku_cloud() -> IndicatorSignature {
         .metadata("author", "Goichi Hosoda")
         .metadata("outputs", "tenkan, kijun, senkou_a, senkou_b, chikou")
         .machine_id(BarIndicatorId::Ichimoku) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "ICHIMOKU" is already the main ID, no need for alias
         .alias("Ichimoku")
         .alias("ichimoku")
@@ -408,6 +439,8 @@ pub fn signature_ichimoku_cloud_position() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 100, 9))
         .metadata("range", "above_cloud, in_cloud, below_cloud")
         .machine_id(BarIndicatorId::Ichimokupos) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "ICHIMOKUPOS" is already the main ID, no need for alias
         .alias("Ichimokupos")
         .alias("ichimokupos")
@@ -427,6 +460,8 @@ pub fn signature_ichimoku_cloud_thickness() -> IndicatorSignature {
         .description("Thickness of Ichimoku cloud as volatility measure")
         .add_constraint(ParamConstraint::period(2, 100, 9))
         .machine_id(BarIndicatorId::Ichimokuthick) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
+        .validated()
         // Note: "ICHIMOKUTHICK" is already the main ID, no need for alias
         .alias("Ichimokuthick")
         .alias("ichimokuthick")
@@ -447,6 +482,8 @@ pub fn signature_keltner_bandwidth() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .machine_id(BarIndicatorId::Keltbw) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
+        .validated()
         // Note: "KELTBW" is already the main ID, no need for alias
         .alias("Keltbw")
         .alias("keltbw")
@@ -477,6 +514,8 @@ pub fn signature_keltner_channel() -> IndicatorSignature {
         .metadata("author", "Chester Keltner")
         .metadata("outputs", "upper, middle, lower")
         .machine_id(BarIndicatorId::Kc) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "KC" is already the main ID, no need for alias
         .alias("Kc")
         .alias("kc")
@@ -497,6 +536,8 @@ pub fn signature_keltner_channel_metrics() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("outputs", "bandwidth, distance, position")
         .machine_id(BarIndicatorId::Kcmetrics) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
+        .validated()
         // Note: "KCMETRICS" is already the main ID, no need for alias
         .alias("Kcmetrics")
         .alias("kcmetrics")
@@ -517,6 +558,8 @@ pub fn signature_keltner_distance() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .machine_id(BarIndicatorId::Keltdist) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "KELTDIST" is already the main ID, no need for alias
         .alias("Keltdist")
         .alias("keltdist")
@@ -537,6 +580,8 @@ pub fn signature_keltner_position() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("range", "0-1")
         .machine_id(BarIndicatorId::Keltpos) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "KELTPOS" is already the main ID, no need for alias
         .alias("Keltpos")
         .alias("keltpos")
@@ -557,6 +602,8 @@ pub fn signature_median_channel_position() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("range", "0-1")
         .machine_id(BarIndicatorId::Medchanpos) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "MEDCHANPOS" is already the main ID, no need for alias
         .alias("Medchanpos")
         .alias("medchanpos")
@@ -577,6 +624,8 @@ pub fn signature_median_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .machine_id(BarIndicatorId::Medchan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "MEDCHAN" is already the main ID, no need for alias
         .alias("Medchan")
         .alias("medchan")
@@ -600,6 +649,10 @@ pub fn signature_percent_b() -> IndicatorSignature {
         .metadata("overbought", ">1.0")
         .metadata("oversold", "<0.0")
         .machine_id(BarIndicatorId::Percentb) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(20.0, 80.0)
+        .validated()
         // Note: "PERCENTB" is already the main ID, no need for alias
         .alias("Percentb")
         .alias("percentb")
@@ -629,6 +682,8 @@ pub fn signature_percentile_channels() -> IndicatorSignature {
                 .with_default(ParamValue::F64(10.0))
         )
         .machine_id(BarIndicatorId::Percentilech) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "PERCENTILECH" is already the main ID, no need for alias
         .alias("Percentilech")
         .alias("percentilech")
@@ -649,6 +704,8 @@ pub fn signature_pivot_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("pivot_based", "true")
         .machine_id(BarIndicatorId::Pivotchan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "PIVOTCHAN" is already the main ID, no need for alias
         .alias("Pivotchan")
         .alias("pivotchan")
@@ -669,6 +726,8 @@ pub fn signature_price_channel_oscillator() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("range", "-100 to +100")
         .machine_id(BarIndicatorId::Pchosc) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "PCHOSC" is already the main ID, no need for alias
         .alias("Pchosc")
         .alias("pchosc")
@@ -688,6 +747,8 @@ pub fn signature_price_channel_width() -> IndicatorSignature {
         .description("Width of price channel as volatility measure")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .machine_id(BarIndicatorId::Pchwidth) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
+        .validated()
         // Note: "PCHWIDTH" is already the main ID, no need for alias
         .alias("Pchwidth")
         .alias("pchwidth")
@@ -708,6 +769,8 @@ pub fn signature_price_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("outputs", "upper, middle, lower")
         .machine_id(BarIndicatorId::Pricechan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "PRICECHAN" is already the main ID, no need for alias
         .alias("Pricechan")
         .alias("pricechan")
@@ -728,6 +791,8 @@ pub fn signature_projection_bands() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .machine_id(BarIndicatorId::Projbands) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "PROJBANDS" is already the main ID, no need for alias
         .alias("Projbands")
         .alias("projbands")
@@ -754,6 +819,8 @@ pub fn signature_quantile_regression_channels() -> IndicatorSignature {
         )
         .metadata("regression_based", "true")
         .machine_id(BarIndicatorId::Qrchan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "QRCHAN" is already the main ID, no need for alias
         .alias("Qrchan")
         .alias("qrchan")
@@ -773,6 +840,8 @@ pub fn signature_regression_channel_width() -> IndicatorSignature {
         .description("Width of regression-based channels")
         .add_constraint(ParamConstraint::period(10, 200, 50))
         .machine_id(BarIndicatorId::Regchanwidth) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
+        .validated()
         // Note: "REGCHANWIDTH" is already the main ID, no need for alias
         .alias("Regchanwidth")
         .alias("regchanwidth")
@@ -795,6 +864,8 @@ pub fn signature_regression_channels() -> IndicatorSignature {
         .metadata("regression_based", "true")
         .metadata("outputs", "upper, middle, lower")
         .machine_id(BarIndicatorId::Regchan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "REGCHAN" is already the main ID, no need for alias
         .alias("Regchan")
         .alias("regchan")
@@ -816,6 +887,8 @@ pub fn signature_standard_deviation_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .metadata("outputs", "upper, middle, lower")
         .machine_id(BarIndicatorId::Stddevchan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "STDDEVCHAN" is already the main ID, no need for alias
         .alias("Stddevchan")
         .alias("stddevchan")
@@ -840,6 +913,8 @@ pub fn signature_starc_bands() -> IndicatorSignature {
         .metadata("author", "Manning Stoller")
         .metadata("atr_based", "true")
         .machine_id(BarIndicatorId::Starc) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "STARC" is already the main ID, no need for alias
         .alias("Starc")
         .alias("starc")
@@ -859,6 +934,8 @@ pub fn signature_stddev_channel_width() -> IndicatorSignature {
         .description("Width of standard deviation channels")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .machine_id(BarIndicatorId::Stddevwidth) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
+        .validated()
         // Note: "STDDEVWIDTH" is already the main ID, no need for alias
         .alias("Stddevwidth")
         .alias("stddevwidth")
@@ -880,6 +957,8 @@ pub fn signature_theil_sen_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::multiplier(1.0, 5.0, 2.0))
         .metadata("robust_regression", "true")
         .machine_id(BarIndicatorId::Theilsenchan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "THEILSENCHAN" is already the main ID, no need for alias
         .alias("Theilsenchan")
         .alias("theilsenchan")
@@ -900,6 +979,8 @@ pub fn signature_trima_bands() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .machine_id(BarIndicatorId::Trimabands) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "TRIMABANDS" is already the main ID, no need for alias
         .alias("Trimabands")
         .alias("trimabands")
@@ -919,6 +1000,8 @@ pub fn signature_volume_profile_channels() -> IndicatorSignature {
         .metadata("volume_based", "true")
         .metadata("outputs", "value_area_high, value_area_low, poc")
         .machine_id(BarIndicatorId::Volprofchan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "VOLPROFCHAN" is already the main ID, no need for alias
         .alias("Volprofchan")
         .alias("volprofchan")
@@ -938,6 +1021,8 @@ pub fn signature_vwap_channel_width() -> IndicatorSignature {
         .description("Width of VWAP-based channels")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .machine_id(BarIndicatorId::Vwapchanwidth) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
+        .validated()
         // Note: "VWAPCHANWIDTH" is already the main ID, no need for alias
         .alias("Vwapchanwidth")
         .alias("vwapchanwidth")
@@ -960,6 +1045,8 @@ pub fn signature_vwap_channels() -> IndicatorSignature {
         .metadata("volume_based", "true")
         .metadata("outputs", "upper, vwap, lower")
         .machine_id(BarIndicatorId::Vwapchan) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Channel)
+        .validated()
         // Note: "VWAPCHAN" is already the main ID, no need for alias
         .alias("Vwapchan")
         .alias("vwapchan")

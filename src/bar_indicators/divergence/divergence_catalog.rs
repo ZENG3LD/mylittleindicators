@@ -12,6 +12,7 @@
 
 use crate::catalog::{
     IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
+    IndicatorRoleKind,
 };
 use super::super::bar_indicator_id::BarIndicatorId;
 
@@ -40,6 +41,7 @@ pub fn signature_cci_divergence() -> IndicatorSignature {
         .metadata("indicator", "CCI")
         .metadata("signals", "bullish_regular, bearish_regular, bullish_hidden, bearish_hidden")
         .machine_id(BarIndicatorId::CciDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "CCI_DIV" is already the main ID, no need for alias
         .alias("CciDiv")
         .alias("cci_div")
@@ -73,6 +75,7 @@ pub fn signature_classic_divergence() -> IndicatorSignature {
         .metadata("type", "regular/classic")
         .metadata("signals", "bullish, bearish")
         .machine_id(BarIndicatorId::ClassicDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "CLASSIC_DIV" is already the main ID, no need for alias
         .alias("ClassicDiv")
         .alias("classic_div")
@@ -100,6 +103,8 @@ pub fn signature_divergence_strength() -> IndicatorSignature {
         .metadata("range", "0-100")
         .metadata("interpretation", "0 = no divergence, 100 = maximum divergence")
         .machine_id(BarIndicatorId::DivStrength) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
         // Note: "DIV_STRENGTH" is already the main ID, no need for alias
         .alias("DivStrength")
         .alias("div_strength")
@@ -133,6 +138,7 @@ pub fn signature_hidden_divergence() -> IndicatorSignature {
         .metadata("type", "hidden/continuation")
         .metadata("signals", "bullish_hidden, bearish_hidden")
         .machine_id(BarIndicatorId::HiddenDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "HIDDEN_DIV" is already the main ID, no need for alias
         .alias("HiddenDiv")
         .alias("hidden_div")
@@ -179,6 +185,7 @@ pub fn signature_macd_divergence() -> IndicatorSignature {
         .metadata("indicator", "MACD")
         .metadata("author", "Gerald Appel")
         .machine_id(BarIndicatorId::MacdDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "MACD_DIV" is already the main ID, no need for alias
         .alias("MacdDiv")
         .alias("macd_div")
@@ -205,6 +212,7 @@ pub fn signature_macd_histogram_divergence() -> IndicatorSignature {
         )
         .metadata("based_on", "MACD histogram")
         .machine_id(BarIndicatorId::MacdHistDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "MACD_HIST_DIV" is already the main ID, no need for alias
         .alias("MacdHistDiv")
         .alias("macd_hist_div")
@@ -232,6 +240,7 @@ pub fn signature_multi_indicator_divergence() -> IndicatorSignature {
         .metadata("indicators", "RSI, MACD, Stochastic")
         .metadata("type", "consensus")
         .machine_id(BarIndicatorId::MultiDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "MULTI_DIV" is already the main ID, no need for alias
         .alias("MultiDiv")
         .alias("multi_div")
@@ -265,6 +274,7 @@ pub fn signature_obv_divergence() -> IndicatorSignature {
         .metadata("uses_volume", "true")
         .metadata("author", "Joseph Granville")
         .machine_id(BarIndicatorId::ObvDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "OBV_DIV" is already the main ID, no need for alias
         .alias("ObvDiv")
         .alias("obv_div")
@@ -304,6 +314,7 @@ pub fn signature_rsi_divergence() -> IndicatorSignature {
         .metadata("indicator", "RSI")
         .metadata("author", "J. Welles Wilder")
         .machine_id(BarIndicatorId::RsiDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "RSI_DIV" is already the main ID, no need for alias
         .alias("RsiDiv")
         .alias("rsi_div")
@@ -343,6 +354,7 @@ pub fn signature_stochastic_divergence() -> IndicatorSignature {
         .metadata("indicator", "Stochastic")
         .metadata("author", "George Lane")
         .machine_id(BarIndicatorId::StochDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "STOCH_DIV" is already the main ID, no need for alias
         .alias("StochDiv")
         .alias("stoch_div")
@@ -375,6 +387,7 @@ pub fn signature_volume_divergence() -> IndicatorSignature {
         .metadata("uses_volume", "true")
         .metadata("type", "volume_analysis")
         .machine_id(BarIndicatorId::VolDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "VOL_DIV" is already the main ID, no need for alias
         .alias("VolDiv")
         .alias("vol_div")
@@ -408,6 +421,7 @@ pub fn signature_williams_divergence() -> IndicatorSignature {
         .metadata("indicator", "Williams %R")
         .metadata("author", "Larry Williams")
         .machine_id(BarIndicatorId::WilliamsDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "WILLIAMS_DIV" is already the main ID, no need for alias
         .alias("WilliamsDiv")
         .alias("williams_div")
@@ -447,6 +461,7 @@ pub fn signature_zigzag_divergence() -> IndicatorSignature {
         .metadata("based_on", "ZigZag")
         .metadata("precision", "high")
         .machine_id(BarIndicatorId::ZigzagDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "ZIGZAG_DIV" is already the main ID, no need for alias
         .alias("ZigzagDiv")
         .alias("zigzag_div")

@@ -5,7 +5,7 @@
 
 use crate::catalog::{
     IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
-    SourceType,
+    SourceType, IndicatorRoleKind,
 };
 use crate::bar_indicators::average::moving_average::MovingAverageType;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
@@ -28,6 +28,9 @@ pub fn signature_adaptive_stochastic() -> IndicatorSignature {
         .description("Stochastic oscillator with adaptive parameters")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::AdaptiveStoch) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(20.0, 80.0)
         // Note: "ADAPTIVE_STOCH" is already the main ID, no need for alias
         .alias("AdaptiveStoch")
         .alias("adaptive_stoch")
@@ -49,6 +52,8 @@ pub fn signature_adx() -> IndicatorSignature {
         .metadata("author", "J. Welles Wilder")
         .metadata("range", "0-100")
         .machine_id(BarIndicatorId::Adx)
+        .role_kind(IndicatorRoleKind::Regime)
+        .output_bounds(0.0, 100.0)
         // Note: "ADX" is already the main ID, no need for alias
         .alias("Adx")
         .alias("adx")
@@ -72,6 +77,8 @@ pub fn signature_amat() -> IndicatorSignature {
         .metadata("fast_ma_desc", "Fast MA type")
         .metadata("slow_ma_desc", "Slow MA type")
         .machine_id(BarIndicatorId::Amat)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 1.0)
         // Note: "AMAT" is already the main ID, no need for alias
         .alias("Amat")
         .alias("amat")
@@ -106,6 +113,7 @@ pub fn signature_apo() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::EMA))
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .machine_id(BarIndicatorId::Apo)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "APO" is already the main ID, no need for alias
         .alias("Apo")
         .alias("apo")
@@ -126,6 +134,8 @@ pub fn signature_aroon() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 512, 25))
         .metadata("outputs", "aroon_up, aroon_down, aroon_oscillator")
         .machine_id(BarIndicatorId::Aroon)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
         // Note: "AROON" is already the main ID, no need for alias
         .alias("Aroon")
         .alias("aroon")
@@ -139,6 +149,8 @@ pub fn signature_aroon_down() -> IndicatorSignature {
         .description("Aroon down component")
         .add_constraint(ParamConstraint::period(2, 512, 25))
         .machine_id(BarIndicatorId::AroonDown)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
         // Note: "AROON_DOWN" is already the main ID, no need for alias
         .alias("AroonDown")
         .alias("aroon_down")
@@ -155,6 +167,8 @@ pub fn signature_aroon_oscillator() -> IndicatorSignature {
         .description("Difference between Aroon Up and Aroon Down")
         .add_constraint(ParamConstraint::period(2, 512, 25))
         .machine_id(BarIndicatorId::AroonOsc) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-100.0, 100.0)
         // Note: "AROON_OSC" is already the main ID, no need for alias
         .alias("AroonOsc")
         .alias("aroon_osc")
@@ -174,6 +188,8 @@ pub fn signature_aroon_up() -> IndicatorSignature {
         .description("Aroon up component")
         .add_constraint(ParamConstraint::period(2, 512, 25))
         .machine_id(BarIndicatorId::AroonUp)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
         // Note: "AROON_UP" is already the main ID, no need for alias
         .alias("AroonUp")
         .alias("aroon_up")
@@ -190,6 +206,9 @@ pub fn signature_atr_rsi() -> IndicatorSignature {
         .description("RSI calculated using ATR")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::AtrRsi)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "ATR_RSI" is already the main ID, no need for alias
         .alias("AtrRsi")
         .alias("atr_rsi")
@@ -206,6 +225,7 @@ pub fn signature_auto_fibo() -> IndicatorSignature {
         .description("Automatic Fibonacci retracement levels")
         .add_constraint(ParamConstraint::period(2, 200, 50))
         .machine_id(BarIndicatorId::AutoFibo)
+        .role_kind(IndicatorRoleKind::Level)
         // Note: "AUTO_FIBO" is already the main ID, no need for alias
         .alias("AutoFibo")
         .alias("auto_fibo")
@@ -226,6 +246,7 @@ pub fn signature_bb_period() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::SMA))
         .machine_id(BarIndicatorId::BbPeriod)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "BB_PERIOD" is already the main ID, no need for alias
         .alias("BbPeriod")
         .alias("bb_period")
@@ -245,6 +266,7 @@ pub fn signature_bias() -> IndicatorSignature {
         .description("Price deviation from moving average")
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .machine_id(BarIndicatorId::Bias)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "BIAS" is already the main ID, no need for alias
         .alias("Bias")
         .alias("bias")
@@ -258,6 +280,8 @@ pub fn signature_bop() -> IndicatorSignature {
         .description("Balance between bulls and bears")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::Bop) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-1.0, 1.0)
         // Note: "BOP" is already the main ID, no need for alias
         .alias("Bop")
         .alias("bop")
@@ -277,6 +301,7 @@ pub fn signature_candle_patterns() -> IndicatorSignature {
         .description("Candlestick pattern recognition")
         .add_constraint(ParamConstraint::period(2, 50, 3))
         .machine_id(BarIndicatorId::CandlePatterns)
+        .role_kind(IndicatorRoleKind::Pattern)
         // Note: "CANDLE_PATTERNS" is already the main ID, no need for alias
         .alias("CandlePatterns")
         .alias("candle_patterns")
@@ -300,6 +325,9 @@ pub fn signature_cci() -> IndicatorSignature {
         )
         .metadata("author", "Donald Lambert")
         .machine_id(BarIndicatorId::Cci)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-300.0, 300.0)
+        .default_thresholds(-100.0, 100.0)
         // Note: "CCI" is already the main ID, no need for alias
         .alias("Cci")
         .alias("cci")
@@ -320,6 +348,7 @@ pub fn signature_center_of_gravity() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 10))
         .metadata("author", "John Ehlers")
         .machine_id(BarIndicatorId::Cog) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "COG" is already the main ID, no need for alias
         .alias("Cog")
         .alias("cog")
@@ -342,6 +371,7 @@ pub fn signature_cfo() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("author", "Tushar Chande")
         .machine_id(BarIndicatorId::Cfo) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "CFO" is already the main ID, no need for alias
         .alias("Cfo")
         .alias("cfo")
@@ -363,6 +393,9 @@ pub fn signature_cmo() -> IndicatorSignature {
         .metadata("author", "Tushar Chande")
         .metadata("range", "-100 to +100")
         .machine_id(BarIndicatorId::Cmo)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-100.0, 100.0)
+        .default_thresholds(-50.0, 50.0)
         // Note: "CMO" is already the main ID, no need for alias
         .alias("Cmo")
         .alias("cmo")
@@ -383,6 +416,9 @@ pub fn signature_connors_rsi() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 3))
         .metadata("author", "Larry Connors")
         .machine_id(BarIndicatorId::ConnorsRsi)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "CONNORS_RSI" is already the main ID, no need for alias
         .alias("ConnorsRsi")
         .alias("connors_rsi")
@@ -404,6 +440,7 @@ pub fn signature_coppock() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("author", "Edwin Coppock")
         .machine_id(BarIndicatorId::Coppock) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "COPPOCK" is already the main ID, no need for alias
         .alias("Coppock")
         .alias("coppock")
@@ -425,6 +462,9 @@ pub fn signature_demarker() -> IndicatorSignature {
         .metadata("author", "Tom DeMark")
         .metadata("range", "0-1")
         .machine_id(BarIndicatorId::Demarker)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 1.0)
+        .default_thresholds(0.3, 0.7)
         // Note: "DEMARKER" is already the main ID, no need for alias
         .alias("Demarker")
         .alias("demarker")
@@ -441,6 +481,7 @@ pub fn signature_detrended_synthetic_price() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::SMA))
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .machine_id(BarIndicatorId::Dsp) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "DSP" is already the main ID, no need for alias
         .alias("Dsp")
         .alias("dsp")
@@ -461,6 +502,8 @@ pub fn signature_dm() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 512, 14))
         .metadata("outputs", "+DI, -DI")
         .machine_id(BarIndicatorId::Dm)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
         // Note: "DM" is already the main ID, no need for alias
         .alias("Dm")
         .alias("dm")
@@ -483,6 +526,7 @@ pub fn signature_dpo() -> IndicatorSignature {
         .add_constraint(ParamConstraint::source("source", OhlcvField::Close))
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .machine_id(BarIndicatorId::Dpo) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "DPO" is already the main ID, no need for alias
         .alias("Dpo")
         .alias("dpo")
@@ -502,6 +546,8 @@ pub fn signature_dpo_percent() -> IndicatorSignature {
         .description("Percentage-based DPO")
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .machine_id(BarIndicatorId::DpoPct) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
         // Note: "DPO_PCT" is already the main ID, no need for alias
         .alias("DpoPct")
         .alias("dpo_pct")
@@ -522,6 +568,9 @@ pub fn signature_dss_bressert() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 13))
         .metadata("author", "Walter Bressert")
         .machine_id(BarIndicatorId::Dss) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(20.0, 80.0)
         // Note: "DSS" is already the main ID, no need for alias
         .alias("Dss")
         .alias("dss")
@@ -542,6 +591,8 @@ pub fn signature_ehlers_cyber_cycle() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .metadata("author", "John Ehlers")
         .machine_id(BarIndicatorId::EhlersCc) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-1.0, 1.0)
         // Note: "EHLERS_CC" is already the main ID, no need for alias
         .alias("EhlersCc")
         .alias("ehlers_cc")
@@ -562,6 +613,9 @@ pub fn signature_ehlers_rocket_rsi() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .metadata("author", "John Ehlers")
         .machine_id(BarIndicatorId::EhlersRocket) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "EHLERS_ROCKET" is already the main ID, no need for alias
         .alias("EhlersRocket")
         .alias("ehlers_rocket")
@@ -587,6 +641,8 @@ pub fn signature_elder_impulse() -> IndicatorSignature {
         .add_constraint(ParamConstraint::source("source", OhlcvField::Close))
         .metadata("author", "Alexander Elder")
         .machine_id(BarIndicatorId::ElderImpulse) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-1.0, 1.0)
         // Note: "ELDER_IMPULSE" is already the main ID, no need for alias
         .alias("ElderImpulse")
         .alias("elder_impulse")
@@ -611,6 +667,7 @@ pub fn signature_elder_ray() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("ma_note", "Original default: EMA")
         .machine_id(BarIndicatorId::ElderRay)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "ELDER_RAY" is already the main ID, no need for alias
         .alias("ElderRay")
         .alias("elder_ray")
@@ -629,6 +686,7 @@ pub fn signature_ema_slope() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::EMA))
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .machine_id(BarIndicatorId::EmaSlope)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "EMA_SLOPE" is already the main ID, no need for alias
         .alias("EmaSlope")
         .alias("ema_slope")
@@ -661,6 +719,7 @@ pub fn signature_ewmac() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::EMA))
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .machine_id(BarIndicatorId::Ewmac)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "EWMAC" is already the main ID, no need for alias
         .alias("Ewmac")
         .alias("ewmac")
@@ -689,6 +748,7 @@ pub fn signature_ewmac_robust() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::EMA))
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .machine_id(BarIndicatorId::EwmacRobust) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "EWMAC_ROBUST" is already the main ID, no need for alias
         .alias("EwmacRobust")
         .alias("ewmac_robust")
@@ -707,6 +767,7 @@ pub fn signature_fisher_transform() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 10))
         .metadata("author", "John Ehlers")
         .machine_id(BarIndicatorId::MoFisher)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "MO_FISHER" is already the main ID, no need for alias
         .alias("MoFisher")
         .alias("mo_fisher")
@@ -726,6 +787,7 @@ pub fn signature_gapo() -> IndicatorSignature {
         .description("Volatility-based range indicator")
         .add_constraint(ParamConstraint::period(2, 200, 21))
         .machine_id(BarIndicatorId::Gapo) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volatility)
         // Note: "GAPO" is already the main ID, no need for alias
         .alias("Gapo")
         .alias("gapo")
@@ -751,6 +813,7 @@ pub fn signature_gator_oscillator() -> IndicatorSignature {
         .add_constraint(ParamConstraint::source("source", OhlcvField::Close))
         .metadata("author", "Bill Williams")
         .machine_id(BarIndicatorId::Gator) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "GATOR" is already the main ID, no need for alias
         .alias("Gator")
         .alias("gator")
@@ -770,6 +833,7 @@ pub fn signature_highest() -> IndicatorSignature {
         .description("Highest high over N periods")
         .add_constraint(ParamConstraint::period(2, 512, 20))
         .machine_id(BarIndicatorId::Highest)
+        .role_kind(IndicatorRoleKind::Level)
         // Note: "HIGHEST" is already the main ID, no need for alias
         .alias("Highest")
         .alias("highest")
@@ -784,6 +848,8 @@ pub fn signature_ift_rsi() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .metadata("author", "John Ehlers")
         .machine_id(BarIndicatorId::IftRsi)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-1.0, 1.0)
         // Note: "IFT_RSI" is already the main ID, no need for alias
         .alias("IftRsi")
         .alias("ift_rsi")
@@ -803,6 +869,9 @@ pub fn signature_intraday_momentum_index() -> IndicatorSignature {
         .description("Intraday momentum based on candle bodies")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::Imi) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "IMI" is already the main ID, no need for alias
         .alias("Imi")
         .alias("imi")
@@ -823,6 +892,9 @@ pub fn signature_kdj() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 9))
         .metadata("outputs", "K, D, J")
         .machine_id(BarIndicatorId::Kdj)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(20.0, 80.0)
         // Note: "KDJ" is already the main ID, no need for alias
         .alias("Kdj")
         .alias("kdj")
@@ -860,6 +932,7 @@ pub fn signature_kst() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("ma_note", "Original default: SMA")
         .machine_id(BarIndicatorId::Kst) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "KST" is already the main ID, no need for alias
         .alias("Kst")
         .alias("kst")
@@ -895,6 +968,7 @@ pub fn signature_kvo() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("uses_volume", "true")
         .machine_id(BarIndicatorId::Kvo)
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "KVO" is already the main ID, no need for alias
         .alias("Kvo")
         .alias("kvo")
@@ -921,6 +995,9 @@ pub fn signature_laguerre_rsi() -> IndicatorSignature {
         )
         .metadata("author", "John Ehlers")
         .machine_id(BarIndicatorId::LaguerreRsi)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 1.0)
+        .default_thresholds(0.2, 0.8)
         // Note: "LAGUERRE_RSI" is already the main ID, no need for alias
         .alias("LaguerreRsi")
         .alias("laguerre_rsi")
@@ -938,6 +1015,7 @@ pub fn signature_lowest() -> IndicatorSignature {
         .description("Lowest low over N periods")
         .add_constraint(ParamConstraint::period(2, 512, 20))
         .machine_id(BarIndicatorId::Lowest)
+        .role_kind(IndicatorRoleKind::Level)
         // Note: "LOWEST" is already the main ID, no need for alias
         .alias("Lowest")
         .alias("lowest")
@@ -968,6 +1046,8 @@ pub fn signature_ma_cross() -> IndicatorSignature {
         .metadata("fast_ma_desc", "Fast MA type")
         .metadata("slow_ma_desc", "Slow MA type")
         .machine_id(BarIndicatorId::MaCross)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-1.0, 1.0)
         // Note: "MA_CROSS" is already the main ID, no need for alias
         .alias("MaCross")
         .alias("ma_cross")
@@ -1024,6 +1104,7 @@ pub fn signature_macd() -> IndicatorSignature {
         .metadata("author", "Gerald Appel")
         .metadata("outputs", "macd_line, signal_line, histogram")
         .machine_id(BarIndicatorId::Macd)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "MACD" is already the main ID, no need for alias
         .alias("Macd")
         .alias("macd")
@@ -1038,6 +1119,7 @@ pub fn signature_macd_hist_zscore() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 12))
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::EMA))
         .machine_id(BarIndicatorId::MacdHistZ) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "MACD_HIST_Z" is already the main ID, no need for alias
         .alias("MacdHistZ")
         .alias("macd_hist_z")
@@ -1057,6 +1139,7 @@ pub fn signature_macd_histogram() -> IndicatorSignature {
         .description("MACD histogram (MACD - Signal)")
         .add_constraint(ParamConstraint::period(2, 200, 12))
         .machine_id(BarIndicatorId::MacdHist) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "MACD_HIST" is already the main ID, no need for alias
         .alias("MacdHist")
         .alias("macd_hist")
@@ -1076,6 +1159,7 @@ pub fn signature_macd_signal() -> IndicatorSignature {
         .description("MACD signal line (EMA of MACD)")
         .add_constraint(ParamConstraint::period(2, 200, 9))
         .machine_id(BarIndicatorId::MacdSignal) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "MACD_SIGNAL" is already the main ID, no need for alias
         .alias("MacdSignal")
         .alias("macd_signal")
@@ -1095,6 +1179,8 @@ pub fn signature_market_cipher() -> IndicatorSignature {
         .description("Comprehensive market analysis indicator")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::MarketCipher)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-100.0, 100.0)
         // Note: "MARKET_CIPHER" is already the main ID, no need for alias
         .alias("MarketCipher")
         .alias("market_cipher")
@@ -1111,6 +1197,7 @@ pub fn signature_momentum_zscore() -> IndicatorSignature {
         .description("Standardized momentum indicator")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::MomZscore) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "MOM_ZSCORE" is already the main ID, no need for alias
         .alias("MomZscore")
         .alias("mom_zscore")
@@ -1130,6 +1217,7 @@ pub fn signature_multi_timeframe_momentum_divergence() -> IndicatorSignature {
         .description("Momentum divergence across timeframes")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::MtfMomDiv) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "MTF_MOM_DIV" is already the main ID, no need for alias
         .alias("MtfMomDiv")
         .alias("mtf_mom_div")
@@ -1149,6 +1237,7 @@ pub fn signature_neural_momentum_network() -> IndicatorSignature {
         .description("Neural network-based momentum")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::NeuralMom) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "NEURAL_MOM" is already the main ID, no need for alias
         .alias("NeuralMom")
         .alias("neural_mom")
@@ -1169,6 +1258,7 @@ pub fn signature_obv() -> IndicatorSignature {
         .metadata("author", "Joseph Granville")
         .metadata("uses_volume", "true")
         .machine_id(BarIndicatorId::MoObv)
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "MO_OBV" is already the main ID, no need for alias
         .alias("MoObv")
         .alias("mo_obv")
@@ -1207,6 +1297,7 @@ pub fn signature_parabolic_sar() -> IndicatorSignature {
         )
         .metadata("author", "J. Welles Wilder")
         .machine_id(BarIndicatorId::Psar) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::TrendStop)
         // Note: "PSAR" is already the main ID, no need for alias
         .alias("Psar")
         .alias("psar")
@@ -1226,6 +1317,8 @@ pub fn signature_pfe() -> IndicatorSignature {
         .description("Measures trend efficiency")
         .add_constraint(ParamConstraint::period(2, 200, 10))
         .machine_id(BarIndicatorId::Pfe) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-100.0, 100.0)
         // Note: "PFE" is already the main ID, no need for alias
         .alias("Pfe")
         .alias("pfe")
@@ -1248,6 +1341,7 @@ pub fn signature_pmo() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("ma_note", "Original default: EMA")
         .machine_id(BarIndicatorId::Pmo)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "PMO" is already the main ID, no need for alias
         .alias("Pmo")
         .alias("pmo")
@@ -1300,6 +1394,7 @@ pub fn signature_ppo() -> IndicatorSignature {
         .add_constraint(ParamConstraint::source("source", OhlcvField::Close))
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .machine_id(BarIndicatorId::Ppo)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "PPO" is already the main ID, no need for alias
         .alias("Ppo")
         .alias("ppo")
@@ -1319,6 +1414,7 @@ pub fn signature_ppo_signal() -> IndicatorSignature {
         .description("Signal line for PPO")
         .add_constraint(ParamConstraint::period(2, 200, 9))
         .machine_id(BarIndicatorId::PpoSignal) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "PPO_SIGNAL" is already the main ID, no need for alias
         .alias("PpoSignal")
         .alias("ppo_signal")
@@ -1338,6 +1434,8 @@ pub fn signature_pressure() -> IndicatorSignature {
         .description("Market pressure indicator")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::Pressure)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
         // Note: "PRESSURE" is already the main ID, no need for alias
         .alias("Pressure")
         .alias("pressure")
@@ -1351,6 +1449,9 @@ pub fn signature_psl() -> IndicatorSignature {
         .description("Percentage of up days over period")
         .add_constraint(ParamConstraint::period(2, 200, 12))
         .machine_id(BarIndicatorId::Psl)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(25.0, 75.0)
         // Note: "PSL" is already the main ID, no need for alias
         .alias("Psl")
         .alias("psl")
@@ -1370,6 +1471,9 @@ pub fn signature_qqe() -> IndicatorSignature {
         .description("Quantitative Qualitative Estimation")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::Qqe)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "QQE" is already the main ID, no need for alias
         .alias("Qqe")
         .alias("qqe")
@@ -1383,6 +1487,7 @@ pub fn signature_qstick() -> IndicatorSignature {
         .description("Candlestick momentum indicator")
         .add_constraint(ParamConstraint::period(2, 200, 8))
         .machine_id(BarIndicatorId::Qstick)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "QSTICK" is already the main ID, no need for alias
         .alias("Qstick")
         .alias("qstick")
@@ -1400,6 +1505,9 @@ pub fn signature_rmi() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("ma_note", "Original default: RMA")
         .machine_id(BarIndicatorId::Rmi) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "RMI" is already the main ID, no need for alias
         .alias("Rmi")
         .alias("rmi")
@@ -1423,6 +1531,7 @@ pub fn signature_roc() -> IndicatorSignature {
                 .with_default(ParamValue::Bool(false))
         )
         .machine_id(BarIndicatorId::Roc)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "ROC" is already the main ID, no need for alias
         .alias("Roc")
         .alias("roc")
@@ -1442,6 +1551,8 @@ pub fn signature_roc_percentile() -> IndicatorSignature {
         .description("Percentile rank of ROC")
         .add_constraint(ParamConstraint::period(2, 200, 12))
         .machine_id(BarIndicatorId::RocPct) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
         // Note: "ROC_PCT" is already the main ID, no need for alias
         .alias("RocPct")
         .alias("roc_pct")
@@ -1465,6 +1576,9 @@ pub fn signature_rsi() -> IndicatorSignature {
         .metadata("overbought", "70")
         .metadata("oversold", "30")
         .machine_id(BarIndicatorId::Rsi)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "RSI" is already the main ID, no need for alias
         .alias("Rsi")
         .alias("rsi")
@@ -1484,6 +1598,8 @@ pub fn signature_rsi_percentile_bands() -> IndicatorSignature {
         .description("Dynamic RSI bands based on percentiles")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::RsiPctBands) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
         // Note: "RSI_PCT_BANDS" is already the main ID, no need for alias
         .alias("RsiPctBands")
         .alias("rsi_pct_bands")
@@ -1503,6 +1619,8 @@ pub fn signature_rsi_percentile_rank() -> IndicatorSignature {
         .description("Percentile rank of RSI")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::RsiPctRank) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
         // Note: "RSI_PCT_RANK" is already the main ID, no need for alias
         .alias("RsiPctRank")
         .alias("rsi_pct_rank")
@@ -1522,6 +1640,7 @@ pub fn signature_rsi_zscore() -> IndicatorSignature {
         .description("Standardized RSI")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::RsiZscore)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "RSI_ZSCORE" is already the main ID, no need for alias
         .alias("RsiZscore")
         .alias("rsi_zscore")
@@ -1541,6 +1660,9 @@ pub fn signature_rsioma() -> IndicatorSignature {
         .description("RSI with overlayed moving average")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::Rsioma) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "RSIOMA" is already the main ID, no need for alias
         .alias("Rsioma")
         .alias("rsioma")
@@ -1558,6 +1680,9 @@ pub fn signature_rsx() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .metadata("author", "Mark Jurik")
         .machine_id(BarIndicatorId::Rsx)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "RSX" is already the main ID, no need for alias
         .alias("Rsx")
         .alias("rsx")
@@ -1571,6 +1696,8 @@ pub fn signature_rvgi() -> IndicatorSignature {
         .description("Measures strength of trend")
         .add_constraint(ParamConstraint::period(2, 200, 10))
         .machine_id(BarIndicatorId::Rvgi)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-1.0, 1.0)
         // Note: "RVGI" is already the main ID, no need for alias
         .alias("Rvgi")
         .alias("rvgi")
@@ -1590,6 +1717,8 @@ pub fn signature_rwi() -> IndicatorSignature {
         .description("Determines if price is trending or random")
         .add_constraint(ParamConstraint::period(2, 200, 9))
         .machine_id(BarIndicatorId::Rwi)
+        .role_kind(IndicatorRoleKind::Regime)
+        .output_bounds(0.0, 3.0)
         // Note: "RWI" is already the main ID, no need for alias
         .alias("Rwi")
         .alias("rwi")
@@ -1609,6 +1738,9 @@ pub fn signature_smi() -> IndicatorSignature {
         .description("Refined stochastic indicator")
         .add_constraint(ParamConstraint::period(2, 200, 13))
         .machine_id(BarIndicatorId::Smi)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-100.0, 100.0)
+        .default_thresholds(-40.0, 40.0)
         // Note: "SMI" is already the main ID, no need for alias
         .alias("Smi")
         .alias("smi")
@@ -1629,6 +1761,9 @@ pub fn signature_stc() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 10))
         .metadata("author", "Doug Schaff")
         .machine_id(BarIndicatorId::Stc)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(25.0, 75.0)
         // Note: "STC" is already the main ID, no need for alias
         .alias("Stc")
         .alias("stc")
@@ -1657,6 +1792,9 @@ pub fn signature_stochastic_rsi() -> IndicatorSignature {
         )
         .add_constraint(ParamConstraint::source("source", OhlcvField::Close))
         .machine_id(BarIndicatorId::StochRsi) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 1.0)
+        .default_thresholds(0.2, 0.8)
         // Note: "STOCH_RSI" is already the main ID, no need for alias
         .alias("StochRsi")
         .alias("stoch_rsi")
@@ -1691,6 +1829,9 @@ pub fn signature_stochastics() -> IndicatorSignature {
         .metadata("author", "George Lane")
         .metadata("outputs", "%K, %D")
         .machine_id(BarIndicatorId::Stoch) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(20.0, 80.0)
         // Note: "STOCH" is already the main ID, no need for alias
         .alias("Stoch")
         .alias("stoch")
@@ -1707,6 +1848,9 @@ pub fn signature_stochastikd() -> IndicatorSignature {
         .description("Alternative stochastic implementation")
         .add_constraint(ParamConstraint::period(2, 512, 14))
         .machine_id(BarIndicatorId::Stochkd) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(20.0, 80.0)
         // Note: "STOCHKD" is already the main ID, no need for alias
         .alias("Stochkd")
         .alias("stochkd")
@@ -1728,6 +1872,8 @@ pub fn signature_sweep_reversion() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::RMA))
         .metadata("note", "Uses ATR with configurable MA type (default Wilder)")
         .machine_id(BarIndicatorId::SweepRev) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-1.0, 1.0)
         // Note: "SWEEP_REV" is already the main ID, no need for alias
         .alias("SweepRev")
         .alias("sweep_rev")
@@ -1747,6 +1893,7 @@ pub fn signature_swing_age() -> IndicatorSignature {
         .description("Age of current swing in bars")
         .add_constraint(ParamConstraint::period(2, 200, 5))
         .machine_id(BarIndicatorId::SwingAge)
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "SWING_AGE" is already the main ID, no need for alias
         .alias("SwingAge")
         .alias("swing_age")
@@ -1763,6 +1910,7 @@ pub fn signature_swings() -> IndicatorSignature {
         .description("Identifies swing highs and lows")
         .add_constraint(ParamConstraint::period(2, 200, 5))
         .machine_id(BarIndicatorId::Swings)
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "SWINGS" is already the main ID, no need for alias
         .alias("Swings")
         .alias("swings")
@@ -1776,6 +1924,7 @@ pub fn signature_swings_soft() -> IndicatorSignature {
         .description("Soft swing detection")
         .add_constraint(ParamConstraint::period(2, 200, 5))
         .machine_id(BarIndicatorId::SwingsSoft)
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "SWINGS_SOFT" is already the main ID, no need for alias
         .alias("SwingsSoft")
         .alias("swings_soft")
@@ -1792,6 +1941,9 @@ pub fn signature_tdi() -> IndicatorSignature {
         .description("Combination of RSI, Bollinger Bands, and MAs")
         .add_constraint(ParamConstraint::period(2, 200, 13))
         .machine_id(BarIndicatorId::Tdi) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(32.0, 68.0)
         // Note: "TDI" is already the main ID, no need for alias
         .alias("Tdi")
         .alias("tdi")
@@ -1828,6 +1980,7 @@ pub fn signature_trix() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("ma_note", "Original default: EMA")
         .machine_id(BarIndicatorId::Trix)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         // Note: "TRIX" is already the main ID, no need for alias
         .alias("Trix")
         .alias("trix")
@@ -1872,6 +2025,9 @@ pub fn signature_tsi() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("ma_note", "Original default: EMA")
         .machine_id(BarIndicatorId::Tsi) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-100.0, 100.0)
+        .default_thresholds(-25.0, 25.0)
         // Note: "TSI" is already the main ID, no need for alias
         .alias("Tsi")
         .alias("tsi")
@@ -1912,6 +2068,9 @@ pub fn signature_ultimate_oscillator() -> IndicatorSignature {
         )
         .metadata("author", "Larry Williams")
         .machine_id(BarIndicatorId::Uo) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "UO" is already the main ID, no need for alias
         .alias("Uo")
         .alias("uo")
@@ -1932,6 +2091,9 @@ pub fn signature_ultimate_oscillator_smooth() -> IndicatorSignature {
         .description("Smoothed version of Ultimate Oscillator")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .machine_id(BarIndicatorId::UoSmooth) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "UO_SMOOTH" is already the main ID, no need for alias
         .alias("UoSmooth")
         .alias("uo_smooth")
@@ -1952,6 +2114,8 @@ pub fn signature_vhf() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 28))
         .metadata("author", "Adam White")
         .machine_id(BarIndicatorId::Vhf)
+        .role_kind(IndicatorRoleKind::Regime)
+        .output_bounds(0.0, 1.0)
         // Note: "VHF" is already the main ID, no need for alias
         .alias("Vhf")
         .alias("vhf")
@@ -1972,6 +2136,8 @@ pub fn signature_vhf_ma() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 28))
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::SMA))
         .machine_id(BarIndicatorId::VhfMa)
+        .role_kind(IndicatorRoleKind::Regime)
+        .output_bounds(0.0, 1.0)
         // Note: "VHF_MA" is already the main ID, no need for alias
         .alias("VhfMa")
         .alias("vhf_ma")
@@ -1989,6 +2155,9 @@ pub fn signature_volume_weighted_rsi() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .metadata("uses_volume", "true")
         .machine_id(BarIndicatorId::Vwrsi) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 100.0)
+        .default_thresholds(30.0, 70.0)
         // Note: "VWRSI" is already the main ID, no need for alias
         .alias("Vwrsi")
         .alias("vwrsi")
@@ -2010,6 +2179,9 @@ pub fn signature_vortex_indicator() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .metadata("outputs", "VI+, VI-")
         .machine_id(BarIndicatorId::Vortex) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(0.0, 2.0)
+        .default_thresholds(0.9, 1.1)
         // Note: "VORTEX" is already the main ID, no need for alias
         .alias("Vortex")
         .alias("vortex")
@@ -2033,6 +2205,9 @@ pub fn signature_williams_r() -> IndicatorSignature {
         .metadata("overbought", "-20")
         .metadata("oversold", "-80")
         .machine_id(BarIndicatorId::WilliamsR)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_bounds(-100.0, 0.0)
+        .default_thresholds(-80.0, -20.0)
         // Note: "WILLIAMS_R" is already the main ID, no need for alias
         .alias("WilliamsR")
         .alias("williams_r")
@@ -2057,6 +2232,7 @@ pub fn signature_zigzag() -> IndicatorSignature {
                 .with_default(ParamValue::F64(0.05))
         )
         .machine_id(BarIndicatorId::Zigzag) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
         // Note: "ZIGZAG" is already the main ID, no need for alias
         .alias("Zigzag")
         .alias("zigzag")

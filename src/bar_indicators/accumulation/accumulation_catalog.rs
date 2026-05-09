@@ -4,7 +4,7 @@
 //! Contains IndicatorSignature definitions for accumulation/distribution indicators.
 
 use crate::catalog::{
-    IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue, SourceType,
+    IndicatorSignature, IndicatorCategory, IndicatorRoleKind, ParamConstraint, ParamType, ParamValue, SourceType,
 };
 use crate::bar_indicators::average::moving_average::MovingAverageType;
 use super::super::bar_indicator_id::BarIndicatorId;
@@ -29,6 +29,7 @@ pub fn signature_accumulation_distribution() -> IndicatorSignature {
         .metadata("author", "Marc Chaikin")
         .metadata("parameters", "none")
         .machine_id(BarIndicatorId::Ad) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "AD" is already the main ID, no need for alias
         .alias("Ad")
         .alias("ad")
@@ -57,6 +58,7 @@ pub fn signature_accumulative_swing_index() -> IndicatorSignature {
         .metadata("author", "J. Welles Wilder")
         .metadata("category", "cumulative")
         .machine_id(BarIndicatorId::Asi) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "ASI" is already the main ID, no need for alias
         .alias("Asi")
         .alias("asi")
@@ -79,6 +81,7 @@ pub fn signature_chaikin_money_flow() -> IndicatorSignature {
         .metadata("author", "Marc Chaikin")
         .metadata("range", "-1 to +1")
         .machine_id(BarIndicatorId::Cmf) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "CMF" is already the main ID, no need for alias
         .alias("Cmf")
         .alias("cmf")
@@ -115,6 +118,7 @@ pub fn signature_chaikin_oscillator() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("author", "Marc Chaikin")
         .machine_id(BarIndicatorId::Cho) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "CHO" is already the main ID, no need for alias
         .alias("Cho")
         .alias("cho")
@@ -136,6 +140,7 @@ pub fn signature_demand_index() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("category", "volume_based")
         .machine_id(BarIndicatorId::Di) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "DI" is already the main ID, no need for alias
         .alias("Di")
         .alias("di")
@@ -163,6 +168,7 @@ pub fn signature_ease_of_movement() -> IndicatorSignature {
         )
         .metadata("author", "Richard Arms")
         .machine_id(BarIndicatorId::Eom) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "EOM" is already the main ID, no need for alias
         .alias("Eom")
         .alias("eom")
@@ -194,6 +200,7 @@ pub fn signature_force_index() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("ma_note", "Original default: EMA")
         .machine_id(BarIndicatorId::Fi) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "FI" is already the main ID, no need for alias
         .alias("Fi")
         .alias("fi")
@@ -215,6 +222,7 @@ pub fn signature_intraday_intensity() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 21))
         .metadata("category", "intrabar_analysis")
         .machine_id(BarIndicatorId::Ii) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "II" is already the main ID, no need for alias
         .alias("Ii")
         .alias("ii")
@@ -237,6 +245,7 @@ pub fn signature_intraday_intensity_percent() -> IndicatorSignature {
         .metadata("category", "intrabar_analysis")
         .metadata("range", "percentage")
         .machine_id(BarIndicatorId::Iip) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "IIP" is already the main ID, no need for alias
         .alias("Iip")
         .alias("iip")
@@ -258,6 +267,7 @@ pub fn signature_intraday_intensity_ratio() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 21))
         .metadata("category", "intrabar_analysis")
         .machine_id(BarIndicatorId::Iir) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "IIR" is already the main ID, no need for alias
         .alias("Iir")
         .alias("iir")
@@ -280,6 +290,7 @@ pub fn signature_twiggs_money_flow() -> IndicatorSignature {
         .metadata("author", "Colin Twiggs")
         .metadata("range", "-1 to +1")
         .machine_id(BarIndicatorId::Tmf) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "TMF" is already the main ID, no need for alias
         .alias("Tmf")
         .alias("tmf")
@@ -301,6 +312,7 @@ pub fn signature_williams_ad() -> IndicatorSignature {
         .metadata("author", "Larry Williams")
         .metadata("parameters", "none")
         .machine_id(BarIndicatorId::Wad) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "WAD" is already the main ID, no need for alias
         .alias("Wad")
         .alias("wad")
@@ -323,6 +335,7 @@ pub fn signature_obv() -> IndicatorSignature {
         .metadata("category", "cumulative")
         .metadata("parameters", "none")
         .machine_id(BarIndicatorId::Obv)
+        .role_kind(IndicatorRoleKind::Volume)
         // Note: "OBV" is already the main ID, no need for alias
         .alias("Obv")
         .alias("obv")

@@ -4,7 +4,7 @@
 //! Contains IndicatorSignature definitions for all 2 order book indicators
 
 use crate::catalog::{
-    IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
+    IndicatorSignature, IndicatorCategory, IndicatorRoleKind, ParamConstraint, ParamType, ParamValue,
 };
 use super::super::bar_indicator_id::BarIndicatorId;
 
@@ -28,6 +28,8 @@ pub fn signature_book_imbalance_ratio() -> IndicatorSignature {
         .metadata("requirements", "order_book_data")
         .metadata("interpretation", "Closer to 0 = ask pressure, closer to 1 = bid pressure")
         .machine_id(BarIndicatorId::BookImb) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
         // Note: "BOOK_IMB" is already the main ID, no need for alias
         .alias("BookImb")
         .alias("book_imb")
@@ -49,6 +51,8 @@ pub fn signature_order_book_slope() -> IndicatorSignature {
         .metadata("category", "depth_proxy")
         .metadata("interpretation", "Higher values indicate steeper order book")
         .machine_id(BarIndicatorId::BookSlope) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
         // Note: "BOOK_SLOPE" is already the main ID, no need for alias
         .alias("BookSlope")
         .alias("book_slope")
@@ -84,6 +88,8 @@ pub fn signature_order_flow_imbalance() -> IndicatorSignature {
         .metadata("requirements", "volume_bars_with_buy_sell_split")
         .metadata("interpretation", "Positive = buy pressure, negative = sell pressure")
         .machine_id(BarIndicatorId::Ofi) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
         // Note: "OFI" is already the main ID, no need for alias
         .alias("Ofi")
         .alias("ofi")
@@ -106,6 +112,8 @@ pub fn signature_queue_imbalance() -> IndicatorSignature {
         .metadata("category", "level1_proxy")
         .metadata("interpretation", "Positive = buying pressure, negative = selling pressure")
         .machine_id(BarIndicatorId::QueueImb) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
         // Note: "QUEUE_IMB" is already the main ID, no need for alias
         .alias("QueueImb")
         .alias("queue_imb")

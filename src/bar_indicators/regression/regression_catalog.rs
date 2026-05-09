@@ -4,7 +4,7 @@
 //! Organized alphabetically for easy navigation.
 
 use crate::catalog::{
-    IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
+    IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue, IndicatorRoleKind,
 };
 use super::super::bar_indicator_id::BarIndicatorId;
 
@@ -47,6 +47,7 @@ pub fn signature_arima() -> IndicatorSignature {
         .metadata("outputs", "forecast, aic, bic")
         .metadata("min_observations", "30+")
         .machine_id(BarIndicatorId::Arima)
+        .role_kind(IndicatorRoleKind::Smoother)
         // Note: "ARIMA" is already the main ID, no need for alias
         .alias("Arima")
         .alias("arima")
@@ -89,6 +90,7 @@ pub fn signature_arimax() -> IndicatorSignature {
         .metadata("outputs", "forecast, aic, bic, exog_coefficients")
         .metadata("min_observations", "30+")
         .machine_id(BarIndicatorId::Arimax) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Smoother)
         // Note: "ARIMAX" is already the main ID, no need for alias
         .alias("Arimax")
         .alias("arimax")
@@ -119,6 +121,7 @@ pub fn signature_egarch() -> IndicatorSignature {
         .metadata("min_observations", "50+")
         .metadata("author", "Nelson (1991)")
         .machine_id(BarIndicatorId::Egarch) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Smoother)
         // Note: "EGARCH" is already the main ID, no need for alias
         .alias("Egarch")
         .alias("egarch")
@@ -148,6 +151,7 @@ pub fn signature_garch() -> IndicatorSignature {
         .metadata("author", "Bollerslev (1986)")
         .metadata("min_observations", "50+")
         .machine_id(BarIndicatorId::Garch)
+        .role_kind(IndicatorRoleKind::Smoother)
         // Note: "GARCH" is already the main ID, no need for alias
         .alias("Garch")
         .alias("garch")
@@ -170,6 +174,7 @@ pub fn signature_polynomial_regression() -> IndicatorSignature {
         .metadata("trend_directions", "StrongUptrend, Uptrend, Sideways, Downtrend, StrongDowntrend")
         .metadata("min_observations", "10+")
         .machine_id(BarIndicatorId::PolyReg) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Smoother)
         // Note: "POLY_REG" is already the main ID, no need for alias
         .alias("PolyReg")
         .alias("poly_reg")
@@ -206,6 +211,7 @@ pub fn signature_var() -> IndicatorSignature {
         .metadata("min_observations", "30+")
         .metadata("author", "Sims (1980)")
         .machine_id(BarIndicatorId::Var)
+        .role_kind(IndicatorRoleKind::Smoother)
         // Note: "VAR" is already the main ID, no need for alias
         .alias("Var")
         .alias("var")

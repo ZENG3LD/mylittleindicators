@@ -4,7 +4,7 @@
 //! Contains IndicatorSignature definitions for 19 position-based indicators.
 
 use crate::catalog::{
-    IndicatorSignature, IndicatorCategory, ParamConstraint,
+    IndicatorSignature, IndicatorCategory, ParamConstraint, IndicatorRoleKind,
 };
 use super::super::bar_indicator_id::BarIndicatorId;
 
@@ -25,6 +25,8 @@ pub fn signature_avwap_distance() -> IndicatorSignature {
         .description("Relative distance to anchored VWAP")
         .metadata("type", "distance")
         .machine_id(BarIndicatorId::AvwapDist) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "AVWAP_DIST" is already the main ID, no need for alias
         .alias("AvwapDist")
         .alias("avwap_dist")
@@ -44,6 +46,8 @@ pub fn signature_vwap_distance() -> IndicatorSignature {
         .description("Relative distance to VWAP")
         .metadata("type", "distance")
         .machine_id(BarIndicatorId::VwapDist) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "VWAP_DIST" is already the main ID, no need for alias
         .alias("VwapDist")
         .alias("vwap_dist")
@@ -64,6 +68,8 @@ pub fn signature_central_pivot_range() -> IndicatorSignature {
         .metadata("type", "pivot")
         .metadata("timeframe", "daily")
         .machine_id(BarIndicatorId::Cpr) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "CPR" is already the main ID, no need for alias
         .alias("Cpr")
         .alias("cpr")
@@ -84,6 +90,8 @@ pub fn signature_day_of_week_in_month() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "calendar")
         .machine_id(BarIndicatorId::DayWeekMonth) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "DAY_WEEK_MONTH" is already the main ID, no need for alias
         .alias("DayWeekMonth")
         .alias("day_week_month")
@@ -104,6 +112,8 @@ pub fn signature_dayofmonth_weekofquarter_effect() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "calendar")
         .machine_id(BarIndicatorId::DomWoq) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "DOM_WOQ" is already the main ID, no need for alias
         .alias("DomWoq")
         .alias("dom_woq")
@@ -124,6 +134,8 @@ pub fn signature_distance_to_levels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(10, 500, 50))
         .metadata("type", "distance")
         .machine_id(BarIndicatorId::DistLevels) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "DIST_LEVELS" is already the main ID, no need for alias
         .alias("DistLevels")
         .alias("dist_levels")
@@ -144,6 +156,8 @@ pub fn signature_holiday_weekend_proximity() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "calendar")
         .machine_id(BarIndicatorId::HolidayProx) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "HOLIDAY_PROX" is already the main ID, no need for alias
         .alias("HolidayProx")
         .alias("holiday_prox")
@@ -164,6 +178,8 @@ pub fn signature_hour_of_day_effect() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "intraday")
         .machine_id(BarIndicatorId::HourDay) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "HOUR_DAY" is already the main ID, no need for alias
         .alias("HourDay")
         .alias("hour_day")
@@ -184,6 +200,8 @@ pub fn signature_month_quarter_effect() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "calendar")
         .machine_id(BarIndicatorId::MonthQtr) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "MONTH_QTR" is already the main ID, no need for alias
         .alias("MonthQtr")
         .alias("month_qtr")
@@ -204,6 +222,8 @@ pub fn signature_month_turn_effect() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "calendar")
         .machine_id(BarIndicatorId::MonthTurn) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "MONTH_TURN" is already the main ID, no need for alias
         .alias("MonthTurn")
         .alias("month_turn")
@@ -224,6 +244,8 @@ pub fn signature_quarter_turn_effect() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "calendar")
         .machine_id(BarIndicatorId::QtrTurn) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "QTR_TURN" is already the main ID, no need for alias
         .alias("QtrTurn")
         .alias("qtr_turn")
@@ -244,6 +266,8 @@ pub fn signature_relative_trend_position() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(50, 500, 200))
         .metadata("type", "position")
         .machine_id(BarIndicatorId::RelTrendPos) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "REL_TREND_POS" is already the main ID, no need for alias
         .alias("RelTrendPos")
         .alias("rel_trend_pos")
@@ -264,6 +288,8 @@ pub fn signature_session_effect() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "intraday")
         .machine_id(BarIndicatorId::Session) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "SESSION" is already the main ID, no need for alias
         .alias("Session")
         .alias("session")
@@ -284,6 +310,8 @@ pub fn signature_start_end_of_month_flags() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "calendar")
         .machine_id(BarIndicatorId::SomEom) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "SOM_EOM" is already the main ID, no need for alias
         .alias("SomEom")
         .alias("som_eom")
@@ -304,6 +332,8 @@ pub fn signature_start_end_of_quarter_flags() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "calendar")
         .machine_id(BarIndicatorId::SoqEoq) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "SOQ_EOQ" is already the main ID, no need for alias
         .alias("SoqEoq")
         .alias("soq_eoq")
@@ -324,6 +354,8 @@ pub fn signature_start_end_of_week_flags() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "calendar")
         .machine_id(BarIndicatorId::SowEow) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "SOW_EOW" is already the main ID, no need for alias
         .alias("SowEow")
         .alias("sow_eow")
@@ -344,6 +376,8 @@ pub fn signature_week_in_month_effect() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "calendar")
         .machine_id(BarIndicatorId::WeekMonth) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "WEEK_MONTH" is already the main ID, no need for alias
         .alias("WeekMonth")
         .alias("week_month")
@@ -364,6 +398,8 @@ pub fn signature_weekday_effect() -> IndicatorSignature {
         .metadata("type", "temporal")
         .metadata("category", "calendar")
         .machine_id(BarIndicatorId::Weekday) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Other)
+        .validated()
         // Note: "WEEKDAY" is already the main ID, no need for alias
         .alias("Weekday")
         .alias("weekday")

@@ -5,6 +5,7 @@
 
 use crate::catalog::{
     IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
+    IndicatorRoleKind,
 };
 use super::super::bar_indicator_id::BarIndicatorId;
 
@@ -27,6 +28,8 @@ pub fn signature_pivot_points() -> IndicatorSignature {
         .metadata("author", "Classic TA")
         .metadata("levels", "7 (PP, R1-R3, S1-S3)")
         .machine_id(BarIndicatorId::Pivot) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "PIVOT" is already the main ID, no need for alias
         .alias("Pivot")
         .alias("pivot")
@@ -48,6 +51,8 @@ pub fn signature_floor_trader_pivots() -> IndicatorSignature {
         .metadata("author", "Floor Traders")
         .metadata("use_case", "intraday trading")
         .machine_id(BarIndicatorId::Floorpivot) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "FLOORPIVOT" is already the main ID, no need for alias
         .alias("Floorpivot")
         .alias("floorpivot")
@@ -70,6 +75,8 @@ pub fn signature_camarilla_pivots() -> IndicatorSignature {
         .metadata("levels", "9 (PP, R1-R4, S1-S4)")
         .metadata("multiplier", "1.1")
         .machine_id(BarIndicatorId::Camarilla) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "CAMARILLA" is already the main ID, no need for alias
         .alias("Camarilla")
         .alias("camarilla")
@@ -91,6 +98,8 @@ pub fn signature_woodie_pivots() -> IndicatorSignature {
         .metadata("author", "Woodie")
         .metadata("emphasis", "current session")
         .machine_id(BarIndicatorId::Woodie) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "WOODIE" is already the main ID, no need for alias
         .alias("Woodie")
         .alias("woodie")
@@ -112,6 +121,8 @@ pub fn signature_demark_pivots() -> IndicatorSignature {
         .metadata("author", "Tom DeMark")
         .metadata("feature", "open/close relationship")
         .machine_id(BarIndicatorId::Demark) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "DEMARK" is already the main ID, no need for alias
         .alias("Demark")
         .alias("demark")
@@ -133,6 +144,8 @@ pub fn signature_anchored_vwap() -> IndicatorSignature {
         .metadata("anchor", "monthly")
         .metadata("reset", "calendar-based")
         .machine_id(BarIndicatorId::Avwap) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "AVWAP" is already the main ID, no need for alias
         .alias("Avwap")
         .alias("avwap")
@@ -153,6 +166,8 @@ pub fn signature_avwap_multi_anchor_reversion() -> IndicatorSignature {
         .metadata("uses_volume", "true")
         .metadata("multi_anchor", "true")
         .machine_id(BarIndicatorId::Avwaprev) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "AVWAPREV" is already the main ID, no need for alias
         .alias("Avwaprev")
         .alias("avwaprev")
@@ -173,6 +188,8 @@ pub fn signature_avwap_touch_probability() -> IndicatorSignature {
         .metadata("uses_volume", "true")
         .metadata("statistical", "true")
         .machine_id(BarIndicatorId::Avwaptouch) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "AVWAPTOUCH" is already the main ID, no need for alias
         .alias("Avwaptouch")
         .alias("avwaptouch")
@@ -194,6 +211,8 @@ pub fn signature_break_of_structure() -> IndicatorSignature {
         .metadata("pattern", "BOS/CHOCH")
         .metadata("use_case", "structure breaks")
         .machine_id(BarIndicatorId::Bos) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "BOS" is already the main ID, no need for alias
         .alias("Bos")
         .alias("bos")
@@ -214,6 +233,8 @@ pub fn signature_fvg_detector() -> IndicatorSignature {
         .metadata("pattern", "3-bar FVG")
         .metadata("type", "bull/bear gaps")
         .machine_id(BarIndicatorId::Fvg) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "FVG" is already the main ID, no need for alias
         .alias("Fvg")
         .alias("fvg")
@@ -233,6 +254,8 @@ pub fn signature_fvg_duration_intensity() -> IndicatorSignature {
         .description("Measures duration and intensity of Fair Value Gaps")
         .metadata("scoring", "duration + intensity")
         .machine_id(BarIndicatorId::Fvgdur) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "FVGDUR" is already the main ID, no need for alias
         .alias("Fvgdur")
         .alias("fvgdur")
@@ -252,6 +275,8 @@ pub fn signature_fvg_intensity_alt() -> IndicatorSignature {
         .description("Alternative intensity scoring for Fair Value Gaps")
         .metadata("scoring", "alternative method")
         .machine_id(BarIndicatorId::Fvgalt) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "FVGALT" is already the main ID, no need for alias
         .alias("Fvgalt")
         .alias("fvgalt")
@@ -273,6 +298,8 @@ pub fn signature_fvg_reversion_probability() -> IndicatorSignature {
         .metadata("statistical", "true")
         .metadata("horizon", "H bars")
         .machine_id(BarIndicatorId::Fvgrev) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "FVGREV" is already the main ID, no need for alias
         .alias("Fvgrev")
         .alias("fvgrev")
@@ -292,6 +319,8 @@ pub fn signature_hl_value_area() -> IndicatorSignature {
         .description("Value area calculation based on high/low ranges")
         .metadata("basis", "high/low ranges")
         .machine_id(BarIndicatorId::Hlva) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "HLVA" is already the main ID, no need for alias
         .alias("Hlva")
         .alias("hlva")
@@ -311,6 +340,8 @@ pub fn signature_liquidity_gap_density() -> IndicatorSignature {
         .description("Measures concentration and density of liquidity gaps")
         .metadata("feature", "gap concentration")
         .machine_id(BarIndicatorId::Liqgap) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "LIQGAP" is already the main ID, no need for alias
         .alias("Liqgap")
         .alias("liqgap")
@@ -331,6 +362,8 @@ pub fn signature_pivot_anchored_vwap() -> IndicatorSignature {
         .metadata("uses_volume", "true")
         .metadata("anchor", "pivot points")
         .machine_id(BarIndicatorId::Pivavwap) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "PIVAVWAP" is already the main ID, no need for alias
         .alias("Pivavwap")
         .alias("pivavwap")
@@ -351,6 +384,8 @@ pub fn signature_rolling_midline() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(1, 200, 20))
         .metadata("formula", "(H+L)/2 average")
         .machine_id(BarIndicatorId::Rmid) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "RMID" is already the main ID, no need for alias
         .alias("Rmid")
         .alias("rmid")
@@ -372,6 +407,8 @@ pub fn signature_rolling_quartiles() -> IndicatorSignature {
         .metadata("outputs", "Q1, Q2, Q3")
         .metadata("complexity", "O(N log N) per update")
         .machine_id(BarIndicatorId::Rquart) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "RQUART" is already the main ID, no need for alias
         .alias("Rquart")
         .alias("rquart")
@@ -406,6 +443,8 @@ pub fn signature_swing_strength_score() -> IndicatorSignature {
         .metadata("normalization", "ATR-normalized")
         .metadata("output", "tanh-bounded")
         .machine_id(BarIndicatorId::Swingstr) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Level)
+        .validated()
         // Note: "SWINGSTR" is already the main ID, no need for alias
         .alias("Swingstr")
         .alias("swingstr")

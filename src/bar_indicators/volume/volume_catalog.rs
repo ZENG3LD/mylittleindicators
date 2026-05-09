@@ -4,7 +4,7 @@
 //! Contains IndicatorSignature definitions for all 17 volume indicators
 
 use crate::catalog::{
-    IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue, SourceType,
+    IndicatorSignature, IndicatorCategory, IndicatorRoleKind, ParamConstraint, ParamType, ParamValue, SourceType,
 };
 use crate::bar_indicators::average::moving_average::MovingAverageType;
 use super::super::bar_indicator_id::BarIndicatorId;
@@ -28,6 +28,8 @@ pub fn signature_mfi() -> IndicatorSignature {
         .metadata("range", "0-100")
         .metadata("author", "Gene Quong and Avrum Soudack")
         .machine_id(BarIndicatorId::Mfi)
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "MFI" is already the main ID, no need for alias
         .alias("Mfi")
         .alias("mfi")
@@ -49,6 +51,8 @@ pub fn signature_nvi_pvi() -> IndicatorSignature {
         .metadata("outputs", "nvi, pvi")
         .metadata("parameters", "none")
         .machine_id(BarIndicatorId::NviPvi) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "NVI_PVI" is already the main ID, no need for alias
         .alias("NviPvi")
         .alias("nvi_pvi")
@@ -70,6 +74,9 @@ pub fn signature_poc_detector() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(10, 200, 50))
         .metadata("category", "volume_profile")
         .machine_id(BarIndicatorId::Poc) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
+        .validated()
         // Note: "POC" is already the main ID, no need for alias
         .alias("Poc")
         .alias("poc")
@@ -122,6 +129,8 @@ pub fn signature_pvo() -> IndicatorSignature {
                 .with_default(ParamValue::MaType(MovingAverageType::EMA))
         )
         .machine_id(BarIndicatorId::Pvo) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "PVO" is already the main ID, no need for alias
         .alias("Pvo")
         .alias("pvo")
@@ -143,6 +152,8 @@ pub fn signature_pvt() -> IndicatorSignature {
         .metadata("category", "cumulative")
         .metadata("parameters", "none")
         .machine_id(BarIndicatorId::Pvt) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "PVT" is already the main ID, no need for alias
         .alias("Pvt")
         .alias("pvt")
@@ -164,6 +175,8 @@ pub fn signature_pzo() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 14))
         .metadata("range", "-100 to +100")
         .machine_id(BarIndicatorId::Pzo) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "PZO" is already the main ID, no need for alias
         .alias("Pzo")
         .alias("pzo")
@@ -184,6 +197,8 @@ pub fn signature_relative_volume() -> IndicatorSignature {
         .description("Current volume compared to average volume")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .machine_id(BarIndicatorId::Rvol) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "RVOL" is already the main ID, no need for alias
         .alias("Rvol")
         .alias("rvol")
@@ -205,6 +220,8 @@ pub fn signature_trin() -> IndicatorSignature {
         .metadata("category", "breadth")
         .metadata("requirements", "market_breadth_data")
         .machine_id(BarIndicatorId::Trin)
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "TRIN" is already the main ID, no need for alias
         .alias("Trin")
         .alias("trin")
@@ -232,6 +249,8 @@ pub fn signature_vfi() -> IndicatorSignature {
                 .required()
         )
         .machine_id(BarIndicatorId::Vfi) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "VFI" is already the main ID, no need for alias
         .alias("Vfi")
         .alias("vfi")
@@ -252,6 +271,9 @@ pub fn signature_volume_delta() -> IndicatorSignature {
         .description("Difference between buying and selling volume")
         .metadata("requirements", "bid_ask_volume")
         .machine_id(BarIndicatorId::Vdelta) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
+        .validated()
         // Note: "VDELTA" is already the main ID, no need for alias
         .alias("Vdelta")
         .alias("vdelta")
@@ -285,6 +307,8 @@ pub fn signature_volume_oscillator() -> IndicatorSignature {
                 .required()
         )
         .machine_id(BarIndicatorId::Vo) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "VO" is already the main ID, no need for alias
         .alias("Vo")
         .alias("vo")
@@ -319,6 +343,9 @@ pub fn signature_volume_profile() -> IndicatorSignature {
         )
         .metadata("outputs", "poc, vah, val, profile")
         .machine_id(BarIndicatorId::Vprofile) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .requires_l2()
+        .validated()
         // Note: "VPROFILE" is already the main ID, no need for alias
         .alias("Vprofile")
         .alias("vprofile")
@@ -339,6 +366,8 @@ pub fn signature_volume_zscore() -> IndicatorSignature {
         .description("Standardized volume using z-score")
         .add_constraint(ParamConstraint::period(10, 200, 20))
         .machine_id(BarIndicatorId::Vz) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "VZ" is already the main ID, no need for alias
         .alias("Vz")
         .alias("vz")
@@ -361,6 +390,8 @@ pub fn signature_vpin() -> IndicatorSignature {
         .metadata("category", "microstructure")
         .metadata("requirements", "volume_buckets")
         .machine_id(BarIndicatorId::Vpin)
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "VPIN" is already the main ID, no need for alias
         .alias("Vpin")
         .alias("vpin")
@@ -376,6 +407,8 @@ pub fn signature_vpt() -> IndicatorSignature {
         .metadata("category", "cumulative")
         .metadata("parameters", "none")
         .machine_id(BarIndicatorId::Vpt) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "VPT" is already the main ID, no need for alias
         .alias("Vpt")
         .alias("vpt")
@@ -396,6 +429,8 @@ pub fn signature_vroc() -> IndicatorSignature {
         .description("Rate of change applied to volume")
         .add_constraint(ParamConstraint::period(5, 100, 14))
         .machine_id(BarIndicatorId::Vroc) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "VROC" is already the main ID, no need for alias
         .alias("Vroc")
         .alias("vroc")
@@ -417,6 +452,8 @@ pub fn signature_vzo() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 14))
         .metadata("range", "-60 to +60")
         .machine_id(BarIndicatorId::Vzo) // TODO: Add to enum
+        .role_kind(IndicatorRoleKind::Volume)
+        .validated()
         // Note: "VZO" is already the main ID, no need for alias
         .alias("Vzo")
         .alias("vzo")
