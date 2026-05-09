@@ -28,7 +28,7 @@ pub mod indicator_value;
 pub mod utils;
 pub mod ohlcv_field;
 
-pub use indicator_value::IndicatorValue;
+pub use indicator_value::{IndicatorValue, IndicatorValueKind};
 pub use ohlcv_field::OhlcvField;
 
 

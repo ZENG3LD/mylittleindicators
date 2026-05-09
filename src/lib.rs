@@ -25,7 +25,7 @@ pub use core::types;
 // Convenience re-exports
 pub use bar_indicators::{
     bar_indicator_id::BarIndicatorId,
-    indicator_value::IndicatorValue,
+    indicator_value::{IndicatorValue, IndicatorValueKind},
     instance_factory::{IndicatorConfig, IndicatorInstance},
 };
 

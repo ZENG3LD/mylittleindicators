@@ -8,6 +8,7 @@ use crate::catalog::{
     ParamValue, ParamConstraint, ConstraintSet, ParamError,
 };
 use crate::bar_indicators::bar_indicator_id::BarIndicatorId;
+use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -309,6 +310,13 @@ pub struct IndicatorSignature {
     /// Indicator requires L2 / order-book data (book/clusters/L2-derived).
     /// Codegen will exclude such indicators from bar-only strategies.
     pub requires_l2: bool,
+
+    /// Output shape discriminant. Two indicators with the same `output_kind`
+    /// have identical state size in the hot loop and can share a generated
+    /// strategy template (mixed via `RoleDef::indicators(&[...])`).
+    /// `None` means unknown — codegen falls back to runtime materialisation
+    /// via `IndicatorInstance::create` to discover the kind.
+    pub output_kind: Option<IndicatorValueKind>,
 }
 
 impl IndicatorSignature {
@@ -463,6 +471,7 @@ pub struct IndicatorSignatureBuilder {
     warmup_bars: Option<usize>,
     validated: bool,
     requires_l2: bool,
+    output_kind: Option<IndicatorValueKind>,
 }
 
 impl IndicatorSignatureBuilder {
@@ -484,7 +493,15 @@ impl IndicatorSignatureBuilder {
             warmup_bars: None,
             validated: false,
             requires_l2: false,
+            output_kind: None,
         }
+    }
+
+    /// Set output kind (IndicatorValue variant discriminant) — used by codegen
+    /// to group indicators with identical state size into one strategy template.
+    pub fn output_kind(mut self, kind: IndicatorValueKind) -> Self {
+        self.output_kind = Some(kind);
+        self
     }
 
     /// Set semantic role for slot-compatibility validation in codegen.
@@ -588,6 +605,7 @@ impl IndicatorSignatureBuilder {
             warmup_bars: self.warmup_bars,
             validated: self.validated,
             requires_l2: self.requires_l2,
+            output_kind: self.output_kind,
         }
     }
 }

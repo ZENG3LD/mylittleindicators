@@ -119,6 +119,76 @@ pub enum IndicatorValue {
     },
 }
 
+/// Discriminant of `IndicatorValue` — describes the output shape without
+/// carrying values. Used by strategy codegen to group indicators with
+/// compatible state size into the same generated strategy template.
+///
+/// Two indicators with the same `IndicatorValueKind` produce the same number
+/// of f64 buffers per bar; mixing them inside one strategy keeps hot-loop
+/// state size constant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IndicatorValueKind {
+    Single,
+    Signal,
+    Flag,
+    Double,
+    Triple,
+    Channel3,
+    Macd,
+    Ichimoku,
+    Candle,
+    ChannelExtended,
+    Adaptive,
+    StatTest,
+    Volatility,
+    ValueFlag,
+    DoubleFlag,
+    FuzzyCandle,
+    CandleAnatomy,
+    Hilbert,
+}
+
+impl IndicatorValueKind {
+    /// Number of f64-equivalent slots this output occupies in slice cache.
+    /// Used by codegen to estimate per-combo memory footprint.
+    pub fn output_arity(self) -> usize {
+        match self {
+            Self::Single | Self::Signal | Self::Flag => 1,
+            Self::ValueFlag | Self::DoubleFlag | Self::Double => 2,
+            Self::Triple | Self::Channel3 | Self::Macd | Self::Volatility
+                | Self::Adaptive | Self::Hilbert | Self::StatTest => 3,
+            Self::Candle | Self::FuzzyCandle => 4,
+            Self::Ichimoku | Self::CandleAnatomy | Self::ChannelExtended => 5,
+        }
+    }
+}
+
+impl IndicatorValue {
+    /// Discriminant — output shape without values.
+    pub fn kind(&self) -> IndicatorValueKind {
+        match self {
+            Self::Single(_) => IndicatorValueKind::Single,
+            Self::Signal(_) => IndicatorValueKind::Signal,
+            Self::Flag(_) => IndicatorValueKind::Flag,
+            Self::Double(..) => IndicatorValueKind::Double,
+            Self::Triple(..) => IndicatorValueKind::Triple,
+            Self::Channel3 { .. } => IndicatorValueKind::Channel3,
+            Self::Macd { .. } => IndicatorValueKind::Macd,
+            Self::Ichimoku { .. } => IndicatorValueKind::Ichimoku,
+            Self::Candle { .. } => IndicatorValueKind::Candle,
+            Self::ChannelExtended { .. } => IndicatorValueKind::ChannelExtended,
+            Self::Adaptive { .. } => IndicatorValueKind::Adaptive,
+            Self::StatTest { .. } => IndicatorValueKind::StatTest,
+            Self::Volatility { .. } => IndicatorValueKind::Volatility,
+            Self::ValueFlag(..) => IndicatorValueKind::ValueFlag,
+            Self::DoubleFlag(..) => IndicatorValueKind::DoubleFlag,
+            Self::FuzzyCandle { .. } => IndicatorValueKind::FuzzyCandle,
+            Self::CandleAnatomy { .. } => IndicatorValueKind::CandleAnatomy,
+            Self::Hilbert { .. } => IndicatorValueKind::Hilbert,
+        }
+    }
+}
+
 impl IndicatorValue {
     /// Получить главное значение как f64
     ///
