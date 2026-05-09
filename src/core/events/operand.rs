@@ -34,8 +34,8 @@ pub enum DerivedOp {
     Slope,
     /// Percentage change.
     PctChange,
-    /// Z-score over N bars.
-    ZScore,
+    /// Z-score over the last `n` bars (mean & std-dev).
+    ZScore { n: usize },
 }
 
 /// Arithmetic binary operation for `Operand::Arithmetic`.
@@ -47,7 +47,8 @@ pub enum ArithmeticOp {
     Sub,
     /// left * right
     Mul,
-    /// left / right (no divide-by-zero guard — caller must ensure right != 0)
+    /// left / right. Codegen MUST emit a zero-guard: `if right.abs() < f64::EPSILON
+    /// { return false; }` before the division. Hot loops never panic-divide.
     Div,
 }
 

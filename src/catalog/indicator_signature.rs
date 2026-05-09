@@ -223,6 +223,36 @@ impl fmt::Display for IndicatorCategory {
 /// ];
 /// assert!(rsi.validate_params(&params).is_ok());
 /// ```
+/// Semantic role an indicator plays — used by codegen to filter slot
+/// compatibility (e.g. only `Smoother` indicators fit a moving-average slot).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IndicatorRoleKind {
+    /// Smoother / moving average (SMA, EMA, HMA, Kalman, ...).
+    Smoother,
+    /// Bounded oscillator [0..100] or [-100..100] (RSI, Stoch, CCI bounded, ...).
+    OscillatorBounded,
+    /// Unbounded oscillator (MACD, ROC, Momentum, ...).
+    OscillatorUnbounded,
+    /// Channel / band (Bollinger, Keltner, Donchian).
+    Channel,
+    /// Trend stop / trailing stop (Supertrend, Chandelier, PSAR).
+    TrendStop,
+    /// Volatility (ATR, NATR, HV).
+    Volatility,
+    /// Volume / money flow (OBV, CMF, MFI).
+    Volume,
+    /// Pivot / level (FVG, OrderBlock, Pivot points).
+    Level,
+    /// Regime classifier (ADX, VHF — outputs strength).
+    Regime,
+    /// Pattern recognition (candlestick, fractals).
+    Pattern,
+    /// Statistical test (ADF, KPSS, cointegration).
+    Statistical,
+    /// Other / catch-all.
+    Other,
+}
+
 #[derive(Debug, Clone)]
 pub struct IndicatorSignature {
     /// Unique identifier (e.g., "SMA", "RSI", "MACD")
@@ -243,7 +273,8 @@ pub struct IndicatorSignature {
     /// Data source requirements (price, volume, or both)
     pub source_type: SourceType,
 
-    /// Additional metadata (for extensions)
+    /// Additional metadata (free-form). Prefer typed fields below; this remains
+    /// for legacy / domain-specific tags (e.g. `author`, `formula`).
     pub metadata: HashMap<String, String>,
 
     /// Machine ID for factory (optional - some indicators may not have implementation yet)
@@ -252,6 +283,32 @@ pub struct IndicatorSignature {
     /// Aliases for user-facing lookup (e.g., ["rsi", "relative_strength_index"])
     /// Used to generate BAR_INDICATOR_MAP automatically
     pub aliases: Vec<String>,
+
+    // -- Typed metadata for codegen seeding --
+
+    /// Semantic role for slot-compatibility validation in strategy codegen.
+    /// `None` → treated as `Other` (no slot constraints).
+    pub role_kind: Option<IndicatorRoleKind>,
+
+    /// Output is bounded (e.g. RSI ∈ [0, 100], Williams %R ∈ [-100, 0]).
+    /// `Some((lo, hi))` for bounded, `None` for unbounded.
+    pub output_bounds: Option<(f64, f64)>,
+
+    /// Default upper / lower thresholds for codegen seeding (RSI 70/30,
+    /// CCI ±100, Williams ±20/±80). `None` means caller must supply.
+    pub default_thresholds: Option<(f64, f64)>,
+
+    /// Warmup period — number of bars before `is_ready()` returns true.
+    /// `None` means warmup equals primary `period` parameter (default).
+    pub warmup_bars: Option<usize>,
+
+    /// Indicator validated against real market data (TEST_CHECKLIST DONE).
+    /// `false` means inline tests may exist but real-data validation is missing.
+    pub validated: bool,
+
+    /// Indicator requires L2 / order-book data (book/clusters/L2-derived).
+    /// Codegen will exclude such indicators from bar-only strategies.
+    pub requires_l2: bool,
 }
 
 impl IndicatorSignature {
@@ -269,6 +326,29 @@ impl IndicatorSignature {
     /// - `ParamError::OutOfRange`: Parameter value out of bounds
     pub fn validate_params(&self, params: &[(&str, ParamValue)]) -> Result<(), ParamError> {
         self.constraints.validate_all(params)
+    }
+
+    /// Effective role kind: explicit `role_kind` field, falling back to a
+    /// category-derived heuristic. Used by codegen for slot validation.
+    pub fn effective_role_kind(&self) -> IndicatorRoleKind {
+        if let Some(rk) = self.role_kind {
+            return rk;
+        }
+        match self.category {
+            IndicatorCategory::Average | IndicatorCategory::Adaptive
+            | IndicatorCategory::Kalman | IndicatorCategory::SignalProcessing
+            | IndicatorCategory::Regression => IndicatorRoleKind::Smoother,
+            IndicatorCategory::Channels => IndicatorRoleKind::Channel,
+            IndicatorCategory::TrendStop => IndicatorRoleKind::TrendStop,
+            IndicatorCategory::Volatility => IndicatorRoleKind::Volatility,
+            IndicatorCategory::Volume | IndicatorCategory::Accumulation => IndicatorRoleKind::Volume,
+            IndicatorCategory::Levels | IndicatorCategory::Zigzag => IndicatorRoleKind::Level,
+            IndicatorCategory::Candles => IndicatorRoleKind::Pattern,
+            IndicatorCategory::Statistics => IndicatorRoleKind::Statistical,
+            IndicatorCategory::Momentum => IndicatorRoleKind::OscillatorUnbounded,
+            IndicatorCategory::Trend => IndicatorRoleKind::Regime,
+            _ => IndicatorRoleKind::Other,
+        }
     }
 
     /// Generate cache key from parameters
@@ -377,6 +457,12 @@ pub struct IndicatorSignatureBuilder {
     metadata: HashMap<String, String>,
     machine_id: Option<BarIndicatorId>,
     aliases: Vec<String>,
+    role_kind: Option<IndicatorRoleKind>,
+    output_bounds: Option<(f64, f64)>,
+    default_thresholds: Option<(f64, f64)>,
+    warmup_bars: Option<usize>,
+    validated: bool,
+    requires_l2: bool,
 }
 
 impl IndicatorSignatureBuilder {
@@ -388,11 +474,53 @@ impl IndicatorSignatureBuilder {
             category,
             description: None,
             constraints: Vec::new(),
-            source_type: SourceType::default(), // Default to PriceOnly for backward compatibility
+            source_type: SourceType::default(),
             metadata: HashMap::new(),
             machine_id: None,
             aliases: Vec::new(),
+            role_kind: None,
+            output_bounds: None,
+            default_thresholds: None,
+            warmup_bars: None,
+            validated: false,
+            requires_l2: false,
         }
+    }
+
+    /// Set semantic role for slot-compatibility validation in codegen.
+    pub fn role_kind(mut self, kind: IndicatorRoleKind) -> Self {
+        self.role_kind = Some(kind);
+        self
+    }
+
+    /// Set output bounds (e.g. RSI → (0.0, 100.0)).
+    pub fn output_bounds(mut self, lo: f64, hi: f64) -> Self {
+        self.output_bounds = Some((lo, hi));
+        self
+    }
+
+    /// Set default thresholds (lower, upper) for codegen seeding.
+    pub fn default_thresholds(mut self, lower: f64, upper: f64) -> Self {
+        self.default_thresholds = Some((lower, upper));
+        self
+    }
+
+    /// Set explicit warmup bars (default = primary period parameter).
+    pub fn warmup_bars(mut self, bars: usize) -> Self {
+        self.warmup_bars = Some(bars);
+        self
+    }
+
+    /// Mark indicator as validated against real data.
+    pub fn validated(mut self) -> Self {
+        self.validated = true;
+        self
+    }
+
+    /// Mark indicator as requiring L2 / order-book data.
+    pub fn requires_l2(mut self) -> Self {
+        self.requires_l2 = true;
+        self
     }
 
     /// Set human-readable name
@@ -454,6 +582,12 @@ impl IndicatorSignatureBuilder {
             metadata: self.metadata,
             machine_id: self.machine_id,
             aliases: self.aliases,
+            role_kind: self.role_kind,
+            output_bounds: self.output_bounds,
+            default_thresholds: self.default_thresholds,
+            warmup_bars: self.warmup_bars,
+            validated: self.validated,
+            requires_l2: self.requires_l2,
         }
     }
 }

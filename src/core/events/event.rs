@@ -129,4 +129,172 @@ impl Event {
             guards,
         }
     }
+
+    /// Zone-exit event (mirror of zone_enter).
+    pub fn zone_exit(left: Operand, bounds: ZoneBounds, guards: Vec<Guard>) -> Self {
+        Self {
+            operator_class: OperatorClass::ZoneExit,
+            left_operand: Some(left),
+            right_operand: None,
+            zone_bounds: Some(bounds),
+            pattern_id: None,
+            window_n: Window::CurrentBar,
+            direction: EventDirection::Either,
+            guards,
+        }
+    }
+
+    /// N-bar extreme event (highest / lowest of `field` over last `n` bars).
+    pub fn nbar_extreme(
+        left: Operand,
+        n: usize,
+        direction: EventDirection,
+        guards: Vec<Guard>,
+    ) -> Self {
+        Self {
+            operator_class: OperatorClass::NBarExtreme,
+            left_operand: Some(left),
+            right_operand: None,
+            zone_bounds: None,
+            pattern_id: None,
+            window_n: Window::NBars(n),
+            direction,
+            guards,
+        }
+    }
+
+    /// Pivot high/low event (l bars left, r bars right).
+    pub fn pivot(
+        left: Operand,
+        l: usize,
+        r: usize,
+        direction: EventDirection,
+        guards: Vec<Guard>,
+    ) -> Self {
+        Self {
+            operator_class: OperatorClass::Pivot,
+            left_operand: Some(left),
+            right_operand: None,
+            zone_bounds: None,
+            pattern_id: None,
+            window_n: Window::PivotLR { l, r },
+            direction,
+            guards,
+        }
+    }
+
+    /// Direction event (slope / above-or-below over a window).
+    pub fn direction(
+        left: Operand,
+        right: Option<Operand>,
+        direction: EventDirection,
+        guards: Vec<Guard>,
+    ) -> Self {
+        Self {
+            operator_class: OperatorClass::Direction,
+            left_operand: Some(left),
+            right_operand: right,
+            zone_bounds: None,
+            pattern_id: None,
+            window_n: Window::CurrentBar,
+            direction,
+            guards,
+        }
+    }
+
+    /// Divergence event between two operands (typically price vs oscillator).
+    pub fn divergence(
+        left: Operand,
+        right: Operand,
+        n: usize,
+        direction: EventDirection,
+        guards: Vec<Guard>,
+    ) -> Self {
+        Self {
+            operator_class: OperatorClass::Divergence,
+            left_operand: Some(left),
+            right_operand: Some(right),
+            zone_bounds: None,
+            pattern_id: None,
+            window_n: Window::NBars(n),
+            direction,
+            guards,
+        }
+    }
+
+    /// Regime gate (filter that must hold persistently — e.g. ADX > 25).
+    pub fn regime_gate(
+        left: Operand,
+        right: Operand,
+        direction: EventDirection,
+        guards: Vec<Guard>,
+    ) -> Self {
+        Self {
+            operator_class: OperatorClass::RegimeGate,
+            left_operand: Some(left),
+            right_operand: Some(right),
+            zone_bounds: None,
+            pattern_id: None,
+            window_n: Window::CurrentBar,
+            direction,
+            guards,
+        }
+    }
+
+    /// Sequence event: arm-trigger (left) then fire-trigger (right) within `n` bars.
+    pub fn sequence(
+        arm: Operand,
+        fire: Operand,
+        n: usize,
+        guards: Vec<Guard>,
+    ) -> Self {
+        Self {
+            operator_class: OperatorClass::Sequence,
+            left_operand: Some(arm),
+            right_operand: Some(fire),
+            zone_bounds: None,
+            pattern_id: None,
+            window_n: Window::NBars(n),
+            direction: EventDirection::Either,
+            guards,
+        }
+    }
+
+    /// Volatility regime shift (z-score / percentile-based regime transition).
+    pub fn volatility_regime(
+        left: Operand,
+        right: Operand,
+        direction: EventDirection,
+        guards: Vec<Guard>,
+    ) -> Self {
+        Self {
+            operator_class: OperatorClass::VolatilityRegime,
+            left_operand: Some(left),
+            right_operand: Some(right),
+            zone_bounds: None,
+            pattern_id: None,
+            window_n: Window::CurrentBar,
+            direction,
+            guards,
+        }
+    }
+
+    /// Volume event (Spike / Climax / Delta shift).
+    pub fn volume_event(
+        left: Operand,
+        right: Operand,
+        direction: EventDirection,
+        guards: Vec<Guard>,
+    ) -> Self {
+        Self {
+            operator_class: OperatorClass::VolumeEvent,
+            left_operand: Some(left),
+            right_operand: Some(right),
+            zone_bounds: None,
+            pattern_id: None,
+            window_n: Window::CurrentBar,
+            direction,
+            guards,
+        }
+    }
 }

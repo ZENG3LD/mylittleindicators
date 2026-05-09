@@ -25,9 +25,12 @@ pub enum ThresholdCondition {
 }
 
 impl ThresholdCondition {
-    /// Проверить условие
+    /// Проверить условие. NaN всегда false.
     #[inline]
     pub fn check(&self, value: f64) -> bool {
+        if !value.is_finite() {
+            return false;
+        }
         match self {
             Self::Above(threshold) => value > *threshold,
             Self::Below(threshold) => value < *threshold,
@@ -66,9 +69,14 @@ pub enum CrossoverType {
 }
 
 impl CrossoverType {
-    /// Проверить пересечение двух линий
+    /// Проверить пересечение двух линий. NaN/inf — всегда false.
     #[inline]
     pub fn check(&self, prev_a: f64, curr_a: f64, prev_b: f64, curr_b: f64) -> bool {
+        if !(prev_a.is_finite() && curr_a.is_finite()
+            && prev_b.is_finite() && curr_b.is_finite())
+        {
+            return false;
+        }
         match self {
             Self::CrossUp => prev_a <= prev_b && curr_a > curr_b,
             Self::CrossDown => prev_a >= prev_b && curr_a < curr_b,
@@ -78,9 +86,12 @@ impl CrossoverType {
         }
     }
 
-    /// Проверить пересечение линии с уровнем
+    /// Проверить пересечение линии с уровнем. NaN/inf — всегда false.
     #[inline]
     pub fn check_level(&self, prev: f64, curr: f64, level: f64) -> bool {
+        if !(prev.is_finite() && curr.is_finite() && level.is_finite()) {
+            return false;
+        }
         match self {
             Self::CrossUp => prev <= level && curr > level,
             Self::CrossDown => prev >= level && curr < level,
@@ -113,9 +124,12 @@ pub enum CompareCondition {
 }
 
 impl CompareCondition {
-    /// Проверить условие с допуском
+    /// Проверить условие с допуском. NaN — всегда false.
     #[inline]
     pub fn check(&self, a: f64, b: f64, tolerance: f64) -> bool {
+        if !(a.is_finite() && b.is_finite()) {
+            return false;
+        }
         match self {
             Self::Greater => a > b + tolerance,
             Self::GreaterOrEqual => a >= b - tolerance,
@@ -147,9 +161,12 @@ pub enum TrendCondition {
 }
 
 impl TrendCondition {
-    /// Проверить тренд по последним N значениям
+    /// Проверить тренд по последним N значениям. NaN/inf — всегда false.
     pub fn check(&self, values: &[f64], tolerance: f64) -> bool {
         if values.len() < 2 {
+            return false;
+        }
+        if values.iter().any(|v| !v.is_finite()) {
             return false;
         }
 
@@ -200,10 +217,15 @@ pub enum DivergenceType {
 }
 
 impl DivergenceType {
-    /// Проверить дивергенцию по двум точкам
+    /// Проверить дивергенцию по двум точкам. NaN/inf — всегда false.
     /// price1, price2 - цены в точках 1 и 2
     /// ind1, ind2 - значения индикатора в точках 1 и 2
     pub fn check(&self, price1: f64, price2: f64, ind1: f64, ind2: f64) -> bool {
+        if !(price1.is_finite() && price2.is_finite()
+            && ind1.is_finite() && ind2.is_finite())
+        {
+            return false;
+        }
         match self {
             Self::Bullish => {
                 // Цена делает новый минимум, индикатор - более высокий минимум
@@ -298,6 +320,37 @@ pub enum PatternState {
     Broken,
 }
 
+impl PatternState {
+    /// Считается ли состояние "активным" — паттерн в процессе или завершён,
+    /// но ещё не сломан. Используется детекторами для решения "продолжать
+    /// отслеживать или сбрасывать state".
+    pub fn is_active(self) -> bool {
+        matches!(self, Self::Forming | Self::Complete | Self::Confirmed)
+    }
+
+    /// Подтверждённое срабатывание — сигнал имеет смысл эмитировать.
+    pub fn is_actionable(self) -> bool {
+        matches!(self, Self::Complete | Self::Confirmed)
+    }
+
+    /// Допустим ли переход `self -> next` в state-machine паттерна.
+    pub fn can_transition_to(self, next: Self) -> bool {
+        use PatternState::*;
+        matches!(
+            (self, next),
+            (None, Forming)
+                | (Forming, Complete)
+                | (Forming, Broken)
+                | (Forming, None)
+                | (Complete, Confirmed)
+                | (Complete, Broken)
+                | (Confirmed, Broken)
+                | (Confirmed, None)
+                | (Broken, None)
+        )
+    }
+}
+
 /// Тип свечного паттерна
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CandlePattern {
@@ -326,6 +379,47 @@ pub enum CandlePattern {
     ThreeBlackCrows,
     ThreeInsideUp,
     ThreeInsideDown,
+}
+
+impl CandlePattern {
+    /// Сколько баров lookback нужно паттерну.
+    /// Single = 1, Double = 2, Triple = 3.
+    pub fn bars_required(self) -> usize {
+        use CandlePattern::*;
+        match self {
+            Doji | Hammer | InvertedHammer | ShootingStar | HangingMan
+            | Marubozu | SpinningTop => 1,
+            BullishEngulfing | BearishEngulfing | BullishHarami | BearishHarami
+            | PiercingLine | DarkCloudCover | Tweezer => 2,
+            MorningStar | EveningStar | ThreeWhiteSoldiers | ThreeBlackCrows
+            | ThreeInsideUp | ThreeInsideDown => 3,
+        }
+    }
+
+    /// Бычий ли паттерн по своей семантике.
+    pub fn is_bullish(self) -> bool {
+        use CandlePattern::*;
+        matches!(
+            self,
+            Hammer | InvertedHammer | BullishEngulfing | BullishHarami
+                | PiercingLine | MorningStar | ThreeWhiteSoldiers | ThreeInsideUp
+        )
+    }
+
+    /// Медвежий ли паттерн по своей семантике.
+    pub fn is_bearish(self) -> bool {
+        use CandlePattern::*;
+        matches!(
+            self,
+            ShootingStar | HangingMan | BearishEngulfing | BearishHarami
+                | DarkCloudCover | EveningStar | ThreeBlackCrows | ThreeInsideDown
+        )
+    }
+
+    /// Нейтральный паттерн (без direction bias) — Doji, Marubozu, SpinningTop, Tweezer.
+    pub fn is_neutral(self) -> bool {
+        !self.is_bullish() && !self.is_bearish()
+    }
 }
 
 // ============================================================================
@@ -437,12 +531,27 @@ pub enum LogicOp {
 }
 
 impl LogicOp {
+    /// Применить бинарный оператор. Для `Not` используй `apply_unary`.
+    ///
+    /// # Panics
+    /// Паникует если `self == Not` (Not — унарный оператор).
     pub fn apply(&self, a: bool, b: bool) -> bool {
         match self {
             Self::And => a && b,
             Self::Or => a || b,
-            Self::Not => !a,
             Self::Xor => a ^ b,
+            Self::Not => panic!("LogicOp::Not is unary, use apply_unary"),
+        }
+    }
+
+    /// Применить унарный оператор `Not`. Для бинарных используй `apply`.
+    ///
+    /// # Panics
+    /// Паникует если `self != Not`.
+    pub fn apply_unary(&self, a: bool) -> bool {
+        match self {
+            Self::Not => !a,
+            _ => panic!("LogicOp::{:?} is binary, use apply", self),
         }
     }
 }
@@ -458,6 +567,32 @@ pub enum ConfirmationRequirement {
     WithinBars(usize),
     /// Подтверждение закрытием выше/ниже уровня
     CloseConfirmation,
+}
+
+impl ConfirmationRequirement {
+    /// Проверить, удовлетворяет ли подтверждение этому требованию,
+    /// учитывая количество баров с момента инициирующего сигнала.
+    /// `bars_since` — сколько баров прошло с момента события (0 = тот же бар).
+    /// `confirmed` — было ли получено подтверждение (close above/below, ...).
+    pub fn check(self, bars_since: usize, confirmed: bool) -> bool {
+        match self {
+            Self::Immediate => true,
+            Self::NextBar => bars_since == 1 && confirmed,
+            Self::WithinBars(n) => bars_since <= n && confirmed,
+            Self::CloseConfirmation => confirmed,
+        }
+    }
+
+    /// Истёк ли таймаут подтверждения. После истечения событие считается
+    /// невалидным, и detector должен сбросить state.
+    pub fn is_expired(self, bars_since: usize) -> bool {
+        match self {
+            Self::Immediate => false,
+            Self::NextBar => bars_since > 1,
+            Self::WithinBars(n) => bars_since > n,
+            Self::CloseConfirmation => false,
+        }
+    }
 }
 
 // ============================================================================

@@ -33,7 +33,7 @@ pub mod rendering_tests;
 
 // Core catalog exports
 pub use master_catalog::MasterIndicatorCatalog;
-pub use indicator_signature::{IndicatorSignature, IndicatorCategory, SourceType};
+pub use indicator_signature::{IndicatorSignature, IndicatorCategory, SourceType, IndicatorRoleKind};
 pub use constraints::{ParamConstraint, ConstraintSet};
 pub use param_value::{ParamValue, ParamType, ParamError};
 pub use parameter_grid::ParameterValue;
