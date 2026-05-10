@@ -66,17 +66,17 @@ impl std::fmt::Display for MovingAverageType {
 /// as standalone indicators from IndicatorInstance.
 #[derive(Debug, Clone)]
 pub enum MovingAverageProvider {
-    Sma(Sma),
-    Wma(Wma),
-    Rma(Rma),
-    Ema(Ema),
-    Dema(Dema),
-    Tema(Tema),
-    Tma(Tma),
-    Hma(Hma),
-    Ama(Ama),
-    Vwma(Vwma),
-    Vwap(Vwap),
+    Sma(Box<Sma>),
+    Wma(Box<Wma>),
+    Rma(Box<Rma>),
+    Ema(Box<Ema>),
+    Dema(Box<Dema>),
+    Tema(Box<Tema>),
+    Tma(Box<Tma>),
+    Hma(Box<Hma>),
+    Ama(Box<Ama>),
+    Vwma(Box<Vwma>),
+    Vwap(Box<Vwap>),
 }
 
 impl MovingAverageProvider {
@@ -102,19 +102,19 @@ impl MovingAverageProvider {
         // Add other guards as necessary to avoid runtime panics during massive grid search
 
         match ma_type {
-            MovingAverageType::SMA => Self::Sma(Sma::new(period.max(1))),
-            MovingAverageType::WMA => Self::Wma(Wma::new(period.max(1))),
-            MovingAverageType::EMA => Self::Ema(Ema::new(period.max(1))),
-            MovingAverageType::RMA => Self::Rma(Rma::new(period.max(1))),
-            MovingAverageType::DEMA => Self::Dema(Dema::new(period.max(1))),
-            MovingAverageType::TEMA => Self::Tema(Tema::new(period.max(1))),
-            MovingAverageType::HMA => Self::Hma(Hma::new(period)),
-            MovingAverageType::TMA => Self::Tma(Tma::new(period.max(1))),
-            MovingAverageType::VWMA => Self::Vwma(Vwma::new(period.max(1))),
-            MovingAverageType::VWAP => Self::Vwap(Vwap::new(period.max(1))),
+            MovingAverageType::SMA => Self::Sma(Box::new(Sma::new(period.max(1)))),
+            MovingAverageType::WMA => Self::Wma(Box::new(Wma::new(period.max(1)))),
+            MovingAverageType::EMA => Self::Ema(Box::new(Ema::new(period.max(1)))),
+            MovingAverageType::RMA => Self::Rma(Box::new(Rma::new(period.max(1)))),
+            MovingAverageType::DEMA => Self::Dema(Box::new(Dema::new(period.max(1)))),
+            MovingAverageType::TEMA => Self::Tema(Box::new(Tema::new(period.max(1)))),
+            MovingAverageType::HMA => Self::Hma(Box::new(Hma::new(period))),
+            MovingAverageType::TMA => Self::Tma(Box::new(Tma::new(period.max(1)))),
+            MovingAverageType::VWMA => Self::Vwma(Box::new(Vwma::new(period.max(1)))),
+            MovingAverageType::VWAP => Self::Vwap(Box::new(Vwap::new(period.max(1)))),
             MovingAverageType::AMA => {
                 let p = period.max(2);
-                Self::Ama(Ama::new(p, 2, 30))
+                Self::Ama(Box::new(Ama::new(p, 2, 30)))
             }
         }
     }
