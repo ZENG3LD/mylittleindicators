@@ -437,12 +437,17 @@ mod tests {
         let mut stoch_close = StochasticRsi::with_source(5, 5, 3, 3, OhlcvField::Close);
         let mut stoch_open = StochasticRsi::with_source(5, 5, 3, 3, OhlcvField::Open);
 
-        // Feed data with diverging open/close
-        for i in 1..=30 {
-            let open = 105.0 - (i as f64 * 0.5);   // Trending down
-            let close = 100.0 + (i as f64 * 0.5);  // Trending up
-            stoch_close.update_bar(open, 120.0, 80.0, close, 1000.0);
-            stoch_open.update_bar(open, 120.0, 80.0, close, 1000.0);
+        // Irregular open/close series — pure monotone trend gives flat RSI →
+        // stochastic div-by-zero → both fall back to 50.0.
+        let open_seq = [100.0, 105.0, 95.0, 110.0, 90.0, 108.0, 92.0, 106.0, 94.0, 104.0,
+                        96.0, 103.0, 97.0, 102.0, 98.0, 101.0, 99.0, 100.0, 101.0, 102.0,
+                        99.0, 103.0, 98.0, 104.0, 97.0, 105.0, 96.0, 106.0, 95.0, 107.0];
+        let close_seq = [105.0, 95.0, 110.0, 90.0, 108.0, 92.0, 106.0, 94.0, 104.0, 96.0,
+                         103.0, 97.0, 102.0, 98.0, 101.0, 99.0, 100.0, 101.0, 102.0, 99.0,
+                         103.0, 98.0, 104.0, 97.0, 105.0, 96.0, 106.0, 95.0, 107.0, 94.0];
+        for i in 0..30 {
+            stoch_close.update_bar(open_seq[i], 120.0, 80.0, close_seq[i], 1000.0);
+            stoch_open.update_bar(open_seq[i], 120.0, 80.0, close_seq[i], 1000.0);
         }
 
         if stoch_close.is_ready() && stoch_open.is_ready() {
