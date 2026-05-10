@@ -42,6 +42,9 @@ pub enum Guard {
         role_idx: usize,
         mult: f64,
     },
-    /// No open position (flat before entry).
-    PositionFlat,
+    // Note: PositionFlat removed — express via Guard::State on the strategy's
+    // own prev_state field (e.g. State{ var_idx: PREV_STATE, op: Eq, val:
+    // Signal::None as i32 }). Strategies model position-awareness via their
+    // own state machine (see DualMaCrossV3.prev_state), not via backtester
+    // position. Hot loop signature unchanged.
 }
