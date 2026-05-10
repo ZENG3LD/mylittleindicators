@@ -279,8 +279,7 @@ fn validate_composition_inner(c: &CompositionSpec, is_root: bool) -> Result<(), 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::axes::{Operand, EventDirection, Window};
-    use crate::event::Event;
+    use crate::core::events::{Operand, EventDirection, Window, Event};
 
     fn make_cross_event(left: Operand, right: Operand) -> Event {
         Event {
@@ -312,7 +311,7 @@ mod tests {
 
     #[test]
     fn cross_accepts_indicator_bar_field() {
-        use crate::axes::BarField;
+        use crate::core::events::BarField;
         let e = make_cross_event(
             Operand::IndicatorValue { role_idx: 0 },
             Operand::BarField(BarField::Close),
@@ -322,7 +321,7 @@ mod tests {
 
     #[test]
     fn composition_not_as_root_rejected() {
-        use crate::axes::BarField;
+        use crate::core::events::BarField;
         let inner_event = make_cross_event(
             Operand::IndicatorValue { role_idx: 0 },
             Operand::BarField(BarField::Close),
@@ -333,7 +332,7 @@ mod tests {
 
     #[test]
     fn composition_not_as_sub_ok() {
-        use crate::axes::BarField;
+        use crate::core::events::BarField;
         let inner_event = make_cross_event(
             Operand::IndicatorValue { role_idx: 0 },
             Operand::BarField(BarField::Close),
@@ -357,7 +356,7 @@ mod tests {
 
     #[test]
     fn composition_sequence_zero_max_bars_rejected() {
-        use crate::axes::BarField;
+        use crate::core::events::BarField;
         let e = make_cross_event(
             Operand::IndicatorValue { role_idx: 0 },
             Operand::BarField(BarField::Close),
