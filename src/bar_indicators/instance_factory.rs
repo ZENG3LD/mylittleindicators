@@ -660,13 +660,14 @@ impl IndicatorConfig {
 /// Unified wrapper over concrete indicator implementations with scalar output
 #[derive(Clone)]
 pub enum IndicatorInstance {
-    // Core simple
-    Sma(Sma),
-    Ema(Ema),
-    Rsi(Rsi),
-    Macd(Macd),
-    BbPeriod(BbPeriod),
-    Atr(Atr),
+    // Core simple — all boxed (Sma + BbPeriod hold 4KB ArrayVec inline,
+    // which propagates to IndicatorInstance size and overflows test stack)
+    Sma(Box<Sma>),
+    Ema(Box<Ema>),
+    Rsi(Box<Rsi>),
+    Macd(Box<Macd>),
+    BbPeriod(Box<BbPeriod>),
+    Atr(Box<Atr>),
 
     // Boxed to reduce stack usage (O(1) optimized versions)
     Rma(Box<Rma>),
@@ -1412,8 +1413,8 @@ impl IndicatorInstance {
         let period = config.periods.first().copied().unwrap_or(14).clamp(2, 512);
         match config.id {
             // Average indicators
-            BarIndicatorId::Sma => Ok(Self::Sma(Sma::with_source(period, config.source))),
-            BarIndicatorId::Ema => Ok(Self::Ema(Ema::with_source(period, config.source))),
+            BarIndicatorId::Sma => Ok(Self::Sma(Box::new(Sma::with_source(period, config.source)))),
+            BarIndicatorId::Ema => Ok(Self::Ema(Box::new(Ema::with_source(period, config.source)))),
             BarIndicatorId::Rma => Ok(Self::Rma(Box::new(Rma::with_source(period, config.source)))),
             BarIndicatorId::Hma => Ok(Self::Hma(Box::new(Hma::with_source(period, config.source)))),
             BarIndicatorId::Wma => Ok(Self::Wma(Box::new(Wma::with_source(period, config.source)))),
@@ -1449,7 +1450,7 @@ impl IndicatorInstance {
             // VWMA handled above, leave here for completeness
 
             // Core momentum/volatility
-            BarIndicatorId::Rsi => Ok(Self::Rsi(Rsi::with_source(period, MovingAverageType::RMA, config.source))),
+            BarIndicatorId::Rsi => Ok(Self::Rsi(Box::new(Rsi::with_source(period, MovingAverageType::RMA, config.source)))),
             BarIndicatorId::Macd => {
                 let fast = config.periods.first().copied().unwrap_or(12);
                 let slow = config.periods.get(1).copied().unwrap_or(26);
@@ -1473,11 +1474,11 @@ impl IndicatorInstance {
                     .and_then(|c| c.source)
                     .unwrap_or(config.source);
 
-                Ok(Self::Macd(Macd::with_full_config(
+                Ok(Self::Macd(Box::new(Macd::with_full_config(
                     fast, slow, signal,
                     fast_ma_type, slow_ma_type, signal_ma_type,
                     fast_source, slow_source
-                )))
+                ))))
             }
             BarIndicatorId::Ppo => {
                 let fast = config.periods.first().copied().unwrap_or(12);
@@ -1512,11 +1513,11 @@ impl IndicatorInstance {
             BarIndicatorId::BbPeriod => {
                 let std_dev = config.additional_params.get("std_dev").copied().unwrap_or(2.0);
                 let ma_type = config.ma_types.get("ma_type").copied().unwrap_or(MovingAverageType::SMA);
-                Ok(Self::BbPeriod(BbPeriod::new(period, std_dev, ma_type)))
+                Ok(Self::BbPeriod(Box::new(BbPeriod::new(period, std_dev, ma_type))))
             }
             BarIndicatorId::Atr => {
                 let ma_type = config.ma_types.get("ma_type").copied().unwrap_or(MovingAverageType::SMA);
-                Ok(Self::Atr(Atr::new(period, ma_type)))
+                Ok(Self::Atr(Box::new(Atr::new(period, ma_type))))
             }
             BarIndicatorId::Tr => Ok(Self::TrueRange(Box::default())),
             BarIndicatorId::Bpv => {
