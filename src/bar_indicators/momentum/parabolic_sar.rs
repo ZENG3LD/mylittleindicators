@@ -1,6 +1,5 @@
 //! Parabolic SAR (Stop and Reverse) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Parabolic SAR (Stop and Reverse) - trend-following indicator by J. Welles Wilder.
@@ -38,8 +37,11 @@ pub struct ParabolicSAR {
     af: f64,
     ep: f64,
 
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
+    // SAR reads only the previous 2 high/low values per bar; keeping a 512-buffer is pointless.
+    prev_high: f64,
+    last_high: f64,
+    prev_low: f64,
+    last_low: f64,
 
     is_initialized: bool,
     bars_count: usize,
@@ -66,8 +68,10 @@ impl ParabolicSAR {
             trend: 1,
             af: af_start,
             ep: 0.0,
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            prev_high: 0.0,
+            last_high: 0.0,
+            prev_low: 0.0,
+            last_low: 0.0,
             is_initialized: false,
             bars_count: 0,
         }
@@ -77,15 +81,14 @@ impl ParabolicSAR {
     ///
     /// Uses `high` and `low` prices to calculate SAR and detect trend reversals.
     pub fn update_bar(&mut self, _open: f64, high: f64, low: f64, _close: f64, _volume: f64) -> f64 {
-        if self.highs.len() >= 512 {
-            self.highs.remove(0);
-            self.lows.remove(0);
-        }
-        self.highs.push(high);
-        self.lows.push(low);
-        
+        // Сдвигаем окно из последних 2 high/low.
+        self.prev_high = self.last_high;
+        self.prev_low = self.last_low;
+        self.last_high = high;
+        self.last_low = low;
+
         self.bars_count += 1;
-        
+
         if !self.is_initialized {
             // Инициализация на первых двух барах
             if self.bars_count == 1 {
@@ -95,42 +98,36 @@ impl ParabolicSAR {
                 return self.sar;
             } else if self.bars_count == 2 {
                 // Определяем направление тренда по первым двум барам
-                let prev_high = self.highs[0];
-                let prev_low = self.lows[0];
-                
-                if high > prev_high {
+                if high > self.prev_high {
                     // Восходящий тренд
                     self.trend = 1;
-                    self.sar = prev_low.min(low);
+                    self.sar = self.prev_low.min(low);
                     self.ep = high;
                 } else {
-                    // Нисходящий тренд  
+                    // Нисходящий тренд
                     self.trend = -1;
-                    self.sar = prev_high.max(high);
+                    self.sar = self.prev_high.max(high);
                     self.ep = low;
                 }
-                
+
                 self.af = self.af_start;
                 self.is_initialized = true;
                 return self.sar;
             }
         }
-        
+
         // Основной расчет SAR
         let prev_sar = self.sar;
         let new_sar = prev_sar + self.af * (self.ep - prev_sar);
-        
+
         if self.trend == 1 {
             // Восходящий тренд
             self.sar = new_sar;
 
             // SAR не должен быть выше минимумов последних двух баров
-            let len = self.lows.len();
-            if len >= 2 {
-                let min_low = self.lows[len-2].min(self.lows[len-1]);
-                if self.sar > min_low {
-                    self.sar = min_low;
-                }
+            let min_low = self.prev_low.min(self.last_low);
+            if self.sar > min_low {
+                self.sar = min_low;
             }
 
             // Проверяем новый максимум
@@ -151,12 +148,9 @@ impl ParabolicSAR {
             self.sar = new_sar;
 
             // SAR не должен быть ниже максимумов последних двух баров
-            let len = self.highs.len();
-            if len >= 2 {
-                let max_high = self.highs[len-2].max(self.highs[len-1]);
-                if self.sar < max_high {
-                    self.sar = max_high;
-                }
+            let max_high = self.prev_high.max(self.last_high);
+            if self.sar < max_high {
+                self.sar = max_high;
             }
 
             // Проверяем новый минимум
@@ -173,7 +167,7 @@ impl ParabolicSAR {
                 self.af = self.af_start;
             }
         }
-        
+
         self.sar
     }
     
@@ -213,8 +207,10 @@ impl ParabolicSAR {
         self.trend = 1;
         self.af = self.af_start;
         self.ep = 0.0;
-        self.highs.clear();
-        self.lows.clear();
+        self.prev_high = 0.0;
+        self.last_high = 0.0;
+        self.prev_low = 0.0;
+        self.last_low = 0.0;
         self.is_initialized = false;
         self.bars_count = 0;
     }
