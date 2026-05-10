@@ -56,6 +56,8 @@ impl Macd {
     pub fn with_source(fast_period: usize, slow_period: usize, source: OhlcvField) -> Self {
         let mut macd = Self::with_signal(fast_period, slow_period, 9, MovingAverageType::EMA);
         macd.source = source;
+        macd.fast_source = source;
+        macd.slow_source = source;
         macd
     }
 
