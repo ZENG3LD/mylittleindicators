@@ -28,20 +28,20 @@ impl Dc {
             lower: 0.0,
         }
     }
-    /// Обновить Donchian Channel новым баром (используются high, low)
+    /// Обновить Donchian Channel новым баром (используются high, low).
+    /// Циклический буфер: O(1) запись, O(period) скан экстремумов.
     pub fn update_bar(&mut self, _open: f64, high: f64, low: f64, _close: f64, _volume: f64) -> (f64, f64, f64) {
         if self.highs.len() < self.period {
             self.highs.push(high);
             self.lows.push(low);
         } else {
-            self.highs.remove(0);
-            self.lows.remove(0);
-            self.highs.push(high);
-            self.lows.push(low);
+            self.highs[self.index] = high;
+            self.lows[self.index] = low;
             self.filled = true;
         }
-        let len = self.highs.len();
-        if len < self.period {
+        self.index = (self.index + 1) % self.period;
+
+        if self.highs.len() < self.period {
             self.upper = 0.0;
             self.middle = 0.0;
             self.lower = 0.0;
