@@ -221,6 +221,12 @@ pub struct IndicatorKey {
 
     /// Output selector for multi-output indicators (default: Main)
     pub output: OutputSelector,
+
+    /// Hash of all extra parameters that don't fit into `period`/`ma_type` slots:
+    /// secondary periods (MACD slow, MaCross slow), additional ma_types
+    /// (MACD fast/slow/signal), component_configs, source (when not Close),
+    /// inner_indicators (recursive). 0 when no extras.
+    pub param_hash: u64,
 }
 
 impl IndicatorKey {
@@ -250,6 +256,7 @@ impl IndicatorKey {
             period,
             ma_type,
             output: OutputSelector::Main,
+            param_hash: 0,
         }
     }
 
@@ -286,7 +293,17 @@ impl IndicatorKey {
             period,
             ma_type,
             output,
+            param_hash: 0,
         }
+    }
+
+    /// Set `param_hash` (builder-style). Used when an indicator has extras
+    /// (secondary periods, multiple ma_types, component_configs, inner_indicators)
+    /// that don't fit into the typed slots.
+    #[inline]
+    pub fn with_param_hash(mut self, hash: u64) -> Self {
+        self.param_hash = hash;
+        self
     }
 
     /// Get the base key (same indicator/period/ma_type but with Main output)
@@ -300,6 +317,7 @@ impl IndicatorKey {
             period: self.period,
             ma_type: self.ma_type,
             output: OutputSelector::Main,
+            param_hash: self.param_hash,
         }
     }
 
@@ -460,6 +478,9 @@ impl Hash for IndicatorKey {
 
         // Hash output selector
         (self.output as u8).hash(state);
+
+        // Hash extra-params digest (0 when indicator has no extras).
+        self.param_hash.hash(state);
     }
 }
 
@@ -489,6 +510,17 @@ mod tests {
         assert_eq!(key.indicator_id, BarIndicatorId::Atr);
         assert_eq!(key.period, 14);
         assert_eq!(key.ma_type, Some(MovingAverageType::RMA));
+    }
+
+    #[test]
+    fn test_param_hash_distinguishes_secondary_params() {
+        // Without param_hash, MaCross(9, 21) and MaCross(9, 30) collided.
+        let a = IndicatorKey::new(BarIndicatorId::MaCross, 9, None).with_param_hash(0x1234);
+        let b = IndicatorKey::new(BarIndicatorId::MaCross, 9, None).with_param_hash(0x5678);
+        let c = IndicatorKey::new(BarIndicatorId::MaCross, 9, None).with_param_hash(0x1234);
+
+        assert_ne!(a, b);
+        assert_eq!(a, c);
     }
 
     #[test]

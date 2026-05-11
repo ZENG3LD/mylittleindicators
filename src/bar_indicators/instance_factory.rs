@@ -654,6 +654,104 @@ impl IndicatorConfig {
         self.source = source;
         self
     }
+
+    /// Compute a stable hash of all "extra" config fields that don't fit into
+    /// the typed `IndicatorKey` slots (`period[0]`, `ma_types["ma_type"]`, `output`).
+    ///
+    /// This includes:
+    /// - `periods[1..]` — secondary periods (MACD slow/signal, MaCross slow)
+    /// - `additional_params` — named scalar floats (sorted by key)
+    /// - `ma_types` — named MA types except the unnamed `"ma_type"` slot (sorted by key)
+    /// - `flags` — boolean flags (sorted by key)
+    /// - `source` — only when not Close (default)
+    /// - `component_configs` — per-component overrides (sorted by key)
+    ///
+    /// Returns 0 when the config has no extras (autonomous indicator).
+    pub fn compute_param_hash(&self) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = DefaultHasher::new();
+        let mut has_extra = false;
+
+        // Secondary periods (periods[1..])
+        if self.periods.len() > 1 {
+            has_extra = true;
+            for p in &self.periods[1..] {
+                p.hash(&mut hasher);
+            }
+        }
+
+        // Named additional_params (sorted for stability)
+        if !self.additional_params.is_empty() {
+            has_extra = true;
+            let mut entries: Vec<(&String, &f64)> = self.additional_params.iter().collect();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            for (k, v) in entries {
+                k.hash(&mut hasher);
+                v.to_bits().hash(&mut hasher);
+            }
+        }
+
+        // Named ma_types EXCEPT unnamed "ma_type" (which lives in IndicatorKey.ma_type).
+        let extra_ma_types: Vec<(&String, &MovingAverageType)> = self
+            .ma_types
+            .iter()
+            .filter(|(k, _)| k.as_str() != "ma_type")
+            .collect();
+        if !extra_ma_types.is_empty() {
+            has_extra = true;
+            let mut entries = extra_ma_types;
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            for (k, v) in entries {
+                k.hash(&mut hasher);
+                (*v as u8).hash(&mut hasher);
+            }
+        }
+
+        // Flags (sorted)
+        if !self.flags.is_empty() {
+            has_extra = true;
+            let mut entries: Vec<(&String, &bool)> = self.flags.iter().collect();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            for (k, v) in entries {
+                k.hash(&mut hasher);
+                v.hash(&mut hasher);
+            }
+        }
+
+        // Source (only when not Close — default)
+        if self.source != OhlcvField::Close {
+            has_extra = true;
+            (self.source as u8).hash(&mut hasher);
+        }
+
+        // Component configs (sorted by key)
+        if !self.component_configs.is_empty() {
+            has_extra = true;
+            let mut entries: Vec<(&String, &ComponentConfig)> =
+                self.component_configs.iter().collect();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            for (k, v) in entries {
+                k.hash(&mut hasher);
+                if let Some(s) = v.source {
+                    (s as u8).hash(&mut hasher);
+                }
+                if let Some(m) = v.ma_type {
+                    (m as u8).hash(&mut hasher);
+                }
+                if let Some(p) = v.period {
+                    p.hash(&mut hasher);
+                }
+            }
+        }
+
+        if has_extra {
+            hasher.finish()
+        } else {
+            0
+        }
+    }
 }
 
 
@@ -7232,5 +7330,75 @@ impl IndicatorInstance {
             Self::ZigzagTime(ind) => ind.reset(),
             Self::ZlSma(ind) => ind.reset(),
         }
+    }
+}
+
+#[cfg(test)]
+mod compute_param_hash_tests {
+    use super::*;
+
+    #[test]
+    fn autonomous_config_returns_zero() {
+        let cfg = IndicatorConfig::new(BarIndicatorId::Sma, "Sma".into(), vec![20]);
+        assert_eq!(cfg.compute_param_hash(), 0, "Sma(20) has no extras");
+    }
+
+    #[test]
+    fn single_ma_type_is_in_typed_slot_not_hashed() {
+        // ATR(14, SMA) → typed slot, param_hash stays 0
+        let cfg = IndicatorConfig::new(BarIndicatorId::Atr, "Atr".into(), vec![14])
+            .with_ma_type(MovingAverageType::SMA);
+        assert_eq!(cfg.compute_param_hash(), 0);
+    }
+
+    #[test]
+    fn secondary_period_is_hashed() {
+        let cfg_a = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 21]);
+        let cfg_b = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 30]);
+        let cfg_c = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 21]);
+
+        assert_ne!(cfg_a.compute_param_hash(), 0);
+        assert_ne!(cfg_a.compute_param_hash(), cfg_b.compute_param_hash());
+        assert_eq!(cfg_a.compute_param_hash(), cfg_c.compute_param_hash());
+    }
+
+    #[test]
+    fn named_ma_types_are_hashed() {
+        let cfg_a = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::EMA);
+        let cfg_b = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::SMA);
+
+        assert_ne!(cfg_a.compute_param_hash(), cfg_b.compute_param_hash());
+    }
+
+    #[test]
+    fn source_change_is_hashed() {
+        let cfg_close =
+            IndicatorConfig::new(BarIndicatorId::Sma, "Sma".into(), vec![20]).with_source(OhlcvField::Close);
+        let cfg_high =
+            IndicatorConfig::new(BarIndicatorId::Sma, "Sma".into(), vec![20]).with_source(OhlcvField::High);
+
+        // Close is default → param_hash 0
+        assert_eq!(cfg_close.compute_param_hash(), 0);
+        assert_ne!(cfg_high.compute_param_hash(), 0);
+    }
+
+    #[test]
+    fn hash_is_deterministic_across_insertion_order() {
+        let mut cfg_a = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9]);
+        cfg_a.ma_types.insert("signal_ma_type".into(), MovingAverageType::EMA);
+        cfg_a.ma_types.insert("fast_ma_type".into(), MovingAverageType::EMA);
+        cfg_a.ma_types.insert("slow_ma_type".into(), MovingAverageType::EMA);
+
+        let mut cfg_b = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9]);
+        cfg_b.ma_types.insert("fast_ma_type".into(), MovingAverageType::EMA);
+        cfg_b.ma_types.insert("slow_ma_type".into(), MovingAverageType::EMA);
+        cfg_b.ma_types.insert("signal_ma_type".into(), MovingAverageType::EMA);
+
+        // Insertion order differs but compute_param_hash must be deterministic.
+        assert_eq!(cfg_a.compute_param_hash(), cfg_b.compute_param_hash());
     }
 }
