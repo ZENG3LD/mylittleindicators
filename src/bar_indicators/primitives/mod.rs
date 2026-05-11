@@ -12,13 +12,17 @@
 //! inner-indicator configs recursively.
 
 pub mod breakout;
+pub mod confluence;
 pub mod crossover;
 pub mod divergence;
 pub mod event_at_level;
 pub mod relative_position;
+pub mod swing_detection;
 
 pub use breakout::Breakout;
+pub use confluence::Confluence;
 pub use crossover::Crossover;
 pub use divergence::Divergence;
 pub use event_at_level::EventAtLevel;
 pub use relative_position::RelativePosition;
+pub use swing_detection::SwingDetection;

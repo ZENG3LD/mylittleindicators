@@ -187,5 +187,5 @@ struct PatternAtLevel {
 | 6. Breakout primitive | DONE |
 | 7. Divergence unification | DONE |
 | 8. EventAtLevel (WickAtLevel + PatternAtLevel unified) | DONE |
-| 9. SwingDetection unification | TODO |
-| 10. Остальные primitives | TODO |
+| 9. SwingDetection unification | DONE |
+| 10. Confluence + остальные primitives | DONE (Confluence covers Multi*, MarketCipher-style) |
