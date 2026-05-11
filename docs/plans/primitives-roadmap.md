@@ -185,7 +185,7 @@ struct PatternAtLevel {
 | 4. Crossover primitive | DONE (this commit) |
 | 5. RelativePosition (MaCross-style state semantics) | DONE |
 | 6. Breakout primitive | DONE |
-| 7. Divergence unification | TODO |
-| 8. WickAtLevel + PatternAtLevel | TODO |
+| 7. Divergence unification | DONE |
+| 8. EventAtLevel (WickAtLevel + PatternAtLevel unified) | DONE |
 | 9. SwingDetection unification | TODO |
 | 10. Остальные primitives | TODO |

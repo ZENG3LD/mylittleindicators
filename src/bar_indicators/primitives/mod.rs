@@ -13,8 +13,12 @@
 
 pub mod breakout;
 pub mod crossover;
+pub mod divergence;
+pub mod event_at_level;
 pub mod relative_position;
 
 pub use breakout::Breakout;
 pub use crossover::Crossover;
+pub use divergence::Divergence;
+pub use event_at_level::EventAtLevel;
 pub use relative_position::RelativePosition;
