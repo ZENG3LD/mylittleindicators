@@ -2,6 +2,7 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::momentum::rsi::Rsi;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 use crate::bar_indicators::utils::math::percentile::percentile_rank;
 
 /// Connors RSI result containing all component values.
@@ -77,6 +78,7 @@ impl ConnorsRsiResult {
 pub struct ConnorsRsi {
     updown_period: usize,
     roc_period: usize,
+    source: OhlcvField,
 
     rsi: Rsi,
 
@@ -111,6 +113,20 @@ impl ConnorsRsi {
     /// * `rsi_period` - RSI calculation period (typically 3)
     /// * `updown_period` - UpDown RSI period (typically 2)
     /// * `roc_period` - ROC percentile lookback (typically 100)
+    pub fn with_source(source: OhlcvField) -> Self {
+        let mut s = Self::with_periods(3, 2, 100);
+        s.source = source;
+        s.rsi = Rsi::with_source(3, crate::bar_indicators::average::MovingAverageType::RMA, source);
+        s
+    }
+
+    pub fn with_periods_and_source(rsi_period: usize, updown_period: usize, roc_period: usize, source: OhlcvField) -> Self {
+        let mut s = Self::with_periods(rsi_period, updown_period, roc_period);
+        s.source = source;
+        s.rsi = Rsi::with_source(rsi_period, crate::bar_indicators::average::MovingAverageType::RMA, source);
+        s
+    }
+
     pub fn with_periods(rsi_period: usize, updown_period: usize, roc_period: usize) -> Self {
         assert!(rsi_period > 0, "RSI period must be greater than 0");
         assert!(updown_period > 0, "UpDown period must be greater than 0");
@@ -119,6 +135,7 @@ impl ConnorsRsi {
         Self {
             updown_period,
             roc_period,
+            source: OhlcvField::Close,
             rsi: Rsi::new(rsi_period),
             prices: Vec::with_capacity(roc_period),
             updown_lengths: Vec::with_capacity(updown_period),
@@ -134,12 +151,11 @@ impl ConnorsRsi {
             update_count: 0,
         }
     }
-    
+
     /// Updates the indicator with a new bar and returns the result.
-    ///
-    /// Only the `close` price is used.
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> ConnorsRsiResult {
-        self.update_price(close)
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> ConnorsRsiResult {
+        let value = self.source.extract(open, high, low, close, volume);
+        self.update_price(value)
     }
 
     /// Updates the indicator with a new price.

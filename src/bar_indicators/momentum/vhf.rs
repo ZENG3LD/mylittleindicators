@@ -2,10 +2,12 @@
 // (c) 2024
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 #[derive(Clone)]
 pub struct Vhf {
     period: usize,
+    source: OhlcvField,
     buffer: Vec<f64>,
     filled: bool,
     value: f64,
@@ -13,20 +15,26 @@ pub struct Vhf {
 
 impl Vhf {
     pub fn new(period: usize) -> Self {
+        Self::with_source(period, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, source: OhlcvField) -> Self {
         Self {
             period,
+            source,
             buffer: Vec::with_capacity(period),
             filled: false,
             value: 0.0,
         }
     }
-    /// Обновить VHF новым баром (используется close)
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
+    /// Обновить VHF новым баром
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
         if self.buffer.len() < self.period {
-            self.buffer.push(close);
+            self.buffer.push(value);
         } else {
             self.buffer.remove(0);
-            self.buffer.push(close);
+            self.buffer.push(value);
             self.filled = true;
         }
         if self.buffer.len() < self.period {

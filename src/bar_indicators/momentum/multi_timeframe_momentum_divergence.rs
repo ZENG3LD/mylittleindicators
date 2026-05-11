@@ -7,6 +7,7 @@
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 use std::collections::HashMap;
 
 /// Тип дивергенции
@@ -136,6 +137,7 @@ impl MultiTimeframeMomentumResult {
 /// Multi-ResearchTimeframe Momentum Divergence индикатор
 #[derive(Clone)]
 pub struct MultiTimeframeMomentumDivergence {
+    source: OhlcvField,
     // Переиспользуем MovingAverage для разных таймфреймов
     short_momentum_ma: MovingAverageProvider,        // Короткий momentum (5 периодов)
     medium_momentum_ma: MovingAverageProvider,       // Средний momentum (14 периодов)
@@ -179,13 +181,20 @@ impl MultiTimeframeMomentumDivergence {
     pub fn new() -> Self {
         Self::with_parameters(0.3, 0.7)
     }
-    
+
+    pub fn with_source(source: OhlcvField) -> Self {
+        let mut s = Self::with_parameters(0.3, 0.7);
+        s.source = source;
+        s
+    }
+
     /// Создать с настраиваемыми параметрами
     pub fn with_parameters(divergence_threshold: f64, extreme_threshold: f64) -> Self {
         assert!(divergence_threshold > 0.0 && divergence_threshold < 1.0, "Invalid divergence threshold");
         assert!(extreme_threshold > divergence_threshold, "Extreme threshold must be > divergence threshold");
-        
+
         Self {
+            source: OhlcvField::Close,
             // Переиспользуем MovingAverage для разных целей и периодов
             short_momentum_ma: MovingAverageProvider::new(MovingAverageType::EMA, 5),
             medium_momentum_ma: MovingAverageProvider::new(MovingAverageType::EMA, 14),
@@ -218,20 +227,21 @@ impl MultiTimeframeMomentumDivergence {
     }
     
     /// Обновить индикатор новым баром
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> MultiTimeframeMomentumResult {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> MultiTimeframeMomentumResult {
+        let value = self.source.extract(open, high, low, close, volume);
         // Добавляем цену в буфер
         if self.prices.len() >= 64 {
             self.prices.remove(0);
         }
-        self.prices.push(close);
-        
+        self.prices.push(value);
+
         // 1. Обновляем MA цен для разных таймфреймов (переиспользуем MovingAverage)
-        let price_short = self.price_ma_short.update_bar(0.0, 0.0, 0.0, close, 0.0);
-        let price_medium = self.price_ma_medium.update_bar(0.0, 0.0, 0.0, close, 0.0);
-        let price_long = self.price_ma_long.update_bar(0.0, 0.0, 0.0, close, 0.0);
-        
+        let price_short = self.price_ma_short.update_bar(0.0, 0.0, 0.0, value, 0.0);
+        let price_medium = self.price_ma_medium.update_bar(0.0, 0.0, 0.0, value, 0.0);
+        let price_long = self.price_ma_long.update_bar(0.0, 0.0, 0.0, value, 0.0);
+
         // 2. Рассчитываем momentum для каждого таймфрейма
-        self.calculate_timeframe_momentum(close, price_short, price_medium, price_long);
+        self.calculate_timeframe_momentum(value, price_short, price_medium, price_long);
         
         // 3. Анализируем каждый таймфрейм
         self.analyze_timeframes();

@@ -3,6 +3,7 @@
 //! Значения: 0.0-3.0+, где 0.0 = максимально регулярно, выше = более сложно
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// Sample Entropy индикатор
 #[derive(Clone)]
@@ -10,6 +11,7 @@ pub struct SampleEntropy {
     period: usize,              // Период анализа
     m: usize,                   // Длина паттерна (обычно 2)
     r: f64,                     // Толерантность
+    source: OhlcvField,
     
     // Буферы
     data: Vec<f64>,   // Буфер цен
@@ -28,10 +30,15 @@ pub struct SampleEntropy {
 
 impl SampleEntropy {
     pub fn new(period: usize, m: usize, r: f64) -> Self {
+        Self::with_source(period, m, r, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, m: usize, r: f64, source: OhlcvField) -> Self {
         Self {
             period: period.min(512),
             m: m.clamp(1, 5), // Ограничиваем разумными пределами
             r: r.clamp(0.01, 1.0), // Толерантность не может быть слишком маленькой или большой
+            source,
             data: Vec::with_capacity(period.min(512)),
             sampen: 0.0,
             complexity_score: 0.5,
@@ -40,19 +47,20 @@ impl SampleEntropy {
             std_dev: 0.0,
         }
     }
-    
+
     /// Создать SampEn с параметрами по умолчанию
     pub fn new_default(period: usize) -> Self {
         Self::new(period, 2, 0.0) // r будет вычислено автоматически
     }
-    
+
     /// Обновить индикатор новым баром
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
         // Добавляем цену в буфер
         if self.data.len() >= self.period {
             self.data.remove(0);
         }
-        self.data.push(close);
+        self.data.push(value);
         self.count += 1;
         
         // Рассчитываем SampEn если достаточно данных

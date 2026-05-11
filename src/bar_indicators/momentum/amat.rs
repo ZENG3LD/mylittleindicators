@@ -3,6 +3,7 @@
 use std::collections::VecDeque;
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 #[derive(Clone)]
 pub struct Amat {
@@ -14,6 +15,7 @@ pub struct Amat {
     pub initialized: bool,
     fast_type: MovingAverageType,  // Store catalog types
     slow_type: MovingAverageType,
+    source: OhlcvField,
     fast_ma: MovingAverageProvider,
     slow_ma: MovingAverageProvider,
     fast_ma_price: VecDeque<f64>,
@@ -26,6 +28,10 @@ pub struct Amat {
 
 impl Amat {
     pub fn new(fast_period: usize, slow_period: usize, signal_period: usize, fast_type: MovingAverageType, slow_type: MovingAverageType) -> Self {
+        Self::with_source(fast_period, slow_period, signal_period, fast_type, slow_type, OhlcvField::Close)
+    }
+
+    pub fn with_source(fast_period: usize, slow_period: usize, signal_period: usize, fast_type: MovingAverageType, slow_type: MovingAverageType, source: OhlcvField) -> Self {
         Self {
             fast_period,
             slow_period,
@@ -35,6 +41,7 @@ impl Amat {
             initialized: false,
             fast_type,
             slow_type,
+            source,
             fast_ma: MovingAverageProvider::new(fast_type, fast_period),
             slow_ma: MovingAverageProvider::new(slow_type, slow_period),
             fast_ma_price: VecDeque::with_capacity(signal_period + 1),
@@ -43,10 +50,11 @@ impl Amat {
         }
     }
 
-    /// Обновить AMAT новым баром (используется close)
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> i8 {
-        self.fast_ma.update_bar(0.0, 0.0, 0.0, close, 0.0);
-        self.slow_ma.update_bar(0.0, 0.0, 0.0, close, 0.0);
+    /// Обновить AMAT новым баром
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> i8 {
+        let value = self.source.extract(open, high, low, close, volume);
+        self.fast_ma.update_bar(0.0, 0.0, 0.0, value, 0.0);
+        self.slow_ma.update_bar(0.0, 0.0, 0.0, value, 0.0);
         if self.slow_ma.is_ready() {
             self.fast_ma_price.push_back(self.fast_ma.value().main());
             self.slow_ma_price.push_back(self.slow_ma.value().main());

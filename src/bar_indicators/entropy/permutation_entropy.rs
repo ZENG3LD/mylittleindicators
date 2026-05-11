@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// Permutation Entropy индикатор
 #[derive(Clone)]
@@ -11,6 +12,7 @@ pub struct PermutationEntropy {
     period: usize,              // Период анализа
     order: usize,               // Порядок перестановки (3-7)
     delay: usize,               // Задержка (обычно 1)
+    source: OhlcvField,
     
     // Буферы
     data: Vec<f64>,   // Буфер цен
@@ -27,10 +29,15 @@ pub struct PermutationEntropy {
 
 impl PermutationEntropy {
     pub fn new(period: usize, order: usize, delay: usize) -> Self {
+        Self::with_source(period, order, delay, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, order: usize, delay: usize, source: OhlcvField) -> Self {
         Self {
             period: period.min(512),
             order: order.clamp(3, 7), // Ограничиваем разумными пределами
             delay: delay.clamp(1, 5), // Задержка не может быть слишком большой
+            source,
             data: Vec::with_capacity(period.min(512)),
             pe: 0.0,
             normalized_pe: 0.0,
@@ -39,19 +46,20 @@ impl PermutationEntropy {
             initialized: false,
         }
     }
-    
+
     /// Создать PE с параметрами по умолчанию
     pub fn new_default(period: usize) -> Self {
         Self::new(period, 3, 1) // Порядок 3, задержка 1
     }
-    
+
     /// Обновить индикатор новым баром
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
         // Добавляем цену в буфер
         if self.data.len() >= self.period {
             self.data.remove(0);
         }
-        self.data.push(close);
+        self.data.push(value);
         self.count += 1;
         
         // Рассчитываем PE если достаточно данных

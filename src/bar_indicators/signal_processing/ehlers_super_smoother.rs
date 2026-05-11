@@ -11,6 +11,7 @@
 
 use std::f64::consts::PI;
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// Результат Super Smoother
 #[derive(Debug, Clone, Copy)]
@@ -53,6 +54,7 @@ impl SuperSmootherResult {
 /// Ehlers Super Smoother индикатор
 #[derive(Clone)]
 pub struct EhlersSuperSmoother {
+    source: OhlcvField,
     // Коэффициенты фильтра
     a1: f64,                     // Коэффициент для текущей цены
     a2: f64,                     // Коэффициент для предыдущей цены
@@ -86,6 +88,7 @@ impl EhlersSuperSmoother {
         assert!(period > 0.0, "Period must be greater than 0");
         
         let mut smoother = Self {
+            source: OhlcvField::Close,
             a1: 0.0,
             a2: 0.0,
             b1: 0.0,
@@ -105,11 +108,17 @@ impl EhlersSuperSmoother {
     
     /// Создать Super Smoother с заданной частотой среза
     pub fn with_cutoff_frequency(cutoff_freq: f64) -> Self {
-        assert!(cutoff_freq > 0.0 && cutoff_freq < 0.5, 
+        assert!(cutoff_freq > 0.0 && cutoff_freq < 0.5,
                 "Cutoff frequency must be between 0 and 0.5");
-        
+
         let period = 1.0 / cutoff_freq;
         Self::with_period(period)
+    }
+
+    pub fn with_source(period: f64, source: OhlcvField) -> Self {
+        let mut s = Self::with_period(period);
+        s.source = source;
+        s
     }
     
     /// Рассчитать коэффициенты фильтра
@@ -138,8 +147,9 @@ impl EhlersSuperSmoother {
     }
     
     /// Обновить индикатор новым баром
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> SuperSmootherResult {
-        self.update_price(close)
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> SuperSmootherResult {
+        let value = self.source.extract(open, high, low, close, volume);
+        self.update_price(value)
     }
     
     /// Обновить индикатор новой ценой

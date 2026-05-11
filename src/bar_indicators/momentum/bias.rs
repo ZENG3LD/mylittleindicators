@@ -3,9 +3,11 @@
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 #[derive(Clone)]
 pub struct Bias {
+    source: OhlcvField,
     ma: MovingAverageProvider,
     value: f64,
     filled: bool,
@@ -13,22 +15,28 @@ pub struct Bias {
 
 impl Bias {
     pub fn new(period: usize, ma_type: Option<MovingAverageType>) -> Self {
+        Self::with_source(period, ma_type, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, ma_type: Option<MovingAverageType>, source: OhlcvField) -> Self {
         let ma_type = ma_type.unwrap_or(MovingAverageType::SMA);
         Self {
+            source,
             ma: MovingAverageProvider::new(ma_type, period),
             value: 0.0,
             filled: false,
         }
     }
-    /// Обновить Bias новым баром (используется close)
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
-        self.ma.update_bar(0.0, 0.0, 0.0, close, 0.0);
+    /// Обновить Bias новым баром
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
+        self.ma.update_bar(0.0, 0.0, 0.0, value, 0.0);
         if self.ma.is_ready() {
             let ma = self.ma.value().main();
             if ma.abs() < 1e-12 {
                 self.value = 0.0;
             } else {
-                self.value = close / ma - 1.0;
+                self.value = value / ma - 1.0;
             }
             self.filled = true;
         } else {

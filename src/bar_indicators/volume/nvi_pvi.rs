@@ -5,6 +5,7 @@
 
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// NVI/PVI индикатор
 #[derive(Clone)]
@@ -12,6 +13,7 @@ pub struct NegativePositiveVolumeIndex {
     // Периоды для скользящих средних
     nvi_ma_period: usize,
     pvi_ma_period: usize,
+    price_source: OhlcvField,
     
     // Буферы для значений
     nvi_values: Vec<f64>,
@@ -44,12 +46,17 @@ impl NegativePositiveVolumeIndex {
     
     /// Создать новый NVI/PVI с настраиваемыми параметрами
     pub fn with_params(nvi_ma_period: usize, pvi_ma_period: usize) -> Self {
+        Self::with_source(nvi_ma_period, pvi_ma_period, OhlcvField::Close)
+    }
+
+    pub fn with_source(nvi_ma_period: usize, pvi_ma_period: usize, price_source: OhlcvField) -> Self {
         assert!(nvi_ma_period > 0, "NVI MA period must be greater than 0");
         assert!(pvi_ma_period > 0, "PVI MA period must be greater than 0");
-        
+
         Self {
             nvi_ma_period,
             pvi_ma_period,
+            price_source,
             nvi_values: Vec::with_capacity(512),
             pvi_values: Vec::with_capacity(512),
             nvi_ma: MovingAverageProvider::new(MovingAverageType::EMA, nvi_ma_period),
@@ -66,19 +73,20 @@ impl NegativePositiveVolumeIndex {
     }
     
     /// Обновить индикатор новым баром
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, volume: f64) -> (f64, f64) {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> (f64, f64) {
+        let price = self.price_source.extract(open, high, low, close, volume);
         self.bars_count += 1;
-        
+
         if self.bars_count == 1 {
             // Первый бар - инициализируем предыдущие значения
-            self.prev_close = close;
+            self.prev_close = price;
             self.prev_volume = volume;
             return (self.nvi_value, self.pvi_value);
         }
-        
+
         // Рассчитываем процентное изменение цены
         let price_change_pct = if self.prev_close.abs() > 1e-12 {
-            (close - self.prev_close) / self.prev_close
+            (price - self.prev_close) / self.prev_close
         } else {
             0.0
         };
@@ -111,7 +119,7 @@ impl NegativePositiveVolumeIndex {
         self.pvi_ma_value = self.pvi_ma.update_bar(self.pvi_value, self.pvi_value, self.pvi_value, self.pvi_value, 1.0);
         
         // Обновляем предыдущие значения
-        self.prev_close = close;
+        self.prev_close = price;
         self.prev_volume = volume;
         
         // Проверяем готовность

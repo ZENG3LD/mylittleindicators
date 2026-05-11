@@ -3,10 +3,12 @@
 
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 #[derive(Clone)]
 pub struct VhfMa {
     period: usize,
+    source: OhlcvField,
     buffer: Vec<f64>,
     filled: bool,
     value: f64,
@@ -16,8 +18,13 @@ pub struct VhfMa {
 
 impl VhfMa {
     pub fn new(period: usize, ma_type: MovingAverageType) -> Self {
+        Self::with_source(period, ma_type, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, ma_type: MovingAverageType, source: OhlcvField) -> Self {
         Self {
             period,
+            source,
             buffer: Vec::with_capacity(period),
             filled: false,
             value: 0.0,
@@ -25,21 +32,22 @@ impl VhfMa {
             prev_close: None,
         }
     }
-    /// Модифицированный VHF: знаменатель — MA от abs разностей между close
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
+    /// Модифицированный VHF: знаменатель — MA от abs разностей
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
         if self.buffer.len() < self.period {
-            self.buffer.push(close);
+            self.buffer.push(value);
         } else {
             self.buffer.remove(0);
-            self.buffer.push(close);
+            self.buffer.push(value);
             self.filled = true;
         }
-        // Обновляем MA по модулю разности close
+        // Обновляем MA по модулю разности
         if let Some(prev) = self.prev_close {
-            let abs_diff = (close - prev).abs();
+            let abs_diff = (value - prev).abs();
             self.ma.update_bar(0.0, 0.0, 0.0, abs_diff, 0.0);
         }
-        self.prev_close = Some(close);
+        self.prev_close = Some(value);
         if self.buffer.len() < self.period || !self.filled {
             self.value = 0.0;
             return self.value;

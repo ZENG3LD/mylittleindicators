@@ -5,12 +5,14 @@
 
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// Force Index индикатор
 #[derive(Clone)]
 pub struct ForceIndex {
     smoothing_period: usize,
     ma_type: MovingAverageType,
+    price_source: OhlcvField,
 
     // Буферы для расчетов
     force_values: Vec<f64>,
@@ -43,11 +45,16 @@ impl ForceIndex {
 
     /// Создать новый Force Index с заданным периодом сглаживания
     pub fn with_smoothing(smoothing_period: usize, ma_type: MovingAverageType) -> Self {
+        Self::with_source(smoothing_period, ma_type, OhlcvField::Close)
+    }
+
+    pub fn with_source(smoothing_period: usize, ma_type: MovingAverageType, price_source: OhlcvField) -> Self {
         assert!(smoothing_period > 0, "Smoothing period must be greater than 0");
 
         Self {
             smoothing_period,
             ma_type,
+            price_source,
             force_values: Vec::with_capacity(512),
             prev_close: 0.0,
             smoothed_force: MovingAverageProvider::new(ma_type, smoothing_period),
@@ -64,17 +71,18 @@ impl ForceIndex {
     }
     
     /// Обновить индикатор новым баром
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, volume: f64) -> f64 {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let price = self.price_source.extract(open, high, low, close, volume);
         self.bars_count += 1;
-        
+
         if self.bars_count == 1 {
             // Первый бар - инициализируем предыдущую цену
-            self.prev_close = close;
+            self.prev_close = price;
             return self.force_smooth;
         }
-        
+
         // Рассчитываем Force Index
-        let price_change = close - self.prev_close;
+        let price_change = price - self.prev_close;
         self.force_raw = volume * price_change;
         
         // Добавляем в буфер
@@ -93,7 +101,7 @@ impl ForceIndex {
         }
         
         // Обновляем предыдущую цену
-        self.prev_close = close;
+        self.prev_close = price;
         
         // Проверяем готовность
         if self.bars_count >= 2 {

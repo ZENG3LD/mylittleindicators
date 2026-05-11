@@ -2,9 +2,11 @@
 // (c) 2024
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 #[derive(Debug, Clone)]
 pub struct EfficiencyRatioFullHistory {
     pub period: usize,
+    source: OhlcvField,
     values: Vec<f64>,    // динамический вектор всех значений (как в Nautilus)
     deltas: Vec<f64>,    // динамический вектор всех дельт (как в Nautilus)
     value: f64,
@@ -28,9 +30,14 @@ impl EfficiencyRatioFullHistory {
         self.deltas[len - n..].iter().rev().cloned().collect()
     }
     pub fn new(period: usize) -> Self {
+        Self::with_source(period, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, source: OhlcvField) -> Self {
         let p = period.max(1);
         Self {
             period: p,
+            source,
             values: Vec::with_capacity(512), // pre-allocate для ускорения
             deltas: Vec::with_capacity(512),
             value: 0.0,
@@ -38,8 +45,9 @@ impl EfficiencyRatioFullHistory {
         }
     }
     /// Обновить Efficiency Ratio новым баром (используется close)
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
-        self.update_raw(close)
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
+        self.update_raw(value)
     }
     /// Обновить Efficiency Ratio новым значением (аналог Nautilus)
     pub fn update_raw(&mut self, value: f64) -> f64 {

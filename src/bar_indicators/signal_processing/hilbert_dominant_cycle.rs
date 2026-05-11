@@ -10,6 +10,7 @@
 
 use std::f64::consts::PI;
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// Результат анализа доминирующего цикла
 #[derive(Debug, Clone, Copy)]
@@ -58,6 +59,7 @@ impl DominantCycleResult {
 /// Hilbert Transform Dominant Cycle индикатор
 #[derive(Clone)]
 pub struct HilbertDominantCycle {
+    source: OhlcvField,
     // Буферы для Hilbert Transform (требуется минимум 7 значений)
     prices: Vec<f64>,
 
@@ -97,6 +99,7 @@ impl HilbertDominantCycle {
                 "Invalid period range: min_period must be > 0 and max_period > min_period");
         
         Self {
+            source: OhlcvField::Close,
             prices: Vec::with_capacity(32),
             in_phase: Vec::with_capacity(32),
             quadrature: Vec::with_capacity(32),
@@ -111,10 +114,17 @@ impl HilbertDominantCycle {
             update_count: 0,
         }
     }
-    
+
+    pub fn with_source(source: OhlcvField) -> Self {
+        let mut s = Self::new();
+        s.source = source;
+        s
+    }
+
     /// Обновить индикатор новым баром
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> DominantCycleResult {
-        self.update_price(close)
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> DominantCycleResult {
+        let value = self.source.extract(open, high, low, close, volume);
+        self.update_price(value)
     }
     
     /// Обновить индикатор новой ценой

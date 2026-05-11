@@ -2,6 +2,7 @@
 // (c) 2024
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 #[derive(Clone)]
 pub struct MaCross {
@@ -9,6 +10,7 @@ pub struct MaCross {
     slow_period: usize,
     fast_type: MovingAverageType,  // Store catalog types
     slow_type: MovingAverageType,
+    source: OhlcvField,
     fast_ma: MovingAverageProvider,
     slow_ma: MovingAverageProvider,
     prev_trend: i8, // Предыдущий значимый сигнал (1 или -1)
@@ -18,11 +20,16 @@ pub struct MaCross {
 
 impl MaCross {
     pub fn new(fast_period: usize, slow_period: usize, fast_type: MovingAverageType, slow_type: MovingAverageType) -> Self {
+        Self::with_source(fast_period, slow_period, fast_type, slow_type, OhlcvField::Close)
+    }
+
+    pub fn with_source(fast_period: usize, slow_period: usize, fast_type: MovingAverageType, slow_type: MovingAverageType, source: OhlcvField) -> Self {
         Self {
             fast_period,
             slow_period,
             fast_type,
             slow_type,
+            source,
             fast_ma: MovingAverageProvider::new(fast_type, fast_period),
             slow_ma: MovingAverageProvider::new(slow_type, slow_period),
             prev_trend: 0,
@@ -31,9 +38,10 @@ impl MaCross {
         }
     }
 
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> i8 {
-        let fast = self.fast_ma.update_bar(0.0, 0.0, 0.0, close, 0.0);
-        let slow = self.slow_ma.update_bar(0.0, 0.0, 0.0, close, 0.0);
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> i8 {
+        let value = self.source.extract(open, high, low, close, volume);
+        let fast = self.fast_ma.update_bar(0.0, 0.0, 0.0, value, 0.0);
+        let slow = self.slow_ma.update_bar(0.0, 0.0, 0.0, value, 0.0);
         if self.slow_ma.is_ready() {
             let new_trend = if fast > slow { 1 } else if fast < slow { -1 } else { 0 };
             if new_trend != 0 && new_trend != self.prev_trend {

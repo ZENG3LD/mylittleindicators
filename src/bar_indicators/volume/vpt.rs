@@ -5,12 +5,14 @@
 
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// Volume Price Trend индикатор
 #[derive(Clone)]
 pub struct VolumePriceTrend {
     // Период для сигнальной линии
     signal_period: usize,
+    price_source: OhlcvField,
     
     // Буферы для значений
     vpt_values: Vec<f64>,
@@ -38,10 +40,15 @@ impl VolumePriceTrend {
     
     /// Создать новый VPT с настраиваемым периодом сигнальной линии
     pub fn with_signal_period(signal_period: usize) -> Self {
+        Self::with_source(signal_period, OhlcvField::Close)
+    }
+
+    pub fn with_source(signal_period: usize, price_source: OhlcvField) -> Self {
         assert!(signal_period > 0, "Signal period must be greater than 0");
-        
+
         Self {
             signal_period,
+            price_source,
             vpt_values: Vec::with_capacity(512),
             signal_ma: MovingAverageProvider::new(MovingAverageType::SMA, signal_period),
             prev_close: 0.0,
@@ -51,21 +58,22 @@ impl VolumePriceTrend {
             is_ready: false,
         }
     }
-    
+
     /// Обновить индикатор новым баром
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, volume: f64) -> f64 {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let price = self.price_source.extract(open, high, low, close, volume);
         self.bars_count += 1;
-        
+
         if self.bars_count == 1 {
             // Первый бар - инициализируем предыдущую цену
-            self.prev_close = close;
+            self.prev_close = price;
             self.vpt_value = 0.0;
             return self.vpt_value;
         }
-        
+
         // Рассчитываем процентное изменение цены
         let price_change_pct = if self.prev_close.abs() > 1e-12 {
-            (close - self.prev_close) / self.prev_close
+            (price - self.prev_close) / self.prev_close
         } else {
             0.0
         };
@@ -83,7 +91,7 @@ impl VolumePriceTrend {
         self.signal_value = self.signal_ma.update_bar(self.vpt_value, self.vpt_value, self.vpt_value, self.vpt_value, 1.0);
         
         // Обновляем предыдущую цену
-        self.prev_close = close;
+        self.prev_close = price;
         
         // Проверяем готовность
         if self.bars_count >= self.signal_period + 5 {

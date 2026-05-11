@@ -3,12 +3,14 @@
 //! Значения: 1.0-2.0, где 1.0 = тренд, 1.5 = случайное блуждание, 2.0 = максимальный шум
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// Фрактальная размерность по методу Хигучи
 #[derive(Clone)]
 pub struct FractalDimension {
     period: usize,
     max_k: usize, // Максимальное значение k для алгоритма Хигучи
+    source: OhlcvField,
     
     // Буфер цен
     prices: Vec<f64>,
@@ -23,9 +25,14 @@ pub struct FractalDimension {
 
 impl FractalDimension {
     pub fn new(period: usize, max_k: usize) -> Self {
+        Self::with_source(period, max_k, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, max_k: usize, source: OhlcvField) -> Self {
         Self {
             period: period.min(512),
             max_k: max_k.min(period / 4).max(2), // k не должно быть больше period/4
+            source,
             prices: Vec::with_capacity(512),
             fractal_dimension: 1.5, // Начальное значение (случайное блуждание)
             complexity_score: 0.5,
@@ -172,9 +179,10 @@ impl FractalDimension {
         self.is_ready
     }
 
-    /// Update with OHLCV bar - uses close price
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> IndicatorValue {
-        self.update(close);
+    /// Update with OHLCV bar - uses configurable source field
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> IndicatorValue {
+        let value = self.source.extract(open, high, low, close, volume);
+        self.update(value);
         self.value()
     }
 

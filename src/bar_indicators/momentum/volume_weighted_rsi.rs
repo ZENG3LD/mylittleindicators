@@ -9,6 +9,7 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::momentum::rsi::Rsi;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// Результат Volume Weighted RSI
 #[derive(Debug, Clone, Copy)]
@@ -68,6 +69,7 @@ pub struct VolumeWeightedRsi {
     // Параметры
     period: usize,
     volume_period: usize,        // Период для анализа объема
+    price_source: OhlcvField,
 
     // Буферы для VWRSI (уникальная логика - остается inline)
     vw_gains: Vec<f64>,
@@ -107,12 +109,17 @@ impl VolumeWeightedRsi {
     
     /// Создать с настраиваемыми периодами
     pub fn with_periods(rsi_period: usize, volume_period: usize) -> Self {
+        Self::with_source(rsi_period, volume_period, OhlcvField::Close)
+    }
+
+    pub fn with_source(rsi_period: usize, volume_period: usize, price_source: OhlcvField) -> Self {
         assert!(rsi_period > 0, "RSI period must be greater than 0");
         assert!(volume_period > 0, "Volume period must be greater than 0");
 
         Self {
             period: rsi_period,
             volume_period,
+            price_source,
 
             vw_gains: Vec::with_capacity(64),
             vw_losses: Vec::with_capacity(64),
@@ -136,9 +143,10 @@ impl VolumeWeightedRsi {
     
     /// Обновить индикатор новым баром
     /// 🚀 Refactored: regular RSI использует стандартный Rsi struct
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, volume: f64) -> VolumeWeightedRsiResult {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> VolumeWeightedRsiResult {
+        let price = self.price_source.extract(open, high, low, close, volume);
         // 🚀 Обновляем стандартный RSI для regular_rsi (already returns 0-100)
-        let regular_rsi_value = self.regular_rsi.update_bar(0.0, 0.0, 0.0, close, 0.0);
+        let regular_rsi_value = self.regular_rsi.update_bar(0.0, 0.0, 0.0, price, 0.0);
         self.current_result.regular_rsi = regular_rsi_value;
 
         // Добавляем объем в буфер
@@ -151,7 +159,7 @@ impl VolumeWeightedRsi {
         self.avg_volume = self.volumes.iter().sum::<f64>() / self.volumes.len() as f64;
 
         if let Some(prev_close) = self.prev_close {
-            let price_change = close - prev_close;
+            let price_change = price - prev_close;
 
             // Рассчитываем обычные gain/loss (нужны для volume weighting)
             let regular_gain = if price_change > 0.0 { price_change } else { 0.0 };
@@ -177,7 +185,7 @@ impl VolumeWeightedRsi {
             self.analyze_volume_and_smart_money();
         }
         
-        self.prev_close = Some(close);
+        self.prev_close = Some(price);
         self.update_count += 1;
         self.current_result
     }

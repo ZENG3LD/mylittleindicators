@@ -4,12 +4,14 @@
 //! Чем выше значение, тем больше стресс от просадок
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// Ulcer Index индикатор
 #[derive(Clone)]
 pub struct UlcerIndex {
     period: usize,
-    
+    source: OhlcvField,
+
     // Буферы для расчетов
     close_prices: Vec<f64>,
     r_squared_values: Vec<f64>,
@@ -31,10 +33,15 @@ impl UlcerIndex {
     
     /// Создать новый Ulcer Index с заданным периодом
     pub fn with_period(period: usize) -> Self {
+        Self::with_source(period, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, source: OhlcvField) -> Self {
         assert!(period > 0, "Period must be greater than 0");
-        
+
         Self {
             period,
+            source,
             close_prices: Vec::with_capacity(period),
             r_squared_values: Vec::with_capacity(period),
             ulcer_values: Vec::with_capacity(period),
@@ -45,25 +52,26 @@ impl UlcerIndex {
     }
     
     /// Обновить индикатор новым баром
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
         self.bars_count += 1;
-        
+
         // Добавляем цену закрытия в буфер
         if self.close_prices.len() >= 512 {
             self.close_prices.remove(0);
         }
-        self.close_prices.push(close);
-        
+        self.close_prices.push(value);
+
         // Проверяем, можем ли рассчитать Ulcer Index
         if self.close_prices.len() >= self.period {
             // Находим максимальную цену за период
             let start_idx = self.close_prices.len() - self.period;
             let highest_high = self.close_prices[start_idx..].iter()
                 .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-            
+
             // Рассчитываем R (процент просадки от максимума)
             let r = if highest_high > 1e-12 {
-                (close - highest_high) / highest_high * 100.0
+                (value - highest_high) / highest_high * 100.0
             } else {
                 0.0
             };

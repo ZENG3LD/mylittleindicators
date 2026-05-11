@@ -2,10 +2,12 @@
 // (c) 2024
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 #[derive(Clone)]
 pub struct Psl {
     period: usize,
+    source: OhlcvField,
     buffer: Vec<u8>,
     index: usize,
     filled: bool,
@@ -15,9 +17,14 @@ pub struct Psl {
 
 impl Psl {
     pub fn new(period: usize) -> Self {
+        Self::with_source(period, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, source: OhlcvField) -> Self {
         assert!(period <= 512, "PSL period must be <= 512");
         Self {
             period,
+            source,
             buffer: vec![0u8; 512],
             index: 0,
             filled: false,
@@ -25,16 +32,17 @@ impl Psl {
             value: 0.0,
         }
     }
-    /// Обновить PSL новым баром (используется close)
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
+    /// Обновить PSL новым баром
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
         if self.index == 0 && !self.filled && self.prev_close == 0.0 {
-            self.prev_close = close;
+            self.prev_close = value;
             self.index = 1;
             return self.value;
         }
-        let up = if close > self.prev_close { 1 } else { 0 };
+        let up = if value > self.prev_close { 1 } else { 0 };
         self.buffer[self.index % self.period] = up;
-        self.prev_close = close;
+        self.prev_close = value;
         self.index += 1;
         if self.index >= self.period {
             self.filled = true;

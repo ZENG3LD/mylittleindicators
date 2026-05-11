@@ -49,6 +49,7 @@ impl WaveletCoefficients {
 /// Wavelet Transform
 #[derive(Clone)]
 pub struct WaveletTransform {
+    source: crate::bar_indicators::ohlcv_field::OhlcvField,
     // Временные данные
     time_series: Vec<f64>,
     
@@ -78,6 +79,7 @@ impl WaveletTransform {
         let max_scales = max_scales.min(32);
         
         let mut transform = Self {
+            source: crate::bar_indicators::ohlcv_field::OhlcvField::Close,
             time_series: Vec::with_capacity(512),
             wavelet_coeffs: WaveletCoefficients::new(),
             wavelet_type,
@@ -95,6 +97,12 @@ impl WaveletTransform {
         transform
     }
     
+    pub fn with_source(wavelet_type: WaveletType, max_scales: usize, source: crate::bar_indicators::ohlcv_field::OhlcvField) -> Self {
+        let mut s = Self::new(wavelet_type, max_scales);
+        s.source = source;
+        s
+    }
+
     /// Обновить вейвлет-преобразование новым значением
     pub fn update(&mut self, value: f64) -> &WaveletCoefficients {
         // Добавляем новое значение
@@ -432,8 +440,9 @@ impl WaveletTransform {
     }
 
     /// Update with OHLCV bar - uses close price
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> crate::bar_indicators::indicator_value::IndicatorValue {
-        self.update(close);
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> crate::bar_indicators::indicator_value::IndicatorValue {
+        let value = self.source.extract(open, high, low, close, volume);
+        self.update(value);
         self.value()
     }
 

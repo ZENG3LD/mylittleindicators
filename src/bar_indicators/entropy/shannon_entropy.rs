@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// Состояние рынка на основе энтропии Шеннона
 #[derive(Debug, Clone, PartialEq)]
@@ -19,7 +20,8 @@ pub enum MarketEntropyState {
 pub struct ShannonEntropy {
     period: usize,              // Период анализа
     bins: usize,                // Количество корзин для гистограммы
-    
+    source: OhlcvField,
+
     // Буферы данных
     returns: Vec<f64>, // Буфер логарифмических доходностей
     prev_close: Option<f64>,     // Предыдущая цена для расчета доходности
@@ -36,9 +38,14 @@ pub struct ShannonEntropy {
 
 impl ShannonEntropy {
     pub fn new(period: usize, bins: usize) -> Self {
+        Self::with_source(period, bins, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, bins: usize, source: OhlcvField) -> Self {
         Self {
             period: period.min(512),
             bins: bins.clamp(5, 50), // Ограничиваем разумными пределами
+            source,
             returns: Vec::with_capacity(period.min(512)),
             prev_close: None,
             entropy: 0.0,
@@ -48,17 +55,18 @@ impl ShannonEntropy {
             initialized: false,
         }
     }
-    
+
     /// Создать Shannon Entropy с параметрами по умолчанию
     pub fn new_default(period: usize) -> Self {
         Self::new(period, 20) // 20 bins по умолчанию
     }
-    
+
     /// Обновить индикатор новым баром
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
         // Рассчитываем логарифмическую доходность
         if let Some(prev_close) = self.prev_close {
-            let log_return = (close / prev_close).ln();
+            let log_return = (value / prev_close).ln();
             
             // Фильтруем экстремальные значения
             if log_return.is_finite() && log_return.abs() < 1.0 {
@@ -77,7 +85,7 @@ impl ShannonEntropy {
             }
         }
         
-        self.prev_close = Some(close);
+        self.prev_close = Some(value);
         self.normalized_entropy
     }
     

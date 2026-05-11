@@ -2,6 +2,7 @@
 // (c) 2024
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 #[derive(Clone)]
 pub struct ZigZagTime {
@@ -13,10 +14,15 @@ pub struct ZigZagTime {
     pub last_extreme_idx: usize,
     pub direction: i8,
     bar_counter: usize,
+    source: OhlcvField,
 }
 
 impl ZigZagTime {
     pub fn new(period: usize, min_bars: usize) -> Self {
+        Self::with_source(period, min_bars, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, min_bars: usize, source: OhlcvField) -> Self {
         Self {
             min_bars,
             period,
@@ -26,14 +32,16 @@ impl ZigZagTime {
             last_extreme_idx: 0,
             direction: 0,
             bar_counter: 0,
+            source,
         }
     }
 
-    /// Update with OHLCV bar (uses close price)
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
-        self.update(close, self.bar_counter);
+    /// Update with OHLCV bar (uses configurable source field)
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
+        self.update(value, self.bar_counter);
         self.bar_counter += 1;
-        self.last_swing().map(|(_, price)| price).unwrap_or(close)
+        self.last_swing().map(|(_, price)| price).unwrap_or(value)
     }
 
     /// Get current indicator value

@@ -3,11 +3,13 @@
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 #[derive(Clone)]
 pub struct Rvi {
     period: usize,
     ma_type: MovingAverageType,
+    source: OhlcvField,
     scalar: f64,
     closes: Vec<f64>,
     idx: usize,
@@ -28,10 +30,15 @@ impl Rvi {
 
     /// Create RVI with specified MA type
     pub fn new_with_ma_type(period: usize, ma_type: MovingAverageType) -> Self {
+        Self::with_source(period, ma_type, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, ma_type: MovingAverageType, source: OhlcvField) -> Self {
         assert!(period <= 512, "RVI period must be <= 512");
         Self {
             period,
             ma_type,
+            source,
             scalar: 100.0,
             closes: vec![0.0; 512],
             idx: 0,
@@ -50,11 +57,12 @@ impl Rvi {
         self.reset();
     }
     /// Обновить RVI новым баром (используется close)
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
         // cyclically update closes
-        self.closes[self.idx % 512] = close;
+        self.closes[self.idx % 512] = value;
         // обновить ma_close (Wilder)
-        self.ma_close.update_bar(0.0, 0.0, 0.0, close, 0.0);
+        self.ma_close.update_bar(0.0, 0.0, 0.0, value, 0.0);
         // calculate std по rolling window (circular buffer)
         let n = self.period.min(self.idx + 1);
         let mean = self.ma_close.value().main();
@@ -71,10 +79,10 @@ impl Rvi {
         }
         // сглаживаем через RMA (Wilder)
         if self.idx > 0 {
-            if close > self.prev_close {
+            if value > self.prev_close {
                 self.pos_rma.update_bar(0.0, 0.0, 0.0, std, 0.0);
                 self.neg_rma.update_bar(0.0, 0.0, 0.0, 0.0, 0.0);
-            } else if close < self.prev_close {
+            } else if value < self.prev_close {
                 self.pos_rma.update_bar(0.0, 0.0, 0.0, 0.0, 0.0);
                 self.neg_rma.update_bar(0.0, 0.0, 0.0, std, 0.0);
             } else {
@@ -82,7 +90,7 @@ impl Rvi {
                 self.neg_rma.update_bar(0.0, 0.0, 0.0, 0.0, 0.0);
             }
         }
-        self.prev_close = close;
+        self.prev_close = value;
         self.idx += 1;
         if self.idx >= self.period {
             self.filled = true;

@@ -3,6 +3,7 @@
 //! Позволяет вычислять мгновенную амплитуду, фазу и частоту
 
 use std::f64::consts::PI;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// Аналитический сигнал (результат преобразования Гильберта)
 #[derive(Debug, Clone)]
@@ -35,6 +36,7 @@ impl AnalyticSignal {
 /// Hilbert Transform
 #[derive(Clone)]
 pub struct HilbertTransform {
+    source: OhlcvField,
     // Временные данные
     time_series: Vec<f64>,
 
@@ -70,6 +72,7 @@ impl HilbertTransform {
         let window_size = window_size.clamp(16, 256);
         
         Self {
+            source: OhlcvField::Close,
             time_series: Vec::with_capacity(512),
             hilbert_transform: Vec::with_capacity(512),
             analytic_signal: AnalyticSignal::new(),
@@ -86,6 +89,12 @@ impl HilbertTransform {
             is_ready: false,
             min_samples: window_size * 2,
         }
+    }
+
+    pub fn with_source(window_size: usize, sampling_rate: f64, source: OhlcvField) -> Self {
+        let mut s = Self::new(window_size, sampling_rate);
+        s.source = source;
+        s
     }
     
     /// Обновить преобразование Гильберта новым значением
@@ -399,9 +408,10 @@ impl HilbertTransform {
         self.sampling_rate
     }
     
-    /// Update with bar data (uses close price)
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) {
-        self.update(close);
+    /// Update with bar data (uses configurable source field)
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) {
+        let value = self.source.extract(open, high, low, close, volume);
+        self.update(value);
     }
 
     /// Get current value as IndicatorValue::Hilbert

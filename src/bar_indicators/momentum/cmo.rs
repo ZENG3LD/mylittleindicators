@@ -2,6 +2,7 @@
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// CMO calculation mode.
 #[derive(Clone)]
@@ -37,6 +38,7 @@ pub enum CmoMode {
 #[derive(Clone)]
 pub struct Cmo {
     period: usize,
+    source: OhlcvField,
     ma_type: MovingAverageType,  // Store catalog type, no pattern matching needed
     gain_ma: MovingAverageProvider,
     loss_ma: MovingAverageProvider,
@@ -47,7 +49,7 @@ pub struct Cmo {
     filled: bool,
     index: usize,
     mode: CmoMode,
-} 
+}
 
 impl Cmo {
     /// Creates a new CMO with Wilder mode (default).
@@ -59,6 +61,10 @@ impl Cmo {
         Self::with_mode(period, ma_type, CmoMode::Wilder)
     }
 
+    pub fn with_source(period: usize, source: OhlcvField) -> Self {
+        Self::with_source_and_mode(period, None, CmoMode::Wilder, source)
+    }
+
     /// Creates a new CMO with specified mode.
     ///
     /// # Arguments
@@ -66,9 +72,14 @@ impl Cmo {
     /// * `ma_type` - Optional moving average type (default RMA)
     /// * `mode` - Calculation mode (Wilder or Classic)
     pub fn with_mode(period: usize, ma_type: Option<MovingAverageType>, mode: CmoMode) -> Self {
+        Self::with_source_and_mode(period, ma_type, mode, OhlcvField::Close)
+    }
+
+    pub fn with_source_and_mode(period: usize, ma_type: Option<MovingAverageType>, mode: CmoMode, source: OhlcvField) -> Self {
         let ma_type_resolved = ma_type.unwrap_or(MovingAverageType::RMA);
         Self {
             period,
+            source,
             ma_type: ma_type_resolved,
             gain_ma: MovingAverageProvider::new(ma_type_resolved, period),
             loss_ma: MovingAverageProvider::new(ma_type_resolved, period),
@@ -82,21 +93,20 @@ impl Cmo {
         }
     }
     /// Updates the CMO with a new bar and returns the current value.
-    ///
-    /// Only the `close` price is used; other OHLCV fields are ignored.
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
         if self.index == 0 && self.prev == 0.0 {
-            self.prev = close;
+            self.prev = value;
             self.index = 1;
             return self.value;
         }
-        let diff = close - self.prev;
+        let diff = value - self.prev;
         let (gain, loss) = if diff > 0.0 {
             (diff, 0.0)
         } else {
             (0.0, -diff)
         };
-        self.prev = close;
+        self.prev = value;
         self.index += 1;
         match self.mode {
             CmoMode::Wilder => {

@@ -1,6 +1,7 @@
 //! On-Balance Volume (OBV) indicator.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 /// On-Balance Volume (OBV) - cumulative volume-based momentum indicator.
 ///
@@ -22,6 +23,7 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 /// Cumulative calculation. O(1) per update.
 #[derive(Clone)]
 pub struct Obv {
+    price_source: OhlcvField,
     value: f64,
     prev_close: f64,
     ready: bool,
@@ -31,7 +33,12 @@ pub struct Obv {
 impl Obv {
     /// Creates a new OBV indicator.
     pub fn new() -> Self {
+        Self::with_source(OhlcvField::Close)
+    }
+
+    pub fn with_source(price_source: OhlcvField) -> Self {
         Self {
+            price_source,
             value: 0.0,
             prev_close: 0.0,
             ready: false,
@@ -42,18 +49,19 @@ impl Obv {
     /// Updates the OBV with a new bar and returns the current value.
     ///
     /// Uses `close` and `volume` prices.
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, volume: f64) -> f64 {
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let price = self.price_source.extract(open, high, low, close, volume);
         if self.count == 0 {
-            self.prev_close = close;
+            self.prev_close = price;
             self.count += 1;
             return self.value;
         }
-        if close > self.prev_close {
+        if price > self.prev_close {
             self.value += volume;
-        } else if close < self.prev_close {
+        } else if price < self.prev_close {
             self.value -= volume;
         }
-        self.prev_close = close;
+        self.prev_close = price;
         self.count += 1;
         self.ready = self.count > 1;
         self.value

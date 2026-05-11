@@ -2,6 +2,7 @@
 // (c) 2024
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 
 #[derive(Clone)]
 pub struct ZigZagLookahead {
@@ -11,10 +12,15 @@ pub struct ZigZagLookahead {
     pub swings: Vec<(usize, f64)>,
     pub candidates: Vec<(usize, f64)>, // временные экстремумы
     bar_counter: usize,
+    source: OhlcvField,
 }
 
 impl ZigZagLookahead {
     pub fn new(period: usize, lookahead: usize) -> Self {
+        Self::with_source(period, lookahead, OhlcvField::Close)
+    }
+
+    pub fn with_source(period: usize, lookahead: usize, source: OhlcvField) -> Self {
         Self {
             lookahead,
             period,
@@ -22,14 +28,16 @@ impl ZigZagLookahead {
             swings: Vec::with_capacity(512),
             candidates: Vec::with_capacity(16),
             bar_counter: 0,
+            source,
         }
     }
 
-    /// Update with OHLCV bar (uses close price)
-    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
-        self.update(close, self.bar_counter);
+    /// Update with OHLCV bar (uses configurable source field)
+    pub fn update_bar(&mut self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
+        let value = self.source.extract(open, high, low, close, volume);
+        self.update(value, self.bar_counter);
         self.bar_counter += 1;
-        self.last_swing().map(|(_, price)| price).unwrap_or(close)
+        self.last_swing().map(|(_, price)| price).unwrap_or(value)
     }
 
     /// Get current indicator value
