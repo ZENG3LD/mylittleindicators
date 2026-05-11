@@ -1,7 +1,6 @@
 //! Commodity Channel Index (CCI) indicator.
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Commodity Channel Index (CCI) - measures price deviation from statistical mean.
@@ -30,7 +29,7 @@ pub struct Cci {
     period: usize,
     scalar: f64,
     ma: MovingAverageProvider,
-    typical_buf: ArrayVec<f64, 512>,
+    typical_buf: Vec<f64>,
     idx: usize,
     count: usize,
     value: f64,
@@ -50,7 +49,7 @@ impl Cci {
             period,
             scalar,
             ma: MovingAverageProvider::new(ma_type, period),
-            typical_buf: ArrayVec::new(),
+            typical_buf: Vec::with_capacity(period),
             idx: 0,
             count: 0,
             value: 0.0,

@@ -3,7 +3,6 @@
 //! Используется для определения потенциальных разворотов тренда
 //! Значения выше 27 указывают на возможный разворот, ниже 26.5 - на продолжение тренда
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -14,9 +13,9 @@ pub struct MassIndex {
     sum_period: usize,
     
     // Буферы для расчетов
-    high_low_values: ArrayVec<f64, 512>,
-    mass_ratio_values: ArrayVec<f64, 512>,
-    mass_index_values: ArrayVec<f64, 512>,
+    high_low_values: Vec<f64>,
+    mass_ratio_values: Vec<f64>,
+    mass_index_values: Vec<f64>,
     
     // EMA для первого и второго сглаживания
     first_ema: MovingAverageProvider,
@@ -44,9 +43,9 @@ impl MassIndex {
         Self {
             ema_period,
             sum_period,
-            high_low_values: ArrayVec::new(),
-            mass_ratio_values: ArrayVec::new(),
-            mass_index_values: ArrayVec::new(),
+            high_low_values: Vec::with_capacity(sum_period),
+            mass_ratio_values: Vec::with_capacity(sum_period),
+            mass_index_values: Vec::with_capacity(sum_period),
             first_ema: MovingAverageProvider::new(MovingAverageType::EMA, ema_period),
             second_ema: MovingAverageProvider::new(MovingAverageType::EMA, ema_period),
             mass_index_value: 0.0,

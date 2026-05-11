@@ -3,7 +3,6 @@
 //! Измеряет глубину и продолжительность просадок цены
 //! Чем выше значение, тем больше стресс от просадок
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Ulcer Index индикатор
@@ -12,9 +11,9 @@ pub struct UlcerIndex {
     period: usize,
     
     // Буферы для расчетов
-    close_prices: ArrayVec<f64, 512>,
-    r_squared_values: ArrayVec<f64, 512>,
-    ulcer_values: ArrayVec<f64, 512>,
+    close_prices: Vec<f64>,
+    r_squared_values: Vec<f64>,
+    ulcer_values: Vec<f64>,
     
     // Текущие значения
     ulcer_index_value: f64,
@@ -36,9 +35,9 @@ impl UlcerIndex {
         
         Self {
             period,
-            close_prices: ArrayVec::new(),
-            r_squared_values: ArrayVec::new(),
-            ulcer_values: ArrayVec::new(),
+            close_prices: Vec::with_capacity(period),
+            r_squared_values: Vec::with_capacity(period),
+            ulcer_values: Vec::with_capacity(period),
             ulcer_index_value: 0.0,
             bars_count: 0,
             is_ready: false,

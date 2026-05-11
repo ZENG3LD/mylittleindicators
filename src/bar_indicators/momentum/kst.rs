@@ -1,6 +1,5 @@
 //! Know Sure Thing (KST) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
@@ -39,10 +38,10 @@ pub struct KnowSureThing {
     signal_ma_type: MovingAverageType,
     source: OhlcvField,
 
-    source_prices: ArrayVec<f64, 512>,
+    source_prices: Vec<f64>,
     roc_smas: [MovingAverageProvider; 4],
     signal_sma: MovingAverageProvider,
-    kst_values: ArrayVec<f64, 512>,
+    kst_values: Vec<f64>,
 
     kst_value: f64,
     signal_value: f64,
@@ -81,7 +80,7 @@ impl KnowSureThing {
             roc_ma_type: ma_type,
             signal_ma_type: ma_type,
             source: OhlcvField::Close,
-            source_prices: ArrayVec::new(),
+            source_prices: Vec::with_capacity(512),
             roc_smas: [
                 MovingAverageProvider::new(ma_type, sma_periods[0]),
                 MovingAverageProvider::new(ma_type, sma_periods[1]),
@@ -89,7 +88,7 @@ impl KnowSureThing {
                 MovingAverageProvider::new(ma_type, sma_periods[3]),
             ],
             signal_sma: MovingAverageProvider::new(ma_type, signal_period),
-            kst_values: ArrayVec::new(),
+            kst_values: Vec::with_capacity(512),
             kst_value: 0.0,
             signal_value: 0.0,
             bars_count: 0,
@@ -136,7 +135,7 @@ impl KnowSureThing {
             roc_ma_type,
             signal_ma_type,
             source: OhlcvField::Close,
-            source_prices: ArrayVec::new(),
+            source_prices: Vec::with_capacity(512),
             roc_smas: [
                 MovingAverageProvider::new(roc_ma_type, sma_periods[0]),
                 MovingAverageProvider::new(roc_ma_type, sma_periods[1]),
@@ -144,7 +143,7 @@ impl KnowSureThing {
                 MovingAverageProvider::new(roc_ma_type, sma_periods[3]),
             ],
             signal_sma: MovingAverageProvider::new(signal_ma_type, signal_period),
-            kst_values: ArrayVec::new(),
+            kst_values: Vec::with_capacity(512),
             kst_value: 0.0,
             signal_value: 0.0,
             bars_count: 0,

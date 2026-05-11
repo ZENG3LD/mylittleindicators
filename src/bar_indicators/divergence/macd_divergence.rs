@@ -1,14 +1,13 @@
 use crate::bar_indicators::divergence::divergence::DivergenceDetector;
 use crate::bar_indicators::momentum::macd::Macd;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct MacdDivergence {
     detector: DivergenceDetector,
     macd: Macd,
-    prices: ArrayVec<f64, 512>,
-    macd_values: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
+    macd_values: Vec<f64>,
     lookback: usize,
     value: f64,
 }
@@ -18,8 +17,8 @@ impl MacdDivergence {
         Self {
             detector: DivergenceDetector::new(),
             macd: Macd::new(fast.max(1), slow.max(2)),
-            prices: ArrayVec::new(),
-            macd_values: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            macd_values: Vec::with_capacity(512),
             lookback: lookback.max(5),
             value: 0.0,
         }

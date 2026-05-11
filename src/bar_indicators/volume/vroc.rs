@@ -3,7 +3,6 @@
 //! Показывает процентное изменение объема по сравнению с предыдущими периодами
 //! Используется для анализа активности торговли и подтверждения ценовых движений
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -14,8 +13,8 @@ pub struct VolumeRateOfChange {
     signal_period: usize,
     
     // Буферы для объемов и значений
-    volume_buffer: ArrayVec<f64, 512>,
-    vroc_values: ArrayVec<f64, 512>,
+    volume_buffer: Vec<f64>,
+    vroc_values: Vec<f64>,
     
     // Сигнальная линия (MA от VROC)
     signal_ma: MovingAverageProvider,
@@ -43,8 +42,8 @@ impl VolumeRateOfChange {
         Self {
             period,
             signal_period,
-            volume_buffer: ArrayVec::new(),
-            vroc_values: ArrayVec::new(),
+            volume_buffer: Vec::with_capacity(period),
+            vroc_values: Vec::with_capacity(512),
             signal_ma: MovingAverageProvider::new(MovingAverageType::SMA, signal_period),
             vroc_value: 0.0,
             signal_value: 0.0,

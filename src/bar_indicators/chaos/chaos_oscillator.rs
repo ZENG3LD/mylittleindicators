@@ -2,7 +2,6 @@
 //! Объединяет фрактальную размерность, показатель Херста и волатильность
 //! для определения степени хаоса в рыночных движениях
 
-use arrayvec::ArrayVec;
 use super::fractal_dimension::FractalDimension;
 use super::hurst_exponent::HurstExponent;
 use crate::bar_indicators::indicator_value::IndicatorValue;
@@ -17,8 +16,8 @@ pub struct ChaosOscillator {
     hurst_exponent: HurstExponent,
     
     // Буферы для дополнительных расчетов
-    prices: ArrayVec<f64, 512>,
-    volatilities: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
+    volatilities: Vec<f64>,
     
     // Результаты
     chaos_index: f64,      // 0.0-1.0, где 1.0 = максимальный хаос
@@ -50,8 +49,8 @@ impl ChaosOscillator {
             period: period.min(512),
             fractal_dimension: FractalDimension::new(period, period / 8),
             hurst_exponent: HurstExponent::new(period),
-            prices: ArrayVec::new(),
-            volatilities: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            volatilities: Vec::with_capacity(512),
             chaos_index: 0.5,
             predictability: 0.5,
             market_regime: MarketRegime::TransitionPhase,
@@ -79,8 +78,8 @@ impl ChaosOscillator {
             period: period.min(512),
             fractal_dimension: FractalDimension::new(period, period / 8),
             hurst_exponent: HurstExponent::new(period),
-            prices: ArrayVec::new(),
-            volatilities: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            volatilities: Vec::with_capacity(512),
             chaos_index: 0.5,
             predictability: 0.5,
             market_regime: MarketRegime::TransitionPhase,

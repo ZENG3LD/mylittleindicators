@@ -1,14 +1,13 @@
 use crate::bar_indicators::divergence::divergence::DivergenceDetector;
 use crate::bar_indicators::momentum::stochastics::Stochastics;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct StochasticDivergence {
     detector: DivergenceDetector,
     stoch: Stochastics,
-    prices: ArrayVec<f64, 512>,
-    stoch_values: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
+    stoch_values: Vec<f64>,
     lookback: usize,
     value: f64,
 }
@@ -18,8 +17,8 @@ impl StochasticDivergence {
         Self {
             detector: DivergenceDetector::new(),
             stoch: Stochastics::new(period_k.max(1), period_d.max(1)),
-            prices: ArrayVec::new(),
-            stoch_values: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            stoch_values: Vec::with_capacity(512),
             lookback: lookback.max(5),
             value: 0.0,
         }

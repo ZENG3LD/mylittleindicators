@@ -11,7 +11,6 @@
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
-use arrayvec::ArrayVec;
 use serde::{Serialize, Deserialize};
 
 /// Режимы расчета Bollinger Bands
@@ -45,7 +44,7 @@ pub struct BollingerBands {
     center_ma: MovingAverageProvider,     // ✅ Центральная линия через MovingAverage
 
     // Circular buffer для стандартного отклонения - O(1) operations
-    price_buffer: ArrayVec<f64, 512>,
+    price_buffer: Vec<f64>,
     buffer_index: usize,
     buffer_filled: bool,
 
@@ -82,7 +81,7 @@ impl BollingerBands {
             ma_type,
             source: OhlcvField::Close,
             center_ma: MovingAverageProvider::new(ma_type, period),
-            price_buffer: ArrayVec::new(),
+            price_buffer: Vec::with_capacity(period),
             buffer_index: 0,
             buffer_filled: false,
             upper: 0.0,
@@ -117,7 +116,7 @@ impl BollingerBands {
             ma_type,
             source,
             center_ma: MovingAverageProvider::new(ma_type, period),
-            price_buffer: ArrayVec::new(),
+            price_buffer: Vec::with_capacity(period),
             buffer_index: 0,
             buffer_filled: false,
             upper: 0.0,

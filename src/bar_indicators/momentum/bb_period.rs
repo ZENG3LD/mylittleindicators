@@ -1,7 +1,6 @@
 // Bollinger Bands (stddev по последнему окну period, классика)
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -9,7 +8,7 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 pub struct BbPeriod {
     period: usize,
     stddev_mult: f64,
-    buffer: ArrayVec<f64, 512>,
+    buffer: Vec<f64>,
     ma: MovingAverageProvider,
     middle: f64,
     upper: f64,
@@ -18,12 +17,11 @@ pub struct BbPeriod {
 
 impl BbPeriod {
     pub fn new(period: usize, stddev_mult: f64, ma_type: MovingAverageType) -> Self {
-        assert!(period <= 64, "BbPeriod: period too large for ArrayVec window");
         let ma = MovingAverageProvider::new(ma_type, period);
         Self {
             period,
             stddev_mult,
-            buffer: ArrayVec::new(),
+            buffer: Vec::with_capacity(period),
             ma,
             middle: 0.0,
             upper: 0.0,

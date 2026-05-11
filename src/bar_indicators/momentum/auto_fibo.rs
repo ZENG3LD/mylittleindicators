@@ -6,8 +6,6 @@
 use crate::bar_indicators::zigzag::zigzag_atr::ZigZagAtr;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
-use arrayvec::ArrayVec;
-
 /// Fibonacci levels calculated from swing points
 #[derive(Debug, Clone, Copy)]
 pub struct FiboLevels {
@@ -154,7 +152,7 @@ impl AutoFibo {
     }
     
     /// Получить все свинги от ZigZag
-    pub fn get_all_swings(&self) -> &ArrayVec<(usize, f64), 512> {
+    pub fn get_all_swings(&self) -> &Vec<(usize, f64)> {
         self.zigzag.swings()
     }
     

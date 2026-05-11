@@ -1,6 +1,5 @@
 //! Linear Regression Moving Average (LR) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use super::super::ohlcv_field::OhlcvField;
 
@@ -24,7 +23,7 @@ pub struct LinearRegressionMA {
     intercept: f64,
     r2: f64,
     value: f64,
-    buf: ArrayVec<f64, 512>,
+    buf: Vec<f64>,
     initialized: bool,
 }
 
@@ -60,7 +59,7 @@ impl LinearRegressionMA {
             intercept: 0.0,
             r2: 0.0,
             value: 0.0,
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(period),
             initialized: false,
         }
     }

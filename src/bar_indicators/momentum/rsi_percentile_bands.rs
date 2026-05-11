@@ -3,14 +3,13 @@
 use crate::bar_indicators::momentum::rsi::Rsi;
 use crate::bar_indicators::utils::math::percentile::quickselect_nth;
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 
 
 #[derive(Clone)]
 pub struct RsiPercentileBands {
     rsi: Rsi,
     window: usize,
-    buf: ArrayVec<f64, 1024>,
+    buf: Vec<f64>,
     idx: usize,
     filled: bool,
     upper: f64,
@@ -23,7 +22,7 @@ impl RsiPercentileBands {
         Self {
             rsi: Rsi::new(rsi_period.max(1)),
             window: window.clamp(10, 1024),
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(window.clamp(10, 1024)),
             idx: 0,
             filled: false,
             upper: 80.0,

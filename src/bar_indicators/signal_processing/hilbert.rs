@@ -2,7 +2,6 @@
 //! Преобразование Гильберта для получения аналитического сигнала
 //! Позволяет вычислять мгновенную амплитуду, фазу и частоту
 
-use arrayvec::ArrayVec;
 use std::f64::consts::PI;
 
 /// Аналитический сигнал (результат преобразования Гильберта)
@@ -37,16 +36,16 @@ impl AnalyticSignal {
 #[derive(Clone)]
 pub struct HilbertTransform {
     // Временные данные
-    time_series: ArrayVec<f64, 512>,
-    
+    time_series: Vec<f64>,
+
     // Результаты преобразования
-    hilbert_transform: ArrayVec<f64, 512>,      // Преобразование Гильберта
+    hilbert_transform: Vec<f64>,      // Преобразование Гильберта
     analytic_signal: AnalyticSignal,            // Текущий аналитический сигнал
-    
+
     // История мгновенных характеристик
-    amplitude_history: ArrayVec<f64, 512>,      // История амплитуд
-    phase_history: ArrayVec<f64, 512>,          // История фаз
-    frequency_history: ArrayVec<f64, 512>,      // История частот
+    amplitude_history: Vec<f64>,      // История амплитуд
+    phase_history: Vec<f64>,          // История фаз
+    frequency_history: Vec<f64>,      // История частот
     
     // Фильтр для сглаживания мгновенной частоты
     frequency_filter_length: usize,
@@ -71,12 +70,12 @@ impl HilbertTransform {
         let window_size = window_size.clamp(16, 256);
         
         Self {
-            time_series: ArrayVec::new(),
-            hilbert_transform: ArrayVec::new(),
+            time_series: Vec::with_capacity(512),
+            hilbert_transform: Vec::with_capacity(512),
             analytic_signal: AnalyticSignal::new(),
-            amplitude_history: ArrayVec::new(),
-            phase_history: ArrayVec::new(),
-            frequency_history: ArrayVec::new(),
+            amplitude_history: Vec::with_capacity(512),
+            phase_history: Vec::with_capacity(512),
+            frequency_history: Vec::with_capacity(512),
             frequency_filter_length: 5,
             window_size,
             sampling_rate,
@@ -95,9 +94,7 @@ impl HilbertTransform {
         if self.time_series.len() >= 512 {
             self.time_series.remove(0);
         }
-        if !self.time_series.is_full() {
-            self.time_series.push(value);
-        }
+        self.time_series.push(value);
         
         // Если достаточно данных, вычисляем преобразование Гильберта
         if self.time_series.len() >= self.min_samples {
@@ -145,9 +142,7 @@ impl HilbertTransform {
                 hilbert_value /= weight_sum;
             }
             
-            if !self.hilbert_transform.is_full() {
-                self.hilbert_transform.push(hilbert_value);
-            }
+            self.hilbert_transform.push(hilbert_value);
         }
     }
     
@@ -245,25 +240,19 @@ impl HilbertTransform {
         if self.amplitude_history.len() >= 512 {
             self.amplitude_history.remove(0);
         }
-        if !self.amplitude_history.is_full() {
-            self.amplitude_history.push(self.analytic_signal.instantaneous_amplitude);
-        }
-        
+        self.amplitude_history.push(self.analytic_signal.instantaneous_amplitude);
+
         // Фаза
         if self.phase_history.len() >= 512 {
             self.phase_history.remove(0);
         }
-        if !self.phase_history.is_full() {
-            self.phase_history.push(self.analytic_signal.instantaneous_phase);
-        }
-        
+        self.phase_history.push(self.analytic_signal.instantaneous_phase);
+
         // Частота
         if self.frequency_history.len() >= 512 {
             self.frequency_history.remove(0);
         }
-        if !self.frequency_history.is_full() {
-            self.frequency_history.push(self.analytic_signal.instantaneous_frequency);
-        }
+        self.frequency_history.push(self.analytic_signal.instantaneous_frequency);
     }
     
     /// Обновление статистик

@@ -3,7 +3,6 @@
 //! ARIMA(p,d,q) - p: AR terms, d: differencing, q: MA terms
 //! ARIMAX - ARIMA with eXogenous variables
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// ARIMA Model - AutoRegressive Integrated Moving Average
@@ -15,18 +14,18 @@ pub struct Arima {
     q: usize, // MA order (скользящее среднее)
     
     // Данные
-    original_series: ArrayVec<f64, 512>,
-    differenced_series: ArrayVec<f64, 512>,
-    residuals: ArrayVec<f64, 512>,
-    
+    original_series: Vec<f64>,
+    differenced_series: Vec<f64>,
+    residuals: Vec<f64>,
+
     // Коэффициенты модели
-    ar_coefficients: ArrayVec<f64, 32>, // φ (phi) коэффициенты
-    ma_coefficients: ArrayVec<f64, 32>, // θ (theta) коэффициенты
+    ar_coefficients: Vec<f64>,           // φ (phi) коэффициенты
+    ma_coefficients: Vec<f64>,           // θ (theta) коэффициенты
     constant: f64,
-    
+
     // Прогнозы и метрики
     forecast: f64,
-    fitted_values: ArrayVec<f64, 512>,
+    fitted_values: Vec<f64>,
     aic: f64, // Akaike Information Criterion
     bic: f64, // Bayesian Information Criterion
     
@@ -43,14 +42,14 @@ impl Arima {
             p: p.min(16), // Ограничиваем максимальный порядок
             d: d.min(3),
             q: q.min(16),
-            original_series: ArrayVec::new(),
-            differenced_series: ArrayVec::new(),
-            residuals: ArrayVec::new(),
-            ar_coefficients: ArrayVec::new(),
-            ma_coefficients: ArrayVec::new(),
+            original_series: Vec::with_capacity(512),
+            differenced_series: Vec::with_capacity(512),
+            residuals: Vec::with_capacity(512),
+            ar_coefficients: Vec::with_capacity(32),
+            ma_coefficients: Vec::with_capacity(32),
             constant: 0.0,
             forecast: 0.0,
-            fitted_values: ArrayVec::new(),
+            fitted_values: Vec::with_capacity(512),
             aic: f64::INFINITY,
             bic: f64::INFINITY,
             is_fitted: false,
@@ -122,11 +121,9 @@ impl Arima {
         
         // Применяем дифференцирование d раз
         for _ in 0..self.d {
-            let mut diff_series = ArrayVec::new();
+            let mut diff_series: Vec<f64> = Vec::with_capacity(current_series.len());
             for i in 1..current_series.len() {
-                if !diff_series.is_full() {
-                    diff_series.push(current_series[i] - current_series[i-1]);
-                }
+                diff_series.push(current_series[i] - current_series[i - 1]);
             }
             current_series = diff_series;
         }
@@ -160,9 +157,7 @@ impl Arima {
         if !x_matrix.is_empty() {
             let coeffs = self.solve_least_squares(&x_matrix, &y_vector);
             for &coeff in &coeffs {
-                if !self.ar_coefficients.is_full() {
-                    self.ar_coefficients.push(coeff);
-                }
+                self.ar_coefficients.push(coeff);
             }
         }
     }
@@ -179,9 +174,7 @@ impl Arima {
         // В реальной реализации здесь был бы итеративный алгоритм
         for i in 0..self.q.min(8) {
             let coeff = 0.1 / (i as f64 + 1.0); // Простая эвристика
-            if !self.ma_coefficients.is_full() {
-                self.ma_coefficients.push(coeff);
-            }
+            self.ma_coefficients.push(coeff);
         }
     }
     
@@ -254,15 +247,11 @@ impl Arima {
                 }
             }
             
-            if !self.fitted_values.is_full() {
-                self.fitted_values.push(fitted_value);
-            }
-            
+            self.fitted_values.push(fitted_value);
+
             // Рассчитываем остаток
             let residual = self.differenced_series[t] - fitted_value;
-            if !self.residuals.is_full() {
-                self.residuals.push(residual);
-            }
+            self.residuals.push(residual);
         }
     }
     
@@ -378,8 +367,8 @@ pub struct ArimaX {
     arima: Arima,
     
     // Экзогенные переменные
-    exogenous_data: ArrayVec<ArrayVec<f64, 16>, 512>, // Матрица экзогенных переменных
-    exog_coefficients: ArrayVec<f64, 16>, // Коэффициенты для экзогенных переменных
+    exogenous_data: Vec<Vec<f64>>,        // Матрица экзогенных переменных
+    exog_coefficients: Vec<f64>,          // Коэффициенты для экзогенных переменных
     num_exog_vars: usize,
 }
 
@@ -387,8 +376,8 @@ impl ArimaX {
     pub fn new(p: usize, d: usize, q: usize, num_exog_vars: usize) -> Self {
         Self {
             arima: Arima::new(p, d, q),
-            exogenous_data: ArrayVec::new(),
-            exog_coefficients: ArrayVec::new(),
+            exogenous_data: Vec::with_capacity(512),
+            exog_coefficients: Vec::with_capacity(16),
             num_exog_vars: num_exog_vars.min(16),
         }
     }
@@ -396,19 +385,17 @@ impl ArimaX {
     /// Обновить модель с эндогенной переменной и экзогенными переменными
     pub fn update(&mut self, endogenous: f64, exogenous: &[f64]) -> f64 {
         // Добавляем экзогенные переменные
-        let mut exog_row = ArrayVec::new();
+        let mut exog_row: Vec<f64> = Vec::with_capacity(self.num_exog_vars);
         for (i, &val) in exogenous.iter().enumerate() {
-            if i < self.num_exog_vars && !exog_row.is_full() {
+            if i < self.num_exog_vars {
                 exog_row.push(val);
             }
         }
-        
+
         if self.exogenous_data.len() >= 512 {
             self.exogenous_data.remove(0);
         }
-        if !self.exogenous_data.is_full() {
-            self.exogenous_data.push(exog_row);
-        }
+        self.exogenous_data.push(exog_row);
         
         // Обновляем базовую ARIMA модель
         let base_forecast = self.arima.update(endogenous);

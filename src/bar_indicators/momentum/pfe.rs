@@ -1,12 +1,11 @@
 // Polarized Fractal Efficiency (PFE) - placeholder implementation
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
 pub struct Pfe {
     window: usize,
-    closes: ArrayVec<f64, 1024>,
+    closes: Vec<f64>,
     idx: usize,
     count: usize,
     value: f64,
@@ -16,7 +15,7 @@ impl Pfe {
     pub fn new(window: usize) -> Self {
         Self {
             window: window.clamp(5, 1024),
-            closes: ArrayVec::new(),
+            closes: Vec::with_capacity(window.clamp(5, 1024)),
             idx: 0,
             count: 0,
             value: 0.0,

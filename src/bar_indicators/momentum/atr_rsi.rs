@@ -10,7 +10,6 @@
 
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Результат ATR-Normalized RSI
@@ -70,8 +69,8 @@ pub struct AtrRsi {
     
     // RSI компоненты
     rsi_period: usize,
-    gains: ArrayVec<f64, 64>,
-    losses: ArrayVec<f64, 64>,
+    gains: Vec<f64>,
+    losses: Vec<f64>,
     avg_gain: f64,
     avg_loss: f64,
     
@@ -113,8 +112,8 @@ impl AtrRsi {
             atr_ma: MovingAverageProvider::new(atr_ma_type, atr_ma_period),
             
             rsi_period,
-            gains: ArrayVec::new(),
-            losses: ArrayVec::new(),
+            gains: Vec::with_capacity(64),
+            losses: Vec::with_capacity(64),
             avg_gain: 0.0,
             avg_loss: 0.0,
             

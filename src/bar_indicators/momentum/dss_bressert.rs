@@ -1,15 +1,14 @@
 // DSS Bressert (Double Smoothed Stochastic) - placeholder
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
 pub struct DssBressert {
     k_period: usize,
     smooth_period: usize,
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
     idx: usize,
     count: usize,
     ema1: MovingAverageProvider,
@@ -24,8 +23,8 @@ impl DssBressert {
         Self {
             k_period: k,
             smooth_period: s,
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(k),
+            lows: Vec::with_capacity(k),
             idx: 0,
             count: 0,
             ema1: MovingAverageProvider::new(MovingAverageType::EMA, s),

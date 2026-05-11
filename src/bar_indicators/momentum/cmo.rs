@@ -1,6 +1,5 @@
 //! Chande Momentum Oscillator (CMO) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -41,8 +40,8 @@ pub struct Cmo {
     ma_type: MovingAverageType,  // Store catalog type, no pattern matching needed
     gain_ma: MovingAverageProvider,
     loss_ma: MovingAverageProvider,
-    gains: ArrayVec<f64, 512>,
-    losses: ArrayVec<f64, 512>,
+    gains: Vec<f64>,
+    losses: Vec<f64>,
     prev: f64,
     value: f64,
     filled: bool,
@@ -73,8 +72,8 @@ impl Cmo {
             ma_type: ma_type_resolved,
             gain_ma: MovingAverageProvider::new(ma_type_resolved, period),
             loss_ma: MovingAverageProvider::new(ma_type_resolved, period),
-            gains: ArrayVec::new(),
-            losses: ArrayVec::new(),
+            gains: Vec::with_capacity(period),
+            losses: Vec::with_capacity(period),
             prev: 0.0,
             value: 0.0,
             filled: false,

@@ -2,7 +2,6 @@
 //! Усовершенствованная версия Approximate Entropy, не подверженная самосовпадениям
 //! Значения: 0.0-3.0+, где 0.0 = максимально регулярно, выше = более сложно
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Sample Entropy индикатор
@@ -13,7 +12,7 @@ pub struct SampleEntropy {
     r: f64,                     // Толерантность
     
     // Буферы
-    data: ArrayVec<f64, 512>,   // Буфер цен
+    data: Vec<f64>,   // Буфер цен
     
     // Результаты
     sampen: f64,                // Sample Entropy
@@ -33,7 +32,7 @@ impl SampleEntropy {
             period: period.min(512),
             m: m.clamp(1, 5), // Ограничиваем разумными пределами
             r: r.clamp(0.01, 1.0), // Толерантность не может быть слишком маленькой или большой
-            data: ArrayVec::new(),
+            data: Vec::with_capacity(period.min(512)),
             sampen: 0.0,
             complexity_score: 0.5,
             count: 0,

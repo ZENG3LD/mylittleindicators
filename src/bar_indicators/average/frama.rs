@@ -1,6 +1,5 @@
 //! Fractal Adaptive Moving Average (FRAMA) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use super::super::ohlcv_field::OhlcvField;
 
@@ -23,7 +22,7 @@ use super::super::ohlcv_field::OhlcvField;
 pub struct Frama {
     period: usize,
     source: OhlcvField,
-    window: ArrayVec<f64, 512>,
+    window: Vec<f64>,
     alpha: f64,
     value: f64,
     initialized: bool,
@@ -67,7 +66,7 @@ impl Frama {
         Self {
             period,
             source,
-            window: ArrayVec::new(),
+            window: Vec::with_capacity(period),
             alpha: 0.0,
             value: 0.0,
             initialized: false,

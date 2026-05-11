@@ -10,8 +10,6 @@ use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
 use crate::bar_indicators::volatility::atr::Atr;
-use arrayvec::ArrayVec;
-
 /// Результат Adaptive Bollinger Bands
 #[derive(Debug, Clone, Copy)]
 pub struct AdaptiveBollingerBandsResult {
@@ -86,10 +84,10 @@ pub struct AdaptiveBollingerBands {
     bandwidth_ma: MovingAverageProvider,     // MA для анализа ширины канала
 
     // Буферы для расчетов
-    prices: ArrayVec<f64, 64>,
-    std_devs: ArrayVec<f64, 32>,     // Стандартные отклонения
-    bandwidths: ArrayVec<f64, 32>,   // История ширины канала
-    periods: ArrayVec<f64, 16>,      // История адаптивных периодов
+    prices: Vec<f64>,
+    std_devs: Vec<f64>,     // Стандартные отклонения
+    bandwidths: Vec<f64>,   // История ширины канала
+    periods: Vec<f64>,      // История адаптивных периодов
 
     // Параметры адаптации
     base_period: usize,              // Базовый период
@@ -182,10 +180,10 @@ impl AdaptiveBollingerBands {
             volatility_ma: MovingAverageProvider::new(MovingAverageType::SMA, 10),
             bandwidth_ma: MovingAverageProvider::new(MovingAverageType::SMA, 20),
 
-            prices: ArrayVec::new(),
-            std_devs: ArrayVec::new(),
-            bandwidths: ArrayVec::new(),
-            periods: ArrayVec::new(),
+            prices: Vec::with_capacity(64),
+            std_devs: Vec::with_capacity(32),
+            bandwidths: Vec::with_capacity(32),
+            periods: Vec::with_capacity(16),
 
             base_period,
             min_period,

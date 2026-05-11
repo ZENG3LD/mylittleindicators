@@ -10,7 +10,6 @@
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
-use arrayvec::ArrayVec;
 use std::f64::consts::PI;
 
 /// Результат MESA Adaptive MA
@@ -46,10 +45,10 @@ pub struct MesaAdaptiveMA {
     period_ma: MovingAverageProvider,    // MA для сглаживания периода
 
     // Буферы для расчетов
-    prices: ArrayVec<f64, 64>,
-    i_components: ArrayVec<f64, 32>,
-    q_components: ArrayVec<f64, 32>,
-    periods: ArrayVec<f64, 32>,
+    prices: Vec<f64>,
+    i_components: Vec<f64>,
+    q_components: Vec<f64>,
+    periods: Vec<f64>,
 
     // Параметры
     min_period: f64,
@@ -95,10 +94,10 @@ impl MesaAdaptiveMA {
             slow_ma: MovingAverageProvider::new(MovingAverageType::EMA, 12),
             period_ma: MovingAverageProvider::new(MovingAverageType::EMA, 10),
 
-            prices: ArrayVec::new(),
-            i_components: ArrayVec::new(),
-            q_components: ArrayVec::new(),
-            periods: ArrayVec::new(),
+            prices: Vec::with_capacity(64),
+            i_components: Vec::with_capacity(32),
+            q_components: Vec::with_capacity(32),
+            periods: Vec::with_capacity(32),
 
             min_period,
             max_period,

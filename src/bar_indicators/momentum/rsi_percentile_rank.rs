@@ -2,7 +2,6 @@
 
 use crate::bar_indicators::momentum::rsi::Rsi;
 use crate::bar_indicators::utils::math::percentile::percentile_rank;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 
@@ -10,7 +9,7 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 pub struct RsiPercentileRank {
     rsi: Rsi,
     window: usize,
-    buf: ArrayVec<f64, 1024>,
+    buf: Vec<f64>,
     idx: usize,
     filled: bool,
     value: f64,
@@ -21,7 +20,7 @@ impl RsiPercentileRank {
         Self {
             rsi: Rsi::new(rsi_period.max(1)),
             window: window.clamp(5, 1024),
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(window.clamp(5, 1024)),
             idx: 0,
             filled: false,
             value: 50.0,

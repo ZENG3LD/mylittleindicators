@@ -2,7 +2,6 @@
 //! Фильтр Чебышева для обработки сигналов
 //! Обеспечивает крутые переходы с контролируемой пульсацией в полосе пропускания
 
-use arrayvec::ArrayVec;
 use std::f64::consts::PI;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -33,20 +32,20 @@ pub struct ChebyshevFilter {
     ripple_db: f64,                         // Пульсации в дБ
     
     // Коэффициенты IIR фильтра
-    a_coefficients: ArrayVec<f64, 16>,      // Коэффициенты знаменателя
-    b_coefficients: ArrayVec<f64, 16>,      // Коэффициенты числителя
-    
+    a_coefficients: Vec<f64>,      // Коэффициенты знаменателя
+    b_coefficients: Vec<f64>,      // Коэффициенты числителя
+
     // Буферы задержки
-    x_buffer: ArrayVec<f64, 16>,            // Входные значения
-    y_buffer: ArrayVec<f64, 16>,            // Выходные значения
-    
+    x_buffer: Vec<f64>,            // Входные значения
+    y_buffer: Vec<f64>,            // Выходные значения
+
     // Результаты
     filtered_value: f64,                    // Отфильтрованное значение
     group_delay: f64,                       // Групповая задержка
     phase_response: f64,                    // Фазовая характеристика
-    
+
     // Каскады биквадратных секций для высоких порядков
-    biquad_sections: ArrayVec<BiquadSection, 4>,
+    biquad_sections: Vec<BiquadSection>,
     
     // Состояние
     is_initialized: bool,
@@ -112,14 +111,14 @@ impl ChebyshevFilter {
             low_cutoff: 0.1,
             high_cutoff: 0.4,
             ripple_db,
-            a_coefficients: ArrayVec::new(),
-            b_coefficients: ArrayVec::new(),
-            x_buffer: ArrayVec::new(),
-            y_buffer: ArrayVec::new(),
+            a_coefficients: Vec::with_capacity(16),
+            b_coefficients: Vec::with_capacity(16),
+            x_buffer: Vec::with_capacity(16),
+            y_buffer: Vec::with_capacity(16),
             filtered_value: 0.0,
             group_delay: 0.0,
             phase_response: 0.0,
-            biquad_sections: ArrayVec::new(),
+            biquad_sections: Vec::with_capacity(4),
             is_initialized: false,
         };
         
@@ -149,14 +148,14 @@ impl ChebyshevFilter {
             low_cutoff,
             high_cutoff,
             ripple_db,
-            a_coefficients: ArrayVec::new(),
-            b_coefficients: ArrayVec::new(),
-            x_buffer: ArrayVec::new(),
-            y_buffer: ArrayVec::new(),
+            a_coefficients: Vec::with_capacity(16),
+            b_coefficients: Vec::with_capacity(16),
+            x_buffer: Vec::with_capacity(16),
+            y_buffer: Vec::with_capacity(16),
             filtered_value: 0.0,
             group_delay: 0.0,
             phase_response: 0.0,
-            biquad_sections: ArrayVec::new(),
+            biquad_sections: Vec::with_capacity(4),
             is_initialized: false,
         };
         
@@ -195,15 +194,11 @@ impl ChebyshevFilter {
         
         // Заполняем буферы начальным значением для устойчивости
         for _ in 0..=self.order {
-            if !self.x_buffer.is_full() {
-                self.x_buffer.push(initial_value);
-            }
+            self.x_buffer.push(initial_value);
         }
         
         for _ in 0..self.order {
-            if !self.y_buffer.is_full() {
-                self.y_buffer.push(initial_value);
-            }
+            self.y_buffer.push(initial_value);
         }
         
         // Инициализируем биквадратные секции
@@ -218,9 +213,7 @@ impl ChebyshevFilter {
         if self.x_buffer.len() > self.order {
             self.x_buffer.remove(0);
         }
-        if !self.x_buffer.is_full() {
-            self.x_buffer.push(input);
-        }
+        self.x_buffer.push(input);
         
         // Вычисляем выходное значение
         let mut output = 0.0;
@@ -248,9 +241,7 @@ impl ChebyshevFilter {
         if self.y_buffer.len() >= self.order {
             self.y_buffer.remove(0);
         }
-        if !self.y_buffer.is_full() {
-            self.y_buffer.push(output);
-        }
+        self.y_buffer.push(output);
         
         output
     }
@@ -366,17 +357,13 @@ impl ChebyshevFilter {
                 let alpha = wa / (wa + 1.0);
                 for i in 0..=self.order {
                     let coeff = if i == 0 || i == self.order { alpha } else { 2.0 * alpha };
-                    if !self.b_coefficients.is_full() {
-                        self.b_coefficients.push(coeff);
-                    }
+                    self.b_coefficients.push(coeff);
                 }
                 
                 self.a_coefficients.push(1.0);
                 for i in 1..=self.order {
                     let coeff = if i % 2 == 1 { alpha - 1.0 } else { 1.0 - alpha };
-                    if !self.a_coefficients.is_full() {
-                        self.a_coefficients.push(coeff);
-                    }
+                    self.a_coefficients.push(coeff);
                 }
             }
         }
@@ -476,9 +463,7 @@ impl ChebyshevFilter {
                 section.a2 = self.a_coefficients[section_index + 2];
             }
             
-            if !self.biquad_sections.is_full() {
-                self.biquad_sections.push(section);
-            }
+            self.biquad_sections.push(section);
         }
     }
     

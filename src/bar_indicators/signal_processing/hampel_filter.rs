@@ -1,6 +1,5 @@
 // Hampel Filter - robust outlier smoother using median and MAD
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::utils::math::percentile::median;
 
@@ -8,7 +7,7 @@ use crate::bar_indicators::utils::math::percentile::median;
 pub struct HampelFilter {
     window: usize,
     k: f64,
-    buf: ArrayVec<f64, 512>,
+    buf: Vec<f64>,
     idx: usize,
     filled: bool,
     value: f64,
@@ -19,7 +18,7 @@ impl HampelFilter {
         Self {
             window: window.clamp(3, 512),
             k: if k > 0.0 { k } else { 3.0 },
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(window.clamp(3, 512)),
             idx: 0,
             filled: false,
             value: 0.0,

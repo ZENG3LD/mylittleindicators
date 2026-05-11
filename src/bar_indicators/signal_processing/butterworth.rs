@@ -2,7 +2,6 @@
 //! Фильтр Баттерворта для сглаживания временных рядов
 //! Обеспечивает максимально плоскую частотную характеристику в полосе пропускания
 
-use arrayvec::ArrayVec;
 use std::f64::consts::PI;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -27,16 +26,16 @@ pub struct ButterworthFilter {
     sampling_rate: f64,                     // Частота дискретизации
     
     // Коэффициенты фильтра (IIR)
-    a_coefficients: ArrayVec<f64, 16>,      // Коэффициенты знаменателя
-    b_coefficients: ArrayVec<f64, 16>,      // Коэффициенты числителя
-    
+    a_coefficients: Vec<f64>,      // Коэффициенты знаменателя
+    b_coefficients: Vec<f64>,      // Коэффициенты числителя
+
     // Буферы для задержки
-    x_buffer: ArrayVec<f64, 16>,            // Входные значения
-    y_buffer: ArrayVec<f64, 16>,            // Выходные значения
-    
+    x_buffer: Vec<f64>,            // Входные значения
+    y_buffer: Vec<f64>,            // Выходные значения
+
     // Результаты
     filtered_value: f64,                    // Текущее отфильтрованное значение
-    filter_response: ArrayVec<f64, 256>,    // Импульсная характеристика
+    filter_response: Vec<f64>,    // Импульсная характеристика
     
     // Состояние
     is_initialized: bool,
@@ -58,12 +57,12 @@ impl ButterworthFilter {
             low_cutoff: 0.1,
             high_cutoff: 0.4,
             sampling_rate,
-            a_coefficients: ArrayVec::new(),
-            b_coefficients: ArrayVec::new(),
-            x_buffer: ArrayVec::new(),
-            y_buffer: ArrayVec::new(),
+            a_coefficients: Vec::with_capacity(16),
+            b_coefficients: Vec::with_capacity(16),
+            x_buffer: Vec::with_capacity(16),
+            y_buffer: Vec::with_capacity(16),
             filtered_value: 0.0,
-            filter_response: ArrayVec::new(),
+            filter_response: Vec::with_capacity(256),
             is_initialized: false,
         };
         
@@ -95,12 +94,12 @@ impl ButterworthFilter {
             low_cutoff: normalized_low,
             high_cutoff: normalized_high,
             sampling_rate,
-            a_coefficients: ArrayVec::new(),
-            b_coefficients: ArrayVec::new(),
-            x_buffer: ArrayVec::new(),
-            y_buffer: ArrayVec::new(),
+            a_coefficients: Vec::with_capacity(16),
+            b_coefficients: Vec::with_capacity(16),
+            x_buffer: Vec::with_capacity(16),
+            y_buffer: Vec::with_capacity(16),
             filtered_value: 0.0,
-            filter_response: ArrayVec::new(),
+            filter_response: Vec::with_capacity(256),
             is_initialized: false,
         };
         
@@ -123,20 +122,16 @@ impl ButterworthFilter {
         if self.x_buffer.len() > self.order {
             self.x_buffer.remove(0);
         }
-        if !self.x_buffer.is_full() {
-            self.x_buffer.push(value);
-        }
-        
+        self.x_buffer.push(value);
+
         // Вычисляем выходное значение по формуле IIR фильтра
         self.filtered_value = self.compute_filter_output();
-        
+
         // Добавляем новое выходное значение в буфер
         if self.y_buffer.len() >= self.order {
             self.y_buffer.remove(0);
         }
-        if !self.y_buffer.is_full() {
-            self.y_buffer.push(self.filtered_value);
-        }
+        self.y_buffer.push(self.filtered_value);
         
         self.filtered_value
     }
@@ -148,15 +143,11 @@ impl ButterworthFilter {
         
         // Заполняем буферы начальным значением
         for _ in 0..=self.order {
-            if !self.x_buffer.is_full() {
-                self.x_buffer.push(initial_value);
-            }
+            self.x_buffer.push(initial_value);
         }
-        
+
         for _ in 0..self.order {
-            if !self.y_buffer.is_full() {
-                self.y_buffer.push(initial_value);
-            }
+            self.y_buffer.push(initial_value);
         }
     }
     
@@ -187,10 +178,10 @@ impl ButterworthFilter {
                 // Первый порядок: H(s) = 1/(s + 1)
                 let k = wc_tan;
                 for &val in &[k, k] {
-                    if !self.b_coefficients.is_full() { self.b_coefficients.push(val); }
+                    self.b_coefficients.push(val);
                 }
                 for &val in &[1.0 + k, k - 1.0] {
-                    if !self.a_coefficients.is_full() { self.a_coefficients.push(val); }
+                    self.a_coefficients.push(val);
                 }
             },
             
@@ -202,10 +193,10 @@ impl ButterworthFilter {
                 let norm = 1.0 + sqrt2 * k + k2;
                 
                 for &val in &[k2, 2.0 * k2, k2] {
-                    if !self.b_coefficients.is_full() { self.b_coefficients.push(val); }
+                    self.b_coefficients.push(val);
                 }
                 for &val in &[norm, 2.0 * (k2 - 1.0), 1.0 - sqrt2 * k + k2] {
-                    if !self.a_coefficients.is_full() { self.a_coefficients.push(val); }
+                    self.a_coefficients.push(val);
                 }
             },
             
@@ -226,10 +217,10 @@ impl ButterworthFilter {
             1 => {
                 let k = wc_tan;
                 for &val in &[1.0, -1.0] {
-                    if !self.b_coefficients.is_full() { self.b_coefficients.push(val); }
+                    self.b_coefficients.push(val);
                 }
                 for &val in &[1.0 + k, k - 1.0] {
-                    if !self.a_coefficients.is_full() { self.a_coefficients.push(val); }
+                    self.a_coefficients.push(val);
                 }
             },
             
@@ -364,8 +355,8 @@ impl ButterworthFilter {
         
         // Инициализируем буферы нулями
         for _ in 0..self.order.max(self.a_coefficients.len()).max(self.b_coefficients.len()) {
-            if !self.x_buffer.is_full() { self.x_buffer.push(0.0); }
-            if !self.y_buffer.is_full() { self.y_buffer.push(0.0); }
+            self.x_buffer.push(0.0);
+            self.y_buffer.push(0.0);
         }
         
         // Подаем импульс (1.0 в первый момент, затем нули)
@@ -395,9 +386,7 @@ impl ButterworthFilter {
                 self.y_buffer[0] = output;
             }
             
-            if !self.filter_response.is_full() {
-                self.filter_response.push(output);
-            }
+            self.filter_response.push(output);
         }
         
         // Восстанавливаем исходное состояние буферов

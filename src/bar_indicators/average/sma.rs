@@ -1,6 +1,5 @@
 //! Simple Moving Average (SMA) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
 
@@ -18,7 +17,7 @@ pub struct Sma {
     sum: f64,
     count: usize,
     value: f64,
-    buf: ArrayVec<f64, 512>,
+    buf: Vec<f64>,
     idx: usize,
 }
 
@@ -50,7 +49,7 @@ impl Sma {
             sum: 0.0,
             count: 0,
             value: 0.0,
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(period),
             idx: 0,
         }
     }

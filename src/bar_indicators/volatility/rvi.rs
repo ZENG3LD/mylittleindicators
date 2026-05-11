@@ -1,7 +1,6 @@
 // High-performance Relative Volatility Index (RVI)
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -10,7 +9,7 @@ pub struct Rvi {
     period: usize,
     ma_type: MovingAverageType,
     scalar: f64,
-    closes: ArrayVec<f64, 512>,
+    closes: Vec<f64>,
     idx: usize,
     filled: bool,
     prev_close: f64,
@@ -34,7 +33,7 @@ impl Rvi {
             period,
             ma_type,
             scalar: 100.0,
-            closes: ArrayVec::from([0.0; 512]),
+            closes: vec![0.0; 512],
             idx: 0,
             filled: false,
             prev_close: 0.0,

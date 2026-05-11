@@ -1,12 +1,11 @@
 // Historical Volatility (Close-to-Close) - annualized std dev of log returns
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
 pub struct HistoricalVolatilityC2C {
     window: usize,
-    rets: ArrayVec<f64, 1024>,
+    rets: Vec<f64>,
     idx: usize,
     count: usize,
     prev_close: f64,
@@ -18,7 +17,7 @@ impl HistoricalVolatilityC2C {
     pub fn new(window: usize) -> Self {
         Self {
             window: window.clamp(5, 1024),
-            rets: ArrayVec::new(),
+            rets: Vec::with_capacity(window.clamp(5, 1024)),
             idx: 0,
             count: 0,
             prev_close: 0.0,

@@ -3,7 +3,6 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::types::Bar;
-use arrayvec::ArrayVec;
 
 /// Объемно-взвешенный ценовой уровень
 #[derive(Debug, Clone)]
@@ -34,8 +33,8 @@ pub struct VolumeWeightedPriceLevels {
     price_precision: f64,
     
     // Буферы данных
-    volume_bars: ArrayVec<Bar, 512>,
-    levels: ArrayVec<VwapLevel, 64>,
+    volume_bars: Vec<Bar>,
+    levels: Vec<VwapLevel>,
     
     // VWAP расчеты
     cumulative_volume: f64,
@@ -53,8 +52,8 @@ impl VolumeWeightedPriceLevels {
         Self {
             period,
             price_precision,
-            volume_bars: ArrayVec::new(),
-            levels: ArrayVec::new(),
+            volume_bars: Vec::with_capacity(period),
+            levels: Vec::with_capacity(64),
             cumulative_volume: 0.0,
             cumulative_price_volume: 0.0,
             current_vwap: 0.0,
@@ -197,12 +196,8 @@ impl VolumeWeightedPriceLevels {
     
     /// Добавить уровень
     fn add_level(&mut self, price: f64, volume: f64, level_type: LevelType) {
-        if self.levels.is_full() {
-            return;
-        }
-        
         let significance = (volume / self.cumulative_volume.max(1.0)).min(1.0);
-        
+
         let level = VwapLevel {
             price,
             volume_weight: volume,
@@ -211,7 +206,7 @@ impl VolumeWeightedPriceLevels {
             touch_count: 0,
             last_touch_time: 0,
         };
-        
+
         self.levels.push(level);
     }
     
@@ -253,7 +248,7 @@ impl VolumeWeightedPriceLevels {
     }
     
     /// Получить все уровни
-    pub fn get_levels(&self) -> &ArrayVec<VwapLevel, 64> {
+    pub fn get_levels(&self) -> &Vec<VwapLevel> {
         &self.levels
     }
     

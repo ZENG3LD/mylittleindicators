@@ -1,14 +1,13 @@
 use crate::bar_indicators::divergence::divergence::DivergenceDetector;
 use crate::bar_indicators::momentum::obv::Obv;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct ObvDivergence {
     detector: DivergenceDetector,
     obv: Obv,
-    prices: ArrayVec<f64, 512>,
-    obv_values: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
+    obv_values: Vec<f64>,
     lookback: usize,
     value: f64,
 }
@@ -18,8 +17,8 @@ impl ObvDivergence {
         Self {
             detector: DivergenceDetector::new(),
             obv: Obv::new(),
-            prices: ArrayVec::new(),
-            obv_values: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            obv_values: Vec::with_capacity(512),
             lookback: lookback.max(5),
             value: 0.0,
         }

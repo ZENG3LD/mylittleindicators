@@ -1,14 +1,13 @@
 use crate::bar_indicators::divergence::divergence::DivergenceDetector;
 use crate::bar_indicators::momentum::cci::Cci;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct CciDivergence {
     detector: DivergenceDetector,
     cci: Cci,
-    prices: ArrayVec<f64, 512>,
-    cci_values: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
+    cci_values: Vec<f64>,
     lookback: usize,
     value: f64,
 }
@@ -18,8 +17,8 @@ impl CciDivergence {
         Self {
             detector: DivergenceDetector::new(),
             cci: Cci::new(period.max(1), 0.015, None),
-            prices: ArrayVec::new(),
-            cci_values: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            cci_values: Vec::with_capacity(512),
             lookback: lookback.max(5),
             value: 0.0,
         }

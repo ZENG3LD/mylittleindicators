@@ -3,16 +3,15 @@
 //! Формула: MFI = 100 - (100 / (1 + Money Flow Ratio))
 //! где Money Flow Ratio = Positive Money Flow / Negative Money Flow
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Money Flow Index индикатор
 #[derive(Clone)]
 pub struct Mfi {
     period: usize,
-    money_flows: ArrayVec<f64, 512>,  // Positive/Negative money flows
-    flow_types: ArrayVec<bool, 512>,  // true = positive, false = negative
-    typical_prices: ArrayVec<f64, 512>, // Для сравнения направления
+    money_flows: Vec<f64>,             // Positive/Negative money flows
+    flow_types: Vec<bool>,             // true = positive, false = negative
+    typical_prices: Vec<f64>,          // Для сравнения направления
     count: usize,
     value: f64,
 }
@@ -21,9 +20,9 @@ impl Mfi {
     pub fn new(period: usize) -> Self {
         Self {
             period,
-            money_flows: ArrayVec::new(),
-            flow_types: ArrayVec::new(),
-            typical_prices: ArrayVec::new(),
+            money_flows: Vec::with_capacity(period),
+            flow_types: Vec::with_capacity(period),
+            typical_prices: Vec::with_capacity(period),
             count: 0,
             value: 50.0, // Нейтральное значение
         }

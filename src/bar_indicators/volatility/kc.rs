@@ -2,14 +2,13 @@
 // (c) 2024
 
 use super::atr::Atr;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct Kc {
     period: usize,
     k_multiplier: f64,
-    sma_buf: ArrayVec<f64, 512>,
+    sma_buf: Vec<f64>,
     sma_sum: f64,
     sma_filled: bool, // true, если буфер заполнен полностью
     atr: Atr,
@@ -23,7 +22,7 @@ impl Kc {
         Self {
             period,
             k_multiplier,
-            sma_buf: ArrayVec::new(),
+            sma_buf: Vec::with_capacity(period),
             sma_sum: 0.0,
             sma_filled: false,
             atr: Atr::new(period, crate::bar_indicators::average::moving_average::MovingAverageType::RMA),

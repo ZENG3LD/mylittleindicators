@@ -3,15 +3,13 @@
 use crate::bar_indicators::average::trima::Trima;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
-use arrayvec::ArrayVec;
-
 #[derive(Debug, Clone)]
 pub struct TrimaBands {
     trima: Trima,
     window: usize,
     k: f64,
     source: OhlcvField,
-    buf: ArrayVec<f64, 512>,
+    buf: Vec<f64>,
     idx: usize,
     filled: bool,
     upper: f64,
@@ -26,7 +24,7 @@ impl TrimaBands {
             window: period.clamp(2, 512),
             k: if k > 0.0 { k } else { 2.0 },
             source: OhlcvField::Close,
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(period.clamp(2, 512)),
             idx: 0,
             filled: false,
             upper: 0.0,
@@ -41,7 +39,7 @@ impl TrimaBands {
             window: period.clamp(2, 512),
             k: if k > 0.0 { k } else { 2.0 },
             source,
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(period.clamp(2, 512)),
             idx: 0,
             filled: false,
             upper: 0.0,

@@ -1,6 +1,5 @@
 //! Fisher Transform indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Fisher Transform - converts prices to Gaussian normal distribution.
@@ -34,9 +33,9 @@ pub struct FisherTransform {
     smooth_period: usize,
     
     // Буферы для расчета
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
-    normalized_values: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    normalized_values: Vec<f64>,
     
     // EMA для сглаживания
     ema_alpha: f64,
@@ -67,9 +66,9 @@ impl FisherTransform {
         Self {
             period,
             smooth_period,
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
-            normalized_values: ArrayVec::new(),
+            highs: Vec::with_capacity(period),
+            lows: Vec::with_capacity(period),
+            normalized_values: Vec::new(),
             ema_alpha,
             smoothed_value: 0.0,
             ema_initialized: false,

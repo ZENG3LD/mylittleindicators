@@ -1,12 +1,11 @@
 // Center of Gravity (COG) - Ehlers proxy (placeholder)
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
 pub struct CenterOfGravity {
     period: usize,
-    buf: ArrayVec<f64, 512>,
+    buf: Vec<f64>,
     idx: usize,
     count: usize,
     value: f64,
@@ -16,7 +15,7 @@ impl CenterOfGravity {
     pub fn new(period: usize) -> Self {
         Self {
             period: period.clamp(2, 512),
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(period.clamp(2, 512)),
             idx: 0,
             count: 0,
             value: 0.0,

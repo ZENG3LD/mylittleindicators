@@ -9,7 +9,6 @@
 //! SS = a1*Price + a2*Price[1] + b1*SS[1] + b2*SS[2]
 //! где коэффициенты рассчитываются на основе желаемой частоты среза
 
-use arrayvec::ArrayVec;
 use std::f64::consts::PI;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -61,8 +60,8 @@ pub struct EhlersSuperSmoother {
     b2: f64,                     // Коэффициент для SS[2]
     
     // Буферы данных
-    prices: ArrayVec<f64, 8>,    // Буфер цен
-    values: ArrayVec<f64, 8>,    // Буфер сглаженных значений
+    prices: Vec<f64>,    // Буфер цен
+    values: Vec<f64>,    // Буфер сглаженных значений
     
     // Параметры
     period: f64,                 // Период фильтра
@@ -91,8 +90,8 @@ impl EhlersSuperSmoother {
             a2: 0.0,
             b1: 0.0,
             b2: 0.0,
-            prices: ArrayVec::new(),
-            values: ArrayVec::new(),
+            prices: Vec::with_capacity(8),
+            values: Vec::with_capacity(8),
             period,
             cutoff_frequency: 0.0,
             current_result: SuperSmootherResult::empty(),

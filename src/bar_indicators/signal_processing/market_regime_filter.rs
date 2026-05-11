@@ -8,7 +8,6 @@
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 use std::collections::HashMap;
 
 /// Типы рыночных режимов
@@ -89,11 +88,11 @@ pub struct MarketRegimeFilter {
     stability_ma: MovingAverageProvider,     // MA для стабильности
     
     // Буферы для анализа
-    prices: ArrayVec<f64, 64>,
-    highs: ArrayVec<f64, 32>,
-    lows: ArrayVec<f64, 32>,
-    ranges: ArrayVec<f64, 32>,
-    regime_history: ArrayVec<MarketRegime, 32>,
+    prices: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    ranges: Vec<f64>,
+    regime_history: Vec<MarketRegime>,
     
     // Параметры анализа
     trend_threshold: f64,            // Порог для определения тренда
@@ -140,11 +139,11 @@ impl MarketRegimeFilter {
             momentum_ma: MovingAverageProvider::new(MovingAverageType::EMA, 8),
             stability_ma: MovingAverageProvider::new(MovingAverageType::SMA, 15),
             
-            prices: ArrayVec::new(),
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
-            ranges: ArrayVec::new(),
-            regime_history: ArrayVec::new(),
+            prices: Vec::with_capacity(64),
+            highs: Vec::with_capacity(32),
+            lows: Vec::with_capacity(32),
+            ranges: Vec::with_capacity(32),
+            regime_history: Vec::with_capacity(32),
             
             trend_threshold,
             volatility_threshold,

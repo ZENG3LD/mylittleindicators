@@ -2,7 +2,6 @@
 //! Расширенный фильтр Калмана для нелинейных систем
 //! Использует линеаризацию через якобианы для обработки нелинейностей
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 
@@ -258,9 +257,9 @@ pub struct ExtendedKalmanFilter {
     current_result: EkfResult,
     
     // История для анализа
-    state_history: ArrayVec<[f64; 2], 100>,
-    innovation_history: ArrayVec<f64, 100>,
-    linearization_errors: ArrayVec<f64, 50>,
+    state_history: Vec<[f64; 2]>,
+    innovation_history: Vec<f64>,
+    linearization_errors: Vec<f64>,
     
     // Адаптивность
     adaptive_noise: bool,
@@ -268,8 +267,8 @@ pub struct ExtendedKalmanFilter {
     innovation_variance: f64,
     
     // Диагностика
-    jacobian_condition_numbers: ArrayVec<f64, 50>,
-    nonlinearity_measures: ArrayVec<f64, 50>,
+    jacobian_condition_numbers: Vec<f64>,
+    nonlinearity_measures: Vec<f64>,
     
     // Состояние
     is_initialized: bool,
@@ -308,13 +307,13 @@ impl ExtendedKalmanFilter {
             state: [0.0, 0.0],
             covariance: Matrix2x2::new([[1000.0, 0.0], [0.0, 100.0]]),
             current_result: EkfResult::new(),
-            state_history: ArrayVec::new(),
-            innovation_history: ArrayVec::new(),
-            linearization_errors: ArrayVec::new(),
+            state_history: Vec::with_capacity(100),
+            innovation_history: Vec::with_capacity(100),
+            linearization_errors: Vec::with_capacity(50),
             adaptive_noise: false,
             innovation_variance: 0.0,
-            jacobian_condition_numbers: ArrayVec::new(),
-            nonlinearity_measures: ArrayVec::new(),
+            jacobian_condition_numbers: Vec::with_capacity(50),
+            nonlinearity_measures: Vec::with_capacity(50),
             is_initialized: false,
         }
     }
@@ -458,9 +457,7 @@ impl ExtendedKalmanFilter {
         if self.linearization_errors.len() >= 50 {
             self.linearization_errors.remove(0);
         }
-        if !self.linearization_errors.is_full() {
-            self.linearization_errors.push(linearization_error);
-        }
+        self.linearization_errors.push(linearization_error);
     }
     
     /// Анализ нелинейности системы
@@ -481,16 +478,12 @@ impl ExtendedKalmanFilter {
         if self.jacobian_condition_numbers.len() >= 50 {
             self.jacobian_condition_numbers.remove(0);
         }
-        if !self.jacobian_condition_numbers.is_full() {
-            self.jacobian_condition_numbers.push(condition_number);
-        }
-        
+        self.jacobian_condition_numbers.push(condition_number);
+
         if self.nonlinearity_measures.len() >= 50 {
             self.nonlinearity_measures.remove(0);
         }
-        if !self.nonlinearity_measures.is_full() {
-            self.nonlinearity_measures.push(nonlinearity_measure);
-        }
+        self.nonlinearity_measures.push(nonlinearity_measure);
     }
     
     /// Вычисление числа обусловленности матрицы
@@ -548,16 +541,12 @@ impl ExtendedKalmanFilter {
         if self.state_history.len() >= 100 {
             self.state_history.remove(0);
         }
-        if !self.state_history.is_full() {
-            self.state_history.push(self.state);
-        }
-        
+        self.state_history.push(self.state);
+
         if self.innovation_history.len() >= 100 {
             self.innovation_history.remove(0);
         }
-        if !self.innovation_history.is_full() {
-            self.innovation_history.push(self.current_result.innovation);
-        }
+        self.innovation_history.push(self.current_result.innovation);
     }
     
     // Публичные методы доступа

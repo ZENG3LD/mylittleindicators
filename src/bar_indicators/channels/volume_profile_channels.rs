@@ -8,7 +8,6 @@
 //! - Adaptive price bins based on volatility
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 use serde::{Serialize, Deserialize};
 
 
@@ -83,7 +82,7 @@ pub struct VolumeProfileChannels {
     max_price: f64,
     
     // Буфер данных баров
-    bar_buffer: ArrayVec<(f64, f64, f64, f64, f64), 1000>, // OHLCV
+    bar_buffer: Vec<(f64, f64, f64, f64, f64)>, // OHLCV
     buffer_index: usize,
     buffer_filled: bool,
     
@@ -151,7 +150,7 @@ impl VolumeProfileChannels {
             bin_size: 0.0,
             min_price: f64::INFINITY,
             max_price: f64::NEG_INFINITY,
-            bar_buffer: ArrayVec::new(),
+            bar_buffer: Vec::with_capacity(1000),
             buffer_index: 0,
             buffer_filled: false,
             point_of_control: 0.0,

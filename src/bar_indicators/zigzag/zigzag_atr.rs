@@ -1,7 +1,6 @@
 // ZigZag by ATR-multiplier threshold
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -9,15 +8,15 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 pub struct ZigZagAtr {
     pub zigzag_period: usize,     // Период для расчета ZigZag
     pub atr_mult: f64,           // Множитель ATR
-    pub swings: ArrayVec<(usize, f64), 512>,
+    pub swings: Vec<(usize, f64)>,
     pub last_extreme: f64,
     pub last_extreme_idx: usize,
     pub direction: i8,
     pub atr: Atr,               // ATR с собственным периодом
     
     // Оптимизированные циклические буферы как в SMA
-    high_buffer: ArrayVec<f64, 1024>,
-    low_buffer: ArrayVec<f64, 1024>,
+    high_buffer: Vec<f64>,
+    low_buffer: Vec<f64>,
     buffer_count: usize,
     buffer_idx: usize,
     
@@ -43,13 +42,13 @@ impl ZigZagAtr {
         Self {
             zigzag_period,
             atr_mult,
-            swings: ArrayVec::new(),
+            swings: Vec::with_capacity(512),
             last_extreme: 0.0,
             last_extreme_idx: 0,
             direction: 0,
             atr,
-            high_buffer: ArrayVec::new(),
-            low_buffer: ArrayVec::new(),
+            high_buffer: Vec::with_capacity(1024),
+            low_buffer: Vec::with_capacity(1024),
             buffer_count: 0,
             buffer_idx: 0,
             current_max: f64::NEG_INFINITY,
@@ -63,13 +62,13 @@ impl ZigZagAtr {
         Self {
             zigzag_period: period,
             atr_mult,
-            swings: ArrayVec::new(),
+            swings: Vec::with_capacity(512),
             last_extreme: 0.0,
             last_extreme_idx: 0,
             direction: 0,
             atr,
-            high_buffer: ArrayVec::new(),
-            low_buffer: ArrayVec::new(),
+            high_buffer: Vec::with_capacity(1024),
+            low_buffer: Vec::with_capacity(1024),
             buffer_count: 0,
             buffer_idx: 0,
             current_max: f64::NEG_INFINITY,
@@ -240,7 +239,7 @@ impl ZigZagAtr {
         self.swings.last().copied()
     }
     
-    pub fn swings(&self) -> &ArrayVec<(usize, f64), 512> {
+    pub fn swings(&self) -> &Vec<(usize, f64)> {
         &self.swings
     }
     

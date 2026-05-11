@@ -8,7 +8,6 @@
 //! - Future cloud projection
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 use serde::{Serialize, Deserialize};
 
 /// Состояние облака Ишимоку
@@ -58,26 +57,26 @@ pub struct IchimokuCloud {
     displacement: usize,    // Обычно 26 (смещение в будущее для Senkou)
 
     // Circular buffers для high/low - O(1) operations
-    tenkan_high_buffer: ArrayVec<f64, 512>,
-    tenkan_low_buffer: ArrayVec<f64, 512>,
+    tenkan_high_buffer: Vec<f64>,
+    tenkan_low_buffer: Vec<f64>,
     tenkan_index: usize,
     tenkan_filled: bool,
 
-    kijun_high_buffer: ArrayVec<f64, 512>,
-    kijun_low_buffer: ArrayVec<f64, 512>,
+    kijun_high_buffer: Vec<f64>,
+    kijun_low_buffer: Vec<f64>,
     kijun_index: usize,
     kijun_filled: bool,
 
-    senkou_b_high_buffer: ArrayVec<f64, 512>,
-    senkou_b_low_buffer: ArrayVec<f64, 512>,
+    senkou_b_high_buffer: Vec<f64>,
+    senkou_b_low_buffer: Vec<f64>,
     senkou_b_index: usize,
     senkou_b_filled: bool,
 
     // Буфер для сдвига Chikou Span
-    chikou_buffer: ArrayVec<f64, 512>,
+    chikou_buffer: Vec<f64>,
 
     // Буфер для будущих значений Senkou (displacement)
-    senkou_future_buffer: ArrayVec<(f64, f64), 512>, // (Senkou A, Senkou B)
+    senkou_future_buffer: Vec<(f64, f64)>, // (Senkou A, Senkou B)
 
     // Текущие значения линий
     tenkan_sen: f64,     // Conversion Line
@@ -121,20 +120,20 @@ impl IchimokuCloud {
             kijun_period,
             senkou_b_period,
             displacement,
-            tenkan_high_buffer: ArrayVec::new(),
-            tenkan_low_buffer: ArrayVec::new(),
+            tenkan_high_buffer: Vec::with_capacity(512),
+            tenkan_low_buffer: Vec::with_capacity(512),
             tenkan_index: 0,
             tenkan_filled: false,
-            kijun_high_buffer: ArrayVec::new(),
-            kijun_low_buffer: ArrayVec::new(),
+            kijun_high_buffer: Vec::with_capacity(512),
+            kijun_low_buffer: Vec::with_capacity(512),
             kijun_index: 0,
             kijun_filled: false,
-            senkou_b_high_buffer: ArrayVec::new(),
-            senkou_b_low_buffer: ArrayVec::new(),
+            senkou_b_high_buffer: Vec::with_capacity(512),
+            senkou_b_low_buffer: Vec::with_capacity(512),
             senkou_b_index: 0,
             senkou_b_filled: false,
-            chikou_buffer: ArrayVec::new(),
-            senkou_future_buffer: ArrayVec::new(),
+            chikou_buffer: Vec::with_capacity(512),
+            senkou_future_buffer: Vec::with_capacity(512),
             tenkan_sen: 0.0,
             kijun_sen: 0.0,
             senkou_span_a: 0.0,

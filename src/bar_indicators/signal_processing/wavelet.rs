@@ -2,7 +2,6 @@
 //! Вейвлет-преобразование для многомасштабного анализа временных рядов
 //! Позволяет анализировать сигнал одновременно во времени и частоте
 
-use arrayvec::ArrayVec;
 
 /// Типы вейвлетов
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -18,11 +17,11 @@ pub enum WaveletType {
 /// Результат вейвлет-преобразования
 #[derive(Debug, Clone)]
 pub struct WaveletCoefficients {
-    pub scales: ArrayVec<f64, 32>,                      // Масштабы
-    pub coefficients: ArrayVec<ArrayVec<f64, 256>, 32>, // Коэффициенты для каждого масштаба
-    pub approximation: ArrayVec<f64, 256>,              // Аппроксимирующие коэффициенты
-    pub details: ArrayVec<ArrayVec<f64, 256>, 8>,       // Детализирующие коэффициенты
-    pub energy: ArrayVec<f64, 32>,                      // Энергия на каждом масштабе
+    pub scales: Vec<f64>,                      // Масштабы
+    pub coefficients: Vec<Vec<f64>>, // Коэффициенты для каждого масштаба
+    pub approximation: Vec<f64>,              // Аппроксимирующие коэффициенты
+    pub details: Vec<Vec<f64>>,       // Детализирующие коэффициенты
+    pub energy: Vec<f64>,                      // Энергия на каждом масштабе
     pub dominant_scale: f64,                            // Доминирующий масштаб
     pub wavelet_entropy: f64,                           // Вейвлет-энтропия
 }
@@ -36,11 +35,11 @@ impl Default for WaveletCoefficients {
 impl WaveletCoefficients {
     pub fn new() -> Self {
         Self {
-            scales: ArrayVec::new(),
-            coefficients: ArrayVec::new(),
-            approximation: ArrayVec::new(),
-            details: ArrayVec::new(),
-            energy: ArrayVec::new(),
+            scales: Vec::with_capacity(32),
+            coefficients: Vec::with_capacity(32),
+            approximation: Vec::with_capacity(256),
+            details: Vec::with_capacity(8),
+            energy: Vec::with_capacity(32),
             dominant_scale: 0.0,
             wavelet_entropy: 0.0,
         }
@@ -51,7 +50,7 @@ impl WaveletCoefficients {
 #[derive(Clone)]
 pub struct WaveletTransform {
     // Временные данные
-    time_series: ArrayVec<f64, 512>,
+    time_series: Vec<f64>,
     
     // Результаты преобразования
     wavelet_coeffs: WaveletCoefficients,
@@ -63,8 +62,8 @@ pub struct WaveletTransform {
     max_scale: f64,                     // Максимальный масштаб
     
     // Фильтры для дискретного вейвлет-преобразования
-    low_pass_filter: ArrayVec<f64, 16>, // Низкочастотный фильтр
-    high_pass_filter: ArrayVec<f64, 16>, // Высокочастотный фильтр
+    low_pass_filter: Vec<f64>, // Низкочастотный фильтр
+    high_pass_filter: Vec<f64>, // Высокочастотный фильтр
     
     // Параметры непрерывного вейвлет-преобразования
     morlet_omega: f64,                  // Параметр ω для вейвлета Морле
@@ -79,14 +78,14 @@ impl WaveletTransform {
         let max_scales = max_scales.min(32);
         
         let mut transform = Self {
-            time_series: ArrayVec::new(),
+            time_series: Vec::with_capacity(512),
             wavelet_coeffs: WaveletCoefficients::new(),
             wavelet_type,
             max_scales,
             min_scale: 1.0,
             max_scale: 64.0,
-            low_pass_filter: ArrayVec::new(),
-            high_pass_filter: ArrayVec::new(),
+            low_pass_filter: Vec::with_capacity(16),
+            high_pass_filter: Vec::with_capacity(16),
             morlet_omega: 6.0,
             is_ready: false,
             min_samples: 32,
@@ -102,9 +101,7 @@ impl WaveletTransform {
         if self.time_series.len() >= 512 {
             self.time_series.remove(0);
         }
-        if !self.time_series.is_full() {
-            self.time_series.push(value);
-        }
+        self.time_series.push(value);
         
         // Если достаточно данных, вычисляем вейвлет-преобразование
         if self.time_series.len() >= self.min_samples {
@@ -152,9 +149,7 @@ impl WaveletTransform {
                 // Высокочастотный фильтр (альтернирующие знаки)
                 for (i, &coeff) in h.iter().enumerate() {
                     let sign = if i % 2 == 0 { -1.0 } else { 1.0 };
-                    if !self.high_pass_filter.is_full() {
-                        self.high_pass_filter.push(sign * coeff);
-                    }
+                    self.high_pass_filter.push(sign * coeff);
                 }
                 self.high_pass_filter.reverse();
             },
@@ -175,9 +170,7 @@ impl WaveletTransform {
                 
                 for (i, &coeff) in h.iter().enumerate() {
                     let sign = if i % 2 == 0 { -1.0 } else { 1.0 };
-                    if !self.high_pass_filter.is_full() {
-                        self.high_pass_filter.push(sign * coeff);
-                    }
+                    self.high_pass_filter.push(sign * coeff);
                 }
                 self.high_pass_filter.reverse();
             },
@@ -226,8 +219,8 @@ impl WaveletTransform {
             let (approximation, detail) = self.single_level_dwt(&current_signal);
             
             // Сохраняем детализирующие коэффициенты (приводим к нужному размеру)
-            if !self.wavelet_coeffs.details.is_full() {
-                let mut detail_256 = ArrayVec::<f64, 256>::new();
+            {
+                let mut detail_256: Vec<f64> = Vec::with_capacity(256);
                 for (i, &val) in detail.iter().enumerate() {
                     if i >= 256 { break; }
                     detail_256.push(val);
@@ -248,9 +241,9 @@ impl WaveletTransform {
     }
     
     /// Одноуровневое дискретное вейвлет-преобразование
-    fn single_level_dwt(&self, signal: &ArrayVec<f64, 512>) -> (ArrayVec<f64, 512>, ArrayVec<f64, 512>) {
-        let mut approximation = ArrayVec::new();
-        let mut detail = ArrayVec::new();
+    fn single_level_dwt(&self, signal: &Vec<f64>) -> (Vec<f64>, Vec<f64>) {
+        let mut approximation: Vec<f64> = Vec::new();
+        let mut detail: Vec<f64> = Vec::new();
         
         let n = signal.len();
         
@@ -269,12 +262,8 @@ impl WaveletTransform {
                 detail_sum += g_coeff * signal[signal_idx];
             }
             
-            if !approximation.is_full() {
-                approximation.push(approx_sum);
-            }
-            if !detail.is_full() {
-                detail.push(detail_sum);
-            }
+            approximation.push(approx_sum);
+            detail.push(detail_sum);
         }
         
         (approximation, detail)
@@ -291,23 +280,17 @@ impl WaveletTransform {
         for i in 0..self.max_scales {
             let scale = self.min_scale * (self.max_scale / self.min_scale).powf(i as f64 / (self.max_scales - 1) as f64);
             
-            if !self.wavelet_coeffs.scales.is_full() {
-                self.wavelet_coeffs.scales.push(scale);
-            }
-            
-            let mut scale_coefficients = ArrayVec::new();
-            
+            self.wavelet_coeffs.scales.push(scale);
+
+            let mut scale_coefficients: Vec<f64> = Vec::with_capacity(n);
+
             // Вычисляем коэффициенты для текущего масштаба
             for t in 0..n {
                 let coeff = self.compute_wavelet_coefficient(t, scale);
-                if !scale_coefficients.is_full() {
-                    scale_coefficients.push(coeff);
-                }
+                scale_coefficients.push(coeff);
             }
-            
-            if !self.wavelet_coeffs.coefficients.is_full() {
-                self.wavelet_coeffs.coefficients.push(scale_coefficients);
-            }
+
+            self.wavelet_coeffs.coefficients.push(scale_coefficients);
         }
     }
     
@@ -363,9 +346,7 @@ impl WaveletTransform {
             for (i, coeffs) in self.wavelet_coeffs.coefficients.iter().enumerate() {
                 let energy: f64 = coeffs.iter().map(|&c| c * c).sum();
 
-                if !self.wavelet_coeffs.energy.is_full() {
-                    self.wavelet_coeffs.energy.push(energy);
-                }
+                self.wavelet_coeffs.energy.push(energy);
 
                 total_energy += energy;
 
@@ -384,9 +365,7 @@ impl WaveletTransform {
             for (i, detail_coeffs) in self.wavelet_coeffs.details.iter().enumerate() {
                 let energy: f64 = detail_coeffs.iter().map(|&c| c * c).sum();
 
-                if !self.wavelet_coeffs.energy.is_full() {
-                    self.wavelet_coeffs.energy.push(energy);
-                }
+                self.wavelet_coeffs.energy.push(energy);
 
                 total_energy += energy;
 

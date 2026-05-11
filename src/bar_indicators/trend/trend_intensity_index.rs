@@ -1,14 +1,13 @@
 // Trend Intensity Index (TII) - percent of closes above MA in window
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
 pub struct TrendIntensityIndex {
     window: usize,
     ma: MovingAverageProvider,
-    buf: ArrayVec<f64, 512>,
+    buf: Vec<f64>,
     idx: usize,
     filled: bool,
     value: f64,
@@ -20,7 +19,7 @@ impl TrendIntensityIndex {
         Self {
             window: w,
             ma: MovingAverageProvider::new(MovingAverageType::SMA, w),
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(w),
             idx: 0,
             filled: false,
             value: 50.0,

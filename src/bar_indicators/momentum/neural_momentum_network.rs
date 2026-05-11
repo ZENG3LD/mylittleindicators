@@ -11,7 +11,6 @@
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 
 /// Тип активационной функции
 #[derive(Debug, Clone, Copy)]
@@ -56,7 +55,7 @@ impl ActivationFunction {
 /// Нейрон в сети
 #[derive(Debug, Clone)]
 struct Neuron {
-    weights: ArrayVec<f64, 8>,      // Веса входов
+    weights: Vec<f64>,      // Веса входов
     bias: f64,                      // Смещение
     activation: ActivationFunction, // Функция активации
     output: f64,                    // Последний выход
@@ -65,7 +64,7 @@ struct Neuron {
 
 impl Neuron {
     fn new(num_inputs: usize, activation: ActivationFunction, learning_rate: f64) -> Self {
-        let mut weights = ArrayVec::new();
+        let mut weights = Vec::with_capacity(num_inputs);
         
         // Инициализация весов (Xavier initialization)
         let limit = (6.0 / num_inputs as f64).sqrt();
@@ -153,15 +152,15 @@ pub struct NeuralMomentumNetwork {
     atr: Atr,                          // ATR для волатильности
     
     // Нейронная сеть
-    layer1: ArrayVec<Neuron, 4>,       // Первый скрытый слой (4 нейрона)
-    layer2: ArrayVec<Neuron, 2>,       // Второй скрытый слой (2 нейрона)
+    layer1: Vec<Neuron>,       // Первый скрытый слой (4 нейрона)
+    layer2: Vec<Neuron>,       // Второй скрытый слой (2 нейрона)
     output_neuron: Neuron,             // Выходной нейрон
     
     // Буферы для данных
-    prices: ArrayVec<f64, 32>,         // Цены
-    volumes: ArrayVec<f64, 16>,        // Объемы
-    features: ArrayVec<[f64; 6], 16>,  // Входные признаки
-    targets: ArrayVec<f64, 16>,        // Целевые значения для обучения
+    prices: Vec<f64>,         // Цены
+    volumes: Vec<f64>,        // Объемы
+    features: Vec<[f64; 6]>,  // Входные признаки
+    targets: Vec<f64>,        // Целевые значения для обучения
     
     // Параметры
     learning_rate: f64,                // Скорость обучения
@@ -186,13 +185,13 @@ impl NeuralMomentumNetwork {
                 "Learning rate must be between 0.0 and 1.0");
         
         // Создаем нейроны для каждого слоя
-        let mut layer1 = ArrayVec::new();
+        let mut layer1 = Vec::with_capacity(4);
         layer1.push(Neuron::new(6, ActivationFunction::Tanh, learning_rate));
         layer1.push(Neuron::new(6, ActivationFunction::Sigmoid, learning_rate));
         layer1.push(Neuron::new(6, ActivationFunction::ReLU, learning_rate));
         layer1.push(Neuron::new(6, ActivationFunction::Swish, learning_rate));
         
-        let mut layer2 = ArrayVec::new();
+        let mut layer2 = Vec::with_capacity(2);
         layer2.push(Neuron::new(4, ActivationFunction::Tanh, learning_rate));
         layer2.push(Neuron::new(4, ActivationFunction::Sigmoid, learning_rate));
         
@@ -210,10 +209,10 @@ impl NeuralMomentumNetwork {
             layer2,
             output_neuron,
             
-            prices: ArrayVec::new(),
-            volumes: ArrayVec::new(),
-            features: ArrayVec::new(),
-            targets: ArrayVec::new(),
+            prices: Vec::with_capacity(32),
+            volumes: Vec::with_capacity(16),
+            features: Vec::with_capacity(16),
+            targets: Vec::with_capacity(16),
             
             learning_rate,
             

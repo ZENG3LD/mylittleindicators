@@ -10,7 +10,6 @@ use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::utils::math::percentile::quickselect_nth;
-use arrayvec::ArrayVec;
 
 /// Тип режима волатильности
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -89,10 +88,10 @@ pub struct DynamicVolatilityRegime {
     regime_smoother: MovingAverageProvider,         // Сглаживание режима
     
     // Буферы для расчетов
-    returns: ArrayVec<f64, 64>,             // Логарифмические доходности
-    volatilities: ArrayVec<f64, 32>,        // Значения волатильности
-    regime_scores: ArrayVec<f64, 16>,       // Оценки режимов
-    regime_history: ArrayVec<VolatilityRegime, 16>, // История режимов
+    returns: Vec<f64>,             // Логарифмические доходности
+    volatilities: Vec<f64>,        // Значения волатильности
+    regime_scores: Vec<f64>,       // Оценки режимов
+    regime_history: Vec<VolatilityRegime>, // История режимов
     
     // GARCH-подобные параметры
     garch_alpha: f64,                       // Коэффициент для GARCH (0.0-1.0)
@@ -139,10 +138,10 @@ impl DynamicVolatilityRegime {
             long_term_vol: MovingAverageProvider::new(MovingAverageType::SMA, 50),
             regime_smoother: MovingAverageProvider::new(MovingAverageType::EMA, 5),
             
-            returns: ArrayVec::new(),
-            volatilities: ArrayVec::new(),
-            regime_scores: ArrayVec::new(),
-            regime_history: ArrayVec::new(),
+            returns: Vec::with_capacity(64),
+            volatilities: Vec::with_capacity(32),
+            regime_scores: Vec::with_capacity(16),
+            regime_history: Vec::with_capacity(16),
             
             garch_alpha,
             garch_beta,

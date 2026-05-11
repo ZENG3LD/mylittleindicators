@@ -12,7 +12,6 @@
 //! Индикатор НЕ содержит логику стопов - только возвращает свинг уровни.
 //! Логика остановки позиций реализуется в стратегиях на основе этих уровней.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Swing Stop индикатор - уровни на основе свинг экстремумов
@@ -24,8 +23,8 @@ pub struct SwingStop {
     use_percentage: bool,   // Использовать процентный отступ
     
     // Буферы цен
-    highs: ArrayVec<f64, 1024>,
-    lows: ArrayVec<f64, 1024>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
     
     // Текущие свинг уровни
     last_swing_high: f64,
@@ -60,8 +59,8 @@ impl SwingStop {
             min_swing_size,
             offset,
             use_percentage,
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(1024),
+            lows: Vec::with_capacity(1024),
             last_swing_high: 0.0,
             last_swing_low: f64::MAX,
             long_stop: 0.0,

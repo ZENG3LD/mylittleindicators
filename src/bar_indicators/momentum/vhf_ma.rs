@@ -1,14 +1,13 @@
 // VhfMa: модифицированный VHF с MA в знаменателе (аналог Nautilus, но на ArrayVec и с нашими MA)
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct VhfMa {
     period: usize,
-    buffer: ArrayVec<f64, 512>,
+    buffer: Vec<f64>,
     filled: bool,
     value: f64,
     ma: MovingAverageProvider,
@@ -19,7 +18,7 @@ impl VhfMa {
     pub fn new(period: usize, ma_type: MovingAverageType) -> Self {
         Self {
             period,
-            buffer: ArrayVec::new(),
+            buffer: Vec::with_capacity(period),
             filled: false,
             value: 0.0,
             ma: MovingAverageProvider::new(ma_type, period),

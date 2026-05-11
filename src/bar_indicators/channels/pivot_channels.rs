@@ -8,7 +8,6 @@
 //! - Breakout and bounce signal detection
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 use serde::{Serialize, Deserialize};
 
 /// Тип Pivot Points
@@ -93,7 +92,7 @@ pub struct PivotChannels {
     period_open: f64,
     
     // Буфер для адаптивности
-    volatility_buffer: ArrayVec<f64, 100>,
+    volatility_buffer: Vec<f64>,
     volatility_index: usize,
     volatility_filled: bool,
     
@@ -145,7 +144,7 @@ impl PivotChannels {
             period_low: f64::INFINITY,
             period_close: 0.0,
             period_open: 0.0,
-            volatility_buffer: ArrayVec::new(),
+            volatility_buffer: Vec::with_capacity(100),
             volatility_index: 0,
             volatility_filled: false,
             current_levels: PivotChannelLevels {

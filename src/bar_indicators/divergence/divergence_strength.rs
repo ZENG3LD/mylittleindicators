@@ -1,14 +1,13 @@
 use crate::bar_indicators::divergence::divergence::{DivergenceDetector, DivergenceType};
 use crate::bar_indicators::momentum::rsi::Rsi;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct DivergenceStrength {
     detector: DivergenceDetector,
     rsi: Rsi,
-    prices: ArrayVec<f64, 512>,
-    rsi_values: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
+    rsi_values: Vec<f64>,
     lookback: usize,
     value: f64,
 }
@@ -18,8 +17,8 @@ impl DivergenceStrength {
         Self {
             detector: DivergenceDetector::new(),
             rsi: Rsi::new(period.max(1)),
-            prices: ArrayVec::new(),
-            rsi_values: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            rsi_values: Vec::with_capacity(512),
             lookback: lookback.max(5),
             value: 0.0,
         }

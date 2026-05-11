@@ -11,7 +11,6 @@
 //! Support (S1) = X / 2 - High
 //! Resistance (R1) = X / 2 - Low
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Уровни DeMark Pivot Points
@@ -57,13 +56,13 @@ pub struct DeMarkPivots {
     current_levels: DeMarkPivotLevels,
     
     // История уровней
-    levels_history: ArrayVec<DeMarkPivotLevels, 100>,
-    
+    levels_history: Vec<DeMarkPivotLevels>,
+
     // Буферы для расчета
-    opens: ArrayVec<f64, 32>,
-    highs: ArrayVec<f64, 32>,
-    lows: ArrayVec<f64, 32>,
-    closes: ArrayVec<f64, 32>,
+    opens: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    closes: Vec<f64>,
     
     // Настройки
     calculation_period: usize, // Период для расчета
@@ -86,11 +85,11 @@ impl DeMarkPivots {
         
         Self {
             current_levels: DeMarkPivotLevels::empty(),
-            levels_history: ArrayVec::new(),
-            opens: ArrayVec::new(),
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
-            closes: ArrayVec::new(),
+            levels_history: Vec::with_capacity(100),
+            opens: Vec::with_capacity(32),
+            highs: Vec::with_capacity(32),
+            lows: Vec::with_capacity(32),
+            closes: Vec::with_capacity(32),
             calculation_period,
             bars_since_update: 0,
             is_ready: false,

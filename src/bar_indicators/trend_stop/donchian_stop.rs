@@ -11,7 +11,6 @@
 //! Индикатор НЕ содержит логику стопов - только возвращает граници каналов.
 //! Логика остановки позиций реализуется в стратегиях на основе этих уровней.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Donchian Stop индикатор - уровни на основе каналов Дончиана
@@ -23,8 +22,8 @@ pub struct DonchianStop {
     use_percentage: bool,   // Использовать процентный отступ
     
     // Буферы данных
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
     
     // Текущие уровни
     upper_line: f64,        // Максимальный high
@@ -76,8 +75,8 @@ impl DonchianStop {
             lower_period,
             offset,
             use_percentage,
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(512),
+            lows: Vec::with_capacity(512),
             upper_line: 0.0,
             lower_line: 0.0,
             middle_line: 0.0,

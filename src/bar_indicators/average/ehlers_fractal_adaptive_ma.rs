@@ -7,7 +7,6 @@
 //! Переиспользует существующие компоненты EMA
 
 use crate::bar_indicators::average::ema::Ema;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use super::super::ohlcv_field::OhlcvField;
 
@@ -47,7 +46,7 @@ pub struct EhlersFractalAdaptiveMa {
     max_period: usize,
 
     // Буферы для расчетов
-    prices: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
 
     // Результат
     last_result: FractalAdaptiveResult,
@@ -72,7 +71,7 @@ impl EhlersFractalAdaptiveMa {
             source,
             min_period,
             max_period,
-            prices: ArrayVec::new(),
+            prices: Vec::with_capacity(period),
             last_result: FractalAdaptiveResult::empty(),
             initialized: false,
         }

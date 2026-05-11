@@ -1,12 +1,11 @@
 use crate::bar_indicators::divergence::divergence::DivergenceDetector;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct VolumeDivergence {
     detector: DivergenceDetector,
-    prices: ArrayVec<f64, 512>,
-    volumes: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
+    volumes: Vec<f64>,
     lookback: usize,
     value: f64,
 }
@@ -15,8 +14,8 @@ impl VolumeDivergence {
     pub fn new(lookback: usize) -> Self {
         Self {
             detector: DivergenceDetector::new(),
-            prices: ArrayVec::new(),
-            volumes: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            volumes: Vec::with_capacity(512),
             lookback: lookback.max(5),
             value: 0.0,
         }

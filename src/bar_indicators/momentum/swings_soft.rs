@@ -1,14 +1,13 @@
 // SwingsSoft: реализация swings с "мягкой" логикой (идентично Nautilus)
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct SwingsSoft {
     period: usize,
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
     filled: bool,
     direction: i8,
     high_price: f64,
@@ -21,8 +20,8 @@ impl SwingsSoft {
     pub fn new(period: usize) -> Self {
         Self {
             period,
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(period),
+            lows: Vec::with_capacity(period),
             filled: false,
             direction: 0,
             high_price: 0.0,

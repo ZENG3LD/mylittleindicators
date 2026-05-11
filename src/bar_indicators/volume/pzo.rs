@@ -1,13 +1,12 @@
 // Price Zone Oscillator (PZO) - optimized with O(1) running sum
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
 pub struct Pzo {
     period: usize,
-    pos: ArrayVec<f64, 1024>,
-    neg: ArrayVec<f64, 1024>,
+    pos: Vec<f64>,
+    neg: Vec<f64>,
 
     // Running sums for O(1) calculation
     sum_pos: f64,
@@ -24,8 +23,8 @@ impl Pzo {
     pub fn new(period: usize) -> Self {
         Self {
             period: period.clamp(2, 1024),
-            pos: ArrayVec::new(),
-            neg: ArrayVec::new(),
+            pos: Vec::with_capacity(period.clamp(2, 1024)),
+            neg: Vec::with_capacity(period.clamp(2, 1024)),
             sum_pos: 0.0,
             sum_neg: 0.0,
             idx: 0,

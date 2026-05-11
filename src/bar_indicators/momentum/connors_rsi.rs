@@ -1,6 +1,5 @@
 //! Connors RSI indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::momentum::rsi::Rsi;
 use crate::bar_indicators::utils::math::percentile::percentile_rank;
@@ -81,18 +80,18 @@ pub struct ConnorsRsi {
 
     rsi: Rsi,
 
-    prices: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
 
-    updown_lengths: ArrayVec<i32, 512>,
+    updown_lengths: Vec<i32>,
     current_updown_length: i32,
     last_direction: i8,
 
-    updown_gains: ArrayVec<f64, 32>,
-    updown_losses: ArrayVec<f64, 32>,
+    updown_gains: Vec<f64>,
+    updown_losses: Vec<f64>,
     updown_avg_gain: f64,
     updown_avg_loss: f64,
 
-    roc_values: ArrayVec<f64, 512>,
+    roc_values: Vec<f64>,
 
     current_result: ConnorsRsiResult,
 
@@ -121,15 +120,15 @@ impl ConnorsRsi {
             updown_period,
             roc_period,
             rsi: Rsi::new(rsi_period),
-            prices: ArrayVec::new(),
-            updown_lengths: ArrayVec::new(),
+            prices: Vec::with_capacity(roc_period),
+            updown_lengths: Vec::with_capacity(updown_period),
             current_updown_length: 0,
             last_direction: 0,
-            updown_gains: ArrayVec::new(),
-            updown_losses: ArrayVec::new(),
+            updown_gains: Vec::with_capacity(32),
+            updown_losses: Vec::with_capacity(32),
             updown_avg_gain: 0.0,
             updown_avg_loss: 0.0,
-            roc_values: ArrayVec::new(),
+            roc_values: Vec::with_capacity(roc_period),
             current_result: ConnorsRsiResult::empty(),
             is_ready: false,
             update_count: 0,

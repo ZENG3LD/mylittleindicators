@@ -1,6 +1,5 @@
 //! Aroon indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Aroon indicator - measures time since highest high and lowest low.
@@ -25,8 +24,8 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 #[derive(Debug, Clone)]
 pub struct Aroon {
     period: usize,
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
     filled: bool,
     aroon_up: f64,
     aroon_down: f64,
@@ -41,8 +40,8 @@ impl Aroon {
     pub fn new(period: usize) -> Self {
         Self {
             period,
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(period),
+            lows: Vec::with_capacity(period),
             filled: false,
             aroon_up: 0.0,
             aroon_down: 0.0,

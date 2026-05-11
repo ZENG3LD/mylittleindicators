@@ -10,7 +10,6 @@
 use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::average::moving_average::MovingAverageProvider;
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 use serde::{Serialize, Deserialize};
 
 /// Режимы расчета Price Channels
@@ -33,8 +32,8 @@ pub struct PriceChannels {
     ma_type: MovingAverageType,
 
     // Circular buffers для high/low - O(1) operations
-    high_buffer: ArrayVec<f64, 512>,
-    low_buffer: ArrayVec<f64, 512>,
+    high_buffer: Vec<f64>,
+    low_buffer: Vec<f64>,
     buffer_index: usize,
     buffer_filled: bool,
 
@@ -66,8 +65,8 @@ impl PriceChannels {
             period,
             mode,
             ma_type,
-            high_buffer: ArrayVec::new(),
-            low_buffer: ArrayVec::new(),
+            high_buffer: Vec::with_capacity(period),
+            low_buffer: Vec::with_capacity(period),
             buffer_index: 0,
             buffer_filled: false,
             ma_high,

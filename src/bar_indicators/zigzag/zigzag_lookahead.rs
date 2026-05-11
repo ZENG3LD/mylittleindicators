@@ -1,16 +1,15 @@
 // ZigZag with lookahead confirmation
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct ZigZagLookahead {
     pub lookahead: usize,
     pub period: usize,
-    pub buffer: ArrayVec<f64, 512>,
-    pub swings: ArrayVec<(usize, f64), 512>,
-    pub candidates: ArrayVec<(usize, f64), 16>, // временные экстремумы
+    pub buffer: Vec<f64>,
+    pub swings: Vec<(usize, f64)>,
+    pub candidates: Vec<(usize, f64)>, // временные экстремумы
     bar_counter: usize,
 }
 
@@ -19,9 +18,9 @@ impl ZigZagLookahead {
         Self {
             lookahead,
             period,
-            buffer: ArrayVec::new(),
-            swings: ArrayVec::new(),
-            candidates: ArrayVec::new(),
+            buffer: Vec::with_capacity(512),
+            swings: Vec::with_capacity(512),
+            candidates: Vec::with_capacity(16),
             bar_counter: 0,
         }
     }
@@ -54,9 +53,7 @@ impl ZigZagLookahead {
         }
 
         // Кандидат в swing — текущий экстремум
-        if !self.candidates.is_full() {
-            self.candidates.push((idx, close));
-        }
+        self.candidates.push((idx, close));
 
         // Проверка lookahead: swing подтверждается, если не перебит в течение lookahead баров
         while let Some(&(cand_idx, cand_val)) = self.candidates.first() {
@@ -65,7 +62,7 @@ impl ZigZagLookahead {
                 let is_extreme = self.buffer[start..]
                     .iter()
                     .all(|&x| x != cand_val);
-                if is_extreme && !self.swings.is_full() {
+                if is_extreme {
                     self.swings.push((cand_idx, cand_val));
                 }
                 self.candidates.remove(0);
@@ -77,7 +74,7 @@ impl ZigZagLookahead {
     pub fn last_swing(&self) -> Option<(usize, f64)> {
         self.swings.last().copied()
     }
-    pub fn swings(&self) -> &ArrayVec<(usize, f64), 512> {
+    pub fn swings(&self) -> &Vec<(usize, f64)> {
         &self.swings
     }
 

@@ -2,7 +2,6 @@
 
 use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::volatility::atr::Atr;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
@@ -13,8 +12,8 @@ pub struct ChandeKrollStop {
     hh_period: usize,
     ll_period: usize,
     atr: Atr,
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
     long_stop: f64,
     short_stop: f64,
     ready: bool,
@@ -28,8 +27,8 @@ impl ChandeKrollStop {
             hh_period: hh_period.max(1),
             ll_period: ll_period.max(1),
             atr: Atr::new(atr_period.max(1), MovingAverageType::RMA),
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(512),
+            lows: Vec::with_capacity(512),
             long_stop: 0.0,
             short_stop: 0.0,
             ready: false,

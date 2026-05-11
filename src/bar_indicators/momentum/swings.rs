@@ -1,14 +1,13 @@
 // High-performance Swings indicator
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct Swings {
     period: usize,
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
     index: usize,
     filled: bool,
     direction: i8,
@@ -22,8 +21,8 @@ impl Swings {
     pub fn new(period: usize) -> Self {
         Self {
             period,
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(period),
+            lows: Vec::with_capacity(period),
             index: 0,
             filled: false,
             direction: 0,

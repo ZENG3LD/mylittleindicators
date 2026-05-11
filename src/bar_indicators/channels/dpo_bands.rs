@@ -2,15 +2,12 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::momentum::dpo::DetrendedPriceOscillator;
-use arrayvec::ArrayVec;
-
-
 #[derive(Clone)]
 pub struct DpoBands {
     dpo: DetrendedPriceOscillator,
     window: usize,
     k: f64,
-    buf: ArrayVec<f64, 512>,
+    buf: Vec<f64>,
     idx: usize,
     filled: bool,
     upper: f64,
@@ -24,7 +21,7 @@ impl DpoBands {
             dpo: DetrendedPriceOscillator::with_period(period.max(2)),
             window: window.clamp(5, 512),
             k: if k > 0.0 { k } else { 2.0 },
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(window.clamp(5, 512)),
             idx: 0,
             filled: false,
             upper: 0.0,

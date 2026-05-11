@@ -8,7 +8,6 @@
 //! Переиспользует существующие MovingAverage компоненты для оптимизации
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
 
@@ -66,10 +65,10 @@ pub struct EhlersInstantaneousTrendline {
     noise_ma: MovingAverageProvider,         // MA для анализа шума
 
     // Буферы для расчетов
-    prices: ArrayVec<f64, 64>,
-    i_components: ArrayVec<f64, 32>,  // In-Phase компоненты
-    q_components: ArrayVec<f64, 32>,  // Quadrature компоненты
-    trendlines: ArrayVec<f64, 32>,    // История трендовых линий
+    prices: Vec<f64>,
+    i_components: Vec<f64>,  // In-Phase компоненты
+    q_components: Vec<f64>,  // Quadrature компоненты
+    trendlines: Vec<f64>,    // История трендовых линий
 
     // Параметры
     alpha: f64,                      // Коэффициент сглаживания (0.0 до 1.0)
@@ -106,10 +105,10 @@ impl EhlersInstantaneousTrendline {
             trend_ma: MovingAverageProvider::new(MovingAverageType::EMA, 10),
             noise_ma: MovingAverageProvider::new(MovingAverageType::SMA, 20),
 
-            prices: ArrayVec::new(),
-            i_components: ArrayVec::new(),
-            q_components: ArrayVec::new(),
-            trendlines: ArrayVec::new(),
+            prices: Vec::with_capacity(64),
+            i_components: Vec::with_capacity(32),
+            q_components: Vec::with_capacity(32),
+            trendlines: Vec::with_capacity(32),
 
             alpha,
             current_result: InstantaneousTrendlineResult::empty(),

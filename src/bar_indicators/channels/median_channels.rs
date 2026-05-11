@@ -10,7 +10,6 @@
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
 use crate::bar_indicators::utils::math::percentile::{median, quickselect_nth};
-use arrayvec::ArrayVec;
 use serde::{Serialize, Deserialize};
 
 /// Режимы расчета медианных каналов
@@ -83,14 +82,14 @@ pub struct MedianChannels {
     mad_multiplier: f64,
     
     // Circular buffer для цен - O(1) operations
-    price_buffer: ArrayVec<f64, 512>,
-    volume_buffer: ArrayVec<f64, 512>,
-    
+    price_buffer: Vec<f64>,
+    volume_buffer: Vec<f64>,
+
     // Дополнительные буферы для OHLC медианы
-    open_buffer: ArrayVec<f64, 512>,
-    high_buffer: ArrayVec<f64, 512>,
-    low_buffer: ArrayVec<f64, 512>,
-    close_buffer: ArrayVec<f64, 512>,
+    open_buffer: Vec<f64>,
+    high_buffer: Vec<f64>,
+    low_buffer: Vec<f64>,
+    close_buffer: Vec<f64>,
     
     price_index: usize,
     buffer_filled: bool,
@@ -161,12 +160,12 @@ impl MedianChannels {
             ohlcv_source: OhlcvField::Close,
             mad_multiplier,
 
-            price_buffer: ArrayVec::new(),
-            volume_buffer: ArrayVec::new(),
-            open_buffer: ArrayVec::new(),
-            high_buffer: ArrayVec::new(),
-            low_buffer: ArrayVec::new(),
-            close_buffer: ArrayVec::new(),
+            price_buffer: Vec::with_capacity(period),
+            volume_buffer: Vec::with_capacity(period),
+            open_buffer: Vec::with_capacity(period),
+            high_buffer: Vec::with_capacity(period),
+            low_buffer: Vec::with_capacity(period),
+            close_buffer: Vec::with_capacity(period),
 
             price_index: 0,
             buffer_filled: false,
@@ -219,12 +218,12 @@ impl MedianChannels {
             ohlcv_source,
             mad_multiplier,
 
-            price_buffer: ArrayVec::new(),
-            volume_buffer: ArrayVec::new(),
-            open_buffer: ArrayVec::new(),
-            high_buffer: ArrayVec::new(),
-            low_buffer: ArrayVec::new(),
-            close_buffer: ArrayVec::new(),
+            price_buffer: Vec::with_capacity(period),
+            volume_buffer: Vec::with_capacity(period),
+            open_buffer: Vec::with_capacity(period),
+            high_buffer: Vec::with_capacity(period),
+            low_buffer: Vec::with_capacity(period),
+            close_buffer: Vec::with_capacity(period),
 
             price_index: 0,
             buffer_filled: false,

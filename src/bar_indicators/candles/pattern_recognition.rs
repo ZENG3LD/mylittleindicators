@@ -8,7 +8,6 @@
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 use serde::{Serialize, Deserialize};
 
 /// Конфигурация для гибкой настройки паттернов
@@ -186,7 +185,7 @@ pub struct AdvancedPatternRecognition {
     config: PatternConfig,
     
     // История баров для анализа
-    ohlc_history: ArrayVec<[f64; 4], 10>, // [open, high, low, close]
+    ohlc_history: Vec<[f64; 4]>, // [open, high, low, close]
     
     // Вспомогательные индикаторы
     atr_ma: MovingAverageProvider,      // Для нормализации
@@ -220,7 +219,7 @@ impl AdvancedPatternRecognition {
     pub fn new_with_config(config: PatternConfig) -> Self {
         Self {
             config,
-            ohlc_history: ArrayVec::new(),
+            ohlc_history: Vec::with_capacity(10),
             atr_ma: MovingAverageProvider::new(MovingAverageType::EMA, 14),
             volume_ma: MovingAverageProvider::new(MovingAverageType::SMA, 20),
             current_result: PatternResult::default(),

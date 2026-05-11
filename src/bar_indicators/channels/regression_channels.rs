@@ -10,7 +10,6 @@
 use crate::bar_indicators::average::lr::LinearRegressionMA;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
-use arrayvec::ArrayVec;
 use serde::{Serialize, Deserialize};
 
 /// Режимы расчета Regression Channels
@@ -39,8 +38,8 @@ pub struct RegressionChannels {
     lr: LinearRegressionMA,
 
     // Circular buffer для расчета отклонений от регрессии
-    price_buffer: ArrayVec<f64, 512>,
-    residuals_buffer: ArrayVec<f64, 512>, // Отклонения от регрессионной линии
+    price_buffer: Vec<f64>,
+    residuals_buffer: Vec<f64>, // Отклонения от регрессионной линии
     buffer_index: usize,
     buffer_filled: bool,
 
@@ -79,8 +78,8 @@ impl RegressionChannels {
             mode,
             source: OhlcvField::Close,
             lr: LinearRegressionMA::new(period),
-            price_buffer: ArrayVec::new(),
-            residuals_buffer: ArrayVec::new(),
+            price_buffer: Vec::with_capacity(period),
+            residuals_buffer: Vec::with_capacity(period),
             buffer_index: 0,
             buffer_filled: false,
             upper: 0.0,
@@ -105,8 +104,8 @@ impl RegressionChannels {
             mode,
             source,
             lr: LinearRegressionMA::new(period),
-            price_buffer: ArrayVec::new(),
-            residuals_buffer: ArrayVec::new(),
+            price_buffer: Vec::with_capacity(period),
+            residuals_buffer: Vec::with_capacity(period),
             buffer_index: 0,
             buffer_filled: false,
             upper: 0.0,

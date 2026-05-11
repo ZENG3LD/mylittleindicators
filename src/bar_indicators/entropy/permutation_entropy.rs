@@ -2,7 +2,6 @@
 //! Измеряет разнообразие порядковых паттернов в временном ряду
 //! Значения: 0.0-1.0 (нормализованная), где 0.0 = один паттерн, 1.0 = все паттерны равновероятны
 
-use arrayvec::ArrayVec;
 use std::collections::HashMap;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -14,7 +13,7 @@ pub struct PermutationEntropy {
     delay: usize,               // Задержка (обычно 1)
     
     // Буферы
-    data: ArrayVec<f64, 512>,   // Буфер цен
+    data: Vec<f64>,   // Буфер цен
     
     // Результаты
     pe: f64,                    // Permutation Entropy
@@ -32,7 +31,7 @@ impl PermutationEntropy {
             period: period.min(512),
             order: order.clamp(3, 7), // Ограничиваем разумными пределами
             delay: delay.clamp(1, 5), // Задержка не может быть слишком большой
-            data: ArrayVec::new(),
+            data: Vec::with_capacity(period.min(512)),
             pe: 0.0,
             normalized_pe: 0.0,
             pattern_diversity: 0.0,

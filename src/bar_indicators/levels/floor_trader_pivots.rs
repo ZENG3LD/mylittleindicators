@@ -8,7 +8,6 @@
 //! S2 = PP - (High - Low)
 //! S3 = Low - 2 * (High - PP)
 
-use arrayvec::ArrayVec;
 use std::collections::HashMap;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -101,7 +100,7 @@ pub struct FloorTraderPivots {
     bars_in_period: usize,
     
     // История уровней
-    levels_history: ArrayVec<FloorTraderPivotLevels, 100>,
+    levels_history: Vec<FloorTraderPivotLevels>,
     
     // Статистика взаимодействий с уровнями
     level_touches: HashMap<String, u32>,
@@ -127,7 +126,7 @@ impl FloorTraderPivots {
             period_low: f64::INFINITY,
             period_close: 0.0,
             bars_in_period: 0,
-            levels_history: ArrayVec::new(),
+            levels_history: Vec::with_capacity(100),
             level_touches: HashMap::new(),
             is_ready: false,
         }

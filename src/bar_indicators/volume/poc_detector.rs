@@ -3,7 +3,6 @@
 //! Используется для выявления важных уровней поддержки/сопротивления
 
 use crate::types::Bar;
-use arrayvec::ArrayVec;
 use std::collections::BTreeMap;
 
 /// Тип POC уровня
@@ -87,8 +86,8 @@ impl PocLevel {
 #[derive(Debug, Clone)]
 pub struct PocAnalysis {
     pub current_poc: Option<PocLevel>,              // Текущий основной POC
-    pub active_levels: ArrayVec<PocLevel, 32>,      // Активные POC уровни
-    pub broken_levels: ArrayVec<PocLevel, 16>,      // Недавно пробитые уровни
+    pub active_levels: Vec<PocLevel>,                // Активные POC уровни
+    pub broken_levels: Vec<PocLevel>,               // Недавно пробитые уровни
     pub nearest_support: Option<f64>,               // Ближайшая поддержка
     pub nearest_resistance: Option<f64>,            // Ближайшее сопротивление
     pub market_structure: MarketStructure,          // Структура рынка
@@ -110,8 +109,8 @@ impl Default for PocAnalysis {
     fn default() -> Self {
         Self {
             current_poc: None,
-            active_levels: ArrayVec::new(),
-            broken_levels: ArrayVec::new(),
+            active_levels: Vec::with_capacity(32),
+            broken_levels: Vec::with_capacity(16),
             nearest_support: None,
             nearest_resistance: None,
             market_structure: MarketStructure::Consolidation,
@@ -145,7 +144,7 @@ pub struct PocDetector {
     session_end_hour: u32,              // Конец торговой сессии (UTC)
     
     // История баров для скользящего анализа
-    bar_history: ArrayVec<Bar, 500>,    // История баров
+    bar_history: Vec<Bar>,              // История баров
     
     // Результаты анализа
     analysis: PocAnalysis,
@@ -176,7 +175,7 @@ impl PocDetector {
             rolling_period,
             session_start_hour: 9,  // 9:00 UTC
             session_end_hour: 17,   // 17:00 UTC
-            bar_history: ArrayVec::new(),
+            bar_history: Vec::with_capacity(500),
             analysis: PocAnalysis::default(),
             is_ready: false,
             min_bars: rolling_period.max(20),
@@ -188,7 +187,7 @@ impl PocDetector {
     /// Обновить детектор новым баром
     pub fn update(&mut self, bar: &Bar) -> &PocAnalysis {
         // Добавляем бар в историю
-        if self.bar_history.is_full() {
+        if self.bar_history.len() >= 500 {
             self.bar_history.remove(0);
         }
         self.bar_history.push(*bar);
@@ -359,7 +358,7 @@ impl PocDetector {
             }
             
             // Если не нашли похожий, добавляем новый
-            if !found_similar && !self.analysis.active_levels.is_full() {
+            if !found_similar {
                 self.analysis.active_levels.push(poc);
             }
         }
@@ -376,11 +375,9 @@ impl PocDetector {
             let level = &self.analysis.active_levels[i];
             
             if current_time - level.last_touch_time > max_age || level.is_broken(bar.close, self.level_tolerance) {
-                if !self.analysis.broken_levels.is_full() {
-                    let mut broken_level = level.clone();
-                    broken_level.is_active = false;
-                    self.analysis.broken_levels.push(broken_level);
-                }
+                let mut broken_level = level.clone();
+                broken_level.is_active = false;
+                self.analysis.broken_levels.push(broken_level);
                 self.analysis.active_levels.remove(i);
             } else {
                 i += 1;
@@ -570,7 +567,7 @@ impl PocDetector {
     }
     
     /// Получить активные POC уровни
-    pub fn get_active_levels(&self) -> &ArrayVec<PocLevel, 32> {
+    pub fn get_active_levels(&self) -> &Vec<PocLevel> {
         &self.analysis.active_levels
     }
     

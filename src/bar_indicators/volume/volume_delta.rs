@@ -2,7 +2,6 @@
 //! Анализирует баланс покупок/продаж
 //! Работает с Bar (OHLCV) и опционально с buy/sell объёмами
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::types::Bar;
 
@@ -12,7 +11,7 @@ pub struct VolumeDelta {
     /// Период для расчета средних
     period: usize,
     /// Буфер дельт (фиксированный размер)
-    buffer: ArrayVec<f64, 512>,
+    buffer: Vec<f64>,
     /// Индекс для циклического буфера
     idx: usize,
     /// Сумма дельт в буфере
@@ -32,7 +31,7 @@ impl VolumeDelta {
     pub fn new(period: usize) -> Self {
         Self {
             period,
-            buffer: ArrayVec::new(),
+            buffer: Vec::with_capacity(period),
             idx: 0,
             sum: 0.0,
             count: 0,

@@ -2,7 +2,6 @@
 //! Сигма-точечный фильтр Калмана для нелинейных систем
 //! Использует детерминированную выборку сигма-точек для аппроксимации распределений
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Параметры Unscented Transform
@@ -166,9 +165,9 @@ pub struct UnscentedKalmanFilter {
     covariance: Matrix2x2,              // Ковариационная матрица
     
     // Сигма-точки
-    sigma_points: ArrayVec<SigmaPoint, 5>,  // 2*n+1 точек для n=2
-    predicted_sigma_points: ArrayVec<[f64; 2], 5>,
-    predicted_observations: ArrayVec<f64, 5>,
+    sigma_points: Vec<SigmaPoint>,  // 2*n+1 точек для n=2
+    predicted_sigma_points: Vec<[f64; 2]>,
+    predicted_observations: Vec<f64>,
     
     // Результаты
     current_result: UkfResult,
@@ -179,12 +178,12 @@ pub struct UnscentedKalmanFilter {
     n_sigma: usize,                     // Количество сигма-точек
     
     // История для анализа
-    innovation_history: ArrayVec<f64, 100>,
-    uncertainty_history: ArrayVec<f64, 100>,
-    
+    innovation_history: Vec<f64>,
+    uncertainty_history: Vec<f64>,
+
     // Диагностика
-    transform_quality_history: ArrayVec<f64, 50>,
-    sigma_point_spreads: ArrayVec<f64, 50>,
+    transform_quality_history: Vec<f64>,
+    sigma_point_spreads: Vec<f64>,
     
     // Состояние
     is_initialized: bool,
@@ -214,16 +213,16 @@ impl UnscentedKalmanFilter {
                 [1000.0, 0.0],
                 [0.0, 100.0]
             ]),
-            sigma_points: ArrayVec::new(),
-            predicted_sigma_points: ArrayVec::new(),
-            predicted_observations: ArrayVec::new(),
+            sigma_points: Vec::with_capacity(5),
+            predicted_sigma_points: Vec::with_capacity(5),
+            predicted_observations: Vec::with_capacity(5),
             current_result: UkfResult::new(),
             lambda,
             n_sigma: 2 * n + 1,
-            innovation_history: ArrayVec::new(),
-            uncertainty_history: ArrayVec::new(),
-            transform_quality_history: ArrayVec::new(),
-            sigma_point_spreads: ArrayVec::new(),
+            innovation_history: Vec::with_capacity(100),
+            uncertainty_history: Vec::with_capacity(100),
+            transform_quality_history: Vec::with_capacity(50),
+            sigma_point_spreads: Vec::with_capacity(50),
             is_initialized: false,
         };
         
@@ -287,23 +286,19 @@ impl UnscentedKalmanFilter {
         let w_others = 1.0 / (2.0 * (n + lambda));
         
         // Добавляем точки с весами
-        if !self.sigma_points.is_full() {
-            self.sigma_points.push(SigmaPoint {
-                state: [0.0, 0.0],
-                weight_m: w_m_0,
-                weight_c: w_c_0,
-            });
-        }
-        
+        self.sigma_points.push(SigmaPoint {
+            state: [0.0, 0.0],
+            weight_m: w_m_0,
+            weight_c: w_c_0,
+        });
+
         // Добавляем остальные 4 точки
         for _ in 0..4 {
-            if !self.sigma_points.is_full() {
-                self.sigma_points.push(SigmaPoint {
-                    state: [0.0, 0.0],
-                    weight_m: w_others,
-                    weight_c: w_others,
-                });
-            }
+            self.sigma_points.push(SigmaPoint {
+                state: [0.0, 0.0],
+                weight_m: w_others,
+                weight_c: w_others,
+            });
         }
     }
     
@@ -354,15 +349,11 @@ impl UnscentedKalmanFilter {
         // Пропускаем каждую сигма-точку через нелинейную функцию состояния
         for sigma_point in &self.sigma_points {
             let predicted_state = self.state_function(&sigma_point.state);
-            if !self.predicted_sigma_points.is_full() {
-                self.predicted_sigma_points.push(predicted_state);
-            }
-            
+            self.predicted_sigma_points.push(predicted_state);
+
             // Также вычисляем предсказанные наблюдения
             let predicted_obs = self.observation_function(&predicted_state);
-            if !self.predicted_observations.is_full() {
-                self.predicted_observations.push(predicted_obs);
-            }
+            self.predicted_observations.push(predicted_obs);
         }
         
         // Вычисляем предсказанное среднее состояние
@@ -535,33 +526,25 @@ impl UnscentedKalmanFilter {
         if self.innovation_history.len() >= 100 {
             self.innovation_history.remove(0);
         }
-        if !self.innovation_history.is_full() {
-            self.innovation_history.push(self.current_result.innovation);
-        }
-        
+        self.innovation_history.push(self.current_result.innovation);
+
         // Сохраняем неопределенность
         if self.uncertainty_history.len() >= 100 {
             self.uncertainty_history.remove(0);
         }
-        if !self.uncertainty_history.is_full() {
-            self.uncertainty_history.push(self.current_result.uncertainty);
-        }
-        
+        self.uncertainty_history.push(self.current_result.uncertainty);
+
         // Сохраняем качество трансформации
         if self.transform_quality_history.len() >= 50 {
             self.transform_quality_history.remove(0);
         }
-        if !self.transform_quality_history.is_full() {
-            self.transform_quality_history.push(self.current_result.transform_quality);
-        }
-        
+        self.transform_quality_history.push(self.current_result.transform_quality);
+
         // Сохраняем разброс сигма-точек
         if self.sigma_point_spreads.len() >= 50 {
             self.sigma_point_spreads.remove(0);
         }
-        if !self.sigma_point_spreads.is_full() {
-            self.sigma_point_spreads.push(self.current_result.sigma_point_spread);
-        }
+        self.sigma_point_spreads.push(self.current_result.sigma_point_spread);
     }
     
     // Публичные методы

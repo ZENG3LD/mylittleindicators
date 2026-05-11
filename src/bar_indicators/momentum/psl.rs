@@ -1,13 +1,12 @@
 // High-performance Psychological Line (PSL)
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct Psl {
     period: usize,
-    buffer: ArrayVec<u8, 512>,
+    buffer: Vec<u8>,
     index: usize,
     filled: bool,
     prev_close: f64,
@@ -19,7 +18,7 @@ impl Psl {
         assert!(period <= 512, "PSL period must be <= 512");
         Self {
             period,
-            buffer: ArrayVec::from([0u8; 512]),
+            buffer: vec![0u8; 512],
             index: 0,
             filled: false,
             prev_close: 0.0,

@@ -4,13 +4,12 @@ use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::utils::math::percentile::quickselect_nth;
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 
 #[derive(Debug, Clone)]
 pub struct VolatilityPercentileRankBands {
     atr: Atr,
     window: usize,
-    buf: ArrayVec<f64, 512>,
+    buf: Vec<f64>,
     idx: usize,
     filled: bool,
     upper: f64,
@@ -23,7 +22,7 @@ impl VolatilityPercentileRankBands {
         Self {
             atr: Atr::new(atr_period.max(1), MovingAverageType::EMA),
             window: rank_window.clamp(5, 512),
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(rank_window.clamp(5, 512)),
             idx: 0,
             filled: false,
             upper: 0.0,

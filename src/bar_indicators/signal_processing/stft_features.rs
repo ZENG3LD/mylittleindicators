@@ -1,13 +1,12 @@
 // STFT band energy ratio (placeholder using rolling var over subwindows)
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
 pub struct StftBandEnergyRatio {
     window: usize,
     split: usize,
-    buf: ArrayVec<f64, 1024>,
+    buf: Vec<f64>,
     idx: usize,
     filled: bool,
     value: f64,
@@ -18,7 +17,7 @@ impl StftBandEnergyRatio {
         Self {
             window: window.clamp(4, 1024),
             split: split.clamp(1, 8),
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(window.clamp(4, 1024)),
             idx: 0,
             filled: false,
             value: 0.0,

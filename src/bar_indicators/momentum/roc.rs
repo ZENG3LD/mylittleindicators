@@ -1,6 +1,5 @@
 //! Rate of Change (ROC) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
 
@@ -28,7 +27,7 @@ use crate::bar_indicators::ohlcv_field::OhlcvField;
 #[derive(Clone)]
 pub struct Roc {
     period: usize,
-    buffer: ArrayVec<f64, 512>,
+    buffer: Vec<f64>,
     index: usize,
     filled: bool,
     value: f64,
@@ -59,7 +58,7 @@ impl Roc {
         assert!(period <= 512, "Roc period must be <= 512");
         Self {
             period,
-            buffer: ArrayVec::from([0.0; 512]),
+            buffer: vec![0.0; 512],
             index: 0,
             filled: false,
             value: 0.0,
@@ -110,7 +109,7 @@ impl Roc {
 
     /// Resets the ROC to its initial state.
     pub fn reset(&mut self) {
-        self.buffer = ArrayVec::from([0.0; 512]);
+        self.buffer = vec![0.0; 512];
         self.index = 0;
         self.filled = false;
         self.value = 0.0;

@@ -9,7 +9,6 @@
 //! Переиспользует существующие компоненты EMA
 
 use crate::bar_indicators::average::ema::Ema;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use super::super::ohlcv_field::OhlcvField;
 
@@ -66,9 +65,9 @@ pub struct EhlersZeroLagEma {
     trend_ema: Ema,                  // EMA для анализа тренда
 
     // Буферы для расчетов
-    prices: ArrayVec<f64, 32>,       // Буфер цен
-    zlema_values: ArrayVec<f64, 16>, // Буфер ZLEMA значений
-    ema_values: ArrayVec<f64, 16>,   // Буфер EMA значений
+    prices: Vec<f64>,       // Буфер цен
+    zlema_values: Vec<f64>, // Буфер ZLEMA значений
+    ema_values: Vec<f64>,   // Буфер EMA значений
 
     // Параметры
     period: usize,
@@ -106,9 +105,9 @@ impl EhlersZeroLagEma {
             lag_ema: Ema::new(period),
             trend_ema: Ema::new(5),
 
-            prices: ArrayVec::new(),
-            zlema_values: ArrayVec::new(),
-            ema_values: ArrayVec::new(),
+            prices: Vec::with_capacity(period),
+            zlema_values: Vec::with_capacity(16),
+            ema_values: Vec::with_capacity(16),
 
             period,
             source,

@@ -2,7 +2,6 @@
 //! Анализирует распределение объема по ценовым уровням в рамках сессии
 //! НЕ скользящий! Сбрасывается каждую сессию/период
 
-use arrayvec::ArrayVec;
 use crate::types::Bar;
 
 /// Ценовой уровень с объемом
@@ -16,7 +15,7 @@ pub struct PriceLevel {
 #[derive(Debug, Clone)]
 pub struct VolumeProfile {
     /// Ценовые уровни (фиксированный размер)
-    levels: ArrayVec<PriceLevel, 1024>,
+    levels: Vec<PriceLevel>,
     /// Размер тика для группировки цен
     tick_size: f64,
     /// Общий объем за сессию
@@ -40,7 +39,7 @@ impl VolumeProfile {
     pub fn new(tick_size: f64, session_duration: i64) -> Self {
         let price_multiplier = 1.0 / tick_size;
         Self {
-            levels: ArrayVec::new(),
+            levels: Vec::with_capacity(1024),
             tick_size,
             total_volume: 0.0,
             session_start_time: 0,
@@ -112,14 +111,13 @@ impl VolumeProfile {
         // Ищем существующий уровень
         if let Some(level) = self.levels.iter_mut().find(|l| (l.price - rounded_price).abs() < self.tick_size * 0.5) {
             level.volume += volume;
-        } else if !self.levels.is_full() {
+        } else {
             // Добавляем новый уровень
             self.levels.push(PriceLevel {
                 price: rounded_price,
                 volume,
             });
         }
-        // Если буфер полный - игнорируем (можно добавить логику замещения)
     }
     
     /// Округлить цену до тика

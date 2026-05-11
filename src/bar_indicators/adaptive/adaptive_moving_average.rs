@@ -2,7 +2,6 @@
 //! Адаптивная скользящая средняя с различными режимами адаптации
 //! Автоматически подстраивается под рыночные условия
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Режимы адаптации
@@ -126,24 +125,24 @@ pub struct AdaptiveMovingAverage {
     adaptation_params: AdaptationParameters,
 
     // Данные для расчета
-    prices: ArrayVec<f64, 200>,
-    highs: ArrayVec<f64, 200>,
-    lows: ArrayVec<f64, 200>,
-    volumes: ArrayVec<f64, 200>,
+    prices: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    volumes: Vec<f64>,
 
     // Промежуточные расчеты
-    price_changes: ArrayVec<f64, 200>,
-    absolute_changes: ArrayVec<f64, 200>,
-    volatility_values: ArrayVec<f64, 50>,
-    efficiency_values: ArrayVec<f64, 50>,
+    price_changes: Vec<f64>,
+    absolute_changes: Vec<f64>,
+    volatility_values: Vec<f64>,
+    efficiency_values: Vec<f64>,
 
     // Результаты
     adaptive_ma: f64,
     adaptation_result: AdaptationResult,
 
     // История адаптации
-    period_history: ArrayVec<f64, 100>,
-    efficiency_history: ArrayVec<f64, 100>,
+    period_history: Vec<f64>,
+    efficiency_history: Vec<f64>,
 
     // Вспомогательные индикаторы
     atr: f64,                       // Average True Range
@@ -235,18 +234,18 @@ impl AdaptiveMovingAverage {
             adaptation_mode,
             efficiency_method,
             adaptation_params: AdaptationParameters::new(),
-            prices: ArrayVec::new(),
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
-            volumes: ArrayVec::new(),
-            price_changes: ArrayVec::new(),
-            absolute_changes: ArrayVec::new(),
-            volatility_values: ArrayVec::new(),
-            efficiency_values: ArrayVec::new(),
+            prices: Vec::with_capacity(200),
+            highs: Vec::with_capacity(200),
+            lows: Vec::with_capacity(200),
+            volumes: Vec::with_capacity(200),
+            price_changes: Vec::with_capacity(200),
+            absolute_changes: Vec::with_capacity(200),
+            volatility_values: Vec::with_capacity(50),
+            efficiency_values: Vec::with_capacity(50),
             adaptive_ma: 0.0,
             adaptation_result: AdaptationResult::new(),
-            period_history: ArrayVec::new(),
-            efficiency_history: ArrayVec::new(),
+            period_history: Vec::with_capacity(100),
+            efficiency_history: Vec::with_capacity(100),
             atr: 0.0,
             momentum: 0.0,
             trend_strength: 0.0,
@@ -291,51 +290,39 @@ impl AdaptiveMovingAverage {
         if self.prices.len() >= 200 {
             self.prices.remove(0);
         }
-        if !self.prices.is_full() {
-            self.prices.push(price);
-        }
-        
+        self.prices.push(price);
+
         // Добавляем высокие цены
         if self.highs.len() >= 200 {
             self.highs.remove(0);
         }
-        if !self.highs.is_full() {
-            self.highs.push(high);
-        }
-        
+        self.highs.push(high);
+
         // Добавляем низкие цены
         if self.lows.len() >= 200 {
             self.lows.remove(0);
         }
-        if !self.lows.is_full() {
-            self.lows.push(low);
-        }
-        
+        self.lows.push(low);
+
         // Добавляем объемы
         if self.volumes.len() >= 200 {
             self.volumes.remove(0);
         }
-        if !self.volumes.is_full() {
-            self.volumes.push(volume);
-        }
-        
+        self.volumes.push(volume);
+
         // Вычисляем изменения цен
         if self.prices.len() >= 2 {
             let change = price - self.prices[self.prices.len() - 2];
-            
+
             if self.price_changes.len() >= 200 {
                 self.price_changes.remove(0);
             }
-            if !self.price_changes.is_full() {
-                self.price_changes.push(change);
-            }
-            
+            self.price_changes.push(change);
+
             if self.absolute_changes.len() >= 200 {
                 self.absolute_changes.remove(0);
             }
-            if !self.absolute_changes.is_full() {
-                self.absolute_changes.push(change.abs());
-            }
+            self.absolute_changes.push(change.abs());
         }
     }
     
@@ -359,9 +346,7 @@ impl AdaptiveMovingAverage {
         if self.efficiency_history.len() >= 100 {
             self.efficiency_history.remove(0);
         }
-        if !self.efficiency_history.is_full() {
-            self.efficiency_history.push(efficiency);
-        }
+        self.efficiency_history.push(efficiency);
     }
     
     /// Efficiency Ratio Кауфмана
@@ -680,9 +665,7 @@ impl AdaptiveMovingAverage {
         if self.period_history.len() >= 100 {
             self.period_history.remove(0);
         }
-        if !self.period_history.is_full() {
-            self.period_history.push(self.adaptation_result.adaptive_period);
-        }
+        self.period_history.push(self.adaptation_result.adaptive_period);
     }
     
     /// Расчет адаптивной скользящей средней
@@ -710,17 +693,13 @@ impl AdaptiveMovingAverage {
         if self.volatility_values.len() >= 50 {
             self.volatility_values.remove(0);
         }
-        if !self.volatility_values.is_full() {
-            self.volatility_values.push(self.atr);
-        }
-        
+        self.volatility_values.push(self.atr);
+
         // Обновляем эффективность в истории
         if self.efficiency_values.len() >= 50 {
             self.efficiency_values.remove(0);
         }
-        if !self.efficiency_values.is_full() {
-            self.efficiency_values.push(self.adaptation_result.efficiency_ratio);
-        }
+        self.efficiency_values.push(self.adaptation_result.efficiency_ratio);
     }
     
     // Публичные методы доступа

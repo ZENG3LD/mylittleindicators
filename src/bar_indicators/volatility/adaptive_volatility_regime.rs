@@ -11,7 +11,6 @@
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 
 /// Режим волатильности
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -71,7 +70,7 @@ impl VolatilityRegime {
 #[derive(Debug, Clone)]
 struct VolatilityCluster {
     centroid: [f64; 4],         // Центроид кластера (4 признака)
-    points: ArrayVec<[f64; 4], 32>, // Точки в кластере
+    points: Vec<[f64; 4]>, // Точки в кластере
     regime: VolatilityRegime,   // Соответствующий режим
 }
 
@@ -79,7 +78,7 @@ impl VolatilityCluster {
     fn new(regime: VolatilityRegime) -> Self {
         Self {
             centroid: [0.0; 4],
-            points: ArrayVec::new(),
+            points: Vec::with_capacity(32),
             regime,
         }
     }
@@ -163,13 +162,13 @@ pub struct AdaptiveVolatilityRegime {
     volume_vol_ma: MovingAverageProvider,           // Волатильность объема
     
     // K-means кластеры для классификации режимов
-    clusters: ArrayVec<VolatilityCluster, 6>,
-    
+    clusters: Vec<VolatilityCluster>,
+
     // Буферы для данных
-    prices: ArrayVec<f64, 64>,              // История цен
-    returns: ArrayVec<f64, 32>,             // Доходности
-    volatilities: ArrayVec<f64, 32>,        // История волатильностей
-    regimes: ArrayVec<VolatilityRegime, 16>, // История режимов
+    prices: Vec<f64>,              // История цен
+    returns: Vec<f64>,             // Доходности
+    volatilities: Vec<f64>,        // История волатильностей
+    regimes: Vec<VolatilityRegime>, // История режимов
     
     // Матрица переходов (Hidden Markov Model)
     transition_matrix: [[f64; 6]; 6],       // Вероятности переходов между режимами
@@ -200,7 +199,7 @@ impl AdaptiveVolatilityRegime {
         assert!(adaptation_period > 0, "Adaptation period must be positive");
         
         // Инициализируем кластеры
-        let mut clusters = ArrayVec::new();
+        let mut clusters = Vec::with_capacity(6);
         clusters.push(VolatilityCluster::new(VolatilityRegime::Quiet));
         clusters.push(VolatilityCluster::new(VolatilityRegime::Normal));
         clusters.push(VolatilityCluster::new(VolatilityRegime::Elevated));
@@ -234,10 +233,10 @@ impl AdaptiveVolatilityRegime {
             
             clusters,
             
-            prices: ArrayVec::new(),
-            returns: ArrayVec::new(),
-            volatilities: ArrayVec::new(),
-            regimes: ArrayVec::new(),
+            prices: Vec::with_capacity(64),
+            returns: Vec::with_capacity(32),
+            volatilities: Vec::with_capacity(32),
+            regimes: Vec::with_capacity(16),
             
             transition_matrix,
             

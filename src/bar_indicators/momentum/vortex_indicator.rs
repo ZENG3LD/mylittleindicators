@@ -1,6 +1,5 @@
 //! Vortex Indicator (VI).
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
@@ -30,16 +29,16 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 pub struct VortexIndicator {
     period: usize,
 
-    vi_plus_values: ArrayVec<f64, 512>,
-    vi_minus_values: ArrayVec<f64, 512>,
+    vi_plus_values: Vec<f64>,
+    vi_minus_values: Vec<f64>,
 
     positive_vortex_sum: f64,
     negative_vortex_sum: f64,
     true_range_sum: f64,
 
-    positive_vortex_buffer: ArrayVec<f64, 512>,
-    negative_vortex_buffer: ArrayVec<f64, 512>,
-    true_range_buffer: ArrayVec<f64, 512>,
+    positive_vortex_buffer: Vec<f64>,
+    negative_vortex_buffer: Vec<f64>,
+    true_range_buffer: Vec<f64>,
 
     atr: Atr,
 
@@ -68,14 +67,14 @@ impl VortexIndicator {
         
         Self {
             period,
-            vi_plus_values: ArrayVec::new(),
-            vi_minus_values: ArrayVec::new(),
+            vi_plus_values: Vec::with_capacity(period),
+            vi_minus_values: Vec::with_capacity(period),
             positive_vortex_sum: 0.0,
             negative_vortex_sum: 0.0,
             true_range_sum: 0.0,
-            positive_vortex_buffer: ArrayVec::new(),
-            negative_vortex_buffer: ArrayVec::new(),
-            true_range_buffer: ArrayVec::new(),
+            positive_vortex_buffer: Vec::with_capacity(period),
+            negative_vortex_buffer: Vec::with_capacity(period),
+            true_range_buffer: Vec::with_capacity(period),
             atr: Atr::new(period, MovingAverageType::RMA),
             prev_high: 0.0,
             prev_low: 0.0,

@@ -2,7 +2,6 @@
 //! Быстрое преобразование Фурье для анализа частотного спектра временных рядов
 //! Позволяет выявлять циклические паттерны и доминирующие частоты
 
-use arrayvec::ArrayVec;
 use std::f64::consts::PI;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -55,10 +54,10 @@ impl Complex {
 /// Частотная область
 #[derive(Debug, Clone)]
 pub struct FrequencyDomain {
-    pub frequencies: ArrayVec<f64, 256>,        // Частоты
-    pub magnitudes: ArrayVec<f64, 256>,         // Амплитуды
-    pub phases: ArrayVec<f64, 256>,             // Фазы
-    pub power_spectrum: ArrayVec<f64, 256>,     // Спектр мощности
+    pub frequencies: Vec<f64>,        // Частоты
+    pub magnitudes: Vec<f64>,         // Амплитуды
+    pub phases: Vec<f64>,             // Фазы
+    pub power_spectrum: Vec<f64>,     // Спектр мощности
     pub dominant_frequency: f64,                // Доминирующая частота
     pub dominant_period: f64,                   // Доминирующий период
     pub spectral_centroid: f64,                 // Спектральный центроид
@@ -74,10 +73,10 @@ impl Default for FrequencyDomain {
 impl FrequencyDomain {
     pub fn new() -> Self {
         Self {
-            frequencies: ArrayVec::new(),
-            magnitudes: ArrayVec::new(),
-            phases: ArrayVec::new(),
-            power_spectrum: ArrayVec::new(),
+            frequencies: Vec::with_capacity(256),
+            magnitudes: Vec::with_capacity(256),
+            phases: Vec::with_capacity(256),
+            power_spectrum: Vec::with_capacity(256),
             dominant_frequency: 0.0,
             dominant_period: 0.0,
             spectral_centroid: 0.0,
@@ -90,24 +89,24 @@ impl FrequencyDomain {
 #[derive(Clone)]
 pub struct FastFourierTransform {
     // Временные данные
-    time_series: ArrayVec<f64, 512>,
-    
+    time_series: Vec<f64>,
+
     // Результаты FFT
-    fft_result: ArrayVec<Complex, 256>,
+    fft_result: Vec<Complex>,
     frequency_domain: FrequencyDomain,
-    
+
     // Overlapped windowing
-    prev_window_results: ArrayVec<FrequencyDomain, 8>,  // Хранение предыдущих результатов
+    prev_window_results: Vec<FrequencyDomain>,  // Хранение предыдущих результатов
     hop_size: usize,                                    // Размер шага между окнами
-    
+
     // Параметры
     window_size: usize,                         // Размер окна для FFT (степень 2)
     sampling_rate: f64,                         // Частота дискретизации
     overlap_ratio: f64,                         // Коэффициент перекрытия окон
-    
+
     // Оконные функции
     window_function: WindowType,
-    window_coefficients: ArrayVec<f64, 256>,
+    window_coefficients: Vec<f64>,
     
     // Сглаживание спектра
     spectral_smoothing: bool,
@@ -136,16 +135,16 @@ impl FastFourierTransform {
         let hop_size = (window_size as f64 * (1.0 - overlap_ratio)) as usize;
         
         let mut fft = Self {
-            time_series: ArrayVec::new(),
-            fft_result: ArrayVec::new(),
+            time_series: Vec::with_capacity(512),
+            fft_result: Vec::with_capacity(256),
             frequency_domain: FrequencyDomain::new(),
-            prev_window_results: ArrayVec::new(),
+            prev_window_results: Vec::with_capacity(8),
             hop_size,
             window_size,
             sampling_rate,
             overlap_ratio,
             window_function: WindowType::Hamming,
-            window_coefficients: ArrayVec::new(),
+            window_coefficients: Vec::with_capacity(256),
             spectral_smoothing: true,
             smoothing_factor: 0.8,
             is_ready: false,
@@ -162,9 +161,7 @@ impl FastFourierTransform {
         if self.time_series.len() >= 512 {
             self.time_series.remove(0);
         }
-        if !self.time_series.is_full() {
-            self.time_series.push(value);
-        }
+        self.time_series.push(value);
         
         // Если достаточно данных, вычисляем FFT
         if self.time_series.len() >= self.min_samples {
@@ -218,9 +215,7 @@ impl FastFourierTransform {
                 },
             };
             
-            if !self.window_coefficients.is_full() {
-                self.window_coefficients.push(coeff);
-            }
+            self.window_coefficients.push(coeff);
         }
     }
     
@@ -260,7 +255,7 @@ impl FastFourierTransform {
         
         // Берем данные с учетом перекрытия (overlap_ratio)
         let start_idx = self.time_series.len() - self.window_size;
-        let mut input_data = ArrayVec::<Complex, 256>::new();
+        let mut input_data: Vec<Complex> = Vec::with_capacity(256);
         
         // Применяем оконную функцию и преобразуем в комплексные числа
         for i in 0..self.window_size {
@@ -276,9 +271,7 @@ impl FastFourierTransform {
                 0.0
             };
             
-            if !input_data.is_full() {
-                input_data.push(Complex::new(windowed_value, 0.0));
-            }
+            input_data.push(Complex::new(windowed_value, 0.0));
         }
         
         // Выполняем FFT
@@ -291,16 +284,14 @@ impl FastFourierTransform {
         if self.prev_window_results.len() >= 8 {
             self.prev_window_results.remove(0);
         }
-        if !self.prev_window_results.is_full() {
-            self.prev_window_results.push(self.frequency_domain.clone());
-        }
+        self.prev_window_results.push(self.frequency_domain.clone());
         
         // Применяем overlapped averaging для сглаживания
         self.apply_overlapped_averaging();
     }
     
     /// Упрощенная реализация FFT radix-2
-    fn fft_radix2(&self, input: &ArrayVec<Complex, 256>) -> ArrayVec<Complex, 256> {
+    fn fft_radix2(&self, input: &Vec<Complex>) -> Vec<Complex> {
         let n = input.len();
         if n <= 1 {
             return input.clone();
@@ -403,18 +394,10 @@ impl FastFourierTransform {
             };
             
             // Сохраняем результаты
-            if !self.frequency_domain.frequencies.is_full() {
-                self.frequency_domain.frequencies.push(frequency);
-            }
-            if !self.frequency_domain.magnitudes.is_full() {
-                self.frequency_domain.magnitudes.push(smoothed_magnitude);
-            }
-            if !self.frequency_domain.phases.is_full() {
-                self.frequency_domain.phases.push(phase);
-            }
-            if !self.frequency_domain.power_spectrum.is_full() {
-                self.frequency_domain.power_spectrum.push(power);
-            }
+            self.frequency_domain.frequencies.push(frequency);
+            self.frequency_domain.magnitudes.push(smoothed_magnitude);
+            self.frequency_domain.phases.push(phase);
+            self.frequency_domain.power_spectrum.push(power);
             
             // Ищем доминирующую частоту (исключаем DC компоненту)
             if i > 0 && smoothed_magnitude > max_magnitude {
@@ -474,9 +457,9 @@ impl FastFourierTransform {
             return;
         }
 
-        let mut averaged_magnitudes: ArrayVec<f64, 256> = ArrayVec::new();
-        let mut averaged_phases: ArrayVec<f64, 256> = ArrayVec::new();
-        let mut averaged_power_spectrum: ArrayVec<f64, 256> = ArrayVec::new();
+        let mut averaged_magnitudes: Vec<f64> = Vec::with_capacity(256);
+        let mut averaged_phases: Vec<f64> = Vec::with_capacity(256);
+        let mut averaged_power_spectrum: Vec<f64> = Vec::with_capacity(256);
 
         // Average each frequency bin across all previous windows
         for bin_idx in 0..spectrum_len {
@@ -494,7 +477,7 @@ impl FastFourierTransform {
                 }
             }
 
-            if count > 0 && !averaged_magnitudes.is_full() {
+            if count > 0 {
                 averaged_magnitudes.push(sum_mag / count as f64);
                 averaged_phases.push(sum_phase / count as f64);
                 averaged_power_spectrum.push(sum_power / count as f64);

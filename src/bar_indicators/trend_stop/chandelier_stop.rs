@@ -10,7 +10,6 @@
 //! Индикатор НЕ содержит логику стопов - только возвращает динамические уровни.
 //! Логика остановки позиций реализуется в стратегиях на основе этих уровней.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
@@ -25,8 +24,8 @@ pub struct ChandelierStop {
     atr: Atr,
     
     // Буферы для поиска экстремумов
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
     
     // Текущие уровни
     long_stop: f64,     // Стоп для лонга 
@@ -54,8 +53,8 @@ impl ChandelierStop {
             period,
             multiplier,
             atr: Atr::new(period, MovingAverageType::RMA),
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(512),
+            lows: Vec::with_capacity(512),
             long_stop: 0.0,
             short_stop: 0.0,
             bars_count: 0,
@@ -72,8 +71,8 @@ impl ChandelierStop {
             period,
             multiplier,
             atr: Atr::new(period, atr_type),
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(512),
+            lows: Vec::with_capacity(512),
             long_stop: 0.0,
             short_stop: 0.0,
             bars_count: 0,

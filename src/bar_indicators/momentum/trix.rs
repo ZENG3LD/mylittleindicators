@@ -1,6 +1,5 @@
 //! TRIX (Triple Exponential Average) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
@@ -44,8 +43,8 @@ pub struct Trix {
     signal_ema: MovingAverageProvider,
 
     // Буферы для значений
-    trix_values: ArrayVec<f64, 512>,
-    triple_ema_values: ArrayVec<f64, 512>,
+    trix_values: Vec<f64>,
+    triple_ema_values: Vec<f64>,
 
     // Предыдущее значение тройной EMA для расчета ROC
     prev_triple_ema: f64,
@@ -94,8 +93,8 @@ impl Trix {
             second_ema: MovingAverageProvider::new(ma_type, period),
             third_ema: MovingAverageProvider::new(ma_type, period),
             signal_ema: MovingAverageProvider::new(ma_type, signal_period),
-            trix_values: ArrayVec::new(),
-            triple_ema_values: ArrayVec::new(),
+            trix_values: Vec::with_capacity(512),
+            triple_ema_values: Vec::with_capacity(512),
             prev_triple_ema: 0.0,
             trix_value: 0.0,
             signal_value: 0.0,
@@ -142,8 +141,8 @@ impl Trix {
             second_ema: MovingAverageProvider::new(smoothing_ma_type, period),
             third_ema: MovingAverageProvider::new(smoothing_ma_type, period),
             signal_ema: MovingAverageProvider::new(signal_ma_type, signal_period),
-            trix_values: ArrayVec::new(),
-            triple_ema_values: ArrayVec::new(),
+            trix_values: Vec::with_capacity(512),
+            triple_ema_values: Vec::with_capacity(512),
             prev_triple_ema: 0.0,
             trix_value: 0.0,
             signal_value: 0.0,
@@ -180,8 +179,8 @@ impl Trix {
             second_ema: MovingAverageProvider::new(smoothing_ma_type, period),
             third_ema: MovingAverageProvider::new(smoothing_ma_type, period),
             signal_ema: MovingAverageProvider::new(signal_ma_type, signal_period),
-            trix_values: ArrayVec::new(),
-            triple_ema_values: ArrayVec::new(),
+            trix_values: Vec::with_capacity(512),
+            triple_ema_values: Vec::with_capacity(512),
             prev_triple_ema: 0.0,
             trix_value: 0.0,
             signal_value: 0.0,

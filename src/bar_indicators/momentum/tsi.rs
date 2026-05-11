@@ -1,6 +1,5 @@
 //! True Strength Index (TSI) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
@@ -36,7 +35,7 @@ pub struct TrueStrengthIndex {
     source: OhlcvField,                   // Price source for TSI calculation
 
     // Буферы для расчетов
-    tsi_values: ArrayVec<f64, 512>,
+    tsi_values: Vec<f64>,
 
     // Предыдущая цена
     prev_price: f64,
@@ -86,7 +85,7 @@ impl TrueStrengthIndex {
             smoothing_ma_type: ma_type,
             signal_ma_type: ma_type,
             source: OhlcvField::Close,
-            tsi_values: ArrayVec::new(),
+            tsi_values: Vec::with_capacity(512),
             prev_price: 0.0,
             first_pc_ema: MovingAverageProvider::new(ma_type, first_smoothing),
             second_pc_ema: MovingAverageProvider::new(ma_type, second_smoothing),
@@ -148,7 +147,7 @@ impl TrueStrengthIndex {
             smoothing_ma_type,
             signal_ma_type,
             source,
-            tsi_values: ArrayVec::new(),
+            tsi_values: Vec::with_capacity(512),
             prev_price: 0.0,
             first_pc_ema: MovingAverageProvider::new(smoothing_ma_type, first_smoothing),
             second_pc_ema: MovingAverageProvider::new(smoothing_ma_type, second_smoothing),

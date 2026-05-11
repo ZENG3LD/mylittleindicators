@@ -6,8 +6,8 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 #[derive(Clone)]
 pub struct Dc {
     period: usize,
-    highs: arrayvec::ArrayVec<f64, 512>,
-    lows: arrayvec::ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
     index: usize,
     filled: bool,
     upper: f64,
@@ -19,8 +19,8 @@ impl Dc {
     pub fn new(period: usize) -> Self {
         Self {
             period,
-            highs: arrayvec::ArrayVec::new(),
-            lows: arrayvec::ArrayVec::new(),
+            highs: Vec::with_capacity(period),
+            lows: Vec::with_capacity(period),
             index: 0,
             filled: false,
             upper: 0.0,

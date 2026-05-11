@@ -1,6 +1,5 @@
 //! Stochastic RSI indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::momentum::rsi::Rsi;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
@@ -42,10 +41,10 @@ pub struct StochasticRsi {
 
     // 🚀 RSI calculation - используем стандартный RSI
     rsi: Rsi,
-    rsi_values: ArrayVec<f64, 512>,
+    rsi_values: Vec<f64>,
 
     // Stochastic calculation - raw %K values for manual smoothing
-    k_values: ArrayVec<f64, 512>,
+    k_values: Vec<f64>,
 
     // MA-based smoothing for %K and %D
     k_ma: MovingAverageProvider,
@@ -164,8 +163,8 @@ impl StochasticRsi {
             k_period,
             d_period,
             rsi: Rsi::with_source(rsi_period, MovingAverageType::RMA, source),
-            rsi_values: ArrayVec::new(),
-            k_values: ArrayVec::new(),
+            rsi_values: Vec::with_capacity(512),
+            k_values: Vec::with_capacity(512),
             k_ma: MovingAverageProvider::new(k_ma_type, k_period),
             d_ma: MovingAverageProvider::new(d_ma_type, d_period),
             k_ma_type,

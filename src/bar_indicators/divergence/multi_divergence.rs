@@ -2,7 +2,6 @@ use crate::bar_indicators::divergence::divergence::DivergenceDetector;
 use crate::bar_indicators::momentum::rsi::Rsi;
 use crate::bar_indicators::momentum::cci::Cci;
 use crate::bar_indicators::momentum::macd::Macd;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
@@ -11,10 +10,10 @@ pub struct MultiDivergence {
     rsi: Rsi,
     cci: Cci,
     macd: Macd,
-    prices: ArrayVec<f64, 512>,
-    rsi_values: ArrayVec<f64, 512>,
-    cci_values: ArrayVec<f64, 512>,
-    macd_values: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
+    rsi_values: Vec<f64>,
+    cci_values: Vec<f64>,
+    macd_values: Vec<f64>,
     lookback: usize,
     value: f64,
 }
@@ -26,10 +25,10 @@ impl MultiDivergence {
             rsi: Rsi::new(period.max(1)),
             cci: Cci::new(period.max(1), 0.015, None),
             macd: Macd::new(12, 26),
-            prices: ArrayVec::new(),
-            rsi_values: ArrayVec::new(),
-            cci_values: ArrayVec::new(),
-            macd_values: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            rsi_values: Vec::with_capacity(512),
+            cci_values: Vec::with_capacity(512),
+            macd_values: Vec::with_capacity(512),
             lookback: lookback.max(5),
             value: 0.0,
         }

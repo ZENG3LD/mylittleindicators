@@ -2,7 +2,6 @@
 // (c) 2024
 // OPTIMIZED: O(1) running sum instead of O(n) iter().sum()
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Индикатор Directional Movement (DM):
@@ -12,9 +11,9 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 #[derive(Clone)]
 pub struct Dm {
     period: usize,
-    tr_buf: ArrayVec<f64, 512>,
-    plus_dm_buf: ArrayVec<f64, 512>,
-    minus_dm_buf: ArrayVec<f64, 512>,
+    tr_buf: Vec<f64>,
+    plus_dm_buf: Vec<f64>,
+    minus_dm_buf: Vec<f64>,
 
     // Running sums for O(1) calculation
     sum_tr: f64,
@@ -29,7 +28,7 @@ pub struct Dm {
     plus_di: f64,
     minus_di: f64,
     adx: f64,
-    adx_buf: ArrayVec<f64, 512>,
+    adx_buf: Vec<f64>,
     adx_idx: usize,
     adx_filled: bool,
 
@@ -41,9 +40,9 @@ impl Dm {
     pub fn new(period: usize) -> Self {
         Self {
             period,
-            tr_buf: ArrayVec::from([0.0; 512]),
-            plus_dm_buf: ArrayVec::from([0.0; 512]),
-            minus_dm_buf: ArrayVec::from([0.0; 512]),
+            tr_buf: vec![0.0; 512],
+            plus_dm_buf: vec![0.0; 512],
+            minus_dm_buf: vec![0.0; 512],
             sum_tr: 0.0,
             sum_plus_dm: 0.0,
             sum_minus_dm: 0.0,
@@ -55,7 +54,7 @@ impl Dm {
             plus_di: 0.0,
             minus_di: 0.0,
             adx: 0.0,
-            adx_buf: ArrayVec::from([0.0; 512]),
+            adx_buf: vec![0.0; 512],
             adx_idx: 0,
             adx_filled: false,
             sum_adx: 0.0,

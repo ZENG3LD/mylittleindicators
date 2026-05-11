@@ -1,8 +1,6 @@
 // Модуль дивергенций: классическая и скрытая (обратная) дивергенция/конвергенция
 // (c) 2024
 
-use arrayvec::ArrayVec;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DivergenceType {
     Bullish,
@@ -23,7 +21,7 @@ pub struct DivergenceSignal {
 
 #[derive(Debug, Clone)]
 pub struct DivergenceDetector {
-    pub signals: ArrayVec<DivergenceSignal, 512>,
+    pub signals: Vec<DivergenceSignal>,
     pub last_signal: Option<DivergenceSignal>,
 }
 
@@ -36,7 +34,7 @@ impl Default for DivergenceDetector {
 impl DivergenceDetector {
     pub fn new() -> Self {
         Self {
-            signals: ArrayVec::new(),
+            signals: Vec::with_capacity(512),
             last_signal: None,
         }
     }

@@ -1,7 +1,6 @@
 //! Williams Indicators - индикаторы Билла Вильямса для анализа хаоса
 //! Включает Alligator, Awesome Oscillator, Acceleration/Deceleration и Market Facilitation Index
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -15,9 +14,9 @@ pub struct Alligator {
     lips: MovingAverageProvider,   // Губы (зеленая линия) - 5-периодная SMA, смещение 3
     
     // Буферы для смещений
-    jaw_buffer: ArrayVec<f64, 32>,
-    teeth_buffer: ArrayVec<f64, 32>,
-    lips_buffer: ArrayVec<f64, 32>,
+    jaw_buffer: Vec<f64>,
+    teeth_buffer: Vec<f64>,
+    lips_buffer: Vec<f64>,
     
     // Смещения
     jaw_offset: usize,
@@ -40,9 +39,9 @@ impl Alligator {
             jaw: MovingAverageProvider::new(MovingAverageType::SMA, 13),
             teeth: MovingAverageProvider::new(MovingAverageType::SMA, 8),
             lips: MovingAverageProvider::new(MovingAverageType::SMA, 5),
-            jaw_buffer: ArrayVec::new(),
-            teeth_buffer: ArrayVec::new(),
-            lips_buffer: ArrayVec::new(),
+            jaw_buffer: Vec::with_capacity(32),
+            teeth_buffer: Vec::with_capacity(32),
+            lips_buffer: Vec::with_capacity(32),
             jaw_offset: 8,
             teeth_offset: 5,
             lips_offset: 3,
@@ -169,7 +168,7 @@ pub struct AwesomeOscillator {
     sma34: MovingAverageProvider,
     
     // Буфер значений для анализа
-    ao_values: ArrayVec<f64, 512>,
+    ao_values: Vec<f64>,
     
     // Результат
     ao_value: f64,
@@ -188,7 +187,7 @@ impl AwesomeOscillator {
         Self {
             sma5: MovingAverageProvider::new(MovingAverageType::SMA, 5),
             sma34: MovingAverageProvider::new(MovingAverageType::SMA, 34),
-            ao_values: ArrayVec::new(),
+            ao_values: Vec::with_capacity(512),
             ao_value: 0.0,
             is_ready: false,
         }
@@ -297,7 +296,7 @@ pub struct AccelerationDeceleration {
     ao_sma: MovingAverageProvider,
     
     ac_value: f64,
-    ac_values: ArrayVec<f64, 512>,
+    ac_values: Vec<f64>,
     
     is_ready: bool,
 }
@@ -314,7 +313,7 @@ impl AccelerationDeceleration {
             awesome_oscillator: AwesomeOscillator::new(),
             ao_sma: MovingAverageProvider::new(MovingAverageType::SMA, 5),
             ac_value: 0.0,
-            ac_values: ArrayVec::new(),
+            ac_values: Vec::with_capacity(512),
             is_ready: false,
         }
     }
@@ -384,8 +383,8 @@ impl AccelerationDeceleration {
 /// Измеряет эффективность движения цены на единицу объема
 #[derive(Clone)]
 pub struct MarketFacilitationIndex {
-    mfi_values: ArrayVec<f64, 512>,
-    volume_values: ArrayVec<f64, 512>,
+    mfi_values: Vec<f64>,
+    volume_values: Vec<f64>,
     
     mfi_value: f64,
     
@@ -401,8 +400,8 @@ impl Default for MarketFacilitationIndex {
 impl MarketFacilitationIndex {
     pub fn new() -> Self {
         Self {
-            mfi_values: ArrayVec::new(),
-            volume_values: ArrayVec::new(),
+            mfi_values: Vec::with_capacity(512),
+            volume_values: Vec::with_capacity(512),
             mfi_value: 0.0,
             is_ready: false,
         }

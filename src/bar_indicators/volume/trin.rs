@@ -11,7 +11,6 @@
 //! TRIN < 0.5 = Сильно перекупленный рынок
 //! TRIN > 2.0 = Сильно перепроданный рынок
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Данные для расчета TRIN
@@ -85,11 +84,11 @@ pub struct Trin {
     current_value: f64,
     
     // История значений TRIN
-    values_history: ArrayVec<f64, 512>,
-    
+    values_history: Vec<f64>,
+
     // Скользящее среднее TRIN (сглаженная версия)
     smoothed_period: usize,
-    smoothed_values: ArrayVec<f64, 64>,
+    smoothed_values: Vec<f64>,
     smoothed_trin: f64,
     
     // Состояние
@@ -109,9 +108,9 @@ impl Trin {
         
         Self {
             current_value: 1.0,
-            values_history: ArrayVec::new(),
+            values_history: Vec::with_capacity(512),
             smoothed_period,
-            smoothed_values: ArrayVec::new(),
+            smoothed_values: Vec::with_capacity(64),
             smoothed_trin: 1.0,
             is_ready: false,
             update_count: 0,

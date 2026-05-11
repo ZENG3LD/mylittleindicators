@@ -10,7 +10,6 @@
 use crate::bar_indicators::average::lr::LinearRegressionMA;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
-use arrayvec::ArrayVec;
 use serde::{Serialize, Deserialize};
 
 /// Режимы расчета стандартного отклонения
@@ -71,7 +70,7 @@ pub struct StandardDeviationChannels {
     regression_ma: LinearRegressionMA,  // ✅ Линейная регрессия через готовый компонент
     
     // Circular buffer для расчета отклонений от регрессии - O(1) operations
-    price_buffer: ArrayVec<f64, 512>,
+    price_buffer: Vec<f64>,
     price_index: usize,
     buffer_filled: bool,
     
@@ -126,7 +125,7 @@ impl StandardDeviationChannels {
             source,
             ohlcv_source: OhlcvField::Close,
             regression_ma: LinearRegressionMA::new(period),  // ✅ Используем готовый компонент
-            price_buffer: ArrayVec::new(),
+            price_buffer: Vec::with_capacity(period),
             price_index: 0,
             buffer_filled: false,
             std_deviation: 0.0,
@@ -160,7 +159,7 @@ impl StandardDeviationChannels {
             source,
             ohlcv_source,
             regression_ma: LinearRegressionMA::new(period),
-            price_buffer: ArrayVec::new(),
+            price_buffer: Vec::with_capacity(period),
             price_index: 0,
             buffer_filled: false,
             std_deviation: 0.0,

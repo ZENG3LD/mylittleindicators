@@ -4,7 +4,6 @@
 //!
 //! OPTIMIZED: O(1) running sum for efficiency ratios instead of O(n) iter().sum()
 
-use arrayvec::ArrayVec;
 use std::collections::VecDeque;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
@@ -18,15 +17,15 @@ pub struct KaufmanAdaptiveMA {
     slow_sc_period: usize,              // Медленная константа сглаживания
 
     // Данные для расчета
-    prices: ArrayVec<f64, 200>,         // История цен
+    prices: Vec<f64>,         // История цен
 
     // Промежуточные значения
-    direction_values: ArrayVec<f64, 200>,    // Направление движения
-    volatility_values: ArrayVec<f64, 200>,   // Волатильность
+    direction_values: Vec<f64>,    // Направление движения
+    volatility_values: Vec<f64>,   // Волатильность
 
     // VecDeque for O(1) pop_front
     efficiency_ratios: VecDeque<f64>,   // История Efficiency Ratio
-    smoothing_constants: ArrayVec<f64, 100>, // История констант сглаживания
+    smoothing_constants: Vec<f64>, // История констант сглаживания
 
     // Running sum for O(1) average efficiency calculation
     sum_efficiency_ratios: f64,
@@ -74,11 +73,11 @@ impl KaufmanAdaptiveMA {
             efficiency_ratio_period,
             fast_sc_period,
             slow_sc_period,
-            prices: ArrayVec::new(),
-            direction_values: ArrayVec::new(),
-            volatility_values: ArrayVec::new(),
+            prices: Vec::with_capacity(200),
+            direction_values: Vec::with_capacity(200),
+            volatility_values: Vec::with_capacity(200),
             efficiency_ratios: VecDeque::with_capacity(100),
-            smoothing_constants: ArrayVec::new(),
+            smoothing_constants: Vec::with_capacity(100),
             sum_efficiency_ratios: 0.0,
             fast_sc,
             slow_sc,
@@ -138,9 +137,7 @@ impl KaufmanAdaptiveMA {
         if self.prices.len() >= 200 {
             self.prices.remove(0);
         }
-        if !self.prices.is_full() {
-            self.prices.push(price);
-        }
+        self.prices.push(price);
     }
 
     /// Расчет Efficiency Ratio
@@ -175,16 +172,12 @@ impl KaufmanAdaptiveMA {
         if self.direction_values.len() >= 200 {
             self.direction_values.remove(0);
         }
-        if !self.direction_values.is_full() {
-            self.direction_values.push(direction);
-        }
+        self.direction_values.push(direction);
 
         if self.volatility_values.len() >= 200 {
             self.volatility_values.remove(0);
         }
-        if !self.volatility_values.is_full() {
-            self.volatility_values.push(volatility);
-        }
+        self.volatility_values.push(volatility);
 
         // Сохраняем ER в историю с O(1) running sum tracking
         if self.efficiency_ratios.len() >= 100 {
@@ -212,9 +205,7 @@ impl KaufmanAdaptiveMA {
         if self.smoothing_constants.len() >= 100 {
             self.smoothing_constants.remove(0);
         }
-        if !self.smoothing_constants.is_full() {
-            self.smoothing_constants.push(self.current_sc);
-        }
+        self.smoothing_constants.push(self.current_sc);
     }
 
     /// Расчет KAMA

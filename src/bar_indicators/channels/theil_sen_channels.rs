@@ -1,13 +1,11 @@
 // Theil–Sen Regression Channels (robust slope via median of slopes) - placeholder O(N^2) simplified
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
-
 #[derive(Debug, Clone)]
 pub struct TheilSenChannels {
     window: usize,
     k: f64,
-    buf: ArrayVec<f64, 256>,
+    buf: Vec<f64>,
     idx: usize,
     filled: bool,
     upper: f64,
@@ -20,7 +18,7 @@ impl TheilSenChannels {
         Self {
             window: window.clamp(5, 256),
             k: if k > 0.0 { k } else { 2.0 },
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(window.clamp(5, 256)),
             idx: 0,
             filled: false,
             upper: 0.0,

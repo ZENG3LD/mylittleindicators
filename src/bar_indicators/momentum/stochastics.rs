@@ -1,6 +1,5 @@
 //! Stochastic Oscillator (%K, %D) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -27,9 +26,9 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 pub struct Stochastics {
     period_k: usize,
     period_d: usize,
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
-    closes: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    closes: Vec<f64>,
     d_ma: MovingAverageProvider,
     ma_type: MovingAverageType,
     index: usize,
@@ -60,9 +59,9 @@ impl Stochastics {
         Self {
             period_k,
             period_d,
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
-            closes: ArrayVec::new(),
+            highs: Vec::with_capacity(period_k),
+            lows: Vec::with_capacity(period_k),
+            closes: Vec::with_capacity(period_k),
             d_ma: MovingAverageProvider::new(ma_type, period_d),
             ma_type,
             index: 0,

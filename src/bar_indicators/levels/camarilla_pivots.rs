@@ -11,7 +11,6 @@
 //! S3 = Close - (High - Low) * 1.1/4
 //! S4 = Close - (High - Low) * 1.1/2
 
-use arrayvec::ArrayVec;
 use std::collections::HashMap;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -143,7 +142,7 @@ pub struct CamarillaPivots {
     bars_in_period: usize,
     
     // История уровней
-    levels_history: ArrayVec<CamarillaPivotLevels, 100>,
+    levels_history: Vec<CamarillaPivotLevels>,
     
     // Статистика взаимодействий с уровнями
     level_touches: HashMap<String, u32>,
@@ -170,7 +169,7 @@ impl CamarillaPivots {
             period_low: f64::INFINITY,
             period_close: 0.0,
             bars_in_period: 0,
-            levels_history: ArrayVec::new(),
+            levels_history: Vec::with_capacity(100),
             level_touches: HashMap::new(),
             level_breaks: HashMap::new(),
             is_ready: false,

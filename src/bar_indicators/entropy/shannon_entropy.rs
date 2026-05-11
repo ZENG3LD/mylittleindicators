@@ -2,7 +2,6 @@
 //! Измеряет неопределенность в распределении доходностей
 //! Значения: 0.0-1.0 (нормализованная), где 0.0 = полностью предсказуемо, 1.0 = максимально случайно
 
-use arrayvec::ArrayVec;
 use std::collections::HashMap;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -22,7 +21,7 @@ pub struct ShannonEntropy {
     bins: usize,                // Количество корзин для гистограммы
     
     // Буферы данных
-    returns: ArrayVec<f64, 512>, // Буфер логарифмических доходностей
+    returns: Vec<f64>, // Буфер логарифмических доходностей
     prev_close: Option<f64>,     // Предыдущая цена для расчета доходности
     
     // Результаты
@@ -40,7 +39,7 @@ impl ShannonEntropy {
         Self {
             period: period.min(512),
             bins: bins.clamp(5, 50), // Ограничиваем разумными пределами
-            returns: ArrayVec::new(),
+            returns: Vec::with_capacity(period.min(512)),
             prev_close: None,
             entropy: 0.0,
             normalized_entropy: 0.0,

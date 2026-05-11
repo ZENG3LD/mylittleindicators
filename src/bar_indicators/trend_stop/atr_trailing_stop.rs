@@ -7,7 +7,6 @@
 //! Индикатор НЕ содержит логику стопов - только возвращает динамические уровни.
 //! Логика остановки позиций реализуется в стратегиях на основе этих уровней.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
@@ -22,8 +21,8 @@ pub struct ATRTrailingStop {
     atr: Atr,
     
     // Буферы для экстремумов
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
     
     // Текущие трейлинг уровни
     long_level: f64,    // Трейлинг стоп для лонга (растет)
@@ -51,8 +50,8 @@ impl ATRTrailingStop {
             period,
             multiplier,
             atr: Atr::new(period, MovingAverageType::RMA),
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(512),
+            lows: Vec::with_capacity(512),
             long_level: 0.0,
             short_level: f64::MAX,
             bars_count: 0,
@@ -69,8 +68,8 @@ impl ATRTrailingStop {
             period,
             multiplier,
             atr: Atr::new(period, atr_type),
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(512),
+            lows: Vec::with_capacity(512),
             long_level: 0.0,
             short_level: f64::MAX,
             bars_count: 0,

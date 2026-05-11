@@ -2,7 +2,6 @@
 //! Фильтр Савицкого-Голея для сглаживания и вычисления производных
 //! Использует локальную полиномиальную аппроксимацию для сохранения особенностей сигнала
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -22,15 +21,15 @@ pub struct SavitzkyGolayFilter {
     derivative_order: DerivativeOrder,          // Порядок производной
     
     // Данные
-    values: ArrayVec<f64, 63>,                  // Окно данных (максимум 63 для полинома 6-го порядка)
-    
+    values: Vec<f64>,                  // Окно данных (максимум 63 для полинома 6-го порядка)
+
     // Коэффициенты
-    coefficients: ArrayVec<f64, 63>,            // Коэффициенты фильтра
-    
+    coefficients: Vec<f64>,            // Коэффициенты фильтра
+
     // Результаты
     filtered_value: f64,                        // Отфильтрованное значение
     confidence: f64,                            // Доверительный интервал
-    polynomial_fit: ArrayVec<f64, 7>,           // Коэффициенты полинома
+    polynomial_fit: Vec<f64>,           // Коэффициенты полинома
     
     // Статистики качества
     residual_sum_squares: f64,                  // Сумма квадратов остатков
@@ -52,11 +51,11 @@ impl SavitzkyGolayFilter {
             window_size,
             polynomial_order,
             derivative_order,
-            values: ArrayVec::new(),
-            coefficients: ArrayVec::new(),
+            values: Vec::with_capacity(63),
+            coefficients: Vec::with_capacity(63),
             filtered_value: 0.0,
             confidence: 0.0,
-            polynomial_fit: ArrayVec::new(),
+            polynomial_fit: Vec::with_capacity(7),
             residual_sum_squares: 0.0,
             correlation_coefficient: 0.0,
             is_ready: false,
@@ -73,9 +72,7 @@ impl SavitzkyGolayFilter {
         if self.values.len() >= self.window_size {
             self.values.remove(0);
         }
-        if !self.values.is_full() {
-            self.values.push(value);
-        }
+        self.values.push(value);
         
         if self.values.len() == self.window_size {
             self.filtered_value = self.apply_filter();
@@ -145,17 +142,13 @@ impl SavitzkyGolayFilter {
                     coeff += coeffs[j] * x.powi(j as i32);
                 }
             }
-            if !self.coefficients.is_full() {
-                self.coefficients.push(coeff);
-            }
+            self.coefficients.push(coeff);
         }
         
         // Сохраняем коэффициенты полинома для анализа
         self.polynomial_fit.clear();
         for &coeff in &coeffs {
-            if !self.polynomial_fit.is_full() {
-                self.polynomial_fit.push(coeff);
-            }
+            self.polynomial_fit.push(coeff);
         }
     }
     

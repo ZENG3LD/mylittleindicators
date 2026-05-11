@@ -3,7 +3,6 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::types::Bar;
-use arrayvec::ArrayVec;
 use std::collections::HashMap;
 
 /// Ценовой уровень с объемной информацией
@@ -59,7 +58,7 @@ pub struct OrderFlowImbalance {
     tick_size: f64, // Минимальный размер тика для группировки цен
     
     // Буферы данных
-    volume_bars: ArrayVec<Bar, 512>,
+    volume_bars: Vec<Bar>,
     price_levels: HashMap<i64, PriceLevel>, // price_key -> level
     
     // Метрики дисбаланса
@@ -85,7 +84,7 @@ impl OrderFlowImbalance {
         Self {
             period,
             tick_size,
-            volume_bars: ArrayVec::new(),
+            volume_bars: Vec::with_capacity(period),
             price_levels: HashMap::new(),
             total_imbalance: 0.0,
             avg_imbalance: 0.0,

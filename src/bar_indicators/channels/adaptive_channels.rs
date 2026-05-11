@@ -11,7 +11,6 @@ use crate::bar_indicators::adaptive::kaufman_adaptive_ma::KaufmanAdaptiveMA;
 use crate::bar_indicators::average::lr::LinearRegressionMA;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::volatility::atr::Atr;
-use arrayvec::ArrayVec;
 use serde::{Serialize, Deserialize};
 
 /// Режимы адаптации каналов
@@ -94,8 +93,8 @@ pub struct AdaptiveChannels {
     regression_ma: Option<LinearRegressionMA>, // ✅ Для AdaptiveLinReg режима
     
     // Circular buffers для ML адаптации
-    price_buffer: ArrayVec<f64, 512>,
-    volatility_clusters: ArrayVec<f64, 100>,
+    price_buffer: Vec<f64>,
+    volatility_clusters: Vec<f64>,
     cluster_index: usize,
     cluster_filled: bool,
     
@@ -185,8 +184,8 @@ impl AdaptiveChannels {
             kama,  // ✅ Готовая мощная KAMA!
             adaptive_atr: Atr::new(period, crate::bar_indicators::average::moving_average::MovingAverageType::RMA),
             regression_ma,
-            price_buffer: ArrayVec::new(),
-            volatility_clusters: ArrayVec::new(),
+            price_buffer: Vec::with_capacity(period),
+            volatility_clusters: Vec::with_capacity(100),
             cluster_index: 0,
             cluster_filled: false,
             volatility_factor: 1.0,

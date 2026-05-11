@@ -1,12 +1,11 @@
 // Zero-lag LSMA (approx): linear regression + de-lag via projection
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
 pub struct ZlSma {
     window: usize,
-    buf: ArrayVec<f64, 512>,
+    buf: Vec<f64>,
     idx: usize,
     filled: bool,
     value: f64,
@@ -16,7 +15,7 @@ impl ZlSma {
     pub fn new(window: usize) -> Self {
         Self {
             window: window.clamp(2, 512),
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(window.clamp(2, 512)),
             idx: 0,
             filled: false,
             value: 0.0,

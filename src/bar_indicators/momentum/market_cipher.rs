@@ -2,7 +2,6 @@
 //! Modern comprehensive indicator combining multiple technical analysis signals
 //! (c) 2024
 
-use arrayvec::ArrayVec;
 
 /// Market Cipher - комплексный индикатор, объединяющий несколько сигналов
 /// 
@@ -24,9 +23,9 @@ pub struct MarketCipher {
     // Wave Trend компоненты
     wt_period: usize,
     wt_signal_period: usize,
-    hlc3_values: ArrayVec<f64, 512>,
-    wt1_values: ArrayVec<f64, 512>,
-    wt2_values: ArrayVec<f64, 512>,
+    hlc3_values: Vec<f64>,
+    wt1_values: Vec<f64>,
+    wt2_values: Vec<f64>,
     wt1: f64,
     wt2: f64,
     
@@ -34,11 +33,11 @@ pub struct MarketCipher {
     mf_period: usize,
     money_flow: f64,
     volume_sum: f64,
-    money_flow_values: ArrayVec<f64, 512>,  // История для скользящего среднего
-    
+    money_flow_values: Vec<f64>,  // История для скользящего среднего
+
     // RSI компоненты
     rsi_period: usize,
-    rsi_values: ArrayVec<f64, 512>,
+    rsi_values: Vec<f64>,
     rsi: f64,
     
     // VWAP компоненты
@@ -71,17 +70,17 @@ impl MarketCipher {
             period,
             wt_period: period,
             wt_signal_period: 4,
-            hlc3_values: ArrayVec::new(),
-            wt1_values: ArrayVec::new(),
-            wt2_values: ArrayVec::new(),
+            hlc3_values: Vec::with_capacity(period),
+            wt1_values: Vec::with_capacity(period),
+            wt2_values: Vec::with_capacity(period),
             wt1: 0.0,
             wt2: 0.0,
             mf_period: period,
             money_flow: 0.0,
             volume_sum: 0.0,
-            money_flow_values: ArrayVec::new(),
+            money_flow_values: Vec::with_capacity(period),
             rsi_period: period,
-            rsi_values: ArrayVec::new(),
+            rsi_values: Vec::with_capacity(period),
             rsi: 50.0,
             vwap_sum: 0.0,
             volume_total: 0.0,

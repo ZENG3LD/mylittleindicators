@@ -2,7 +2,6 @@
 //! Фрактальная адаптивная скользящая средняя
 //! Адаптируется к рыночным условиям на основе фрактальной размерности
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Метод вычисления фрактальной размерности
@@ -54,9 +53,9 @@ pub struct FractalAdaptiveMovingAverage {
     method: FractalMethod,
     
     // Данные
-    prices: ArrayVec<f64, 512>,         // Окно цен
-    high_prices: ArrayVec<f64, 512>,    // Максимумы
-    low_prices: ArrayVec<f64, 512>,     // Минимумы
+    prices: Vec<f64>,         // Окно цен
+    high_prices: Vec<f64>,    // Максимумы
+    low_prices: Vec<f64>,     // Минимумы
     
     // Параметры адаптации
     min_alpha: f64,             // Минимальный альфа (медленная адаптация)
@@ -66,9 +65,9 @@ pub struct FractalAdaptiveMovingAverage {
     current_result: FramaResult,
     
     // История для анализа
-    dimension_history: ArrayVec<f64, 100>,
-    alpha_history: ArrayVec<f64, 100>,
-    efficiency_history: ArrayVec<f64, 100>,
+    dimension_history: Vec<f64>,
+    alpha_history: Vec<f64>,
+    efficiency_history: Vec<f64>,
     
     // Дополнительные данные для улучшенных методов
     smoothed_dimension: f64,
@@ -90,15 +89,15 @@ impl FractalAdaptiveMovingAverage {
         Self {
             period,
             method,
-            prices: ArrayVec::new(),
-            high_prices: ArrayVec::new(),
-            low_prices: ArrayVec::new(),
+            prices: Vec::with_capacity(period),
+            high_prices: Vec::with_capacity(period),
+            low_prices: Vec::with_capacity(period),
             min_alpha: 0.01,  // 1% для медленной адаптации
             max_alpha: 1.0,   // 100% для мгновенной адаптации
             current_result: FramaResult::new(),
-            dimension_history: ArrayVec::new(),
-            alpha_history: ArrayVec::new(),
-            efficiency_history: ArrayVec::new(),
+            dimension_history: Vec::with_capacity(100),
+            alpha_history: Vec::with_capacity(100),
+            efficiency_history: Vec::with_capacity(100),
             smoothed_dimension: 1.5,
             dimension_ema_alpha: 0.2,
             trend_periods: 0,
@@ -122,15 +121,9 @@ impl FractalAdaptiveMovingAverage {
             self.low_prices.remove(0);
         }
         
-        if !self.prices.is_full() {
-            self.prices.push(price);
-        }
-        if !self.high_prices.is_full() {
-            self.high_prices.push(high);
-        }
-        if !self.low_prices.is_full() {
-            self.low_prices.push(low);
-        }
+        self.prices.push(price);
+        self.high_prices.push(high);
+        self.low_prices.push(low);
         
         if self.prices.len() < self.period {
             self.current_result.value = price;
@@ -255,13 +248,11 @@ impl FractalAdaptiveMovingAverage {
     /// Устойчивый к выбросам метод
     fn calculate_robust_dimension(&self) -> f64 {
         // Используем медианы вместо средних для устойчивости к выбросам
-        let mut price_changes: ArrayVec<f64, 512> = ArrayVec::new();
-        
+        let mut price_changes: Vec<f64> = Vec::with_capacity(self.prices.len());
+
         for i in 1..self.prices.len() {
             let change = (self.prices[i] - self.prices[i - 1]).abs();
-            if !price_changes.is_full() {
-                price_changes.push(change);
-            }
+            price_changes.push(change);
         }
         
         // Сортируем для вычисления медианы
@@ -280,11 +271,9 @@ impl FractalAdaptiveMovingAverage {
         };
         
         // Устойчивая оценка размаха
-        let mut hl_ranges: ArrayVec<f64, 512> = ArrayVec::new();
+        let mut hl_ranges: Vec<f64> = Vec::with_capacity(self.high_prices.len());
         for i in 0..self.high_prices.len() {
-            if !hl_ranges.is_full() {
-                hl_ranges.push(self.high_prices[i] - self.low_prices[i]);
-            }
+            hl_ranges.push(self.high_prices[i] - self.low_prices[i]);
         }
         
         hl_ranges.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -407,25 +396,19 @@ impl FractalAdaptiveMovingAverage {
         if self.dimension_history.len() >= 100 {
             self.dimension_history.remove(0);
         }
-        if !self.dimension_history.is_full() {
-            self.dimension_history.push(self.current_result.fractal_dimension);
-        }
-        
+        self.dimension_history.push(self.current_result.fractal_dimension);
+
         // Альфа
         if self.alpha_history.len() >= 100 {
             self.alpha_history.remove(0);
         }
-        if !self.alpha_history.is_full() {
-            self.alpha_history.push(self.current_result.alpha);
-        }
-        
+        self.alpha_history.push(self.current_result.alpha);
+
         // Эффективность
         if self.efficiency_history.len() >= 100 {
             self.efficiency_history.remove(0);
         }
-        if !self.efficiency_history.is_full() {
-            self.efficiency_history.push(self.current_result.efficiency);
-        }
+        self.efficiency_history.push(self.current_result.efficiency);
     }
     
     // Публичные методы

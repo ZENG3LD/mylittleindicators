@@ -2,7 +2,6 @@
 //! Полиномиальная регрессия для моделирования нелинейных трендов
 //! y = β₀ + β₁x + β₂x² + ... + βₙxⁿ + ε
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
 
@@ -13,15 +12,15 @@ pub struct PolynomialRegression {
     degree: usize,                      // Степень полинома
 
     // Данные
-    x_values: ArrayVec<f64, 512>,       // Независимая переменная (обычно время/индекс)
-    y_values: ArrayVec<f64, 512>,       // Зависимая переменная (цена/значение)
+    x_values: Vec<f64>,                  // Независимая переменная (обычно время/индекс)
+    y_values: Vec<f64>,                  // Зависимая переменная (цена/значение)
 
     // Коэффициенты полинома
-    coefficients: ArrayVec<f64, 16>,    // β₀, β₁, β₂, ..., βₙ
+    coefficients: Vec<f64>,              // β₀, β₁, β₂, ..., βₙ
 
     // Подогнанные значения и остатки
-    fitted_values: ArrayVec<f64, 512>,  // Предсказанные значения
-    residuals: ArrayVec<f64, 512>,      // Остатки
+    fitted_values: Vec<f64>,             // Предсказанные значения
+    residuals: Vec<f64>,                 // Остатки
 
     // Статистики модели
     r_squared: f64,                     // Коэффициент детерминации
@@ -68,11 +67,11 @@ impl PolynomialRegression {
 
         Self {
             degree,
-            x_values: ArrayVec::new(),
-            y_values: ArrayVec::new(),
-            coefficients: ArrayVec::new(),
-            fitted_values: ArrayVec::new(),
-            residuals: ArrayVec::new(),
+            x_values: Vec::with_capacity(512),
+            y_values: Vec::with_capacity(512),
+            coefficients: Vec::with_capacity(16),
+            fitted_values: Vec::with_capacity(512),
+            residuals: Vec::with_capacity(512),
             r_squared: 0.0,
             adjusted_r_squared: 0.0,
             mse: 0.0,
@@ -107,10 +106,8 @@ impl PolynomialRegression {
             self.current_x -= 1.0;
         }
         
-        if !self.y_values.is_full() {
-            self.y_values.push(value);
-            self.x_values.push(self.current_x);
-        }
+        self.y_values.push(value);
+        self.x_values.push(self.current_x);
         
         self.current_x += 1.0;
         
@@ -193,10 +190,8 @@ impl PolynomialRegression {
         for i in 0..p {
             if xtx[i][i].abs() > 1e-12 {
                 let coeff = xty[i] / xtx[i][i];
-                if !self.coefficients.is_full() {
-                    self.coefficients.push(coeff);
-                }
-            } else if !self.coefficients.is_full() {
+                self.coefficients.push(coeff);
+            } else {
                 self.coefficients.push(0.0);
             }
         }
@@ -236,12 +231,8 @@ impl PolynomialRegression {
         // Intercept (β₀)
         let intercept = mean_y - slope * mean_x;
         
-        if !self.coefficients.is_full() {
-            self.coefficients.push(intercept);
-        }
-        if !self.coefficients.is_full() {
-            self.coefficients.push(slope);
-        }
+        self.coefficients.push(intercept);
+        self.coefficients.push(slope);
     }
     
     /// Рассчитать подогнанные значения и остатки
@@ -251,16 +242,11 @@ impl PolynomialRegression {
         
         for (i, &x) in self.x_values.iter().enumerate() {
             let fitted_value = self.evaluate_polynomial(x);
-            
-            if !self.fitted_values.is_full() {
-                self.fitted_values.push(fitted_value);
-            }
-            
+            self.fitted_values.push(fitted_value);
+
             if i < self.y_values.len() {
                 let residual = self.y_values[i] - fitted_value;
-                if !self.residuals.is_full() {
-                    self.residuals.push(residual);
-                }
+                self.residuals.push(residual);
             }
         }
     }
@@ -426,32 +412,31 @@ impl PolynomialRegression {
     }
     
     /// Найти экстремумы полинома (корни первой производной)
-    pub fn find_extrema(&self) -> ArrayVec<f64, 8> {
-        let mut extrema = ArrayVec::new();
-        
+    pub fn find_extrema(&self) -> Vec<f64> {
+        let mut extrema: Vec<f64> = Vec::with_capacity(8);
+
         if self.coefficients.len() < 3 {
             return extrema; // Линейная функция не имеет экстремумов
         }
-        
+
         // Для простоты находим экстремумы численно в текущем диапазоне данных
         if let (Some(&x_min), Some(&x_max)) = (self.x_values.first(), self.x_values.last()) {
             let step = (x_max - x_min) / 100.0;
             let mut prev_deriv = self.derivative_at(x_min);
-            
+
             for i in 1..=100 {
                 let x = x_min + i as f64 * step;
                 let curr_deriv = self.derivative_at(x);
-                
+
                 // Смена знака производной указывает на экстремум
-                if prev_deriv * curr_deriv < 0.0
-                    && !extrema.is_full() {
-                        extrema.push(x - step * 0.5); // Приблизительная позиция экстремума
-                    }
-                
+                if prev_deriv * curr_deriv < 0.0 {
+                    extrema.push(x - step * 0.5); // Приблизительная позиция экстремума
+                }
+
                 prev_deriv = curr_deriv;
             }
         }
-        
+
         extrema
     }
     

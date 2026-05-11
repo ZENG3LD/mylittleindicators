@@ -2,7 +2,6 @@
 //! Измеряет сложность и "изломанность" временного ряда цен
 //! Значения: 1.0-2.0, где 1.0 = тренд, 1.5 = случайное блуждание, 2.0 = максимальный шум
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Фрактальная размерность по методу Хигучи
@@ -12,7 +11,7 @@ pub struct FractalDimension {
     max_k: usize, // Максимальное значение k для алгоритма Хигучи
     
     // Буфер цен
-    prices: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
     
     // Результат
     fractal_dimension: f64,
@@ -27,7 +26,7 @@ impl FractalDimension {
         Self {
             period: period.min(512),
             max_k: max_k.min(period / 4).max(2), // k не должно быть больше period/4
-            prices: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
             fractal_dimension: 1.5, // Начальное значение (случайное блуждание)
             complexity_score: 0.5,
             is_ready: false,

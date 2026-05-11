@@ -6,7 +6,6 @@
 //         + 2*(1 - alpha) * cycle[1]
 //         - (1 - alpha)^2 * cycle[2]
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 
@@ -17,9 +16,9 @@ pub struct EhlersCyberCycle {
     coeff2: f64,  // 2*(1 - alpha)
     coeff3: f64,  // (1 - alpha)^2
 
-    smooth_history: ArrayVec<f64, 3>,  // smooth[0..2]
-    cycle_history: ArrayVec<f64, 2>,   // cycle[0..1]
-    price_history: ArrayVec<f64, 4>,   // price[0..3]
+    smooth_history: Vec<f64>,  // smooth[0..2]
+    cycle_history: Vec<f64>,   // cycle[0..1]
+    price_history: Vec<f64>,   // price[0..3]
 
     value: f64,
 }
@@ -39,9 +38,9 @@ impl EhlersCyberCycle {
             coeff1,
             coeff2,
             coeff3,
-            smooth_history: ArrayVec::new(),
-            cycle_history: ArrayVec::new(),
-            price_history: ArrayVec::new(),
+            smooth_history: Vec::with_capacity(3),
+            cycle_history: Vec::with_capacity(2),
+            price_history: Vec::with_capacity(4),
             value: 0.0,
         }
     }

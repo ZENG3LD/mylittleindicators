@@ -2,13 +2,12 @@
 // Поиск максимума за N периодов с эффективным буфером
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct Highest {
     period: usize,
-    buffer: ArrayVec<f64, 512>,
+    buffer: Vec<f64>,
     index: usize,
     filled: bool,
     value: f64,
@@ -18,7 +17,7 @@ impl Highest {
     pub fn new(period: usize) -> Self {
         Self {
             period,
-            buffer: ArrayVec::new(),
+            buffer: Vec::with_capacity(period),
             index: 0,
             filled: false,
             value: 0.0,

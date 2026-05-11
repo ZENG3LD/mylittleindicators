@@ -1,14 +1,13 @@
 use crate::bar_indicators::divergence::divergence::DivergenceDetector;
 use crate::bar_indicators::momentum::williams_r::WilliamsR;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct WilliamsDivergence {
     detector: DivergenceDetector,
     williams: WilliamsR,
-    prices: ArrayVec<f64, 512>,
-    williams_values: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
+    williams_values: Vec<f64>,
     lookback: usize,
     value: f64,
 }
@@ -18,8 +17,8 @@ impl WilliamsDivergence {
         Self {
             detector: DivergenceDetector::new(),
             williams: WilliamsR::new(period.max(1)),
-            prices: ArrayVec::new(),
-            williams_values: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            williams_values: Vec::with_capacity(512),
             lookback: lookback.max(5),
             value: 0.0,
         }

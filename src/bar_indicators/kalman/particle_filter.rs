@@ -2,7 +2,6 @@
 //! Фильтр частиц для нелинейных систем с произвольными распределениями
 //! Использует метод Монте-Карло для аппроксимации апостериорного распределения
 
-use arrayvec::ArrayVec;
 use std::f64::consts::PI;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -117,8 +116,8 @@ pub struct ParticleFilter {
     resampling_threshold: f64,
     
     // Частицы
-    particles: ArrayVec<Particle, 1000>,
-    temp_particles: ArrayVec<Particle, 1000>,
+    particles: Vec<Particle>,
+    temp_particles: Vec<Particle>,
     
     // Результаты
     current_result: ParticleFilterResult,
@@ -127,9 +126,9 @@ pub struct ParticleFilter {
     rng: SimpleRng,
     
     // История для анализа
-    ess_history: ArrayVec<f64, 100>,                // Effective Sample Size
-    likelihood_history: ArrayVec<f64, 100>,        // Правдоподобие
-    diversity_history: ArrayVec<f64, 100>,         // Разнообразие
+    ess_history: Vec<f64>,                // Effective Sample Size
+    likelihood_history: Vec<f64>,        // Правдоподобие
+    diversity_history: Vec<f64>,         // Разнообразие
     
     // Статистики
     resampling_count: usize,
@@ -158,13 +157,13 @@ impl ParticleFilter {
             measurement_noise_std,
             resampling_strategy,
             resampling_threshold: 0.5, // Ресемплируем если ESS < 50% от числа частиц
-            particles: ArrayVec::new(),
-            temp_particles: ArrayVec::new(),
+            particles: Vec::with_capacity(1000),
+            temp_particles: Vec::with_capacity(1000),
             current_result: ParticleFilterResult::new(),
             rng: SimpleRng::new(seed),
-            ess_history: ArrayVec::new(),
-            likelihood_history: ArrayVec::new(),
-            diversity_history: ArrayVec::new(),
+            ess_history: Vec::with_capacity(100),
+            likelihood_history: Vec::with_capacity(100),
+            diversity_history: Vec::with_capacity(100),
             resampling_count: 0,
             degeneracy_count: 0,
             is_initialized: false,
@@ -213,9 +212,7 @@ impl ParticleFilter {
             let velocity = self.rng.normal() * 1.0;
             let weight = 1.0 / (self.num_particles as f64);
             
-            if !self.particles.is_full() {
-                self.particles.push(Particle::new([position, velocity], weight));
-            }
+            self.particles.push(Particle::new([position, velocity], weight));
         }
         
         self.current_result.filtered_value = observation;
@@ -347,7 +344,7 @@ impl ParticleFilter {
                 c += self.particles[i].weight;
             }
             
-            if !self.temp_particles.is_full() && i < self.particles.len() {
+            if i < self.particles.len() {
                 let mut new_particle = self.particles[i];
                 new_particle.weight = 1.0 / (n as f64);
                 self.temp_particles.push(new_particle);
@@ -362,15 +359,13 @@ impl ParticleFilter {
         self.temp_particles.clear();
         
         let n = self.particles.len();
-        let mut cumulative_weights = ArrayVec::<f64, 1000>::new();
+        let mut cumulative_weights: Vec<f64> = Vec::with_capacity(1000);
         let mut sum = 0.0;
         
         // Вычисляем кумулятивные веса
         for particle in &self.particles {
             sum += particle.weight;
-            if !cumulative_weights.is_full() {
-                cumulative_weights.push(sum);
-            }
+            cumulative_weights.push(sum);
         }
         
         // Ресемплируем
@@ -389,7 +384,7 @@ impl ParticleFilter {
                 }
             }
             
-            if !self.temp_particles.is_full() && low < self.particles.len() {
+            if low < self.particles.len() {
                 let mut new_particle = self.particles[low];
                 new_particle.weight = 1.0 / (n as f64);
                 self.temp_particles.push(new_particle);
@@ -409,34 +404,30 @@ impl ParticleFilter {
         for particle in &self.particles {
             let count = (n * particle.weight).floor() as usize;
             for _ in 0..count {
-                if !self.temp_particles.is_full() {
-                    self.temp_particles.push(*particle);
-                }
+                self.temp_particles.push(*particle);
             }
         }
-        
+
         // Случайная часть для остатков
         let remaining = self.num_particles - self.temp_particles.len();
         if remaining > 0 {
             // Создаем веса для остатков
-            let mut residual_weights = ArrayVec::<f64, 1000>::new();
+            let mut residual_weights: Vec<f64> = Vec::with_capacity(1000);
             let mut total_residual = 0.0;
-            
+
             for particle in &self.particles {
                 let residual = n * particle.weight - (n * particle.weight).floor();
-                if !residual_weights.is_full() {
-                    residual_weights.push(residual);
-                }
+                residual_weights.push(residual);
                 total_residual += residual;
             }
-            
+
             // Нормализуем остаточные веса
             if total_residual > 1e-12 {
                 for weight in &mut residual_weights {
                     *weight /= total_residual;
                 }
             }
-            
+
             // Ресемплируем остатки
             for _ in 0..remaining {
                 let u = self.rng.next();
@@ -444,9 +435,7 @@ impl ParticleFilter {
                 for (i, &weight) in residual_weights.iter().enumerate() {
                     cumulative += weight;
                     if u <= cumulative && i < self.particles.len() {
-                        if !self.temp_particles.is_full() {
-                            self.temp_particles.push(self.particles[i]);
-                        }
+                        self.temp_particles.push(self.particles[i]);
                         break;
                     }
                 }
@@ -473,11 +462,9 @@ impl ParticleFilter {
             for particle in &self.particles {
                 cumulative += particle.weight;
                 if u <= cumulative {
-                    if !self.temp_particles.is_full() {
-                        let mut new_particle = *particle;
-                        new_particle.weight = 1.0 / (self.num_particles as f64);
-                        self.temp_particles.push(new_particle);
-                    }
+                    let mut new_particle = *particle;
+                    new_particle.weight = 1.0 / (self.num_particles as f64);
+                    self.temp_particles.push(new_particle);
                     break;
                 }
             }
@@ -524,25 +511,19 @@ impl ParticleFilter {
         if self.ess_history.len() >= 100 {
             self.ess_history.remove(0);
         }
-        if !self.ess_history.is_full() {
-            self.ess_history.push(self.current_result.effective_sample_size);
-        }
-        
+        self.ess_history.push(self.current_result.effective_sample_size);
+
         // Правдоподобие
         if self.likelihood_history.len() >= 100 {
             self.likelihood_history.remove(0);
         }
-        if !self.likelihood_history.is_full() {
-            self.likelihood_history.push(self.current_result.likelihood);
-        }
-        
+        self.likelihood_history.push(self.current_result.likelihood);
+
         // Разнообразие
         if self.diversity_history.len() >= 100 {
             self.diversity_history.remove(0);
         }
-        if !self.diversity_history.is_full() {
-            self.diversity_history.push(self.current_result.particle_diversity);
-        }
+        self.diversity_history.push(self.current_result.particle_diversity);
     }
     
     // Публичные методы

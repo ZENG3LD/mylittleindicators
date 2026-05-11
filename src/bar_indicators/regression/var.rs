@@ -2,7 +2,6 @@
 //! Векторная авторегрессионная модель для анализа множественных временных рядов
 //! VAR(p) - p лагов для каждой переменной во всех уравнениях
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// VAR Model - Vector AutoRegression
@@ -13,28 +12,28 @@ pub struct Var {
     n_vars: usize,              // Количество переменных
     
     // Данные
-    data: ArrayVec<ArrayVec<f64, 16>, 512>, // Матрица данных [time x variables]
-    
+    data: Vec<Vec<f64>>,                 // Матрица данных [time x variables]
+
     // Коэффициенты модели - матрица коэффициентов для каждого лага
     // coefficients[lag][var_from][var_to] = коэффициент влияния var_from на var_to с лагом lag
-    coefficients: ArrayVec<ArrayVec<ArrayVec<f64, 16>, 16>, 8>, // [lag][from_var][to_var]
-    constants: ArrayVec<f64, 16>,           // Константы для каждого уравнения
-    
+    coefficients: Vec<Vec<Vec<f64>>>,    // [lag][from_var][to_var]
+    constants: Vec<f64>,                 // Константы для каждого уравнения
+
     // Остатки и прогнозы
-    residuals: ArrayVec<ArrayVec<f64, 16>, 512>, // Остатки для каждой переменной
-    fitted_values: ArrayVec<ArrayVec<f64, 16>, 512>, // Подогнанные значения
-    forecasts: ArrayVec<f64, 16>,           // Прогнозы для каждой переменной
-    
+    residuals: Vec<Vec<f64>>,            // Остатки для каждой переменной
+    fitted_values: Vec<Vec<f64>>,        // Подогнанные значения
+    forecasts: Vec<f64>,                 // Прогнозы для каждой переменной
+
     // Ковариационная матрица остатков
-    residual_covariance: ArrayVec<ArrayVec<f64, 16>, 16>, // Σ matrix
-    
+    residual_covariance: Vec<Vec<f64>>,  // Σ matrix
+
     // Метрики модели
     log_likelihood: f64,
     aic: f64,
     bic: f64,
-    
+
     // Импульсные отклики (упрощенная версия)
-    impulse_responses: ArrayVec<ArrayVec<ArrayVec<f64, 16>, 16>, 20>, // [horizon][shock_var][response_var]
+    impulse_responses: Vec<Vec<Vec<f64>>>, // [horizon][shock_var][response_var]
     
     // Состояние
     is_fitted: bool,
@@ -50,17 +49,17 @@ impl Var {
         Self {
             p,
             n_vars,
-            data: ArrayVec::new(),
-            coefficients: ArrayVec::new(),
-            constants: ArrayVec::new(),
-            residuals: ArrayVec::new(),
-            fitted_values: ArrayVec::new(),
-            forecasts: ArrayVec::new(),
-            residual_covariance: ArrayVec::new(),
+            data: Vec::with_capacity(512),
+            coefficients: Vec::with_capacity(8),
+            constants: Vec::with_capacity(16),
+            residuals: Vec::with_capacity(512),
+            fitted_values: Vec::with_capacity(512),
+            forecasts: Vec::with_capacity(16),
+            residual_covariance: Vec::with_capacity(16),
             log_likelihood: f64::NEG_INFINITY,
             aic: f64::INFINITY,
             bic: f64::INFINITY,
-            impulse_responses: ArrayVec::new(),
+            impulse_responses: Vec::with_capacity(20),
             is_fitted: false,
             min_observations: min_obs,
         }
@@ -74,19 +73,15 @@ impl Var {
         }
         
         // Добавляем новые данные
-        let mut data_row = ArrayVec::new();
+        let mut data_row: Vec<f64> = Vec::with_capacity(self.n_vars);
         for &val in values.iter().take(self.n_vars) {
-            if !data_row.is_full() {
-                data_row.push(val);
-            }
+            data_row.push(val);
         }
-        
+
         if self.data.len() >= 512 {
             self.data.remove(0);
         }
-        if !self.data.is_full() {
-            self.data.push(data_row);
-        }
+        self.data.push(data_row);
         
         // Если достаточно данных, переоцениваем модель
         if self.data.len() >= self.min_observations {
@@ -131,28 +126,16 @@ impl Var {
         
         // Инициализируем коэффициенты нулями
         for _ in 0..self.p {
-            let mut lag_coeffs = ArrayVec::new();
+            let mut lag_coeffs: Vec<Vec<f64>> = Vec::with_capacity(self.n_vars);
             for _ in 0..self.n_vars {
-                let mut from_var_coeffs = ArrayVec::new();
-                for _ in 0..self.n_vars {
-                    if !from_var_coeffs.is_full() {
-                        from_var_coeffs.push(0.0);
-                    }
-                }
-                if !lag_coeffs.is_full() {
-                    lag_coeffs.push(from_var_coeffs);
-                }
+                lag_coeffs.push(vec![0.0; self.n_vars]);
             }
-            if !self.coefficients.is_full() {
-                self.coefficients.push(lag_coeffs);
-            }
+            self.coefficients.push(lag_coeffs);
         }
-        
+
         // Инициализируем константы
         for _ in 0..self.n_vars {
-            if !self.constants.is_full() {
-                self.constants.push(0.0);
-            }
+            self.constants.push(0.0);
         }
     }
     
@@ -279,9 +262,9 @@ impl Var {
         }
         
         for t in start_idx..self.data.len() {
-            let mut fitted_row = ArrayVec::new();
-            let mut residual_row = ArrayVec::new();
-            
+            let mut fitted_row: Vec<f64> = Vec::with_capacity(self.n_vars);
+            let mut residual_row: Vec<f64> = Vec::with_capacity(self.n_vars);
+
             // Для каждой переменной
             for var_idx in 0..self.n_vars {
                 let mut fitted_value = if var_idx < self.constants.len() {
@@ -289,11 +272,11 @@ impl Var {
                 } else {
                     0.0
                 };
-                
+
                 // Добавляем вклад лагов
                 for lag in 0..self.p {
                     for lag_var in 0..self.n_vars {
-                        if t > lag && 
+                        if t > lag &&
                            lag < self.coefficients.len() &&
                            lag_var < self.coefficients[lag].len() &&
                            var_idx < self.coefficients[lag][lag_var].len() {
@@ -302,24 +285,16 @@ impl Var {
                         }
                     }
                 }
-                
+
                 let actual_value = self.data[t][var_idx];
                 let residual = actual_value - fitted_value;
-                
-                if !fitted_row.is_full() {
-                    fitted_row.push(fitted_value);
-                }
-                if !residual_row.is_full() {
-                    residual_row.push(residual);
-                }
+
+                fitted_row.push(fitted_value);
+                residual_row.push(residual);
             }
-            
-            if !self.fitted_values.is_full() {
-                self.fitted_values.push(fitted_row);
-            }
-            if !self.residuals.is_full() {
-                self.residuals.push(residual_row);
-            }
+
+            self.fitted_values.push(fitted_row);
+            self.residuals.push(residual_row);
         }
     }
     
@@ -335,26 +310,21 @@ impl Var {
         
         // Инициализируем ковариационную матрицу
         for i in 0..self.n_vars {
-            let mut cov_row = ArrayVec::new();
+            let mut cov_row: Vec<f64> = Vec::with_capacity(self.n_vars);
             for j in 0..self.n_vars {
                 let mut covariance = 0.0;
-                
+
                 // Рассчитываем ковариацию между переменными i и j
                 for residual_row in &self.residuals {
                     if i < residual_row.len() && j < residual_row.len() {
                         covariance += residual_row[i] * residual_row[j];
                     }
                 }
-                
+
                 covariance /= n_obs;
-                
-                if !cov_row.is_full() {
-                    cov_row.push(covariance);
-                }
+                cov_row.push(covariance);
             }
-            if !self.residual_covariance.is_full() {
-                self.residual_covariance.push(cov_row);
-            }
+            self.residual_covariance.push(cov_row);
         }
     }
     
@@ -384,7 +354,7 @@ impl Var {
     }
     
     /// Вычисление определителя матрицы (упрощенно - только для диагональных элементов)
-    fn calculate_determinant(&self, matrix: &[ArrayVec<f64, 16>]) -> f64 {
+    fn calculate_determinant(&self, matrix: &[Vec<f64>]) -> f64 {
         let mut det = 1.0;
         for (i, row) in matrix.iter().enumerate().take(self.n_vars) {
             if i < row.len() {
@@ -402,31 +372,24 @@ impl Var {
         
         // Для каждого горизонта
         for h in 0..max_horizon {
-            let mut horizon_responses = ArrayVec::new();
-            
+            let mut horizon_responses: Vec<Vec<f64>> = Vec::with_capacity(self.n_vars);
+
             // Для каждой переменной-шока
             for shock_var in 0..self.n_vars {
-                let mut shock_responses = ArrayVec::new();
-                
+                let mut shock_responses: Vec<f64> = Vec::with_capacity(self.n_vars);
+
                 // Для каждой переменной-отклика
                 for response_var in 0..self.n_vars {
                     let impulse_response = self.calculate_single_impulse_response(
                         shock_var, response_var, h
                     );
-                    
-                    if !shock_responses.is_full() {
-                        shock_responses.push(impulse_response);
-                    }
+                    shock_responses.push(impulse_response);
                 }
-                
-                if !horizon_responses.is_full() {
-                    horizon_responses.push(shock_responses);
-                }
+
+                horizon_responses.push(shock_responses);
             }
-            
-            if !self.impulse_responses.is_full() {
-                self.impulse_responses.push(horizon_responses);
-            }
+
+            self.impulse_responses.push(horizon_responses);
         }
     }
     
@@ -492,9 +455,7 @@ impl Var {
                 }
             }
             
-            if !self.forecasts.is_full() {
-                self.forecasts.push(forecast);
-            }
+            self.forecasts.push(forecast);
         }
     }
     
@@ -504,17 +465,17 @@ impl Var {
     }
     
     /// Получить коэффициенты модели
-    pub fn get_coefficients(&self) -> &[ArrayVec<ArrayVec<f64, 16>, 16>] {
+    pub fn get_coefficients(&self) -> &[Vec<Vec<f64>>] {
         &self.coefficients
     }
-    
+
     /// Получить ковариационную матрицу остатков
-    pub fn residual_covariance(&self) -> &[ArrayVec<f64, 16>] {
+    pub fn residual_covariance(&self) -> &[Vec<f64>] {
         &self.residual_covariance
     }
-    
+
     /// Получить импульсные отклики
-    pub fn impulse_responses(&self) -> &[ArrayVec<ArrayVec<f64, 16>, 16>] {
+    pub fn impulse_responses(&self) -> &[Vec<Vec<f64>>] {
         &self.impulse_responses
     }
     

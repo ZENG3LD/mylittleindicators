@@ -2,7 +2,6 @@
 //! Combines Bollinger Bands and Keltner Channels to detect volatility squeeze
 //! (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::indicator_value::IndicatorValue;
@@ -36,7 +35,7 @@ pub struct SqueezeMomentum {
 
     // Bollinger Bands компоненты
     bb_sma: MovingAverageProvider,
-    close_prices: ArrayVec<f64, 512>,
+    close_prices: Vec<f64>,
     bb_multiplier: f64,
 
     // Keltner Channel компоненты
@@ -46,7 +45,7 @@ pub struct SqueezeMomentum {
     prev_close: f64,
 
     // Momentum компоненты
-    momentum_values: ArrayVec<f64, 512>,
+    momentum_values: Vec<f64>,
 
     // Текущие значения
     bb_upper: f64,
@@ -157,13 +156,13 @@ impl SqueezeMomentum {
             kc_ma_type,
             source,
             bb_sma: MovingAverageProvider::new(bb_ma_type, bb_period),
-            close_prices: ArrayVec::new(),
+            close_prices: Vec::with_capacity(bb_period),
             bb_multiplier: 2.0,
             kc_sma: MovingAverageProvider::new(kc_ma_type, kc_period),
             atr: Atr::new_sma(kc_period), // Используем SMA для ATR в SqueezeMomentum
             kc_multiplier: 1.5,
             prev_close: 0.0,
-            momentum_values: ArrayVec::new(),
+            momentum_values: Vec::with_capacity(bb_period),
             bb_upper: 0.0,
             bb_lower: 0.0,
             kc_upper: 0.0,

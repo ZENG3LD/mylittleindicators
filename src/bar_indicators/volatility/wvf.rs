@@ -1,13 +1,12 @@
 // Williams VIX Fix (WVF)
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
 pub struct Wvf {
     lookback: usize,
-    closes: ArrayVec<f64, 1024>,
-    lows: ArrayVec<f64, 1024>,
+    closes: Vec<f64>,
+    lows: Vec<f64>,
     idx: usize,
     filled: bool,
     value: f64,
@@ -18,8 +17,8 @@ impl Wvf {
         let lb = lookback.clamp(2, 1024);
         Self {
             lookback: lb,
-            closes: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            closes: Vec::with_capacity(lb),
+            lows: Vec::with_capacity(lb),
             idx: 0,
             filled: false,
             value: 0.0,

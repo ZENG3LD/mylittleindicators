@@ -2,7 +2,6 @@
 //! Определяет склонность рынка к трендовости или возврату к среднему
 //! Значения: 0.0-1.0, где <0.5 = mean reversion, 0.5 = random walk, >0.5 = trending
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Показатель Херста (R/S анализ)
@@ -12,8 +11,8 @@ pub struct HurstExponent {
     min_period: usize, // Минимальный период для расчета
     
     // Буфер данных
-    prices: ArrayVec<f64, 512>,
-    returns: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
+    returns: Vec<f64>,
     
     // Результаты
     hurst_exponent: f64,
@@ -33,8 +32,8 @@ impl HurstExponent {
         Self {
             period: period.min(512),
             min_period: (period / 2).max(10).min(period.saturating_sub(1)), // Reasonable minimum for R/S analysis
-            prices: ArrayVec::new(),
-            returns: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            returns: Vec::with_capacity(512),
             hurst_exponent: 0.5, // Начальное значение (случайное блуждание)
             persistence_score: 0.0,
             rs_ratio: 1.0,
@@ -75,10 +74,7 @@ impl HurstExponent {
         
         // Рассчитываем логарифмические доходности
         for i in 1..self.prices.len() {
-            let return_val = (self.prices[i] / self.prices[i-1]).ln();
-            if self.returns.is_full() {
-                break;
-            }
+            let return_val = (self.prices[i] / self.prices[i - 1]).ln();
             self.returns.push(return_val);
         }
     }
@@ -100,22 +96,22 @@ impl HurstExponent {
             cumsum += ret - mean_return;
             cumulative_deviations.push(cumsum);
         }
-        
+
         // Рассчитываем Range (размах)
         let max_cumsum = cumulative_deviations.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
         let min_cumsum = cumulative_deviations.iter().fold(f64::INFINITY, |a, &b| a.min(b));
         self.range_value = max_cumsum - min_cumsum;
-        
+
         // Рассчитываем стандартное отклонение
         let variance = self.returns.iter()
             .map(|&ret| (ret - mean_return).powi(2))
             .sum::<f64>() / self.returns.len() as f64;
         self.std_dev = variance.sqrt();
-        
+
         // R/S отношение
         if self.std_dev > 1e-10 {
             self.rs_ratio = self.range_value / self.std_dev;
-            
+
             // Показатель Херста: H = log(R/S) / log(n/2) для R/S анализа
             // Правильная формула: H ≈ ln(R/S) / ln(n/2) или эквивалентно ln(R/S) / (ln(n) - ln(2))
             let n = self.returns.len() as f64;

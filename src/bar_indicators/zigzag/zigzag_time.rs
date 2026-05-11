@@ -1,15 +1,14 @@
 // ZigZag by time window (bars)
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct ZigZagTime {
     pub min_bars: usize,
     pub period: usize,
-    pub buffer: ArrayVec<f64, 512>,
-    pub swings: ArrayVec<(usize, f64), 512>,
+    pub buffer: Vec<f64>,
+    pub swings: Vec<(usize, f64)>,
     pub last_extreme: f64,
     pub last_extreme_idx: usize,
     pub direction: i8,
@@ -21,8 +20,8 @@ impl ZigZagTime {
         Self {
             min_bars,
             period,
-            buffer: ArrayVec::new(),
-            swings: ArrayVec::new(),
+            buffer: Vec::with_capacity(512),
+            swings: Vec::with_capacity(512),
             last_extreme: 0.0,
             last_extreme_idx: 0,
             direction: 0,
@@ -66,7 +65,7 @@ impl ZigZagTime {
     pub fn last_swing(&self) -> Option<(usize, f64)> {
         self.swings.last().copied()
     }
-    pub fn swings(&self) -> &ArrayVec<(usize, f64), 512> {
+    pub fn swings(&self) -> &Vec<(usize, f64)> {
         &self.swings
     }
 

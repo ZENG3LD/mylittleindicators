@@ -7,7 +7,6 @@
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 use std::collections::HashMap;
 
 /// Тип дивергенции
@@ -151,12 +150,12 @@ pub struct MultiTimeframeMomentumDivergence {
     acceleration_ma: MovingAverageProvider,          // MA для ускорения
     
     // Буферы для анализа
-    prices: ArrayVec<f64, 64>,
-    short_momentums: ArrayVec<f64, 32>,
-    medium_momentums: ArrayVec<f64, 32>,
-    long_momentums: ArrayVec<f64, 32>,
+    prices: Vec<f64>,
+    short_momentums: Vec<f64>,
+    medium_momentums: Vec<f64>,
+    long_momentums: Vec<f64>,
     
-    divergence_history: ArrayVec<DivergenceType, 16>,
+    divergence_history: Vec<DivergenceType>,
     
     // Анализ таймфреймов
     short_tf: TimeframeAnalysis,
@@ -199,11 +198,11 @@ impl MultiTimeframeMomentumDivergence {
             volatility_ma: MovingAverageProvider::new(MovingAverageType::SMA, 10),
             acceleration_ma: MovingAverageProvider::new(MovingAverageType::EMA, 3),
             
-            prices: ArrayVec::new(),
-            short_momentums: ArrayVec::new(),
-            medium_momentums: ArrayVec::new(),
-            long_momentums: ArrayVec::new(),
-            divergence_history: ArrayVec::new(),
+            prices: Vec::with_capacity(64),
+            short_momentums: Vec::with_capacity(32),
+            medium_momentums: Vec::with_capacity(32),
+            long_momentums: Vec::with_capacity(32),
+            divergence_history: Vec::with_capacity(16),
             
             short_tf: TimeframeAnalysis::empty(),
             medium_tf: TimeframeAnalysis::empty(),
@@ -330,7 +329,7 @@ impl MultiTimeframeMomentumDivergence {
     }
     
     /// Анализировать один таймфрейм
-    fn analyze_single_timeframe(tf: &mut TimeframeAnalysis, momentums: &ArrayVec<f64, 32>) {
+    fn analyze_single_timeframe(tf: &mut TimeframeAnalysis, momentums: &Vec<f64>) {
         if momentums.len() < 3 {
             return;
         }

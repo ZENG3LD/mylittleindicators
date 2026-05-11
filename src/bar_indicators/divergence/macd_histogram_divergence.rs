@@ -1,14 +1,13 @@
 use crate::bar_indicators::divergence::divergence::DivergenceDetector;
 use crate::bar_indicators::momentum::macd_histogram::MacdHistogram;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct MacdHistogramDivergence {
     detector: DivergenceDetector,
     macd_hist: MacdHistogram,
-    prices: ArrayVec<f64, 512>,
-    hist_values: ArrayVec<f64, 512>,
+    prices: Vec<f64>,
+    hist_values: Vec<f64>,
     lookback: usize,
     value: f64,
 }
@@ -18,8 +17,8 @@ impl MacdHistogramDivergence {
         Self {
             detector: DivergenceDetector::new(),
             macd_hist: MacdHistogram::new(fast.max(1), slow.max(2), signal.max(1)),
-            prices: ArrayVec::new(),
-            hist_values: ArrayVec::new(),
+            prices: Vec::with_capacity(512),
+            hist_values: Vec::with_capacity(512),
             lookback: lookback.max(5),
             value: 0.0,
         }

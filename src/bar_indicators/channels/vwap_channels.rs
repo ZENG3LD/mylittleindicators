@@ -9,7 +9,6 @@
 
 use crate::bar_indicators::average::vwap::Vwap;
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
 use serde::{Serialize, Deserialize};
 
 /// Режимы расчета VWAP Channels
@@ -35,8 +34,8 @@ pub struct VwapChannels {
     vwap: Vwap,
     
     // Circular buffer для расчета стандартного отклонения от VWAP
-    price_buffer: ArrayVec<f64, 512>, // Typical prices
-    vwap_diff_buffer: ArrayVec<f64, 512>, // (price - vwap)^2 для std dev
+    price_buffer: Vec<f64>, // Typical prices
+    vwap_diff_buffer: Vec<f64>, // (price - vwap)^2 для std dev
     buffer_index: usize,
     buffer_filled: bool,
     
@@ -69,8 +68,8 @@ impl VwapChannels {
             std_dev_mult,
             mode,
             vwap: Vwap::new(period),
-            price_buffer: ArrayVec::new(),
-            vwap_diff_buffer: ArrayVec::new(),
+            price_buffer: Vec::with_capacity(period),
+            vwap_diff_buffer: Vec::with_capacity(period),
             buffer_index: 0,
             buffer_filled: false,
             upper: 0.0,

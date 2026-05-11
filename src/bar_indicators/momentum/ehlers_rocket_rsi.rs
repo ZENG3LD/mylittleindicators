@@ -8,7 +8,6 @@
 //! Переиспользует существующие компоненты MovingAverage для оптимизации
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Результат Rocket RSI
@@ -75,15 +74,15 @@ pub struct EhlersRocketRsi {
     
     // RSI компоненты
     rsi_period: usize,
-    gains: ArrayVec<f64, 64>,
-    losses: ArrayVec<f64, 64>,
+    gains: Vec<f64>,
+    losses: Vec<f64>,
     avg_gain: f64,
     avg_loss: f64,
     
     // Rocket компоненты
-    smoothed_prices: ArrayVec<f64, 32>,
-    rsi_values: ArrayVec<f64, 32>,
-    momentum_values: ArrayVec<f64, 16>,
+    smoothed_prices: Vec<f64>,
+    rsi_values: Vec<f64>,
+    momentum_values: Vec<f64>,
     
     // Параметры
     smoothing_factor: f64,           // Фактор сглаживания (0.0-1.0)
@@ -120,14 +119,14 @@ impl EhlersRocketRsi {
             velocity_ma: MovingAverageProvider::new(MovingAverageType::SMA, 5),
             
             rsi_period,
-            gains: ArrayVec::new(),
-            losses: ArrayVec::new(),
+            gains: Vec::with_capacity(64),
+            losses: Vec::with_capacity(64),
             avg_gain: 0.0,
             avg_loss: 0.0,
             
-            smoothed_prices: ArrayVec::new(),
-            rsi_values: ArrayVec::new(),
-            momentum_values: ArrayVec::new(),
+            smoothed_prices: Vec::with_capacity(32),
+            rsi_values: Vec::with_capacity(32),
+            momentum_values: Vec::with_capacity(16),
             
             smoothing_factor,
             momentum_period,

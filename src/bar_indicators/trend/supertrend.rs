@@ -3,7 +3,6 @@
 //! Показывает динамические уровни поддержки и сопротивления
 //! Очень популярен среди трейдеров для определения направления тренда
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
@@ -15,8 +14,8 @@ pub struct Supertrend {
     multiplier: f64,
     
     // Буферы для расчетов
-    supertrend_values: ArrayVec<f64, 512>,
-    trend_direction: ArrayVec<i8, 512>,
+    supertrend_values: Vec<f64>,
+    trend_direction: Vec<i8>,
     
     // ATR для расчета волатильности
     atr: Atr,
@@ -48,8 +47,8 @@ impl Supertrend {
         Self {
             period,
             multiplier,
-            supertrend_values: ArrayVec::new(),
-            trend_direction: ArrayVec::new(),
+            supertrend_values: Vec::with_capacity(512),
+            trend_direction: Vec::with_capacity(512),
             atr: Atr::new(period, MovingAverageType::RMA),
             supertrend_value: 0.0,
             current_trend: 1,

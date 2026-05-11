@@ -1,13 +1,12 @@
 // High-performance Spread Analyzer
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct SpreadAnalyzer {
     period: usize,
-    spreads: ArrayVec<f64, 512>,
+    spreads: Vec<f64>,
     index: usize,
     filled: bool,
     sum: f64,
@@ -20,7 +19,7 @@ impl SpreadAnalyzer {
         assert!(period > 0 && period <= 512, "period must be in 1..=512");
         Self {
             period,
-            spreads: ArrayVec::new(),
+            spreads: Vec::with_capacity(period),
             index: 0,
             filled: false,
             sum: 0.0,

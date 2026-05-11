@@ -3,7 +3,6 @@
 //! где n - период, ATR - Average True Range
 //! Значения близкие к 100 указывают на боковой рынок, близкие к 0 - на трендовый
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
@@ -14,10 +13,10 @@ pub struct ChoppinessIndex {
     period: usize,
     
     // Буферы для расчетов
-    high_prices: ArrayVec<f64, 512>,
-    low_prices: ArrayVec<f64, 512>,
-    atr_values: ArrayVec<f64, 512>,
-    choppiness_values: ArrayVec<f64, 512>,
+    high_prices: Vec<f64>,
+    low_prices: Vec<f64>,
+    atr_values: Vec<f64>,
+    choppiness_values: Vec<f64>,
     
     // ATR для расчета True Range
     atr: Atr,
@@ -42,10 +41,10 @@ impl ChoppinessIndex {
         
         Self {
             period,
-            high_prices: ArrayVec::new(),
-            low_prices: ArrayVec::new(),
-            atr_values: ArrayVec::new(),
-            choppiness_values: ArrayVec::new(),
+            high_prices: Vec::with_capacity(period),
+            low_prices: Vec::with_capacity(period),
+            atr_values: Vec::with_capacity(period),
+            choppiness_values: Vec::with_capacity(period),
             atr: Atr::new(1, MovingAverageType::RMA), // ATR с периодом 1 для получения True Range
             choppiness_value: 50.0,
             bars_count: 0,

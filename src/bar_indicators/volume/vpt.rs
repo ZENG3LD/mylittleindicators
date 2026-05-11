@@ -3,7 +3,6 @@
 //! Показывает кумулятивную связь между объемом и ценовыми изменениями
 //! Используется для подтверждения трендов и поиска дивергенций
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -14,7 +13,7 @@ pub struct VolumePriceTrend {
     signal_period: usize,
     
     // Буферы для значений
-    vpt_values: ArrayVec<f64, 512>,
+    vpt_values: Vec<f64>,
     
     // Сигнальная линия (MA от VPT)
     signal_ma: MovingAverageProvider,
@@ -43,7 +42,7 @@ impl VolumePriceTrend {
         
         Self {
             signal_period,
-            vpt_values: ArrayVec::new(),
+            vpt_values: Vec::with_capacity(512),
             signal_ma: MovingAverageProvider::new(MovingAverageType::SMA, signal_period),
             prev_close: 0.0,
             vpt_value: 0.0,

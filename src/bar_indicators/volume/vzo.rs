@@ -1,13 +1,12 @@
 // Volume Zone Oscillator (VZO) - optimized with O(1) running sum
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
 pub struct Vzo {
     period: usize,
-    vol_pos: ArrayVec<f64, 1024>,
-    vol_neg: ArrayVec<f64, 1024>,
+    vol_pos: Vec<f64>,
+    vol_neg: Vec<f64>,
 
     // Running sums for O(1) calculation
     sum_pos: f64,
@@ -24,8 +23,8 @@ impl Vzo {
     pub fn new(period: usize) -> Self {
         Self {
             period: period.clamp(2, 1024),
-            vol_pos: ArrayVec::new(),
-            vol_neg: ArrayVec::new(),
+            vol_pos: Vec::with_capacity(period.clamp(2, 1024)),
+            vol_neg: Vec::with_capacity(period.clamp(2, 1024)),
             sum_pos: 0.0,
             sum_neg: 0.0,
             idx: 0,

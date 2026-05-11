@@ -3,7 +3,6 @@
 //! Force Index = Volume × (Close - Previous Close)
 //! Положительные значения указывают на силу быков, отрицательные - на силу медведей
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -14,7 +13,7 @@ pub struct ForceIndex {
     ma_type: MovingAverageType,
 
     // Буферы для расчетов
-    force_values: ArrayVec<f64, 512>,
+    force_values: Vec<f64>,
 
     // Предыдущая цена закрытия
     prev_close: f64,
@@ -49,7 +48,7 @@ impl ForceIndex {
         Self {
             smoothing_period,
             ma_type,
-            force_values: ArrayVec::new(),
+            force_values: Vec::with_capacity(512),
             prev_close: 0.0,
             smoothed_force: MovingAverageProvider::new(ma_type, smoothing_period),
             force_raw: 0.0,

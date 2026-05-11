@@ -11,7 +11,6 @@
 //! Индикатор НЕ содержит логику стопов - только возвращает адаптивные уровни.
 //! Логика остановки позиций реализуется в стратегиях на основе этих уровней.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
@@ -40,8 +39,8 @@ pub struct VolatilityStop {
     price_ma: MovingAverageProvider,
     
     // Буферы для расчетов
-    closes: ArrayVec<f64, 512>,
-    ranges: ArrayVec<f64, 512>,
+    closes: Vec<f64>,
+    ranges: Vec<f64>,
     
     // Текущие значения
     current_price: f64,
@@ -84,8 +83,8 @@ impl VolatilityStop {
             ma_type,
             atr,
             price_ma: MovingAverageProvider::new(ma_type, period),
-            closes: ArrayVec::new(),
-            ranges: ArrayVec::new(),
+            closes: Vec::with_capacity(512),
+            ranges: Vec::with_capacity(512),
             current_price: 0.0,
             current_volatility: 0.0,
             long_stop: 0.0,

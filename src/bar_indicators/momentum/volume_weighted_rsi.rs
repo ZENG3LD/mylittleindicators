@@ -7,7 +7,6 @@
 //! Формула: VWRSI основан на взвешенных по объему изменениях цены
 //! Gain_weighted = Gain * Volume, Loss_weighted = Loss * Volume
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::momentum::rsi::Rsi;
 
@@ -71,16 +70,16 @@ pub struct VolumeWeightedRsi {
     volume_period: usize,        // Период для анализа объема
 
     // Буферы для VWRSI (уникальная логика - остается inline)
-    vw_gains: ArrayVec<f64, 64>,
-    vw_losses: ArrayVec<f64, 64>,
-    volumes: ArrayVec<f64, 64>,
+    vw_gains: Vec<f64>,
+    vw_losses: Vec<f64>,
+    volumes: Vec<f64>,
 
     // 🚀 Обычный RSI - используем стандартный struct
     regular_rsi: Rsi,
 
     // Буферы для обычного RSI (сохранены для volume weighting расчета)
-    regular_gains: ArrayVec<f64, 64>,
-    regular_losses: ArrayVec<f64, 64>,
+    regular_gains: Vec<f64>,
+    regular_losses: Vec<f64>,
 
     // Средние значения
     avg_vw_gain: f64,
@@ -115,12 +114,12 @@ impl VolumeWeightedRsi {
             period: rsi_period,
             volume_period,
 
-            vw_gains: ArrayVec::new(),
-            vw_losses: ArrayVec::new(),
-            volumes: ArrayVec::new(),
-            regular_rsi: Rsi::new(rsi_period), // 🚀 Используем стандартный RSI
-            regular_gains: ArrayVec::new(),
-            regular_losses: ArrayVec::new(),
+            vw_gains: Vec::with_capacity(64),
+            vw_losses: Vec::with_capacity(64),
+            volumes: Vec::with_capacity(64),
+            regular_rsi: Rsi::new(rsi_period), // Используем стандартный RSI
+            regular_gains: Vec::with_capacity(64),
+            regular_losses: Vec::with_capacity(64),
 
             avg_vw_gain: 0.0,
             avg_vw_loss: 0.0,

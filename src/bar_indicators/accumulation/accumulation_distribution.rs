@@ -4,7 +4,6 @@
 //! Money Flow Multiplier = ((Close - Low) - (High - Close)) / (High - Low)
 //! Диапазон MFM: от -1 до +1
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Accumulation/Distribution Line индикатор
@@ -14,7 +13,7 @@ pub struct AccumulationDistribution {
     ad_value: f64,
     
     // История значений для анализа
-    ad_history: ArrayVec<f64, 512>,
+    ad_history: Vec<f64>,
     
     // Состояние
     bars_count: usize,
@@ -26,7 +25,7 @@ impl AccumulationDistribution {
     pub fn new() -> Self {
         Self {
             ad_value: 0.0,
-            ad_history: ArrayVec::new(),
+            ad_history: Vec::with_capacity(512),
             bars_count: 0,
             is_ready: false,
         }

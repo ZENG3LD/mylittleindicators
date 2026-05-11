@@ -5,7 +5,6 @@
 //! Box Ratio = Volume / Scale Factor / (High - Low)
 //! Scale Factor обычно 100,000,000 для нормализации
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -16,7 +15,7 @@ pub struct EaseOfMovement {
     period: usize,
     
     // Буферы для расчетов
-    eom_values: ArrayVec<f64, 512>,
+    eom_values: Vec<f64>,
     
     // Предыдущие значения
     prev_high: f64,
@@ -45,7 +44,7 @@ impl EaseOfMovement {
         Self {
             scale_factor,
             period: smoothing_period,
-            eom_values: ArrayVec::new(),
+            eom_values: Vec::with_capacity(512),
             prev_high: 0.0,
             prev_low: 0.0,
             smoothed_eom: MovingAverageProvider::new(MovingAverageType::SMA, smoothing_period),

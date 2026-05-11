@@ -2,7 +2,6 @@
 // (c) 2024
 // OPTIMIZED: O(1) running sum for %D calculation
 
-use arrayvec::ArrayVec;
 use std::collections::VecDeque;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -10,8 +9,8 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 pub struct StochastikD {
     period_k: usize,
     period_d: usize,
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
 
     // VecDeque for %D buffers (O(1) pop_front)
     c_sub_1: VecDeque<f64>,
@@ -33,8 +32,8 @@ impl StochastikD {
         Self {
             period_k,
             period_d,
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
+            highs: Vec::with_capacity(period_k),
+            lows: Vec::with_capacity(period_k),
             c_sub_1: VecDeque::with_capacity(period_d),
             h_sub_l: VecDeque::with_capacity(period_d),
             sum_c_sub_1: 0.0,

@@ -3,7 +3,6 @@
 //! PVI обновляется только когда объем растет по сравнению с предыдущим днем
 //! Используются для анализа поведения "умных" и "неумных" денег
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -15,8 +14,8 @@ pub struct NegativePositiveVolumeIndex {
     pvi_ma_period: usize,
     
     // Буферы для значений
-    nvi_values: ArrayVec<f64, 512>,
-    pvi_values: ArrayVec<f64, 512>,
+    nvi_values: Vec<f64>,
+    pvi_values: Vec<f64>,
     
     // Скользящие средние для сглаживания
     nvi_ma: MovingAverageProvider,
@@ -51,8 +50,8 @@ impl NegativePositiveVolumeIndex {
         Self {
             nvi_ma_period,
             pvi_ma_period,
-            nvi_values: ArrayVec::new(),
-            pvi_values: ArrayVec::new(),
+            nvi_values: Vec::with_capacity(512),
+            pvi_values: Vec::with_capacity(512),
             nvi_ma: MovingAverageProvider::new(MovingAverageType::EMA, nvi_ma_period),
             pvi_ma: MovingAverageProvider::new(MovingAverageType::EMA, pvi_ma_period),
             prev_close: 0.0,

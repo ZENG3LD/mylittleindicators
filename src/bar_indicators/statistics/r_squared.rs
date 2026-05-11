@@ -1,12 +1,11 @@
 // R-Squared (coefficient of determination) via rolling linear regression proxy
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
 pub struct RSquared {
     window: usize,
-    buf: ArrayVec<f64, 1024>,
+    buf: Vec<f64>,
     idx: usize,
     filled: bool,
     value: f64,
@@ -16,7 +15,7 @@ impl RSquared {
     pub fn new(window: usize) -> Self {
         Self {
             window: window.clamp(5, 1024),
-            buf: ArrayVec::new(),
+            buf: Vec::with_capacity(window.clamp(5, 1024)),
             idx: 0,
             filled: false,
             value: 0.0,

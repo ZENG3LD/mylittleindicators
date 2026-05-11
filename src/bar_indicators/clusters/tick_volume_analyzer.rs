@@ -3,13 +3,12 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::types::Tick;
-use arrayvec::ArrayVec;
 
 /// Анализатор тикового объема
 #[derive(Clone)]
 pub struct TickVolumeAnalyzer {
     period: usize,
-    ticks: ArrayVec<Tick, 1024>,
+    ticks: Vec<Tick>,
 
     // Статистика
     total_volume: f64,
@@ -31,7 +30,7 @@ impl TickVolumeAnalyzer {
     pub fn new(period: usize) -> Self {
         Self {
             period,
-            ticks: ArrayVec::new(),
+            ticks: Vec::with_capacity(period),
             total_volume: 0.0,
             buy_volume: 0.0,
             sell_volume: 0.0,
@@ -74,9 +73,7 @@ impl TickVolumeAnalyzer {
         if self.ticks.len() >= self.period {
             self.ticks.remove(0);
         }
-        if !self.ticks.is_full() {
-            self.ticks.push(*tick);
-        }
+        self.ticks.push(*tick);
     }
 
     /// Обновить стандартным update_bar (эмулирует buy/sell по направлению бара)

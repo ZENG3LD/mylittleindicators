@@ -3,7 +3,6 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::types::Bar;
-use arrayvec::ArrayVec;
 
 /// Метрики ликвидности
 #[derive(Debug, Clone)]
@@ -43,10 +42,10 @@ pub struct MarketMicrostructure {
     period: usize,
     
     // Буферы данных
-    volume_bars: ArrayVec<Bar, 512>,
-    price_changes: ArrayVec<f64, 512>,
-    volume_changes: ArrayVec<f64, 512>,
-    spreads: ArrayVec<f64, 512>,
+    volume_bars: Vec<Bar>,
+    price_changes: Vec<f64>,
+    volume_changes: Vec<f64>,
+    spreads: Vec<f64>,
     
     // Текущие метрики
     liquidity_metrics: LiquidityMetrics,
@@ -79,10 +78,10 @@ impl MarketMicrostructure {
     pub fn new(period: usize) -> Self {
         Self {
             period,
-            volume_bars: ArrayVec::new(),
-            price_changes: ArrayVec::new(),
-            volume_changes: ArrayVec::new(),
-            spreads: ArrayVec::new(),
+            volume_bars: Vec::with_capacity(period),
+            price_changes: Vec::with_capacity(period),
+            volume_changes: Vec::with_capacity(period),
+            spreads: Vec::with_capacity(period),
             liquidity_metrics: LiquidityMetrics {
                 bid_ask_spread: 0.0,
                 spread_pct: 0.0,
@@ -231,7 +230,7 @@ impl MarketMicrostructure {
         }
         
         // Кластеризация волатильности
-        let vol_changes: ArrayVec<f64, 512> = self.price_changes.windows(2)
+        let vol_changes: Vec<f64> = self.price_changes.windows(2)
             .map(|w| (w[1].abs() - w[0].abs()).abs())
             .collect();
         if vol_changes.len() > 1 {
@@ -314,7 +313,7 @@ impl MarketMicrostructure {
     }
     
     /// Вспомогательные функции расчета
-    fn calculate_correlation(&self, x: &ArrayVec<f64, 512>, y: &ArrayVec<f64, 512>) -> f64 {
+    fn calculate_correlation(&self, x: &Vec<f64>, y: &Vec<f64>) -> f64 {
         if x.len() != y.len() || x.len() < 2 {
             return 0.0;
         }
@@ -336,19 +335,19 @@ impl MarketMicrostructure {
         }
     }
     
-    fn calculate_autocorrelation(&self, data: &ArrayVec<f64, 512>, lag: usize) -> f64 {
+    fn calculate_autocorrelation(&self, data: &Vec<f64>, lag: usize) -> f64 {
         if data.len() <= lag {
             return 0.0;
         }
-        
+
         let n = data.len() - lag;
-        let x1: ArrayVec<f64, 512> = data.iter().take(n).cloned().collect();
-        let x2: ArrayVec<f64, 512> = data.iter().skip(lag).cloned().collect();
-        
+        let x1: Vec<f64> = data.iter().take(n).cloned().collect();
+        let x2: Vec<f64> = data.iter().skip(lag).cloned().collect();
+
         self.calculate_correlation(&x1, &x2)
     }
-    
-    fn calculate_volatility(&self, data: &ArrayVec<f64, 512>) -> f64 {
+
+    fn calculate_volatility(&self, data: &Vec<f64>) -> f64 {
         if data.len() < 2 {
             return 0.0;
         }

@@ -1,15 +1,14 @@
 // ZigZag by candle pattern (N-bar swing)
 // (c) 2024
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct ZigZagCandle {
     pub swing_bars: usize,
     pub period: usize,
-    pub buffer: ArrayVec<f64, 512>,
-    pub swings: ArrayVec<(usize, f64), 512>,
+    pub buffer: Vec<f64>,
+    pub swings: Vec<(usize, f64)>,
     bar_counter: usize,
 }
 
@@ -23,8 +22,8 @@ impl ZigZagCandle {
         Self {
             swing_bars,
             period,
-            buffer: ArrayVec::new(),
-            swings: ArrayVec::new(),
+            buffer: Vec::with_capacity(512),
+            swings: Vec::with_capacity(512),
             bar_counter: 0,
         }
     }
@@ -69,7 +68,7 @@ impl ZigZagCandle {
     pub fn last_swing(&self) -> Option<(usize, f64)> {
         self.swings.last().copied()
     }
-    pub fn swings(&self) -> &ArrayVec<(usize, f64), 512> {
+    pub fn swings(&self) -> &Vec<(usize, f64)> {
         &self.swings
     }
 

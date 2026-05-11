@@ -4,7 +4,6 @@
 //!
 //! OPTIMIZED: O(1) running sum for CMO Simple MA mode
 
-use arrayvec::ArrayVec;
 use std::collections::VecDeque;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
@@ -23,7 +22,7 @@ pub enum CmoMaType {
 pub struct ChandeMomentumOscillator {
     period: usize,
     ma_type: CmoMaType,
-    prices: ArrayVec<f64, 500>,
+    prices: Vec<f64>,
 
     // VecDeque for O(1) pop_front
     gains: VecDeque<f64>,
@@ -44,7 +43,7 @@ impl ChandeMomentumOscillator {
         Self {
             period,
             ma_type,
-            prices: ArrayVec::new(),
+            prices: Vec::with_capacity(period),
             gains: VecDeque::with_capacity(period),
             losses: VecDeque::with_capacity(period),
             sum_gains: 0.0,
@@ -61,9 +60,7 @@ impl ChandeMomentumOscillator {
         if self.prices.len() >= self.period {
             self.prices.remove(0);
         }
-        if !self.prices.is_full() {
-            self.prices.push(price);
-        }
+        self.prices.push(price);
 
         if self.prices.len() < 2 {
             return;
@@ -227,7 +224,7 @@ pub struct VariableIndexDynamicAverage {
     cmo: ChandeMomentumOscillator,
 
     // Данные
-    prices: ArrayVec<f64, 500>,
+    prices: Vec<f64>,
 
     // Параметры адаптации
     alpha: f64,                 // Базовый альфа-коэффициент
@@ -238,8 +235,8 @@ pub struct VariableIndexDynamicAverage {
     current_result: VidyaResult,
 
     // История для анализа
-    volatility_history: ArrayVec<f64, 100>,
-    adaptation_history: ArrayVec<f64, 100>,
+    volatility_history: Vec<f64>,
+    adaptation_history: Vec<f64>,
 
     // Статистики
     trend_changes: usize,
@@ -267,13 +264,13 @@ impl VariableIndexDynamicAverage {
             period,
             cmo_ma_type,
             cmo: ChandeMomentumOscillator::new(period, cmo_ma_type),
-            prices: ArrayVec::new(),
+            prices: Vec::with_capacity(period),
             alpha,
             min_alpha: alpha * 0.1,   // 10% от базового альфа
             max_alpha: alpha * 3.0,   // 300% от базового альфа
             current_result: VidyaResult::new(),
-            volatility_history: ArrayVec::new(),
-            adaptation_history: ArrayVec::new(),
+            volatility_history: Vec::with_capacity(100),
+            adaptation_history: Vec::with_capacity(100),
             trend_changes: 0,
             high_volatility_periods: 0,
             low_volatility_periods: 0,
@@ -295,9 +292,7 @@ impl VariableIndexDynamicAverage {
         if self.prices.len() >= 500 {
             self.prices.remove(0);
         }
-        if !self.prices.is_full() {
-            self.prices.push(price);
-        }
+        self.prices.push(price);
 
         // Обновляем CMO
         self.cmo.update(price);
@@ -405,17 +400,13 @@ impl VariableIndexDynamicAverage {
         if self.volatility_history.len() >= 100 {
             self.volatility_history.remove(0);
         }
-        if !self.volatility_history.is_full() {
-            self.volatility_history.push(self.current_result.volatility_index);
-        }
+        self.volatility_history.push(self.current_result.volatility_index);
 
         // Адаптация
         if self.adaptation_history.len() >= 100 {
             self.adaptation_history.remove(0);
         }
-        if !self.adaptation_history.is_full() {
-            self.adaptation_history.push(self.current_result.adaptation_rate);
-        }
+        self.adaptation_history.push(self.current_result.adaptation_rate);
     }
 
     // Публичные методы

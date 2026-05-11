@@ -7,7 +7,6 @@
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::volatility::atr::Atr;
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Результат Adaptive Stochastic
@@ -83,11 +82,11 @@ pub struct AdaptiveStochastic {
     momentum_ma: MovingAverageProvider,      // MA для анализа momentum
     
     // Буферы для расчетов
-    highs: ArrayVec<f64, 64>,
-    lows: ArrayVec<f64, 64>,
-    closes: ArrayVec<f64, 64>,
-    k_values: ArrayVec<f64, 32>,     // История %K значений
-    periods: ArrayVec<f64, 16>,      // История адаптивных периодов
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    closes: Vec<f64>,
+    k_values: Vec<f64>,     // История %K значений
+    periods: Vec<f64>,      // История адаптивных периодов
     
     // Параметры адаптации
     base_period: usize,              // Базовый период
@@ -134,11 +133,11 @@ impl AdaptiveStochastic {
             d_ma: MovingAverageProvider::new(MovingAverageType::SMA, d_period),
             momentum_ma: MovingAverageProvider::new(MovingAverageType::EMA, 5),
             
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
-            closes: ArrayVec::new(),
-            k_values: ArrayVec::new(),
-            periods: ArrayVec::new(),
+            highs: Vec::with_capacity(64),
+            lows: Vec::with_capacity(64),
+            closes: Vec::with_capacity(64),
+            k_values: Vec::with_capacity(32),
+            periods: Vec::with_capacity(16),
             
             base_period,
             min_period,

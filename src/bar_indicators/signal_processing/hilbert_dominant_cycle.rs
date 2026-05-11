@@ -8,7 +8,6 @@
 //! 2. Рассчитывается мгновенная фаза и период
 //! 3. Сглаживается для получения доминирующего цикла
 
-use arrayvec::ArrayVec;
 use std::f64::consts::PI;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -60,15 +59,15 @@ impl DominantCycleResult {
 #[derive(Clone)]
 pub struct HilbertDominantCycle {
     // Буферы для Hilbert Transform (требуется минимум 7 значений)
-    prices: ArrayVec<f64, 32>,
-    
+    prices: Vec<f64>,
+
     // Компоненты Hilbert Transform
-    in_phase: ArrayVec<f64, 32>,      // I компонента
-    quadrature: ArrayVec<f64, 32>,    // Q компонента
-    
+    in_phase: Vec<f64>,      // I компонента
+    quadrature: Vec<f64>,    // Q компонента
+
     // Мгновенные значения
-    inst_period: ArrayVec<f64, 32>,   // Мгновенный период
-    inst_phase: ArrayVec<f64, 32>,    // Мгновенная фаза
+    inst_period: Vec<f64>,   // Мгновенный период
+    inst_phase: Vec<f64>,    // Мгновенная фаза
     
     // Сглаженные значения
     smooth_period: f64,               // Сглаженный доминирующий период
@@ -98,11 +97,11 @@ impl HilbertDominantCycle {
                 "Invalid period range: min_period must be > 0 and max_period > min_period");
         
         Self {
-            prices: ArrayVec::new(),
-            in_phase: ArrayVec::new(),
-            quadrature: ArrayVec::new(),
-            inst_period: ArrayVec::new(),
-            inst_phase: ArrayVec::new(),
+            prices: Vec::with_capacity(32),
+            in_phase: Vec::with_capacity(32),
+            quadrature: Vec::with_capacity(32),
+            inst_period: Vec::with_capacity(32),
+            inst_phase: Vec::with_capacity(32),
             smooth_period: (min_period + max_period) / 2.0,
             smooth_phase: 0.0,
             min_period,

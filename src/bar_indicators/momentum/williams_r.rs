@@ -1,6 +1,5 @@
 //! Williams %R indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Williams %R - momentum oscillator showing close position relative to high-low range.
@@ -23,9 +22,9 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 #[derive(Clone)]
 pub struct WilliamsR {
     period: usize,
-    highs: ArrayVec<f64, 512>,
-    lows: ArrayVec<f64, 512>,
-    closes: ArrayVec<f64, 512>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    closes: Vec<f64>,
     index: usize,
     filled: bool,
     value: f64,
@@ -38,9 +37,9 @@ impl WilliamsR {
 
         Self {
             period,
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
-            closes: ArrayVec::new(),
+            highs: Vec::with_capacity(period),
+            lows: Vec::with_capacity(period),
+            closes: Vec::with_capacity(period),
             index: 0,
             filled: false,
             value: -50.0, // Нейтральное значение

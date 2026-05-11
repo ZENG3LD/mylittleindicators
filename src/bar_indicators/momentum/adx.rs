@@ -1,6 +1,5 @@
 //! Average Directional Index (ADX) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
@@ -40,7 +39,7 @@ pub struct Adx {
     minus_dm_sum: f64,
     
     // Буферы для расчета ADX
-    dx_buffer: ArrayVec<f64, 512>,
+    dx_buffer: Vec<f64>,
     dx_index: usize,
     
     // Предыдущие значения
@@ -72,7 +71,7 @@ impl Adx {
             tr_sum: 0.0,
             plus_dm_sum: 0.0,
             minus_dm_sum: 0.0,
-            dx_buffer: ArrayVec::new(),
+            dx_buffer: Vec::with_capacity(period),
             dx_index: 0,
             prev_high: 0.0,
             prev_low: 0.0,

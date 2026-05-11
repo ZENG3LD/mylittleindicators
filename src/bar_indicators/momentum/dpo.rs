@@ -1,6 +1,5 @@
 //! Detrended Price Oscillator (DPO) indicator.
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::average::moving_average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::ohlcv_field::OhlcvField;
 use crate::bar_indicators::indicator_value::IndicatorValue;
@@ -35,8 +34,8 @@ pub struct DetrendedPriceOscillator {
     source: OhlcvField,
 
     // Буферы для расчетов
-    close_prices: ArrayVec<f64, 512>,
-    dpo_values: ArrayVec<f64, 512>,
+    close_prices: Vec<f64>,
+    dpo_values: Vec<f64>,
 
     // Скользящая средняя для расчета
     sma: MovingAverageProvider,
@@ -78,8 +77,8 @@ impl DetrendedPriceOscillator {
             lookback_offset,
             ma_type,
             source: OhlcvField::Close,
-            close_prices: ArrayVec::new(),
-            dpo_values: ArrayVec::new(),
+            close_prices: Vec::with_capacity(period),
+            dpo_values: Vec::with_capacity(period),
             sma: MovingAverageProvider::new(ma_type, period),
             dpo_value: 0.0,
             bars_count: 0,

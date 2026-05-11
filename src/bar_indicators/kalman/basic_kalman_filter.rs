@@ -2,7 +2,6 @@
 //! Базовый фильтр Калмана для отслеживания трендов и прогнозирования цен
 //! Оптимально сочетает предсказания модели с зашумленными наблюдениями
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Матрица 2x2 для простых фильтров Калмана
@@ -179,9 +178,9 @@ pub struct BasicKalmanFilter {
     state: KalmanState,             // Текущее состояние фильтра
     
     // История для анализа
-    state_history: ArrayVec<KalmanState, 100>,
-    innovation_history: ArrayVec<f64, 100>,
-    gain_history: ArrayVec<f64, 100>,
+    state_history: Vec<KalmanState>,
+    innovation_history: Vec<f64>,
+    gain_history: Vec<f64>,
     
     // Результаты
     current_result: FilterResult,
@@ -189,7 +188,7 @@ pub struct BasicKalmanFilter {
     // Адаптивность
     adaptive_noise: bool,           // Адаптивная настройка шума
     innovation_variance: f64,       // Дисперсия инноваций
-    innovation_window: ArrayVec<f64, 10>,
+    innovation_window: Vec<f64>,
     
     // Статистика
     log_likelihood: f64,            // Логарифм правдоподобия
@@ -239,13 +238,13 @@ impl BasicKalmanFilter {
             process_noise_matrix,
             measurement_noise_matrix,
             state: KalmanState::new(0.0, 0.0, 1000.0),
-            state_history: ArrayVec::new(),
-            innovation_history: ArrayVec::new(),
-            gain_history: ArrayVec::new(),
+            state_history: Vec::with_capacity(100),
+            innovation_history: Vec::with_capacity(100),
+            gain_history: Vec::with_capacity(100),
             current_result: FilterResult::new(),
             adaptive_noise: false,
             innovation_variance: 0.0,
-            innovation_window: ArrayVec::new(),
+            innovation_window: Vec::with_capacity(10),
             log_likelihood: 0.0,
             aic: 0.0,
             is_initialized: false,
@@ -379,9 +378,7 @@ impl BasicKalmanFilter {
         if self.innovation_window.len() >= 10 {
             self.innovation_window.remove(0);
         }
-        if !self.innovation_window.is_full() {
-            self.innovation_window.push(innovation);
-        }
+        self.innovation_window.push(innovation);
         
         if self.innovation_window.len() >= 5 {
             // Вычисляем дисперсию инноваций
@@ -411,23 +408,17 @@ impl BasicKalmanFilter {
         if self.state_history.len() >= 100 {
             self.state_history.remove(0);
         }
-        if !self.state_history.is_full() {
-            self.state_history.push(self.state.clone());
-        }
-        
+        self.state_history.push(self.state.clone());
+
         if self.innovation_history.len() >= 100 {
             self.innovation_history.remove(0);
         }
-        if !self.innovation_history.is_full() {
-            self.innovation_history.push(self.current_result.innovation);
-        }
-        
+        self.innovation_history.push(self.current_result.innovation);
+
         if self.gain_history.len() >= 100 {
             self.gain_history.remove(0);
         }
-        if !self.gain_history.is_full() {
-            self.gain_history.push(self.current_result.kalman_gain);
-        }
+        self.gain_history.push(self.current_result.kalman_gain);
     }
     
     /// Обновление статистики

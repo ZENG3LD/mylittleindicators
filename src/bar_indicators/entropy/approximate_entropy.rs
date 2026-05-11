@@ -2,7 +2,6 @@
 //! Измеряет регулярность и предсказуемость в паттернах цен
 //! Значения: 0.0-2.0+, где 0.0 = максимально регулярно, выше = менее регулярно
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Approximate Entropy индикатор
@@ -13,7 +12,7 @@ pub struct ApproximateEntropy {
     r: f64,                     // Толерантность (0.1-0.2 * std_dev)
     
     // Буферы
-    data: ArrayVec<f64, 512>,   // Буфер цен
+    data: Vec<f64>,   // Буфер цен
     
     // Результаты
     apen: f64,                  // Approximate Entropy
@@ -33,7 +32,7 @@ impl ApproximateEntropy {
             period: period.min(512),
             m: m.clamp(1, 5), // Ограничиваем разумными пределами
             r: r.clamp(0.01, 1.0), // Толерантность не может быть слишком маленькой или большой
-            data: ArrayVec::new(),
+            data: Vec::with_capacity(period.min(512)),
             apen: 0.0,
             regularity_score: 0.5,
             count: 0,

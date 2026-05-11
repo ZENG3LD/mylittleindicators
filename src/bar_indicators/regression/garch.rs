@@ -3,7 +3,6 @@
 //! GARCH(p,q) - модель для волатильности с авторегрессией и скользящим средним
 //! EGARCH - Exponential GARCH с асимметричными эффектами
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// GARCH Model - Generalized AutoRegressive Conditional Heteroskedasticity
@@ -14,14 +13,14 @@ pub struct Garch {
     q: usize, // GARCH order (лаги условной дисперсии)
     
     // Данные
-    returns: ArrayVec<f64, 512>,          // Логарифмические доходности
-    residuals: ArrayVec<f64, 512>,        // Остатки модели среднего
-    conditional_variance: ArrayVec<f64, 512>, // Условная дисперсия
-    
+    returns: Vec<f64>,                    // Логарифмические доходности
+    residuals: Vec<f64>,                  // Остатки модели среднего
+    conditional_variance: Vec<f64>,       // Условная дисперсия
+
     // Коэффициенты модели
     omega: f64,                           // Константа
-    alpha_coefficients: ArrayVec<f64, 16>, // ARCH коэффициенты
-    beta_coefficients: ArrayVec<f64, 16>,  // GARCH коэффициенты
+    alpha_coefficients: Vec<f64>,         // ARCH коэффициенты
+    beta_coefficients: Vec<f64>,          // GARCH коэффициенты
     
     // Модель среднего (простая AR(1))
     mu: f64,                              // Среднее
@@ -49,12 +48,12 @@ impl Garch {
         Self {
             p: p.min(8),  // Ограничиваем порядок
             q: q.min(8),
-            returns: ArrayVec::new(),
-            residuals: ArrayVec::new(),
-            conditional_variance: ArrayVec::new(),
+            returns: Vec::with_capacity(512),
+            residuals: Vec::with_capacity(512),
+            conditional_variance: Vec::with_capacity(512),
             omega: 0.01,
-            alpha_coefficients: ArrayVec::new(),
-            beta_coefficients: ArrayVec::new(),
+            alpha_coefficients: Vec::with_capacity(16),
+            beta_coefficients: Vec::with_capacity(16),
             mu: 0.0,
             phi: 0.0,
             current_variance: 0.01,
@@ -173,12 +172,10 @@ impl Garch {
         for i in 1..self.returns.len() {
             let expected_return = self.mu + self.phi * self.returns[i - 1];
             let residual = self.returns[i] - expected_return;
-            if !self.residuals.is_full() {
-                self.residuals.push(residual);
-            }
+            self.residuals.push(residual);
         }
     }
-    
+
     /// Оценка GARCH параметров (упрощенная версия)
     fn estimate_garch_parameters(&mut self) {
         if self.residuals.len() < self.p.max(self.q) + 5 {
@@ -204,18 +201,14 @@ impl Garch {
         let total_arch_weight = 0.3;
         for i in 0..self.p {
             let weight = total_arch_weight * (0.8_f64).powi(i as i32);
-            if !self.alpha_coefficients.is_full() {
-                self.alpha_coefficients.push(weight);
-            }
+            self.alpha_coefficients.push(weight);
         }
-        
+
         // GARCH коэффициенты (убывающие)
         let total_garch_weight = 0.6;
         for i in 0..self.q {
             let weight = total_garch_weight * (0.9_f64).powi(i as i32);
-            if !self.beta_coefficients.is_full() {
-                self.beta_coefficients.push(weight);
-            }
+            self.beta_coefficients.push(weight);
         }
         
         // Нормализация для обеспечения стационарности
@@ -250,9 +243,7 @@ impl Garch {
         
         // Заполняем начальные значения
         for _ in 0..start_idx {
-            if !self.conditional_variance.is_full() {
-                self.conditional_variance.push(unconditional_var);
-            }
+            self.conditional_variance.push(unconditional_var);
         }
         
         // Рассчитываем условную дисперсию по GARCH формуле
@@ -276,10 +267,7 @@ impl Garch {
             }
             
             variance = variance.max(1e-8); // Предотвращаем отрицательную дисперсию
-            
-            if !self.conditional_variance.is_full() {
-                self.conditional_variance.push(variance);
-            }
+            self.conditional_variance.push(variance);
         }
         
         // Обновляем текущие значения
@@ -413,16 +401,16 @@ pub struct EGarch {
     q: usize, // GARCH order
     
     // Данные
-    returns: ArrayVec<f64, 512>,
-    residuals: ArrayVec<f64, 512>,
-    log_conditional_variance: ArrayVec<f64, 512>, // ln(σ²_t)
-    standardized_residuals: ArrayVec<f64, 512>,   // z_t = ε_t / σ_t
-    
+    returns: Vec<f64>,
+    residuals: Vec<f64>,
+    log_conditional_variance: Vec<f64>,   // ln(σ²_t)
+    standardized_residuals: Vec<f64>,     // z_t = ε_t / σ_t
+
     // Коэффициенты EGARCH модели
     omega: f64,                           // Константа
-    alpha_coefficients: ArrayVec<f64, 16>, // Коэффициенты для |z_{t-i}|
-    gamma_coefficients: ArrayVec<f64, 16>, // Асимметричные коэффициенты для z_{t-i}
-    beta_coefficients: ArrayVec<f64, 16>,  // GARCH коэффициенты
+    alpha_coefficients: Vec<f64>,         // Коэффициенты для |z_{t-i}|
+    gamma_coefficients: Vec<f64>,         // Асимметричные коэффициенты для z_{t-i}
+    beta_coefficients: Vec<f64>,          // GARCH коэффициенты
     
     // Модель среднего
     mu: f64,
@@ -450,14 +438,14 @@ impl EGarch {
         Self {
             p: p.min(8),
             q: q.min(8),
-            returns: ArrayVec::new(),
-            residuals: ArrayVec::new(),
-            log_conditional_variance: ArrayVec::new(),
-            standardized_residuals: ArrayVec::new(),
+            returns: Vec::with_capacity(512),
+            residuals: Vec::with_capacity(512),
+            log_conditional_variance: Vec::with_capacity(512),
+            standardized_residuals: Vec::with_capacity(512),
             omega: -1.0,
-            alpha_coefficients: ArrayVec::new(),
-            gamma_coefficients: ArrayVec::new(),
-            beta_coefficients: ArrayVec::new(),
+            alpha_coefficients: Vec::with_capacity(16),
+            gamma_coefficients: Vec::with_capacity(16),
+            beta_coefficients: Vec::with_capacity(16),
             mu: 0.0,
             phi: 0.0,
             current_log_variance: -2.3, // ln(0.1)
@@ -567,12 +555,10 @@ impl EGarch {
         for i in 1..self.returns.len() {
             let expected_return = self.mu + self.phi * self.returns[i - 1];
             let residual = self.returns[i] - expected_return;
-            if !self.residuals.is_full() {
-                self.residuals.push(residual);
-            }
+            self.residuals.push(residual);
         }
     }
-    
+
     /// Оценка EGARCH параметров (упрощенная версия)
     fn estimate_egarch_parameters(&mut self) {
         self.alpha_coefficients.clear();
@@ -585,25 +571,19 @@ impl EGarch {
         // Alpha коэффициенты (эффект размера)
         for i in 0..self.p {
             let coeff = 0.2 * (0.8_f64).powi(i as i32);
-            if !self.alpha_coefficients.is_full() {
-                self.alpha_coefficients.push(coeff);
-            }
+            self.alpha_coefficients.push(coeff);
         }
-        
+
         // Gamma коэффициенты (асимметричный эффект)
         for i in 0..self.p {
             let coeff = -0.1 * (0.9_f64).powi(i as i32); // Отрицательные для leverage effect
-            if !self.gamma_coefficients.is_full() {
-                self.gamma_coefficients.push(coeff);
-            }
+            self.gamma_coefficients.push(coeff);
         }
-        
+
         // Beta коэффициенты (персистентность)
         for i in 0..self.q {
             let coeff = 0.7 * (0.95_f64).powi(i as i32);
-            if !self.beta_coefficients.is_full() {
-                self.beta_coefficients.push(coeff);
-            }
+            self.beta_coefficients.push(coeff);
         }
     }
     
@@ -621,17 +601,13 @@ impl EGarch {
         let start_idx = self.p.max(self.q);
         
         for _ in 0..start_idx {
-            if !self.log_conditional_variance.is_full() {
-                self.log_conditional_variance.push(initial_log_var);
-            }
+            self.log_conditional_variance.push(initial_log_var);
         }
-        
+
         // Рассчитываем стандартизированные остатки для начальных значений
         for i in 0..start_idx.min(self.residuals.len()) {
             let std_residual = self.residuals[i] / initial_log_var.exp().sqrt();
-            if !self.standardized_residuals.is_full() {
-                self.standardized_residuals.push(std_residual);
-            }
+            self.standardized_residuals.push(std_residual);
         }
         
         // EGARCH уравнение: ln(σ²_t) = ω + Σα_i*g(z_{t-i}) + Σβ_j*ln(σ²_{t-j})
@@ -661,16 +637,12 @@ impl EGarch {
                 }
             }
             
-            if !self.log_conditional_variance.is_full() {
-                self.log_conditional_variance.push(log_variance);
-            }
-            
+            self.log_conditional_variance.push(log_variance);
+
             // Рассчитываем стандартизированный остаток
             let variance = log_variance.exp();
             let std_residual = self.residuals[t] / variance.sqrt();
-            if !self.standardized_residuals.is_full() {
-                self.standardized_residuals.push(std_residual);
-            }
+            self.standardized_residuals.push(std_residual);
         }
         
         // Обновляем текущие значения

@@ -7,7 +7,6 @@
 //! Resistance 2 (R2) = PP + (High - Low)
 //! Resistance 3 (R3) = High + 2 × (PP - Low)
 
-use arrayvec::ArrayVec;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Уровни Classic Pivot Points
@@ -67,12 +66,12 @@ pub struct PivotPoints {
     current_levels: ClassicPivotLevels,
     
     // История уровней
-    levels_history: ArrayVec<ClassicPivotLevels, 100>,
-    
+    levels_history: Vec<ClassicPivotLevels>,
+
     // Буферы для расчета (для периодических обновлений)
-    highs: ArrayVec<f64, 32>,
-    lows: ArrayVec<f64, 32>,
-    closes: ArrayVec<f64, 32>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    closes: Vec<f64>,
     
     // Настройки
     calculation_period: usize, // Период для расчета (1 = ежедневно, 7 = еженедельно и т.д.)
@@ -96,10 +95,10 @@ impl PivotPoints {
         
         Self {
             current_levels: ClassicPivotLevels::empty(),
-            levels_history: ArrayVec::new(),
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
-            closes: ArrayVec::new(),
+            levels_history: Vec::with_capacity(100),
+            highs: Vec::with_capacity(32),
+            lows: Vec::with_capacity(32),
+            closes: Vec::with_capacity(32),
             calculation_period,
             bars_since_update: 0,
             is_ready: false,

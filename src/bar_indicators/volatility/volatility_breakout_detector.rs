@@ -9,7 +9,7 @@
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::volatility::atr::Atr;
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use arrayvec::ArrayVec;
+
 
 /// Тип пробоя волатильности
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,12 +114,12 @@ pub struct VolatilityBreakoutDetector {
     squeeze_ma: MovingAverageProvider,           // MA для детекции сжатия
     
     // Буферы для анализа
-    prices: ArrayVec<f64, 64>,
-    highs: ArrayVec<f64, 32>,
-    lows: ArrayVec<f64, 32>,
-    ranges: ArrayVec<f64, 32>,           // True Range значения
-    volatility_ratios: ArrayVec<f64, 32>, // История отношений волатильности
-    breakout_history: ArrayVec<BreakoutType, 16>, // История пробоев
+    prices: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    ranges: Vec<f64>,           // True Range значения
+    volatility_ratios: Vec<f64>, // История отношений волатильности
+    breakout_history: Vec<BreakoutType>, // История пробоев
     
     // Параметры детекции
     mild_threshold: f64,                 // Порог умеренного пробоя
@@ -165,12 +165,12 @@ impl VolatilityBreakoutDetector {
             momentum_ma: MovingAverageProvider::new(MovingAverageType::EMA, 8),
             squeeze_ma: MovingAverageProvider::new(MovingAverageType::SMA, 10),
             
-            prices: ArrayVec::new(),
-            highs: ArrayVec::new(),
-            lows: ArrayVec::new(),
-            ranges: ArrayVec::new(),
-            volatility_ratios: ArrayVec::new(),
-            breakout_history: ArrayVec::new(),
+            prices: Vec::with_capacity(64),
+            highs: Vec::with_capacity(32),
+            lows: Vec::with_capacity(32),
+            ranges: Vec::with_capacity(32),
+            volatility_ratios: Vec::with_capacity(32),
+            breakout_history: Vec::with_capacity(16),
             
             mild_threshold,
             strong_threshold,
