@@ -604,6 +604,11 @@ pub struct IndicatorConfig {
     pub flags: HashMap<String, bool>,  // Boolean flags (e.g., "auto_mode")
     pub source: OhlcvField,  // OHLCV field to use as input (default: Close)
     pub component_configs: HashMap<String, ComponentConfig>,  // Per-component configuration (e.g., "fast_ma", "slow_ma")
+    /// Inner indicator dependencies (for composite primitives like Crossover,
+    /// Breakout, Divergence). Positional — primitive struct chooses which
+    /// index means what (e.g. Crossover uses [0]=subject, [1]=reference).
+    /// Empty for autonomous indicators.
+    pub inner_indicators: Vec<IndicatorConfig>,
 }
 
 impl IndicatorConfig {
@@ -628,7 +633,18 @@ impl IndicatorConfig {
             flags: HashMap::new(),
             source: OhlcvField::Close,
             component_configs: HashMap::new(),
+            inner_indicators: Vec::new(),
         }
+    }
+
+    /// Append an inner indicator dependency (positional).
+    ///
+    /// Primitive structs interpret the position semantics — e.g. for
+    /// `Crossover`, `inner_indicators[0]` is the subject and `[1]` is the
+    /// reference line.
+    pub fn with_inner(mut self, inner: IndicatorConfig) -> Self {
+        self.inner_indicators.push(inner);
+        self
     }
     pub fn with_param(mut self, key: impl Into<String>, value: f64) -> Self {
         self.additional_params.insert(key.into(), value);
@@ -743,6 +759,26 @@ impl IndicatorConfig {
                 if let Some(p) = v.period {
                     p.hash(&mut hasher);
                 }
+            }
+        }
+
+        // Inner indicators (positional — order matters, primitive semantics
+        // depend on it). Recursive: each inner's identity = its id + base
+        // typed fields + its own param_hash.
+        if !self.inner_indicators.is_empty() {
+            has_extra = true;
+            for inner in &self.inner_indicators {
+                (inner.id as u16).hash(&mut hasher);
+                // first period (the "main" period of inner — same as IndicatorKey.period)
+                if let Some(p) = inner.periods.first() {
+                    p.hash(&mut hasher);
+                }
+                // unnamed "ma_type" slot (same as IndicatorKey.ma_type)
+                if let Some(m) = inner.ma_types.get("ma_type") {
+                    (*m as u8).hash(&mut hasher);
+                }
+                // recursive — all extras of inner including its own inner_indicators
+                inner.compute_param_hash().hash(&mut hasher);
             }
         }
 
@@ -7400,5 +7436,68 @@ mod compute_param_hash_tests {
 
         // Insertion order differs but compute_param_hash must be deterministic.
         assert_eq!(cfg_a.compute_param_hash(), cfg_b.compute_param_hash());
+    }
+
+    #[test]
+    fn inner_indicators_are_hashed() {
+        // Crossover(SMA(10), SMA(20)) vs Crossover(SMA(10), SMA(50))
+        let inner_a1 = IndicatorConfig::new(BarIndicatorId::Sma, "Sma".into(), vec![10]);
+        let inner_a2 = IndicatorConfig::new(BarIndicatorId::Sma, "Sma".into(), vec![20]);
+        let cfg_a = IndicatorConfig::new(BarIndicatorId::Sma, "Crossover".into(), vec![])
+            .with_inner(inner_a1)
+            .with_inner(inner_a2);
+
+        let inner_b1 = IndicatorConfig::new(BarIndicatorId::Sma, "Sma".into(), vec![10]);
+        let inner_b2 = IndicatorConfig::new(BarIndicatorId::Sma, "Sma".into(), vec![50]);
+        let cfg_b = IndicatorConfig::new(BarIndicatorId::Sma, "Crossover".into(), vec![])
+            .with_inner(inner_b1)
+            .with_inner(inner_b2);
+
+        assert_ne!(cfg_a.compute_param_hash(), cfg_b.compute_param_hash());
+    }
+
+    #[test]
+    fn inner_indicator_order_matters() {
+        // Crossover(SMA(10), SMA(20)) ≠ Crossover(SMA(20), SMA(10))
+        // because positions encode roles (subject vs reference).
+        let cfg_a = IndicatorConfig::new(BarIndicatorId::Sma, "X".into(), vec![])
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Sma, "A".into(), vec![10]))
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Sma, "B".into(), vec![20]));
+
+        let cfg_b = IndicatorConfig::new(BarIndicatorId::Sma, "X".into(), vec![])
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Sma, "A".into(), vec![20]))
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Sma, "B".into(), vec![10]));
+
+        assert_ne!(cfg_a.compute_param_hash(), cfg_b.compute_param_hash());
+    }
+
+    #[test]
+    fn inner_indicator_type_distinguishes() {
+        // Crossover(SMA(10), SMA(20)) ≠ Crossover(EMA(10), SMA(20))
+        let cfg_sma_first = IndicatorConfig::new(BarIndicatorId::Sma, "X".into(), vec![])
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Sma, "A".into(), vec![10]))
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Sma, "B".into(), vec![20]));
+
+        let cfg_ema_first = IndicatorConfig::new(BarIndicatorId::Sma, "X".into(), vec![])
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Ema, "A".into(), vec![10]))
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Sma, "B".into(), vec![20]));
+
+        assert_ne!(cfg_sma_first.compute_param_hash(), cfg_ema_first.compute_param_hash());
+    }
+
+    #[test]
+    fn inner_recursive_hash_propagates() {
+        // Outer wraps inner that has its own param_hash extras.
+        // Two outers identical except inner's secondary period → different outer param_hash.
+        let inner_a = IndicatorConfig::new(BarIndicatorId::MaCross, "Inner".into(), vec![9, 21]);
+        let inner_b = IndicatorConfig::new(BarIndicatorId::MaCross, "Inner".into(), vec![9, 30]);
+
+        let cfg_a = IndicatorConfig::new(BarIndicatorId::Sma, "Outer".into(), vec![])
+            .with_inner(inner_a);
+        let cfg_b = IndicatorConfig::new(BarIndicatorId::Sma, "Outer".into(), vec![])
+            .with_inner(inner_b);
+
+        assert_ne!(cfg_a.compute_param_hash(), cfg_b.compute_param_hash(),
+            "outer's param_hash must propagate inner's secondary-period difference");
     }
 }
