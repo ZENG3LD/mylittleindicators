@@ -11,6 +11,10 @@
 //! at the slice-cache layer through `IndicatorKey.param_hash` which folds
 //! inner-indicator configs recursively.
 
+pub mod breakout;
 pub mod crossover;
+pub mod relative_position;
 
+pub use breakout::Breakout;
 pub use crossover::Crossover;
+pub use relative_position::RelativePosition;

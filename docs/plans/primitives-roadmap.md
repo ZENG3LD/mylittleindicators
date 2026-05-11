@@ -183,8 +183,8 @@ struct PatternAtLevel {
 | 2. IndicatorConfig.inner_indicators | DONE (725c75e) |
 | 3. Бенчмарк dedup на legacy composites | DONE (ef9b721) |
 | 4. Crossover primitive | DONE (this commit) |
-| 5. MaCross/SslChannel deprecation | TODO |
-| 6. Breakout primitive | TODO |
+| 5. RelativePosition (MaCross-style state semantics) | DONE |
+| 6. Breakout primitive | DONE |
 | 7. Divergence unification | TODO |
 | 8. WickAtLevel + PatternAtLevel | TODO |
 | 9. SwingDetection unification | TODO |
