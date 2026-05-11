@@ -179,8 +179,8 @@ struct PatternAtLevel {
 
 | Шаг | Статус |
 |---|---|
-| 1. IndicatorKey + param_hash | TODO |
-| 2. IndicatorConfig.inner_indicators | TODO |
+| 1. IndicatorKey + param_hash | DONE (d8fce59) |
+| 2. IndicatorConfig.inner_indicators | DONE (725c75e) |
 | 3. Бенчмарк dedup на legacy composites | TODO |
 | 4. Crossover primitive | TODO |
 | 5. MaCross/SslChannel deprecation | TODO |

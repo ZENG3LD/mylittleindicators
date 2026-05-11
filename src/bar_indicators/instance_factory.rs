@@ -7485,6 +7485,95 @@ mod compute_param_hash_tests {
         assert_ne!(cfg_sma_first.compute_param_hash(), cfg_ema_first.compute_param_hash());
     }
 
+    // ──────────────────────────────────────────────────────────────────────
+    // Legacy composites — validation that param_hash distinguishes
+    // configurations that previously collided on IndicatorKey alone.
+    // ──────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn legacy_macross_distinct_slow_periods_have_distinct_hashes() {
+        // Before param_hash: MaCross(9, 21) and MaCross(9, 30) → same IndicatorKey.
+        let cfg_21 = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 21])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::EMA);
+        let cfg_30 = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 30])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::EMA);
+
+        assert_ne!(cfg_21.compute_param_hash(), cfg_30.compute_param_hash());
+    }
+
+    #[test]
+    fn legacy_macross_distinct_ma_combos_have_distinct_hashes() {
+        // MaCross(EMA/EMA) vs MaCross(EMA/SMA) — both inner ma_types matter.
+        let cfg_ema_ema = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 21])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::EMA);
+        let cfg_ema_sma = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 21])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::SMA);
+
+        assert_ne!(cfg_ema_ema.compute_param_hash(), cfg_ema_sma.compute_param_hash());
+    }
+
+    #[test]
+    fn legacy_macd_distinct_signal_period_has_distinct_hash() {
+        // MACD(12, 26, 9) vs MACD(12, 26, 14) — signal period is in periods[2].
+        let cfg_a = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("signal_ma_type", MovingAverageType::EMA);
+        let cfg_b = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 14])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("signal_ma_type", MovingAverageType::EMA);
+
+        assert_ne!(cfg_a.compute_param_hash(), cfg_b.compute_param_hash());
+    }
+
+    #[test]
+    fn legacy_macd_signal_ma_type_change_has_distinct_hash() {
+        // MACD with signal_ma_type=EMA vs WMA.
+        let cfg_ema = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("signal_ma_type", MovingAverageType::EMA);
+        let cfg_wma = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("signal_ma_type", MovingAverageType::WMA);
+
+        assert_ne!(cfg_ema.compute_param_hash(), cfg_wma.compute_param_hash());
+    }
+
+    #[test]
+    fn legacy_bollinger_std_dev_distinguishes_hash() {
+        // BB(20, std_dev=2.0) vs BB(20, std_dev=2.5) — additional_params.
+        let cfg_2 = IndicatorConfig::new(BarIndicatorId::Bb, "Bb".into(), vec![20])
+            .with_ma_type(MovingAverageType::SMA)
+            .with_param("std_dev", 2.0);
+        let cfg_25 = IndicatorConfig::new(BarIndicatorId::Bb, "Bb".into(), vec![20])
+            .with_ma_type(MovingAverageType::SMA)
+            .with_param("std_dev", 2.5);
+
+        assert_ne!(cfg_2.compute_param_hash(), cfg_25.compute_param_hash());
+    }
+
+    #[test]
+    fn config_identical_means_identical_hash() {
+        // Regression guard: identical configs must produce identical hashes.
+        let cfg_a = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("signal_ma_type", MovingAverageType::EMA);
+        let cfg_b = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9])
+            .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("slow_ma_type", MovingAverageType::EMA)
+            .with_named_ma_type("signal_ma_type", MovingAverageType::EMA);
+
+        assert_eq!(cfg_a.compute_param_hash(), cfg_b.compute_param_hash());
+    }
+
     #[test]
     fn inner_recursive_hash_propagates() {
         // Outer wraps inner that has its own param_hash extras.
