@@ -26,6 +26,8 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::instance_factory::IndicatorInstance;
+use crate::core::events::direction::Direction;
+use crate::core::events::kind::{CompositeSub, SignalKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProximityField {
@@ -119,6 +121,26 @@ impl EventAtLevel {
 
     pub fn value(&self) -> IndicatorValue {
         IndicatorValue::Signal(self.last_signal)
+    }
+
+    /// Feed one bar and return a typed signal when an event fires at or near a level.
+    ///
+    /// Maps to `SignalKind::Composite(CompositeSub::Confirmed)` — an event that has been
+    /// confirmed by proximity to a structural level.
+    pub fn detect(
+        &mut self,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        self.update_bar(open, high, low, close, volume);
+        match self.last_signal {
+            1 => Some((SignalKind::Composite(CompositeSub::Confirmed), Direction::Up)),
+            -1 => Some((SignalKind::Composite(CompositeSub::Confirmed), Direction::Down)),
+            _ => None,
+        }
     }
 
     pub fn is_ready(&self) -> bool {

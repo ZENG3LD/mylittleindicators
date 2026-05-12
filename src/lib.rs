@@ -10,6 +10,9 @@
 // Bar indicators
 pub mod bar_indicators;
 
+// Event detectors (strategy primitives over indicators)
+pub mod events;
+
 // Catalog system (signatures, constraints, param values, indicator key)
 pub mod catalog;
 

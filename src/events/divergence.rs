@@ -17,6 +17,8 @@
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::instance_factory::IndicatorInstance;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
+use crate::core::events::direction::Direction;
+use crate::core::events::kind::{DivergenceSub, SignalKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DivergenceKind {
@@ -130,6 +132,34 @@ impl Divergence {
 
     pub fn value(&self) -> IndicatorValue {
         IndicatorValue::Signal(self.last_signal)
+    }
+
+    /// Feed one bar and return a typed signal when divergence is detected.
+    ///
+    /// The `DivergenceSub` variant mirrors the detector's `DivergenceKind`:
+    /// - `DivergenceKind::Regular` → `DivergenceSub::Regular`
+    /// - `DivergenceKind::Hidden` → `DivergenceSub::Hidden`
+    ///
+    /// Bullish divergence (price lower low, oscillator higher low) → `Direction::Up`.
+    /// Bearish divergence (price higher high, oscillator lower high) → `Direction::Down`.
+    pub fn detect(
+        &mut self,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        self.update_bar(open, high, low, close, volume);
+        let sub = match self.kind {
+            DivergenceKind::Regular => DivergenceSub::Regular,
+            DivergenceKind::Hidden => DivergenceSub::Hidden,
+        };
+        match self.last_signal {
+            1 => Some((SignalKind::Divergence(sub), Direction::Up)),
+            -1 => Some((SignalKind::Divergence(sub), Direction::Down)),
+            _ => None,
+        }
     }
 
     pub fn is_ready(&self) -> bool {

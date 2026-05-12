@@ -13,6 +13,8 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::instance_factory::IndicatorInstance;
+use crate::core::events::direction::Direction;
+use crate::core::events::kind::SignalKind;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SwingMode {
@@ -49,6 +51,8 @@ pub struct SwingDetection {
     pivot_low: f64,
     /// Last emitted swing direction (sticky for state-style queries).
     last_swing: i8,
+    /// Per-bar raw event signal: non-zero only on the bar the swing was confirmed.
+    last_event: i8,
     /// Track whether we're currently trending up or down for reversal modes.
     trending_up: Option<bool>,
     bars_seen: usize,
@@ -66,6 +70,7 @@ impl SwingDetection {
             pivot_high: f64::NEG_INFINITY,
             pivot_low: f64::INFINITY,
             last_swing: 0,
+            last_event: 0,
             trending_up: None,
             bars_seen: 0,
         }
@@ -114,6 +119,7 @@ impl SwingDetection {
             SwingMode::Lookahead { n } => self.detect_lookahead(n),
         };
 
+        self.last_event = signal;
         self.last_swing = if signal != 0 { signal } else { self.last_swing };
         signal as f64
     }
@@ -222,6 +228,27 @@ impl SwingDetection {
         IndicatorValue::Signal(self.last_swing)
     }
 
+    /// Feed one bar and return a typed signal when a swing high or low is confirmed.
+    ///
+    /// Swing-high confirmed → `(SignalKind::Swing, Direction::Up)`.
+    /// Swing-low confirmed → `(SignalKind::Swing, Direction::Down)`.
+    /// Returns `None` on bars where no new swing point was confirmed.
+    pub fn detect(
+        &mut self,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        self.update_bar(open, high, low, close, volume);
+        match self.last_event {
+            1 => Some((SignalKind::Swing, Direction::Up)),
+            -1 => Some((SignalKind::Swing, Direction::Down)),
+            _ => None,
+        }
+    }
+
     pub fn is_ready(&self) -> bool {
         self.bars_seen >= 2
     }
@@ -232,6 +259,7 @@ impl SwingDetection {
         self.pivot_high = f64::NEG_INFINITY;
         self.pivot_low = f64::INFINITY;
         self.last_swing = 0;
+        self.last_event = 0;
         self.trending_up = None;
         self.bars_seen = 0;
         if let Some(atr) = self.atr_source.as_mut() {

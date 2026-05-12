@@ -12,6 +12,8 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::instance_factory::IndicatorInstance;
+use crate::core::events::direction::Direction;
+use crate::core::events::kind::{SignalKind, TrendSub};
 
 #[derive(Clone)]
 pub struct RelativePosition {
@@ -55,6 +57,30 @@ impl RelativePosition {
 
     pub fn value(&self) -> IndicatorValue {
         IndicatorValue::Signal(self.last_trend)
+    }
+
+    /// Feed one bar and return a typed signal reflecting the persistent trend state.
+    ///
+    /// Maps to `SignalKind::Trend(TrendSub::MaCross)` — subject line position relative
+    /// to reference line, maintained as sticky trend direction.
+    /// Returns `None` until both inner indicators are ready.
+    pub fn detect(
+        &mut self,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        self.update_bar(open, high, low, close, volume);
+        if !self.ready {
+            return None;
+        }
+        match self.last_trend {
+            1 => Some((SignalKind::Trend(TrendSub::MaCross), Direction::Up)),
+            -1 => Some((SignalKind::Trend(TrendSub::MaCross), Direction::Down)),
+            _ => None,
+        }
     }
 
     pub fn is_ready(&self) -> bool {

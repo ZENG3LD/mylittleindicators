@@ -10,6 +10,8 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::instance_factory::IndicatorInstance;
+use crate::core::events::direction::Direction;
+use crate::core::events::kind::SignalKind;
 
 /// Which crossover direction(s) fire a signal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,6 +105,27 @@ impl Crossover {
 
     pub fn is_ready(&self) -> bool {
         self.subject.is_ready() && self.reference.is_ready()
+    }
+
+    /// Feed one bar and return a typed signal if a crossover occurred.
+    ///
+    /// Returns `Some((SignalKind::Crossover, Direction::Up))` when subject crosses above
+    /// reference, `Some((SignalKind::Crossover, Direction::Down))` for a down-cross,
+    /// and `None` when no crossover event occurred on this bar.
+    pub fn detect(
+        &mut self,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        self.update_bar(open, high, low, close, volume);
+        match self.last_signal {
+            1 => Some((SignalKind::Crossover, Direction::Up)),
+            -1 => Some((SignalKind::Crossover, Direction::Down)),
+            _ => None,
+        }
     }
 
     pub fn reset(&mut self) {

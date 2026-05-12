@@ -24,7 +24,6 @@ pub mod trend_stop;
 pub mod candles;
 pub mod statistics;
 pub mod position;
-pub mod primitives;
 pub mod indicator_value;
 pub mod utils;
 pub mod ohlcv_field;

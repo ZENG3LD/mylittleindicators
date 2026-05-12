@@ -14,6 +14,8 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::instance_factory::IndicatorInstance;
+use crate::core::events::direction::Direction;
+use crate::core::events::kind::{CompositeSub, SignalKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfluenceMode {
@@ -112,6 +114,26 @@ impl Confluence {
 
     pub fn value(&self) -> IndicatorValue {
         IndicatorValue::Signal(self.last_signal)
+    }
+
+    /// Feed one bar and return a typed signal when the configured aggregation mode fires.
+    ///
+    /// Multiple inputs agreeing maps to `SignalKind::Composite(CompositeSub::Strong)`.
+    /// Returns `None` when inputs disagree or are not ready.
+    pub fn detect(
+        &mut self,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        self.update_bar(open, high, low, close, volume);
+        match self.last_signal {
+            1 => Some((SignalKind::Composite(CompositeSub::Strong), Direction::Up)),
+            -1 => Some((SignalKind::Composite(CompositeSub::Strong), Direction::Down)),
+            _ => None,
+        }
     }
 
     pub fn is_ready(&self) -> bool {
