@@ -1,55 +1,31 @@
 //! Indicator Catalog System
 //!
-//! Provides metadata and factory methods for all indicators.
-//!
-//! # Architecture
-//!
-//! The catalog system has three layers:
-//!
-//! 1. **Signature Layer** (`indicator_signature`, `master_catalog`)
-//!    - Defines indicator parameters, constraints, and computational metadata
-//!    - Pure computation, no rendering concerns
-//!
-//! 2. **Rendering Layer** (`rendering`, `rendering_catalog`, `value_adapter`)
-//!    - Defines how indicators are visualized (overlay/sub-pane, colors, bounds)
-//!    - Extracts render-ready values from IndicatorValue variants
-//!
-//! 3. **Unified Layer** (`unified_catalog`)
-//!    - Combines signature and rendering metadata
-//!    - Single access point for complete indicator information
+//! Three concerns:
+//! - data/   — computation metadata (signatures, parameters, constraints, keys)
+//! - visual/ — rendering metadata (how to draw on chart)
+//! - unified — combined access for code needing both
 
-pub mod master_catalog;
-pub mod indicator_signature;
-pub mod indicator_key;
-pub mod constraints;
-pub mod param_value;
-pub mod parameter_grid;
-pub mod rendering;
-pub mod rendering_catalog;
-pub mod value_adapter;
-pub mod unified_catalog;
-pub mod synthetic_data;
-pub mod rendering_tests;
+pub mod data;
+pub mod visual;
+pub mod unified;
 
-// Core catalog exports
-pub use master_catalog::MasterIndicatorCatalog;
-pub use indicator_signature::{IndicatorSignature, IndicatorCategory, SourceType, IndicatorRoleKind};
-pub use constraints::{ParamConstraint, ConstraintSet};
-pub use param_value::{ParamValue, ParamType, ParamError};
-pub use parameter_grid::ParameterValue;
+// Re-export sub-modules by name so that paths like
+// `catalog::master_catalog::MasterIndicatorCatalog` continue to work
+// (required for mlq compatibility).
+pub use data::master_catalog;
+pub use data::indicator_signature;
+pub use data::constraints;
+pub use data::param_value;
+pub use data::parameter_grid;
+pub use data::indicator_key;
+pub use data::synthetic_data;
 
-// Rendering exports
-pub use rendering::{
-    RenderingMetadata, RenderingMetadataBuilder, OutputSpec, OutputType,
-    ReferenceLine, LineStyle, HistogramStyle, ValueExtractor,
-    ChannelPart, MacdPart, IchimokuPart, DoublePart, TriplePart,
-    CandlePart, AdaptivePart, VolatilityPart, StatTestPart, CandleAnatomyPart,
-};
-pub use rendering_catalog::{get_rendering, has_rendering, rendering_count};
-pub use value_adapter::ValueAdapter;
+// Visual sub-module re-exports for unified.rs super:: paths
+pub use visual::rendering;
+pub use visual::rendering_catalog;
+pub use visual::value_adapter;
 
-// Unified catalog exports
-pub use unified_catalog::{UnifiedIndicatorCatalog, UnifiedIndicatorInfo, UnifiedCatalogStats};
-
-// Synthetic data generators
-pub use synthetic_data::{Bar, DataType, generate_bars, recommended_data_type};
+// Flat type re-exports (catalog::MasterIndicatorCatalog etc.)
+pub use data::*;
+pub use visual::*;
+pub use unified::{UnifiedIndicatorCatalog, UnifiedIndicatorInfo, UnifiedCatalogStats};
