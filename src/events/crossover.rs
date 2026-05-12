@@ -41,6 +41,18 @@ pub struct Crossover {
     last_signal: i8,
 }
 
+impl std::fmt::Debug for Crossover {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Crossover")
+            .field("direction", &self.direction)
+            .field("prev_subject", &self.prev_subject)
+            .field("prev_reference", &self.prev_reference)
+            .field("has_prev", &self.has_prev)
+            .field("last_signal", &self.last_signal)
+            .finish()
+    }
+}
+
 impl Crossover {
     /// Construct from owned inner indicators.
     pub fn new(
@@ -135,6 +147,56 @@ impl Crossover {
         self.prev_reference = 0.0;
         self.has_prev = false;
         self.last_signal = 0;
+    }
+
+    /// Detect crossover from pre-computed indicator values (slice-based hot loop).
+    ///
+    /// Use this in native strategies where indicator values are already computed
+    /// and available in `IndicatorSlices<N>`. The inner `Box<IndicatorInstance>`
+    /// fields are not touched — only prev_subject/prev_reference state is used.
+    ///
+    /// Returns `Some((SignalKind::Crossover, Direction::Up))` when subject crosses
+    /// above reference, `Some((SignalKind::Crossover, Direction::Down))` for a
+    /// down-cross, and `None` when no crossover occurred or on the first call
+    /// (no previous state yet).
+    pub fn detect_from_values(
+        &mut self,
+        subject: f64,
+        reference: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        if !self.has_prev {
+            self.prev_subject = subject;
+            self.prev_reference = reference;
+            self.has_prev = true;
+            return None;
+        }
+
+        let was_below = self.prev_subject < self.prev_reference;
+        let is_above = subject > reference;
+        let was_above = self.prev_subject > self.prev_reference;
+        let is_below = subject < reference;
+
+        let result = if was_below && is_above {
+            match self.direction {
+                CrossoverDirection::Both | CrossoverDirection::UpOnly => {
+                    Some((SignalKind::Crossover, Direction::Up))
+                }
+                CrossoverDirection::DownOnly => None,
+            }
+        } else if was_above && is_below {
+            match self.direction {
+                CrossoverDirection::Both | CrossoverDirection::DownOnly => {
+                    Some((SignalKind::Crossover, Direction::Down))
+                }
+                CrossoverDirection::UpOnly => None,
+            }
+        } else {
+            None
+        };
+
+        self.prev_subject = subject;
+        self.prev_reference = reference;
+        result
     }
 }
 

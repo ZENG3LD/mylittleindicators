@@ -24,6 +24,15 @@ pub struct RelativePosition {
     ready: bool,
 }
 
+impl std::fmt::Debug for RelativePosition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RelativePosition")
+            .field("last_trend", &self.last_trend)
+            .field("ready", &self.ready)
+            .finish()
+    }
+}
+
 impl RelativePosition {
     pub fn new(subject: IndicatorInstance, reference: IndicatorInstance) -> Self {
         Self {
@@ -92,6 +101,34 @@ impl RelativePosition {
         self.reference.reset();
         self.last_trend = 0;
         self.ready = false;
+    }
+
+    /// Detect relative position from pre-computed values (slice-based hot loop).
+    ///
+    /// `subject` and `reference` are pre-computed indicator values.
+    /// Does NOT touch the inner `Box<IndicatorInstance>` fields.
+    /// Maintains sticky trend state across calls.
+    pub fn detect_from_values(
+        &mut self,
+        subject: f64,
+        reference: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        let new_trend = if subject > reference {
+            1i8
+        } else if subject < reference {
+            -1
+        } else {
+            0
+        };
+        if new_trend != 0 && new_trend != self.last_trend {
+            self.last_trend = new_trend;
+        }
+        self.ready = true;
+        match self.last_trend {
+            1 => Some((SignalKind::Trend(TrendSub::MaCross), Direction::Up)),
+            -1 => Some((SignalKind::Trend(TrendSub::MaCross), Direction::Down)),
+            _ => None,
+        }
     }
 }
 

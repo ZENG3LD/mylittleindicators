@@ -46,6 +46,17 @@ pub struct Divergence {
     last_signal: i8,
 }
 
+impl std::fmt::Debug for Divergence {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Divergence")
+            .field("lookback", &self.lookback)
+            .field("kind", &self.kind)
+            .field("price_source", &self.price_source)
+            .field("last_signal", &self.last_signal)
+            .finish()
+    }
+}
+
 impl Divergence {
     pub fn new(oscillator: IndicatorInstance, lookback: usize, kind: DivergenceKind) -> Self {
         Self::with_source(oscillator, lookback, kind, OhlcvField::Close)
@@ -171,6 +182,70 @@ impl Divergence {
         self.prices.clear();
         self.osc_values.clear();
         self.last_signal = 0;
+    }
+
+    /// Detect divergence from pre-computed price and oscillator values (slice-based hot loop).
+    ///
+    /// `price` is the pre-extracted price (e.g. close), `oscillator` is the oscillator value.
+    /// Maintains internal rolling buffers — does NOT touch the inner `Box<IndicatorInstance>`.
+    pub fn detect_from_values(
+        &mut self,
+        price: f64,
+        oscillator: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        let cap = self.lookback * 2;
+        if self.prices.len() >= cap {
+            self.prices.remove(0);
+            self.osc_values.remove(0);
+        }
+        self.prices.push(price);
+        self.osc_values.push(oscillator);
+
+        if self.prices.len() < self.lookback + 1 {
+            return None;
+        }
+
+        let n = self.prices.len();
+        let p_now = self.prices[n - 1];
+        let p_then = self.prices[n - 1 - self.lookback];
+        let o_now = self.osc_values[n - 1];
+        let o_then = self.osc_values[n - 1 - self.lookback];
+
+        let price_up = p_now > p_then;
+        let price_down = p_now < p_then;
+        let osc_up = o_now > o_then;
+        let osc_down = o_now < o_then;
+
+        let signal = match self.kind {
+            DivergenceKind::Regular => {
+                if price_down && osc_up {
+                    1i8
+                } else if price_up && osc_down {
+                    -1
+                } else {
+                    0
+                }
+            }
+            DivergenceKind::Hidden => {
+                if price_up && osc_down {
+                    1
+                } else if price_down && osc_up {
+                    -1
+                } else {
+                    0
+                }
+            }
+        };
+
+        let sub = match self.kind {
+            DivergenceKind::Regular => DivergenceSub::Regular,
+            DivergenceKind::Hidden => DivergenceSub::Hidden,
+        };
+        match signal {
+            1 => Some((SignalKind::Divergence(sub), Direction::Up)),
+            -1 => Some((SignalKind::Divergence(sub), Direction::Down)),
+            _ => None,
+        }
     }
 }
 

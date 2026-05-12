@@ -63,6 +63,17 @@ pub struct Breakout {
     last_signal: i8,
 }
 
+impl std::fmt::Debug for Breakout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Breakout")
+            .field("direction", &self.direction)
+            .field("confirmation", &self.confirmation)
+            .field("was_above", &self.was_above)
+            .field("last_signal", &self.last_signal)
+            .finish()
+    }
+}
+
 impl Breakout {
     pub fn new(
         level: IndicatorInstance,
@@ -195,6 +206,38 @@ impl Breakout {
         self.level.reset();
         self.was_above = None;
         self.last_signal = 0;
+    }
+
+    /// Detect breakout from pre-computed values (slice-based hot loop).
+    ///
+    /// `price` is the close price; `level` is the pre-computed level value.
+    /// Uses `CloseThrough` semantics: emits on the bar where close transitions
+    /// to the other side of `level`.
+    ///
+    /// Does NOT touch the inner `Box<IndicatorInstance>`.
+    pub fn detect_from_values(
+        &mut self,
+        price: f64,
+        level: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        let is_above_now = price > level;
+        let signal = match self.was_above {
+            Some(false) if is_above_now => match self.direction {
+                BreakoutDirection::Both | BreakoutDirection::UpOnly => 1i8,
+                BreakoutDirection::DownOnly => 0,
+            },
+            Some(true) if !is_above_now => match self.direction {
+                BreakoutDirection::Both | BreakoutDirection::DownOnly => -1i8,
+                BreakoutDirection::UpOnly => 0,
+            },
+            _ => 0,
+        };
+        self.was_above = Some(is_above_now);
+        match signal {
+            1 => Some((SignalKind::Channel(ChannelSub::Break), Direction::Up)),
+            -1 => Some((SignalKind::Channel(ChannelSub::Break), Direction::Down)),
+            _ => None,
+        }
     }
 }
 

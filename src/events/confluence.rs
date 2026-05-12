@@ -42,6 +42,16 @@ pub struct Confluence {
     last_signal: i8,
 }
 
+impl std::fmt::Debug for Confluence {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Confluence")
+            .field("mode", &self.mode)
+            .field("input_count", &self.inputs.len())
+            .field("last_signal", &self.last_signal)
+            .finish()
+    }
+}
+
 impl Confluence {
     pub fn new(inputs: Vec<IndicatorInstance>, mode: ConfluenceMode) -> Self {
         Self {
@@ -145,6 +155,70 @@ impl Confluence {
             ind.reset();
         }
         self.last_signal = 0;
+    }
+
+    /// Detect confluence from pre-computed values (slice-based hot loop).
+    ///
+    /// `values` is a slice of pre-computed indicator outputs — one per logical input.
+    /// Does NOT touch the inner `Box<IndicatorInstance>` fields.
+    /// Returns `None` if slice is empty.
+    pub fn detect_from_values(&mut self, values: &[f64]) -> Option<(SignalKind, Direction)> {
+        if values.is_empty() {
+            return None;
+        }
+        let signs: Vec<i8> = values
+            .iter()
+            .map(|&v| {
+                if v > 0.0 {
+                    1i8
+                } else if v < 0.0 {
+                    -1
+                } else {
+                    0
+                }
+            })
+            .collect();
+
+        let signal: i8 = match self.mode {
+            ConfluenceMode::All => {
+                if signs.iter().all(|&s| s > 0) {
+                    1
+                } else if signs.iter().all(|&s| s < 0) {
+                    -1
+                } else {
+                    0
+                }
+            }
+            ConfluenceMode::Any => signs.iter().find(|&&s| s != 0).copied().unwrap_or(0),
+            ConfluenceMode::Majority => {
+                let pos = signs.iter().filter(|&&s| s > 0).count() as i32;
+                let neg = signs.iter().filter(|&&s| s < 0).count() as i32;
+                if pos > neg {
+                    1
+                } else if neg > pos {
+                    -1
+                } else {
+                    0
+                }
+            }
+            ConfluenceMode::Sum { threshold } => {
+                let sum: i32 = signs.iter().map(|&s| s as i32).sum();
+                if sum >= threshold {
+                    1
+                } else if sum <= -threshold {
+                    -1
+                } else {
+                    0
+                }
+            }
+        };
+
+        self.last_signal = signal;
+        match signal {
+            1 => Some((SignalKind::Composite(CompositeSub::Strong), Direction::Up)),
+            -1 => Some((SignalKind::Composite(CompositeSub::Strong), Direction::Down)),
+            _ => None,
+        }
     }
 }
 

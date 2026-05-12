@@ -58,6 +58,17 @@ pub struct SwingDetection {
     bars_seen: usize,
 }
 
+impl std::fmt::Debug for SwingDetection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SwingDetection")
+            .field("mode", &self.mode)
+            .field("last_swing", &self.last_swing)
+            .field("last_event", &self.last_event)
+            .field("bars_seen", &self.bars_seen)
+            .finish()
+    }
+}
+
 impl SwingDetection {
     /// Construct without ATR source. AtrMultiple mode requires use of
     /// `with_atr_source` instead — otherwise it always returns 0.
@@ -264,6 +275,57 @@ impl SwingDetection {
         self.bars_seen = 0;
         if let Some(atr) = self.atr_source.as_mut() {
             atr.reset();
+        }
+    }
+
+    /// Detect swing high/low from pre-computed bar values (slice-based hot loop).
+    ///
+    /// Feed `high`, `low`, `close` directly — the inner `Box<IndicatorInstance>` (ATR) is
+    /// NOT driven. For `AtrMultiple` mode pass the pre-computed ATR as `atr_hint`.
+    /// For all other modes `atr_hint` is ignored.
+    ///
+    /// Returns `Some((SignalKind::Swing, Direction::Up))` on swing-high confirmation,
+    /// `Direction::Down` on swing-low, `None` otherwise.
+    pub fn detect_from_values(
+        &mut self,
+        high: f64,
+        low: f64,
+        _close: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        self.bars_seen += 1;
+
+        let cap = match self.mode {
+            SwingMode::NBarExtreme { n } => n.max(2),
+            SwingMode::Lookahead { n } => n.max(2) * 2 + 1,
+            _ => 64,
+        };
+
+        if self.highs.len() >= cap {
+            self.highs.remove(0);
+            self.lows.remove(0);
+        }
+        self.highs.push(high);
+        self.lows.push(low);
+
+        let signal = match self.mode {
+            SwingMode::Percent { threshold_pct } => {
+                self.detect_reversal(high, low, threshold_pct, None)
+            }
+            SwingMode::AtrMultiple { mult } => {
+                // Without atr_hint we fall back to percent semantics using mult as pct.
+                self.detect_reversal(high, low, mult, None)
+            }
+            SwingMode::NBarExtreme { n } => self.detect_n_bar_extreme(n),
+            SwingMode::Lookahead { n } => self.detect_lookahead(n),
+        };
+
+        self.last_event = signal;
+        self.last_swing = if signal != 0 { signal } else { self.last_swing };
+
+        match signal {
+            1 => Some((SignalKind::Swing, Direction::Up)),
+            -1 => Some((SignalKind::Swing, Direction::Down)),
+            _ => None,
         }
     }
 }

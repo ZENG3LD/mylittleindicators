@@ -57,6 +57,16 @@ pub struct EventAtLevel {
     last_signal: i8,
 }
 
+impl std::fmt::Debug for EventAtLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EventAtLevel")
+            .field("proximity", &self.proximity)
+            .field("tolerance", &self.tolerance)
+            .field("last_signal", &self.last_signal)
+            .finish()
+    }
+}
+
 impl EventAtLevel {
     pub fn new(
         event: IndicatorInstance,
@@ -151,6 +161,48 @@ impl EventAtLevel {
         self.event.reset();
         self.level.reset();
         self.last_signal = 0;
+    }
+
+    /// Detect event-at-level from pre-computed values (slice-based hot loop).
+    ///
+    /// `event_value` is the pre-computed event indicator output (non-zero = event fired).
+    /// `level_value` is the pre-computed level indicator output.
+    /// `open`, `high`, `low`, `close` are raw OHLC for proximity checks.
+    /// Does NOT touch the inner `Box<IndicatorInstance>` fields.
+    pub fn detect_from_values(
+        &mut self,
+        event_value: f64,
+        level_value: f64,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+    ) -> Option<(SignalKind, Direction)> {
+        if event_value == 0.0 || level_value == 0.0 {
+            return None;
+        }
+        let tol = level_value.abs() * self.tolerance;
+        let near_level = match self.proximity {
+            ProximityField::Close => (close - level_value).abs() <= tol,
+            ProximityField::Body => {
+                let body_lo = open.min(close);
+                let body_hi = open.max(close);
+                body_lo - tol <= level_value && level_value <= body_hi + tol
+            }
+            ProximityField::Wick => low - tol <= level_value && level_value <= high + tol,
+            ProximityField::Any => {
+                let candidates = [open, high, low, close];
+                candidates.iter().any(|p| (p - level_value).abs() <= tol)
+            }
+        };
+        if !near_level {
+            return None;
+        }
+        if event_value > 0.0 {
+            Some((SignalKind::Composite(CompositeSub::Confirmed), Direction::Up))
+        } else {
+            Some((SignalKind::Composite(CompositeSub::Confirmed), Direction::Down))
+        }
     }
 }
 
