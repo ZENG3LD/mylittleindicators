@@ -1,7 +1,7 @@
 //! mylittleindicators — shared indicator + event factory.
 //!
-//! 480+ технических индикаторов (23 категории) + типы событий, conditions,
-//! composition, role_kind — низкоуровневый клей для построения стратегий и
+//! 480+ технических индикаторов (23 категории) + типы событий, composition,
+//! role_kind — низкоуровневый клей для построения стратегий и
 //! runtime детекторов в крейтах-потребителях (mylittlequant, mylittlechart).
 //!
 //! Здесь нет runtime-логики (детекторов, engine, рендера), нет defaults,
@@ -19,7 +19,7 @@ pub mod catalog;
 // Legacy re-export: old MLQ path `mlq_indicators::indicator_key::IndicatorKey`.
 pub use catalog::indicator_key;
 
-// All base types: market data (Bar/Tick/...), events, conditions, composition, shapes.
+// All base types: market data (Bar/Tick/...), signal taxonomy, codegen AST.
 pub mod core;
 
 // Backwards-compat: `crate::types::*` was the old path before types/ moved into core/.
@@ -41,15 +41,20 @@ pub use catalog::{
 
 pub use core::types::{Bar, Tick, CalendarService, TimeService};
 
-// Event taxonomy re-exports
-pub use core::events::{
+// Signal taxonomy re-exports (runtime layer)
+pub use core::signal::{
     SignalKind, SignalCategory,
     ThresholdSub, HistogramSub, ChannelSub, DivergenceSub, TrendSub,
     VolatilitySub, VolumeSub, StructureSub, PatternSub, CompositeSub,
-    Direction, SignalSource, BarConfirmation,
+    Direction, BarConfirmation,
 };
-pub use core::conditions::{
-    ThresholdCondition, CrossoverType, CompareCondition, TrendCondition,
-    DivergenceType, ChannelPosition, PatternState, CandlePattern,
-    VolatilityRegime, VolumeCharacter, LogicOp, ConfirmationRequirement,
+
+// AST re-exports (codegen layer)
+pub use core::ast::{
+    Event, ZoneBounds, EventTrigger,
+    OperatorClass, Strictness, strictness_for,
+    Operand, BarField, AggregateOp, DerivedOp, ArithmeticOp,
+    Window,
+    CompositionSpec, Guard, CmpOp,
+    RoleKind, role_kind_for,
 };

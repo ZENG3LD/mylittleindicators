@@ -17,8 +17,8 @@
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::instance_factory::IndicatorInstance;
 use crate::bar_indicators::ohlcv_field::OhlcvField;
-use crate::core::events::direction::Direction;
-use crate::core::events::kind::{DivergenceSub, SignalKind};
+use crate::core::signal::direction::Direction;
+use crate::core::signal::kind::{DivergenceSub, SignalKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DivergenceKind {

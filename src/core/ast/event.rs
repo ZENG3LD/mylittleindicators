@@ -4,11 +4,25 @@
 //! breach, candle pattern, etc.) that can be composed into buy/sell logic
 //! via `CompositionSpec`.
 
-use crate::core::events::operator::OperatorClass;
-use crate::core::events::operand::Operand;
-use crate::core::events::event_direction::EventDirection;
-use crate::core::events::window::Window;
-use crate::core::composition::guard::Guard;
+use super::operator::OperatorClass;
+use super::operand::Operand;
+use super::window::Window;
+use super::composition::Guard;
+
+/// Which directional relationship triggers the event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EventTrigger {
+    /// Left crosses above right (bullish cross).
+    Above,
+    /// Left crosses below right (bearish cross).
+    Below,
+    /// Either direction triggers.
+    Either,
+    /// Bullish bias (rising / up-sloping).
+    Bullish,
+    /// Bearish bias (falling / down-sloping).
+    Bearish,
+}
 
 /// Zone bounds for `ZoneEnter` / `ZoneExit` operator classes.
 ///
@@ -58,7 +72,7 @@ pub struct Event {
     /// Bar window the event is evaluated over.
     pub window_n: Window,
     /// Directional constraint on the event.
-    pub direction: EventDirection,
+    pub direction: EventTrigger,
     /// Additional guard conditions that must also be true.
     pub guards: Vec<Guard>,
 }
@@ -68,7 +82,7 @@ impl Event {
     pub fn cross(
         left: Operand,
         right: Operand,
-        direction: EventDirection,
+        direction: EventTrigger,
         guards: Vec<Guard>,
     ) -> Self {
         Self {
@@ -87,7 +101,7 @@ impl Event {
     pub fn threshold(
         left: Operand,
         right: Operand,
-        direction: EventDirection,
+        direction: EventTrigger,
         guards: Vec<Guard>,
     ) -> Self {
         Self {
@@ -111,7 +125,7 @@ impl Event {
             zone_bounds: Some(bounds),
             pattern_id: None,
             window_n: Window::CurrentBar,
-            direction: EventDirection::Either,
+            direction: EventTrigger::Either,
             guards,
         }
     }
@@ -125,7 +139,7 @@ impl Event {
             zone_bounds: None,
             pattern_id: Some(pattern_id),
             window_n: Window::CurrentBar,
-            direction: EventDirection::Either,
+            direction: EventTrigger::Either,
             guards,
         }
     }
@@ -139,7 +153,7 @@ impl Event {
             zone_bounds: Some(bounds),
             pattern_id: None,
             window_n: Window::CurrentBar,
-            direction: EventDirection::Either,
+            direction: EventTrigger::Either,
             guards,
         }
     }
@@ -148,7 +162,7 @@ impl Event {
     pub fn nbar_extreme(
         left: Operand,
         n: usize,
-        direction: EventDirection,
+        direction: EventTrigger,
         guards: Vec<Guard>,
     ) -> Self {
         Self {
@@ -168,7 +182,7 @@ impl Event {
         left: Operand,
         l: usize,
         r: usize,
-        direction: EventDirection,
+        direction: EventTrigger,
         guards: Vec<Guard>,
     ) -> Self {
         Self {
@@ -187,7 +201,7 @@ impl Event {
     pub fn direction(
         left: Operand,
         right: Option<Operand>,
-        direction: EventDirection,
+        direction: EventTrigger,
         guards: Vec<Guard>,
     ) -> Self {
         Self {
@@ -207,7 +221,7 @@ impl Event {
         left: Operand,
         right: Operand,
         n: usize,
-        direction: EventDirection,
+        direction: EventTrigger,
         guards: Vec<Guard>,
     ) -> Self {
         Self {
@@ -226,7 +240,7 @@ impl Event {
     pub fn regime_gate(
         left: Operand,
         right: Operand,
-        direction: EventDirection,
+        direction: EventTrigger,
         guards: Vec<Guard>,
     ) -> Self {
         Self {
@@ -255,7 +269,7 @@ impl Event {
             zone_bounds: None,
             pattern_id: None,
             window_n: Window::NBars(n),
-            direction: EventDirection::Either,
+            direction: EventTrigger::Either,
             guards,
         }
     }
@@ -264,7 +278,7 @@ impl Event {
     pub fn volatility_regime(
         left: Operand,
         right: Operand,
-        direction: EventDirection,
+        direction: EventTrigger,
         guards: Vec<Guard>,
     ) -> Self {
         Self {
@@ -283,7 +297,7 @@ impl Event {
     pub fn volume_event(
         left: Operand,
         right: Operand,
-        direction: EventDirection,
+        direction: EventTrigger,
         guards: Vec<Guard>,
     ) -> Self {
         Self {

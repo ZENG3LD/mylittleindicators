@@ -1,12 +1,97 @@
-//! Validation functions for `Event` and `CompositionSpec`.
+//! Composition — how multiple events combine into a signal condition.
 //!
-//! Call `validate_event` before storing or generating code from an event.
-//! Call `validate_composition` on the root of a `buy_when` / `sell_when` tree.
+//! `CompositionSpec` — recursive tree over `Event`. `Guard` — filters on top of
+//! the composition. `validate_event` / `validate_composition` — static checks.
 
-use crate::core::composition::spec::CompositionSpec;
-use crate::core::events::operator::OperatorClass;
-use crate::core::events::window::Window;
-use crate::core::events::event::Event;
+use super::event::Event;
+use super::operator::OperatorClass;
+use super::window::Window;
+
+// ============================================================================
+// GUARD
+// ============================================================================
+
+/// Comparison operator used in guard conditions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CmpOp {
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    Eq,
+    Neq,
+}
+
+/// A single guard condition that gates an event.
+///
+/// All guards in a `Vec<Guard>` must evaluate to `true` for the event
+/// to be considered active.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Guard {
+    /// Indicator role output must satisfy a threshold comparison.
+    Regime {
+        /// Index into `StrategySpec::roles`.
+        role_idx: usize,
+        op: CmpOp,
+        threshold: f64,
+    },
+    /// A named state variable must match a value.
+    State {
+        /// Index into `StateSpec::vars`.
+        var_idx: usize,
+        op: CmpOp,
+        val: i32,
+    },
+    /// Only trigger within a specific hour range (UTC).
+    TimeOfDay {
+        hour_start: u8,
+        hour_end: u8,
+    },
+    /// Volume must be at least `mult` times the rolling average volume.
+    VolumeMin {
+        /// Index into `StrategySpec::roles` for the volume indicator.
+        role_idx: usize,
+        mult: f64,
+    },
+    // Note: PositionFlat removed — express via Guard::State on the strategy's
+    // own prev_state field (e.g. State{ var_idx: PREV_STATE, op: Eq, val:
+    // Signal::None as i32 }). Strategies model position-awareness via their
+    // own state machine (see DualMaCrossV3.prev_state), not via backtester
+    // position. Hot loop signature unchanged.
+}
+
+// ============================================================================
+// COMPOSITION SPEC
+// ============================================================================
+
+/// Recursive composition of event conditions.
+///
+/// A `CompositionSpec` is the tree structure evaluated per bar to decide
+/// whether to emit Buy / Sell / ForceClose signals.
+#[derive(Debug, Clone)]
+pub enum CompositionSpec {
+    /// Single event — no composition.
+    Single(Event),
+    /// All sub-expressions must be true simultaneously.
+    And(Vec<CompositionSpec>),
+    /// At least one sub-expression must be true.
+    Or(Vec<CompositionSpec>),
+    /// The sub-expression must be false. Only valid as a sub-expression,
+    /// never as the root of a `buy_when` / `sell_when` tree.
+    Not(Box<CompositionSpec>),
+    /// Events must fire in sequence within `max_bars` bars of each other.
+    ///
+    /// Requires 2 extra state variables: `fired_a` + `bars_since_a`.
+    Sequence {
+        events: Vec<CompositionSpec>,
+        /// Maximum bars allowed between first and last event firing.
+        max_bars: usize,
+    },
+}
+
+// ============================================================================
+// VALIDATION
+// ============================================================================
 
 /// Validate an `Event` against the operand / structure rules for its
 /// `operator_class`.
@@ -22,21 +107,18 @@ pub fn validate_event(e: &Event) -> Result<(), String> {
             let right = e.right_operand.as_ref()
                 .ok_or("cross: right_operand is required")?;
 
-            // left must be Indicator or BarField
             if !left.is_indicator() && !left.is_bar_field() {
                 return Err(format!(
                     "cross: left_operand must be Indicator or BarField, got {:?}",
                     left
                 ));
             }
-            // right must be Indicator, BarField, or Constant — NOT both Constant
             if !right.is_indicator() && !right.is_bar_field() && !right.is_constant() {
                 return Err(format!(
                     "cross: right_operand must be Indicator, BarField, or Constant, got {:?}",
                     right
                 ));
             }
-            // Reject (Constant, Constant)
             if left.is_constant() && right.is_constant() {
                 return Err("cross: both operands are constants — meaningless comparison".into());
             }
@@ -95,7 +177,6 @@ pub fn validate_event(e: &Event) -> Result<(), String> {
                     right
                 ));
             }
-            // Window must carry N
             match e.window_n {
                 Window::NBars(_) | Window::CurrentBar => {}
                 Window::PivotLR { .. } => {
@@ -184,13 +265,10 @@ pub fn validate_event(e: &Event) -> Result<(), String> {
         }
 
         OperatorClass::Sequence => {
-            // Sequence as a Single event: slot 0 = arm trigger, slot 1 = fire trigger.
-            // Both operands required: left = arm, right = fire.
             e.left_operand.as_ref()
                 .ok_or("sequence: left_operand (arm trigger) is required")?;
             e.right_operand.as_ref()
                 .ok_or("sequence: right_operand (fire trigger) is required")?;
-            // Window must carry NBars > 0
             match e.window_n {
                 Window::NBars(n) if n > 0 => {}
                 _ => return Err("sequence: window_n must be NBars(n) with n > 0".into()),
@@ -198,13 +276,11 @@ pub fn validate_event(e: &Event) -> Result<(), String> {
         }
 
         OperatorClass::VolatilityRegime => {
-            // Vol regime shift: left = vol metric (z-score, ATR), right = optional threshold.
             e.left_operand.as_ref()
                 .ok_or("volatility_regime: left_operand (vol metric role) is required")?;
         }
 
         OperatorClass::VolumeEvent => {
-            // Volume event: left = volume (or vol-derived), right = avg/threshold.
             e.left_operand.as_ref()
                 .ok_or("volume_event: left_operand (volume role) is required")?;
         }
@@ -279,7 +355,8 @@ fn validate_composition_inner(c: &CompositionSpec, is_root: bool) -> Result<(), 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::events::{Operand, EventDirection, Window, Event};
+    use super::super::event::{Event, EventTrigger};
+    use super::super::operand::{Operand, BarField};
 
     fn make_cross_event(left: Operand, right: Operand) -> Event {
         Event {
@@ -289,7 +366,7 @@ mod tests {
             zone_bounds: None,
             pattern_id: None,
             window_n: Window::CurrentBar,
-            direction: EventDirection::Above,
+            direction: EventTrigger::Above,
             guards: vec![],
         }
     }
@@ -311,7 +388,6 @@ mod tests {
 
     #[test]
     fn cross_accepts_indicator_bar_field() {
-        use crate::core::events::BarField;
         let e = make_cross_event(
             Operand::IndicatorValue { role_idx: 0 },
             Operand::BarField(BarField::Close),
@@ -321,7 +397,6 @@ mod tests {
 
     #[test]
     fn composition_not_as_root_rejected() {
-        use crate::core::events::BarField;
         let inner_event = make_cross_event(
             Operand::IndicatorValue { role_idx: 0 },
             Operand::BarField(BarField::Close),
@@ -332,7 +407,6 @@ mod tests {
 
     #[test]
     fn composition_not_as_sub_ok() {
-        use crate::core::events::BarField;
         let inner_event = make_cross_event(
             Operand::IndicatorValue { role_idx: 0 },
             Operand::BarField(BarField::Close),
@@ -356,7 +430,6 @@ mod tests {
 
     #[test]
     fn composition_sequence_zero_max_bars_rejected() {
-        use crate::core::events::BarField;
         let e = make_cross_event(
             Operand::IndicatorValue { role_idx: 0 },
             Operand::BarField(BarField::Close),

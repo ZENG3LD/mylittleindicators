@@ -16,8 +16,8 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::instance_factory::IndicatorInstance;
-use crate::core::events::direction::Direction;
-use crate::core::events::kind::{ChannelSub, SignalKind};
+use crate::core::signal::direction::Direction;
+use crate::core::signal::kind::{ChannelSub, SignalKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BreakoutDirection {

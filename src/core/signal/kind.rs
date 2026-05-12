@@ -1,7 +1,7 @@
 //! Event taxonomy — hierarchical catalog of trading event types.
 //!
 //! Migrated from `signals/catalog.rs`. Direction (Up/Down/Neutral) is NOT part
-//! of SignalKind — lives on `events/direction::Direction` (and on
+//! of SignalKind — lives on `signal/direction::Direction` (and on
 //! `runtime/signal::Signal.direction`).
 //!
 //! 13 kinds, each with optional subtype for specificity.

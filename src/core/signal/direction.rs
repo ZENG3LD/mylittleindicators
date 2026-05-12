@@ -1,6 +1,4 @@
-//! Direction + SignalSource — кто и куда.
-//!
-//! Migrated from `signals/signal.rs`.
+//! Direction + BarConfirmation — signal direction and bar confirmation status.
 
 use serde::{Deserialize, Serialize};
 
@@ -41,11 +39,13 @@ impl Direction {
     }
 }
 
-/// Кто создал сигнал.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SignalSource {
-    /// Индикатор по имени (e.g. "RSI", "MACD", "EMA").
-    Indicator(String),
-    /// Стратегия по имени.
-    Strategy(String),
+/// Статус подтверждения бара в момент эмиссии сигнала.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BarConfirmation {
+    /// Бар ещё не закрыт — сигнал может исчезнуть.
+    Pending,
+    /// Бар закрылся, тело подтвердило пересечение.
+    Closed,
+    /// Бар закрылся, но тело не подтвердило — только прокол тенью.
+    WickOnly,
 }
