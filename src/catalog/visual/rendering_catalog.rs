@@ -4374,27 +4374,6 @@ fn register_divergence_indicators(catalog: &mut HashMap<BarIndicatorId, Renderin
             .build()
     );
 
-    // Classic Divergence
-    catalog.insert(BarIndicatorId::ClassicDiv,
-        RenderingMetadata::builder("CLASSIC_DIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("div", "Classic Div", COLOR_BLUE, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // Divergence Strength
-    catalog.insert(BarIndicatorId::DivStrength,
-        RenderingMetadata::builder("DIV_STRENGTH")
-            .sub_pane()
-            .line_output("strength", "Div Strength", COLOR_ORANGE)
-            .bounds(0.0, 100.0)
-            .precision(2)
-            .build()
-    );
-
     // Hidden Divergence
     catalog.insert(BarIndicatorId::HiddenDiv,
         RenderingMetadata::builder("HIDDEN_DIV")
@@ -4416,19 +4395,6 @@ fn register_divergence_indicators(catalog: &mut HashMap<BarIndicatorId, Renderin
             .precision(0)
             .build()
     );
-
-    // Multi Divergence
-    catalog.insert(BarIndicatorId::MultiDiv,
-        RenderingMetadata::builder("MULTI_DIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("div", "Multi Div", COLOR_CYAN, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-
 
     // Volume Divergence
     catalog.insert(BarIndicatorId::VolDiv,
@@ -5357,7 +5323,7 @@ fn register_missing_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMe
     // ========================================================================
 
     let divergence_ids = [
-        BarIndicatorId::CciDiv, BarIndicatorId::ClassicDiv, BarIndicatorId::DivStrength, BarIndicatorId::HiddenDiv, BarIndicatorId::MacdDiv, BarIndicatorId::MacdHistDiv, BarIndicatorId::MultiDiv, BarIndicatorId::ObvDiv, BarIndicatorId::RsiDiv, BarIndicatorId::StochDiv, BarIndicatorId::VolDiv, BarIndicatorId::WilliamsDiv, BarIndicatorId::ZigzagDiv
+        BarIndicatorId::CciDiv, BarIndicatorId::HiddenDiv, BarIndicatorId::MacdDiv, BarIndicatorId::MacdHistDiv, BarIndicatorId::ObvDiv, BarIndicatorId::RsiDiv, BarIndicatorId::StochDiv, BarIndicatorId::VolDiv, BarIndicatorId::WilliamsDiv, BarIndicatorId::ZigzagDiv
     ];
     for id in divergence_ids {
         catalog.insert(id,

@@ -56,71 +56,6 @@ pub fn signature_cci_divergence() -> IndicatorSignature {
         .build()
 }
 
-/// Classic Divergence Detector - Generic regular divergence detection
-pub fn signature_classic_divergence() -> IndicatorSignature {
-    IndicatorSignature::builder("CLASSIC_DIV", CATEGORY)
-        .name("Classic Divergence")
-        .description("Detects regular (classic) bullish and bearish divergences between price and any oscillator")
-        .add_constraint(
-            ParamConstraint::new("swing_period", ParamType::USize)
-                .with_min(ParamValue::USize(3))
-                .with_max(ParamValue::USize(20))
-                .with_default(ParamValue::USize(5))
-                .required()
-        )
-        .add_constraint(
-            ParamConstraint::new("min_swing_distance", ParamType::USize)
-                .with_min(ParamValue::USize(1))
-                .with_max(ParamValue::USize(50))
-                .with_default(ParamValue::USize(10))
-        )
-        .metadata("type", "regular/classic")
-        .metadata("signals", "bullish, bearish")
-        .machine_id(BarIndicatorId::ClassicDiv) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Other)
-        .output_kind(IndicatorValueKind::Signal)
-        // Note: "CLASSIC_DIV" is already the main ID, no need for alias
-        .alias("ClassicDiv")
-        .alias("classic_div")
-        .alias("CLASSICDIVERGENCE")
-        .alias("ClassicDivergence")
-        .alias("classicdivergence")
-        .alias("classic_divergence")
-        .alias("CLASSIC_DIVERGENCE")
-        .alias("Classic_Divergence")
-        .build()
-}
-
-/// Divergence Strength - Measures the magnitude of divergence
-pub fn signature_divergence_strength() -> IndicatorSignature {
-    IndicatorSignature::builder("DIV_STRENGTH", CATEGORY)
-        .name("Divergence Strength")
-        .description("Quantifies the strength/magnitude of detected divergences (0-100)")
-        .add_constraint(ParamConstraint::period(5, 200, 14))
-        .add_constraint(
-            ParamConstraint::new("swing_period", ParamType::USize)
-                .with_min(ParamValue::USize(3))
-                .with_max(ParamValue::USize(20))
-                .with_default(ParamValue::USize(5))
-        )
-        .metadata("range", "0-100")
-        .metadata("interpretation", "0 = no divergence, 100 = maximum divergence")
-        .machine_id(BarIndicatorId::DivStrength) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::OscillatorBounded)
-        .output_kind(IndicatorValueKind::Signal)
-        .output_bounds(0.0, 100.0)
-        // Note: "DIV_STRENGTH" is already the main ID, no need for alias
-        .alias("DivStrength")
-        .alias("div_strength")
-        .alias("DIVERGENCESTRENGTH")
-        .alias("DivergenceStrength")
-        .alias("divergencestrength")
-        .alias("divergence_strength")
-        .alias("DIVERGENCE_STRENGTH")
-        .alias("Divergence_Strength")
-        .build()
-}
-
 /// Hidden Divergence Detector - Detects continuation patterns
 pub fn signature_hidden_divergence() -> IndicatorSignature {
     IndicatorSignature::builder("HIDDEN_DIV", CATEGORY)
@@ -229,35 +164,6 @@ pub fn signature_macd_histogram_divergence() -> IndicatorSignature {
         .alias("macd_histogram_divergence")
         .alias("MACD_HISTOGRAM_DIVERGENCE")
         .alias("Macd_Histogram_Divergence")
-        .build()
-}
-
-/// Multi-Indicator Divergence Consensus - Aggregates multiple divergence signals
-pub fn signature_multi_indicator_divergence() -> IndicatorSignature {
-    IndicatorSignature::builder("MULTI_DIV", CATEGORY)
-        .name("Multi-Indicator Divergence")
-        .description("Consensus divergence across RSI, MACD, and Stochastic")
-        .add_constraint(ParamConstraint::period(5, 200, 14))
-        .add_constraint(
-            ParamConstraint::new("min_confirmations", ParamType::USize)
-                .with_min(ParamValue::USize(1))
-                .with_max(ParamValue::USize(3))
-                .with_default(ParamValue::USize(2))
-        )
-        .metadata("indicators", "RSI, MACD, Stochastic")
-        .metadata("type", "consensus")
-        .machine_id(BarIndicatorId::MultiDiv) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Other)
-        .output_kind(IndicatorValueKind::Signal)
-        // Note: "MULTI_DIV" is already the main ID, no need for alias
-        .alias("MultiDiv")
-        .alias("multi_div")
-        .alias("MULTIINDICATORDIVERGENCE")
-        .alias("MultiIndicatorDivergence")
-        .alias("multiindicatordivergence")
-        .alias("multi_indicator_divergence")
-        .alias("MULTI_INDICATOR_DIVERGENCE")
-        .alias("Multi_Indicator_Divergence")
         .build()
 }
 
@@ -496,12 +402,9 @@ pub fn signature_zigzag_divergence() -> IndicatorSignature {
 /// Base catalog with main IDs only (used for initialization)
 const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("CCI_DIV", signature_cci_divergence as fn() -> IndicatorSignature),
-    ("CLASSIC_DIV", signature_classic_divergence as fn() -> IndicatorSignature),
-    ("DIV_STRENGTH", signature_divergence_strength as fn() -> IndicatorSignature),
     ("HIDDEN_DIV", signature_hidden_divergence as fn() -> IndicatorSignature),
     ("MACD_DIV", signature_macd_divergence as fn() -> IndicatorSignature),
     ("MACD_HIST_DIV", signature_macd_histogram_divergence as fn() -> IndicatorSignature),
-    ("MULTI_DIV", signature_multi_indicator_divergence as fn() -> IndicatorSignature),
     ("OBV_DIV", signature_obv_divergence as fn() -> IndicatorSignature),
     ("RSI_DIV", signature_rsi_divergence as fn() -> IndicatorSignature),
     ("STOCH_DIV", signature_stochastic_divergence as fn() -> IndicatorSignature),
@@ -573,13 +476,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_classic_divergence_signature() {
-        let sig = get_signature("CLASSIC_DIV").unwrap();
-        assert_eq!(sig.id, "CLASSIC_DIV");
-        assert!(sig.required_params().len() > 0);
-    }
-
-    #[test]
     fn test_all_signatures_valid() {
         for id in all_indicator_ids() {
             let sig = get_signature(id).unwrap();
@@ -590,7 +486,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 13); // 13 divergence indicators
+        assert_eq!(count(), 10); // 10 divergence indicators
     }
 
     #[test]
@@ -631,11 +527,5 @@ mod tests {
         assert_eq!(sig.get_metadata("uses_volume"), Some("true"));
     }
 
-    #[test]
-    fn test_multi_indicator_divergence() {
-        let sig = get_signature("MULTI_DIV").unwrap();
-        assert_eq!(sig.id, "MULTI_DIV");
-        // Description varies - just check it exists
-        assert!(!sig.description.is_empty());
-    }
 }
+

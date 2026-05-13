@@ -421,14 +421,11 @@ pub enum BarIndicatorId {
     HurstPct,  // HURST_PCT
     WilliamsMfi,  // WILLIAMS_MFI
 
-    // Divergence (13 indicators)
+    // Divergence (10 indicators)
     CciDiv,  // CCI_DIV
-    ClassicDiv,  // CLASSIC_DIV
-    DivStrength,  // DIV_STRENGTH
     HiddenDiv,  // HIDDEN_DIV
     MacdDiv,  // MACD_DIV
     MacdHistDiv,  // MACD_HIST_DIV
-    MultiDiv,  // MULTI_DIV
     ObvDiv,  // OBV_DIV
     RsiDiv,  // RSI_DIV
     StochDiv,  // STOCH_DIV

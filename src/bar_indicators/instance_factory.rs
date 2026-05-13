@@ -155,10 +155,6 @@ use crate::bar_indicators::channels::vwap_channels::VwapChannels;
 // BB Period
 use crate::bar_indicators::momentum::bb_period::BbPeriod;
 
-// Divergence (3 unique algorithms; legacy types removed)
-use crate::bar_indicators::divergence::{
-    ClassicDivergence, DivergenceStrength, MultiDivergence,
-};
 
 // Volume / Accumulation
 use crate::bar_indicators::accumulation::accumulation_distribution::AccumulationDistribution;
@@ -1356,12 +1352,6 @@ pub enum IndicatorInstance {
 
     // ========================================
     // BATCH 5 ADDITIONS (13 divergence indicators)
-    // ========================================
-    // DIVERGENCE (3 unique algorithms remain; legacy wrappers removed — redirected to OscillatorWithDivergence)
-    ClassicDiv(Box<ClassicDivergence>),
-    DivStrength(Box<DivergenceStrength>),
-    MultiDiv(Box<MultiDivergence>),
-
     // ========================================
     // BATCH 6 ADDITIONS (3 timestamp-dependent indicators)
     // ========================================
@@ -3887,7 +3877,6 @@ impl IndicatorInstance {
             // ========================================
             // DIVERGENCE
             // Legacy Div arms redirected to OscillatorWithDivergence wrapper.
-            // ClassicDiv / DivStrength / MultiDiv remain as unique algorithms.
             BarIndicatorId::RsiDiv => {
                 let period = config.periods.first().copied().unwrap_or(14).max(1);
                 let lookback = config.periods.get(1).copied().unwrap_or(14).max(5);
@@ -3987,10 +3976,6 @@ impl IndicatorInstance {
                 let inner = Box::new(Self::Vfi(Box::new(Vfi::new(lookback))));
                 Ok(*Self::wrap_with_divergence_if_requested(inner, &div_config))
             }
-            BarIndicatorId::ClassicDiv => {
-                let lookback = config.periods.first().copied().unwrap_or(14).max(5);
-                Ok(Self::ClassicDiv(Box::new(ClassicDivergence::new(lookback))))
-            }
             BarIndicatorId::HiddenDiv => {
                 let period = config.periods.first().copied().unwrap_or(14).max(1);
                 let lookback = config.periods.get(1).copied().unwrap_or(14).max(5);
@@ -4003,16 +3988,6 @@ impl IndicatorInstance {
                     Rsi::with_source(period, MovingAverageType::RMA, config.source),
                 )));
                 Ok(*Self::wrap_with_divergence_if_requested(inner, &div_config))
-            }
-            BarIndicatorId::DivStrength => {
-                let period = config.periods.first().copied().unwrap_or(14).max(1);
-                let lookback = config.periods.get(1).copied().unwrap_or(14).max(5);
-                Ok(Self::DivStrength(Box::new(DivergenceStrength::new(period, lookback))))
-            }
-            BarIndicatorId::MultiDiv => {
-                let period = config.periods.first().copied().unwrap_or(14).max(1);
-                let lookback = config.periods.get(1).copied().unwrap_or(14).max(5);
-                Ok(Self::MultiDiv(Box::new(MultiDivergence::new(period, lookback))))
             }
             BarIndicatorId::MtfMomDiv => {
                 Ok(Self::MultiTimeframeMomentumDivergence(Box::new(MultiTimeframeMomentumDivergence::with_source(config.source))))
@@ -4465,10 +4440,6 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::ClassicDiv(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
             Self::CloseVolPercentile(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -4566,10 +4537,6 @@ impl IndicatorInstance {
                 x.value()
             }
             Self::DistLevels(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::DivStrength(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -5013,10 +4980,6 @@ impl IndicatorInstance {
                 x.value()
             }
             Self::MovingAverage(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::MultiDiv(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -6168,7 +6131,6 @@ impl IndicatorInstance {
             Self::ChebyshevFilter(ind) => ind.value(),
             Self::Cho(ind) => ind.value(),
             Self::ChoppinessIndex(ind) => ind.value(),
-            Self::ClassicDiv(ind) => ind.value(),
             Self::CloseVolPercentile(ind) => ind.value(),
             Self::ClQueueImb(ind) => ind.value(),
             Self::Cmf(ind) => ind.value(),
@@ -6194,7 +6156,6 @@ impl IndicatorInstance {
             Self::Di(ind) => ind.value(),
             Self::DiPlusMinus(ind) => ind.value(),
             Self::Didi(ind) => ind.value(),
-            Self::DivStrength(ind) => ind.value(),
             Self::Dm(ind) => ind.value(),
             Self::Doji(ind) => ind.value(),
             Self::DonchianBreakout(ind) => ind.value(),
@@ -6292,7 +6253,6 @@ impl IndicatorInstance {
             Self::MomentumZscore(ind) => ind.value(),
             Self::Morningstar(ind) => ind.value(),
             Self::MovingAverage(ind) => ind.value(),
-            Self::MultiDiv(ind) => ind.value(),
             Self::MultiTimeframeMomentumDivergence(ind) => ind.value(),
             Self::MutualInformation(ind) => ind.value(),
             Self::Natr(ind) => ind.value(),
@@ -6668,7 +6628,6 @@ impl IndicatorInstance {
             Self::ChebyshevFilter(ind) => ind.is_ready(),
             Self::Cho(ind) => ind.is_ready(),
             Self::ChoppinessIndex(ind) => ind.is_ready(),
-            Self::ClassicDiv(ind) => ind.is_ready(),
             Self::CloseVolPercentile(ind) => ind.is_ready(),
             Self::ClQueueImb(ind) => ind.is_ready(),
             Self::Cmf(ind) => ind.is_ready(),
@@ -6698,7 +6657,6 @@ impl IndicatorInstance {
             Self::Di(ind) => ind.is_ready(),
             Self::Didi(ind) => ind.is_ready(),
             Self::DistLevels(ind) => ind.is_ready(),
-            Self::DivStrength(ind) => ind.is_ready(),
             Self::Dm(ind) => ind.is_ready(),
             Self::Doji(ind) => ind.is_ready(),
             Self::DomWoq(ind) => ind.is_ready(),
@@ -6834,7 +6792,6 @@ impl IndicatorInstance {
             Self::MonthTurn(ind) => ind.is_ready(),
             Self::Morningstar(ind) => ind.is_ready(),
             Self::MovingAverage(ind) => ind.is_ready(),
-            Self::MultiDiv(ind) => ind.is_ready(),
             Self::MultiTimeframeMomentumDivergence(ind) => ind.is_ready(),
             Self::MutualInformation(ind) => ind.is_ready(),
             Self::Natr(ind) => ind.is_ready(),
@@ -7130,7 +7087,6 @@ impl IndicatorInstance {
             Self::ChebyshevFilter(ind) => ind.reset(),
             Self::Cho(ind) => ind.reset(),
             Self::ChoppinessIndex(ind) => ind.reset(),
-            Self::ClassicDiv(ind) => ind.reset(),
             Self::CloseVolPercentile(ind) => ind.reset(),
             Self::ClQueueImb(ind) => ind.reset(),
             Self::Cmf(ind) => ind.reset(),
@@ -7160,7 +7116,6 @@ impl IndicatorInstance {
             Self::Di(ind) => ind.reset(),
             Self::Didi(ind) => ind.reset(),
             Self::DistLevels(ind) => ind.reset(),
-            Self::DivStrength(ind) => ind.reset(),
             Self::Dm(ind) => ind.reset(),
             Self::Doji(ind) => ind.reset(),
             Self::DomWoq(ind) => ind.reset(),
@@ -7296,7 +7251,6 @@ impl IndicatorInstance {
             Self::MonthTurn(ind) => ind.reset(),
             Self::Morningstar(ind) => ind.reset(),
             Self::MovingAverage(ind) => ind.reset(),
-            Self::MultiDiv(ind) => ind.reset(),
             Self::MultiTimeframeMomentumDivergence(ind) => ind.reset(),
             Self::MutualInformation(ind) => ind.reset(),
             Self::Natr(ind) => ind.reset(),
