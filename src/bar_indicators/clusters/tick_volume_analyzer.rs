@@ -1,27 +1,30 @@
-//! Tick Volume Analyzer - анализатор тикового объема
-//! Работает с Tick данными для детального анализа микроструктуры рынка
+//! Tick Volume Analyzer — buy/sell volume split from trade stream.
+//!
+//! Primary path: `update(&Tick)` — uses real `tick.is_buy` flag set by exchange.
+//! Accurate buy/sell delta requires a live tick feed.
+//!
+//! Fallback path: `update_bar(o,h,l,c,v)` — SYNTHETIC ESTIMATE only.
+//! close > open → all volume counted as buy; close < open → all as sell.
+//! This heuristic is only an approximation. Prefer `update` when ticks available.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::types::Tick;
 
-/// Анализатор тикового объема
+/// Tick Volume Analyzer.
 #[derive(Clone)]
 pub struct TickVolumeAnalyzer {
     period: usize,
     ticks: Vec<Tick>,
 
-    // Статистика
     total_volume: f64,
     buy_volume: f64,
     sell_volume: f64,
 
-    // Метрики
     volume_delta: f64,
-    volume_ratio: f64, // buy / sell
+    volume_ratio: f64,
     tick_count: usize,
     avg_tick_size: f64,
 
-    // Микроструктурные метрики
     avg_spread: f64,
     spread_samples: usize,
 }
@@ -43,9 +46,8 @@ impl TickVolumeAnalyzer {
         }
     }
 
-    /// Обновить анализатор новым тиком
+    /// Update with a real trade tick. Uses `tick.is_buy` directly.
     pub fn update(&mut self, tick: &Tick) {
-        // Обновляем объемы
         self.total_volume += tick.size;
         if tick.is_buy {
             self.buy_volume += tick.size;
@@ -53,7 +55,6 @@ impl TickVolumeAnalyzer {
             self.sell_volume += tick.size;
         }
 
-        // Обновляем spread
         if let Some(spread) = tick.spread() {
             self.avg_spread = (self.avg_spread * self.spread_samples as f64 + spread)
                 / (self.spread_samples + 1) as f64;
@@ -61,40 +62,35 @@ impl TickVolumeAnalyzer {
         }
 
         self.tick_count += 1;
-        self.volume_delta = self.buy_volume - self.sell_volume;
-        self.volume_ratio = if self.sell_volume > 0.0 {
-            self.buy_volume / self.sell_volume
-        } else {
-            1.0
-        };
-        self.avg_tick_size = self.total_volume / self.tick_count as f64;
+        self.recalculate_derived();
 
-        // Сохраняем тик в буфер
         if self.ticks.len() >= self.period {
             self.ticks.remove(0);
         }
         self.ticks.push(*tick);
     }
 
-    /// Обновить стандартным update_bar (эмулирует buy/sell по направлению бара)
-    /// Если close > open - считаем buy volume, иначе sell volume
+    /// SYNTHETIC ESTIMATE: close > open → buy volume; close < open → sell volume;
+    /// close == open (doji) → split 50/50. Not accurate — use `update` with real ticks.
     pub fn update_bar(&mut self, o: f64, _h: f64, _l: f64, c: f64, v: f64) -> f64 {
         self.total_volume += v;
 
-        // Эмуляция buy/sell по направлению бара
         if c > o {
-            // Бычий бар - считаем как buy volume
             self.buy_volume += v;
         } else if c < o {
-            // Медвежий бар - считаем как sell volume
             self.sell_volume += v;
         } else {
-            // Doji - делим пополам
+            // Doji: split evenly
             self.buy_volume += v * 0.5;
             self.sell_volume += v * 0.5;
         }
 
         self.tick_count += 1;
+        self.recalculate_derived();
+        self.volume_delta
+    }
+
+    fn recalculate_derived(&mut self) {
         self.volume_delta = self.buy_volume - self.sell_volume;
         self.volume_ratio = if self.sell_volume > 0.0 {
             self.buy_volume / self.sell_volume
@@ -102,7 +98,6 @@ impl TickVolumeAnalyzer {
             1.0
         };
         self.avg_tick_size = self.total_volume / self.tick_count as f64;
-        self.volume_delta
     }
 
     pub fn volume_delta(&self) -> f64 { self.volume_delta }
@@ -112,11 +107,12 @@ impl TickVolumeAnalyzer {
     pub fn avg_spread(&self) -> f64 { self.avg_spread }
     pub fn tick_count(&self) -> usize { self.tick_count }
 
-    /// Получить значение как IndicatorValue
     #[inline]
     pub fn value(&self) -> IndicatorValue {
         IndicatorValue::Single(self.volume_delta)
     }
+
+    pub fn is_ready(&self) -> bool { self.tick_count > 0 }
 
     pub fn reset(&mut self) {
         self.ticks.clear();
@@ -130,10 +126,6 @@ impl TickVolumeAnalyzer {
         self.avg_spread = 0.0;
         self.spread_samples = 0;
     }
-}
-
-impl TickVolumeAnalyzer {
-    pub fn is_ready(&self) -> bool { self.tick_count > 0 }
 }
 
 #[cfg(test)]
@@ -150,9 +142,21 @@ mod tests {
     #[test]
     fn test_tick_volume_analyzer_update_bar() {
         let mut ind = TickVolumeAnalyzer::new(100);
+        // SYNTHETIC: bullish bar
         ind.update_bar(100.0, 105.0, 95.0, 102.0, 1000.0);
         assert!(ind.is_ready());
         assert_eq!(ind.tick_count(), 1);
+        assert!(ind.buy_volume() > ind.sell_volume());
+    }
+
+    #[test]
+    fn test_tick_volume_analyzer_real_tick() {
+        let mut ind = TickVolumeAnalyzer::new(100);
+        let tick = Tick::new(1000, 100.0, 50.0, true);
+        ind.update(&tick);
+        assert!(ind.is_ready());
+        assert_eq!(ind.buy_volume(), 50.0);
+        assert_eq!(ind.sell_volume(), 0.0);
     }
 
     #[test]
