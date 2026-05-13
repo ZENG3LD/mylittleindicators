@@ -114,10 +114,10 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::UoSmooth
         | BarIndicatorId::Rsx
         | BarIndicatorId::Rsioma
-        | BarIndicatorId::LaguerreRsi
         | BarIndicatorId::AtrRsi
         | BarIndicatorId::Vwrsi
-        | BarIndicatorId::Smi => RoleKind::OscillatorBounded,
+        | BarIndicatorId::Smi
+        | BarIndicatorId::Pzo => RoleKind::OscillatorBounded,
 
         // ── Unbounded Oscillators ────────────────────────────────────────────
         BarIndicatorId::Macd
@@ -244,13 +244,11 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Ad
         | BarIndicatorId::Cho
         | BarIndicatorId::Eom
-        | BarIndicatorId::Pzo
         | BarIndicatorId::Vzo
         | BarIndicatorId::NviPvi
         | BarIndicatorId::Poc
         | BarIndicatorId::Pvo
         | BarIndicatorId::Rvol
-        | BarIndicatorId::Trin
         | BarIndicatorId::Vdelta
         | BarIndicatorId::Vo
         | BarIndicatorId::Vpin

@@ -173,30 +173,6 @@ pub fn signature_pvt() -> IndicatorSignature {
         .build()
 }
 
-/// Price Zone Oscillator
-pub fn signature_pzo() -> IndicatorSignature {
-    IndicatorSignature::builder("PZO", CATEGORY)
-        .name("Price Zone Oscillator")
-        .description("Momentum indicator comparing closes to exponential moving average")
-        .add_constraint(ParamConstraint::period(5, 100, 14))
-        .metadata("range", "-100 to +100")
-        .machine_id(BarIndicatorId::Pzo) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Volume)
-        .output_kind(IndicatorValueKind::Single)
-        .validated()
-        // Note: "PZO" is already the main ID, no need for alias
-        .alias("Pzo")
-        .alias("pzo")
-        .alias("PRICEZONEOSCILLATOR")
-        .alias("PriceZoneOscillator")
-        .alias("pricezoneoscillator")
-        .alias("price_zone_oscillator")
-        .alias("PRICE_ZONE_OSCILLATOR")
-        .alias("Price_Zone_Oscillator")
-        .source_type(SourceType::PriceOnly)
-        .build()
-}
-
 /// Relative Volume
 pub fn signature_relative_volume() -> IndicatorSignature {
     IndicatorSignature::builder("RVOL", CATEGORY)
@@ -216,30 +192,6 @@ pub fn signature_relative_volume() -> IndicatorSignature {
         .alias("relative_volume")
         .alias("RELATIVE_VOLUME")
         .alias("Relative_Volume")
-        .source_type(SourceType::VolumeOnly)
-        .build()
-}
-
-/// TRIN (Arms Index)
-pub fn signature_trin() -> IndicatorSignature {
-    IndicatorSignature::builder("TRIN", CATEGORY)
-        .name("TRIN (Arms Index)")
-        .description("Market breadth indicator (AdvVol/DecVol) / (Adv/Dec)")
-        .metadata("category", "breadth")
-        .metadata("requirements", "market_breadth_data")
-        .machine_id(BarIndicatorId::Trin)
-        .role_kind(IndicatorRoleKind::Volume)
-        .output_kind(IndicatorValueKind::Single)
-        .validated()
-        // Note: "TRIN" is already the main ID, no need for alias
-        .alias("Trin")
-        .alias("trin")
-        .alias("TRIN(ARMSINDEX)")
-        .alias("TRIN(ArmsIndex)")
-        .alias("trin(armsindex)")
-        .alias("trin_(arms_index)")
-        .alias("TRIN_(ARMS_INDEX)")
-        .alias("Trin_(arms_Index)")
         .source_type(SourceType::VolumeOnly)
         .build()
 }
@@ -497,9 +449,7 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("POC", signature_poc_detector as fn() -> IndicatorSignature),
     ("PVO", signature_pvo as fn() -> IndicatorSignature),
     ("PVT", signature_pvt as fn() -> IndicatorSignature),
-    ("PZO", signature_pzo as fn() -> IndicatorSignature),
     ("RVOL", signature_relative_volume as fn() -> IndicatorSignature),
-    ("TRIN", signature_trin as fn() -> IndicatorSignature),
     ("VDELTA", signature_volume_delta as fn() -> IndicatorSignature),
     ("VFI", signature_vfi as fn() -> IndicatorSignature),
     ("VO", signature_volume_oscillator as fn() -> IndicatorSignature),
@@ -573,6 +523,6 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 17);
+        assert_eq!(count(), 15);
     }
 }

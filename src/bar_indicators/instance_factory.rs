@@ -76,7 +76,7 @@ use crate::bar_indicators::momentum::{
     dpo::DetrendedPriceOscillator, dpo_percent::DpoPercent, dss_bressert::DssBressert,
     elder_impulse::ElderImpulseSystem, elder_ray::ElderRay, fisher_transform::FisherTransform, ift_rsi::IftRsi,
     intraday_momentum_index::IntradayMomentumIndex, kdj::Kdj, kst::KnowSureThing,
-    laguerre_rsi::LaguerreRsi, parabolic_sar::ParabolicSAR, pmo::Pmo, qqe::Qqe, qstick::Qstick,
+    parabolic_sar::ParabolicSAR, pmo::Pmo, qqe::Qqe, qstick::Qstick,
     rmi::Rmi, rsi_percentile_bands::RsiPercentileBands, rsi_percentile_rank::RsiPercentileRank,
     rsx::Rsx, rvgi::Rvgi, rwi::Rwi, smi::Smi, stc::Stc, stochastic_rsi::StochasticRsi, trix::Trix,
     tsi::TrueStrengthIndex, ultimate_oscillator::UltimateOscillator,
@@ -192,7 +192,6 @@ use crate::bar_indicators::trend_stop::volatility_stop::{
 };
 use crate::bar_indicators::volume::mfi::Mfi;
 use crate::bar_indicators::volume::nvi_pvi::NegativePositiveVolumeIndex;
-use crate::bar_indicators::volume::trin::Trin as TrinIndicator;
 use crate::bar_indicators::volume::volume_delta::VolumeDelta;
 use crate::bar_indicators::volume::volume_profile::VolumeProfile;
 use crate::bar_indicators::volume::vpin::Vpin;
@@ -426,12 +425,7 @@ use crate::bar_indicators::entropy::permutation_entropy::PermutationEntropy;
 use crate::bar_indicators::entropy::sample_entropy::SampleEntropy;
 use crate::bar_indicators::entropy::shannon_entropy::ShannonEntropy;
 // Regime composites
-use crate::bar_indicators::signal_processing::regime_composite::{
-    RegimeComposite, RegimeCompositeParams,
-};
-use crate::bar_indicators::signal_processing::regime_composite_v2::RegimeCompositeV2;
-use crate::bar_indicators::signal_processing::regime_composite_v3::RegimeCompositeV3;
-use crate::bar_indicators::signal_processing::regime_composite_v4::RegimeCompositeV4;
+use crate::bar_indicators::signal_processing::regime_composite::RegimeComposite;
 // Anchored VWAPs & levels
 use crate::bar_indicators::levels::anchored_vwap::{AnchoredVwap, AnchoredVwapParams};
 use crate::bar_indicators::levels::avwap_multi_anchor_reversion::AvwapMultiAnchorReversion;
@@ -445,7 +439,7 @@ use crate::bar_indicators::volatility::close_to_close_vol_percentile::CloseVolPe
 // Volume
 use crate::bar_indicators::volume::relative_volume::RelativeVolume;
 use crate::bar_indicators::volume::pvo::Pvo;
-use crate::bar_indicators::volume::pzo::Pzo;
+use crate::bar_indicators::momentum::pzo::Pzo;
 use crate::bar_indicators::volume::volume_oscillator::VolumeOscillator;
 use crate::bar_indicators::volume::volume_zscore::VolumeZscore;
 // Trend/levels helpers
@@ -882,7 +876,6 @@ pub enum IndicatorInstance {
     VortexIndicator(Box<VortexIndicator>),
     StochasticRsi(Box<StochasticRsi>),
     FisherTransform(Box<FisherTransform>),
-    LaguerreRsi(Box<LaguerreRsi>),
     Rsx(Box<Rsx>),
     Qqe(Box<Qqe>),
     Kdj(Box<Kdj>),
@@ -935,7 +928,6 @@ pub enum IndicatorInstance {
     VolumePriceTrend(Box<VolumePriceTrend>),
     VolumeRateOfChange(Box<VolumeRateOfChange>),
     NviPvi(Box<NegativePositiveVolumeIndex>),
-    Trin(Box<TrinIndicator>),
     Vpin(Box<Vpin>),
     Cmf(Box<ChaikinMoneyFlow>),
     EaseOfMovement(Box<EaseOfMovement>),
@@ -1188,9 +1180,6 @@ pub enum IndicatorInstance {
     PermutationEntropy(Box<PermutationEntropy>),
 
     // Regime composites
-    RegimeCompositeV2(Box<RegimeCompositeV2>),
-    RegimeCompositeV3(Box<RegimeCompositeV3>),
-    RegimeCompositeV4(Box<RegimeCompositeV4>),
     RegimeComposite(Box<RegimeComposite>),
 
     // Anchored VWAPs & levels
@@ -1452,10 +1441,10 @@ impl IndicatorInstance {
             id,
             // PriceAndVolume indicators - use internal formulas combining price+volume
             Vwap | Vwma | Mfi | Cmf | Cho | Fi | Ii | Wad | Eom | Asi | Di | Kvo |
-            Vwapchan | Vwapchanwidth | VwapLevels | VwapDist | Vfi | Vzo | Pzo |
+            Vwapchan | Vwapchanwidth | VwapLevels | VwapDist | Vfi | Vzo |
 
             // VolumeOnly indicators - only use volume data
-            Obv | MoObv | Vdelta | Vprofile | Vpt | Vroc | NviPvi | Trin | Vpin | TickVolume |
+            Obv | MoObv | Vdelta | Vprofile | Vpt | Vroc | NviPvi | Vpin | TickVolume |
             Pvo | Pvt | Rvol | Vo | Vz | Poc |
 
             // Additional accumulation indicators that use volume internally
@@ -2189,10 +2178,6 @@ impl IndicatorInstance {
                 let sp = config.periods.get(1).copied().unwrap_or(3);
                 Ok(Self::FisherTransform(Box::new(FisherTransform::new(p, sp))))
             }
-            BarIndicatorId::LaguerreRsi => {
-                let inner = Box::new(Self::LaguerreRsi(Box::new(LaguerreRsi::new(period))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
-            }
             BarIndicatorId::Rsx => {
                 let inner = Box::new(Self::Rsx(Box::new(Rsx::new(period))));
                 Ok(*Self::wrap_with_divergence_if_requested(inner, config))
@@ -2355,10 +2340,6 @@ impl IndicatorInstance {
                 let nvi_ma = config.periods.first().copied().unwrap_or(255);
                 let pvi_ma = config.periods.get(1).copied().unwrap_or(255);
                 Ok(Self::NviPvi(Box::new(NegativePositiveVolumeIndex::with_source(nvi_ma, pvi_ma, config.source))))
-            }
-            BarIndicatorId::Trin => {
-                let smooth = config.periods.first().copied().unwrap_or(10);
-                Ok(Self::Trin(Box::new(TrinIndicator::with_smoothing(smooth))))
             }
             BarIndicatorId::Vpin => {
                 let buckets = config.periods.first().copied().unwrap_or(50);
@@ -3117,24 +3098,8 @@ impl IndicatorInstance {
             // AutoFibo (time/index aware; neutral in OHLC path)
             // AutoFibo excluded from universal constructor
 
-            // Regime composites
-            BarIndicatorId::Rc2 => {
-                let win = config.periods.first().copied().unwrap_or(128);
-                let roll_target = config.additional_params.get("roll_target").copied().unwrap_or(0.85);
-                let atr_p = config.periods.get(1).copied().unwrap_or(14);
-                let atr_ma = config.ma_types.get("ma_type").copied().unwrap_or(MovingAverageType::RMA);
-                let atr_win = config.periods.get(2).copied().unwrap_or(100);
-                let bins = config.additional_params.get("shannon_bins").copied().unwrap_or(20.0) as usize;
-                Ok(Self::RegimeCompositeV2(Box::new(RegimeCompositeV2::new(win, roll_target, atr_p, atr_ma, atr_win, bins))))
-            }
-            BarIndicatorId::Rc3 => {
-                let win = config.periods.first().copied().unwrap_or(128);
-                let low_cut = config.additional_params.get("low_cut_fraction").copied().unwrap_or(0.1);
-                let vov_win = config.periods.get(1).copied().unwrap_or(100);
-                let bins = config.additional_params.get("shannon_bins").copied().unwrap_or(20.0) as usize;
-                Ok(Self::RegimeCompositeV3(Box::new(RegimeCompositeV3::new(win, low_cut, vov_win, bins))))
-            }
-            BarIndicatorId::Rc4 => {
+            // Regime composite (v4 canonical)
+            BarIndicatorId::Rc => {
                 let hurst_w = config.periods.first().copied().unwrap_or(100);
                 let dfa1 = config.periods.get(1).copied().unwrap_or(4);
                 let dfa2 = config.periods.get(2).copied().unwrap_or(8);
@@ -3145,11 +3110,7 @@ impl IndicatorInstance {
                 let vov_win = config.periods.get(6).copied().unwrap_or(100);
                 let perc_win = config.periods.get(7).copied().unwrap_or(100);
                 let atr_p = config.periods.get(8).copied().unwrap_or(14);
-                Ok(Self::RegimeCompositeV4(Box::new(RegimeCompositeV4::new(hurst_w, [dfa1, dfa2, dfa3, dfa4], fft_w, ser_low, vov_win, perc_win, atr_p))))
-            }
-            BarIndicatorId::Rc => {
-                let params = RegimeCompositeParams::default();
-                Ok(Self::RegimeComposite(Box::new(RegimeComposite::new(params))))
+                Ok(Self::RegimeComposite(Box::new(RegimeComposite::new(hurst_w, [dfa1, dfa2, dfa3, dfa4], fft_w, ser_low, vov_win, perc_win, atr_p))))
             }
 
             // Anchored VWAPs & levels
@@ -4714,10 +4675,6 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::LaguerreRsi(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
             Self::LjungBox(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -4989,18 +4946,6 @@ impl IndicatorInstance {
                 x.value()
             }
             Self::RegimeComposite(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::RegimeCompositeV2(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::RegimeCompositeV3(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::RegimeCompositeV4(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -5309,10 +5254,6 @@ impl IndicatorInstance {
                 x.value()
             }
             Self::TrimaBands(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::Trin(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -5985,7 +5926,6 @@ impl IndicatorInstance {
             Self::Kp(ind) => ind.value(),
             Self::Kvo(ind) => ind.value(),
             Self::KpssProxy(ind) => ind.value(),
-            Self::LaguerreRsi(ind) => ind.value(),
             Self::LjungBox(ind) => ind.value(),
             Self::Lowest(ind) => ind.value(),
             Self::Lr(ind) => ind.value(),
@@ -6051,9 +5991,6 @@ impl IndicatorInstance {
             Self::RealizedVol(ind) => ind.value(),
             Self::RealizedVolZscore(ind) => ind.value(),
             Self::RegimeComposite(ind) => ind.value(),
-            Self::RegimeCompositeV2(ind) => ind.value(),
-            Self::RegimeCompositeV3(ind) => ind.value(),
-            Self::RegimeCompositeV4(ind) => ind.value(),
             Self::RegressionChannels(ind) => ind.value(),
             Self::RegressionChannelWidth(ind) => ind.value(),
             Self::RelativeVolume(ind) => ind.value(),
@@ -6131,7 +6068,6 @@ impl IndicatorInstance {
             Self::TransferEntropy(ind) => ind.value(),
             Self::Trima(ind) => ind.value(),
             Self::TrimaBands(ind) => ind.value(),
-            Self::Trin(ind) => ind.value(),
             Self::Trix(ind) => ind.value(),
             Self::TrueRange(ind) => ind.value(),
             Self::TrueStrengthIndex(ind) => ind.value(),
@@ -6484,7 +6420,6 @@ impl IndicatorInstance {
             Self::Kslope(ind) => ind.is_ready(),
             Self::Kslopez(ind) => ind.is_ready(),
             Self::Kvo(ind) => ind.is_ready(),
-            Self::LaguerreRsi(ind) => ind.is_ready(),
             Self::Liqgap(ind) => ind.is_ready(),
             Self::LjungBox(ind) => ind.is_ready(),
             Self::Lowest(ind) => ind.is_ready(),
@@ -6564,9 +6499,6 @@ impl IndicatorInstance {
             Self::RealizedVol(ind) => ind.is_ready(),
             Self::RealizedVolZscore(ind) => ind.is_ready(),
             Self::RegimeComposite(ind) => ind.is_ready(),
-            Self::RegimeCompositeV2(ind) => ind.is_ready(),
-            Self::RegimeCompositeV3(ind) => ind.is_ready(),
-            Self::RegimeCompositeV4(ind) => ind.is_ready(),
             Self::RegressionChannels(ind) => ind.is_ready(),
             Self::RegressionChannelWidth(ind) => ind.is_ready(),
             Self::RelativeVolume(ind) => ind.is_ready(),
@@ -6657,7 +6589,6 @@ impl IndicatorInstance {
             Self::TransferEntropy(ind) => ind.is_ready(),
             Self::Trima(ind) => ind.is_ready(),
             Self::TrimaBands(ind) => ind.is_ready(),
-            Self::Trin(ind) => ind.is_ready(),
             Self::Trix(ind) => ind.is_ready(),
             Self::TrueRange(ind) => ind.is_ready(),
             Self::TrueStrengthIndex(ind) => ind.is_ready(),
@@ -6919,7 +6850,6 @@ impl IndicatorInstance {
             Self::Kslope(ind) => ind.reset(),
             Self::Kslopez(ind) => ind.reset(),
             Self::Kvo(ind) => ind.reset(),
-            Self::LaguerreRsi(ind) => ind.reset(),
             Self::Liqgap(ind) => ind.reset(),
             Self::LjungBox(ind) => ind.reset(),
             Self::Lowest(ind) => ind.reset(),
@@ -6999,9 +6929,6 @@ impl IndicatorInstance {
             Self::RealizedVol(ind) => ind.reset(),
             Self::RealizedVolZscore(ind) => ind.reset(),
             Self::RegimeComposite(ind) => ind.reset(),
-            Self::RegimeCompositeV2(ind) => ind.reset(),
-            Self::RegimeCompositeV3(ind) => ind.reset(),
-            Self::RegimeCompositeV4(ind) => ind.reset(),
             Self::RegressionChannels(ind) => ind.reset(),
             Self::RegressionChannelWidth(ind) => ind.reset(),
             Self::RelativeVolume(ind) => ind.reset(),
@@ -7092,7 +7019,6 @@ impl IndicatorInstance {
             Self::TransferEntropy(ind) => ind.reset(),
             Self::Trima(ind) => ind.reset(),
             Self::TrimaBands(ind) => ind.reset(),
-            Self::Trin(ind) => ind.reset(),
             Self::Trix(ind) => ind.reset(),
             Self::TrueRange(ind) => ind.reset(),
             Self::TrueStrengthIndex(ind) => ind.reset(),

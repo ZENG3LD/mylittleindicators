@@ -986,33 +986,6 @@ pub fn signature_kvo() -> IndicatorSignature {
         .build()
 }
 
-/// Laguerre RSI
-pub fn signature_laguerre_rsi() -> IndicatorSignature {
-    IndicatorSignature::builder("LAGUERRE_RSI", CATEGORY)
-        .name("Laguerre RSI")
-        .description("RSI using Laguerre transform")
-        .add_constraint(
-            ParamConstraint::new("gamma", ParamType::F64)
-                .with_min(ParamValue::F64(0.0))
-                .with_max(ParamValue::F64(1.0))
-                .with_default(ParamValue::F64(0.5))
-        )
-        .metadata("author", "John Ehlers")
-        .machine_id(BarIndicatorId::LaguerreRsi)
-        .role_kind(IndicatorRoleKind::OscillatorBounded)
-        .output_kind(IndicatorValueKind::Single)
-        .output_bounds(0.0, 1.0)
-        .default_thresholds(0.2, 0.8)
-        // Note: "LAGUERRE_RSI" is already the main ID, no need for alias
-        .alias("LaguerreRsi")
-        .alias("laguerre_rsi")
-        .alias("LAGUERRERSI")
-        .alias("LaguerreRSI")
-        .alias("laguerrersi")
-        .alias("Laguerre_Rsi")
-        .build()
-}
-
 /// Lowest Low over period
 pub fn signature_lowest() -> IndicatorSignature {
     IndicatorSignature::builder("LOWEST", CATEGORY)
@@ -1333,6 +1306,30 @@ pub fn signature_pmo() -> IndicatorSignature {
         .alias("price_momentum_oscillator")
         .alias("PRICE_MOMENTUM_OSCILLATOR")
         .alias("Price_Momentum_Oscillator")
+        .build()
+}
+
+/// Price Zone Oscillator
+pub fn signature_pzo() -> IndicatorSignature {
+    IndicatorSignature::builder("PZO", CATEGORY)
+        .name("Price Zone Oscillator")
+        .description("Momentum indicator comparing closes to exponential moving average")
+        .add_constraint(ParamConstraint::period(5, 100, 14))
+        .metadata("range", "-100 to +100")
+        .machine_id(BarIndicatorId::Pzo)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_kind(IndicatorValueKind::Single)
+        .output_bounds(-100.0, 100.0)
+        .validated()
+        .alias("Pzo")
+        .alias("pzo")
+        .alias("PRICEZONEOSCILLATOR")
+        .alias("PriceZoneOscillator")
+        .alias("pricezoneoscillator")
+        .alias("price_zone_oscillator")
+        .alias("PRICE_ZONE_OSCILLATOR")
+        .alias("Price_Zone_Oscillator")
+        .source_type(SourceType::PriceOnly)
         .build()
 }
 
@@ -2255,7 +2252,6 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("KDJ", signature_kdj as fn() -> IndicatorSignature),
     ("KST", signature_kst as fn() -> IndicatorSignature),
     ("KVO", signature_kvo as fn() -> IndicatorSignature),
-    ("LAGUERRE_RSI", signature_laguerre_rsi as fn() -> IndicatorSignature),
     ("LOWEST", signature_lowest as fn() -> IndicatorSignature),
     ("MACD", signature_macd as fn() -> IndicatorSignature),
     ("MACD_HIST_Z", signature_macd_hist_zscore as fn() -> IndicatorSignature),
@@ -2271,6 +2267,7 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("PMO", signature_pmo as fn() -> IndicatorSignature),
     ("PPO", signature_ppo as fn() -> IndicatorSignature),
     ("PPO_SIGNAL", signature_ppo_signal as fn() -> IndicatorSignature),
+    ("PZO", signature_pzo as fn() -> IndicatorSignature),
     ("PRESSURE", signature_pressure as fn() -> IndicatorSignature),
     ("PSL", signature_psl as fn() -> IndicatorSignature),
     ("QQE", signature_qqe as fn() -> IndicatorSignature),

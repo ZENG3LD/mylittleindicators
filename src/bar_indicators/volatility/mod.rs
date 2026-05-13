@@ -13,7 +13,6 @@ pub mod ulcer_index;
 pub mod choppiness_index;
 pub mod squeeze_momentum;
 pub mod volatility_breakout_detector;
-pub mod adaptive_bollinger_bands;
 pub mod adaptive_volatility_regime;
 pub mod atr_bandwidth;
 pub mod atr_percentile;

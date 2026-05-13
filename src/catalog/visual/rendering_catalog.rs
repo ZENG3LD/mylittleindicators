@@ -1003,18 +1003,6 @@ fn register_momentum_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingM
             .build()
     );
 
-    // Laguerre RSI
-    catalog.insert(BarIndicatorId::LaguerreRsi,
-        RenderingMetadata::builder("LAGUERRE_RSI")
-            .sub_pane()
-            .line_output("lrsi", "Laguerre RSI", COLOR_PURPLE)
-            .bounds(0.0, 1.0)
-            .reference_line(ReferenceLine::new(0.8, COLOR_OVERBOUGHT))
-            .reference_line(ReferenceLine::new(0.2, COLOR_OVERSOLD))
-            .precision(4)
-            .build()
-    );
-
     // Lowest
     catalog.insert(BarIndicatorId::Lowest,
         RenderingMetadata::builder("LOWEST")
@@ -2378,16 +2366,6 @@ fn register_volume_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMet
             .build()
     );
 
-    // TRIN (Arms Index)
-    catalog.insert(BarIndicatorId::Trin,
-        RenderingMetadata::builder("TRIN")
-            .sub_pane()
-            .line_output("trin", "TRIN", COLOR_ORANGE)
-            .reference_line(ReferenceLine::new(1.0, COLOR_GRAY))
-            .precision(2)
-            .build()
-    );
-
     // Volume Delta
     catalog.insert(BarIndicatorId::Vdelta,
         RenderingMetadata::builder("VDELTA")
@@ -3227,41 +3205,12 @@ fn register_signal_processing_indicators(catalog: &mut HashMap<BarIndicatorId, R
             .build()
     );
 
-    // Renko Charts
+    // Regime Composite - returns Single (composite score in [-1,1])
     catalog.insert(BarIndicatorId::Rc,
         RenderingMetadata::builder("RC")
-            .overlay()
-            .line_output("renko", "Renko", COLOR_BLUE)
-            .precision(4)
-            .build()
-    );
-
-    // Regime Composite V2 - returns Single (composite score)
-    catalog.insert(BarIndicatorId::Rc2,
-        RenderingMetadata::builder("RC2")
             .sub_pane()
-            .line_output("rc2", "Regime Composite V2", COLOR_PURPLE)
-            .bounds(0.0, 1.0)
-            .precision(4)
-            .build()
-    );
-
-    // Regime Composite V3 - returns Single (composite score)
-    catalog.insert(BarIndicatorId::Rc3,
-        RenderingMetadata::builder("RC3")
-            .sub_pane()
-            .line_output("rc3", "Regime Composite V3", COLOR_TEAL)
-            .bounds(0.0, 1.0)
-            .precision(4)
-            .build()
-    );
-
-    // Regime Composite V4 - returns Single (composite score)
-    catalog.insert(BarIndicatorId::Rc4,
-        RenderingMetadata::builder("RC4")
-            .sub_pane()
-            .line_output("rc4", "Regime Composite V4", COLOR_ORANGE)
-            .bounds(0.0, 1.0)
+            .line_output("rc", "Regime Composite", COLOR_BLUE)
+            .bounds(-1.0, 1.0)
             .precision(4)
             .build()
     );

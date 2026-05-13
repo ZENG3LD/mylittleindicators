@@ -69,7 +69,6 @@ pub enum BarIndicatorId {
     Kdj,  // KDJ
     Kst,  // KST
     Kvo,  // KVO
-    LaguerreRsi,  // LAGUERRE_RSI
     Lowest,  // LOWEST
     Macd,  // MACD
     MacdHist,  // MACD_HIST
@@ -142,9 +141,6 @@ pub enum BarIndicatorId {
     Lz,  // LZ
     Mrf,  // MRF
     Rc,  // RC
-    Rc2,  // RC2
-    Rc3,  // RC3
-    Rc4,  // RC4
     Roof,  // ROOF
     Sbp,  // SBP
     Sbprhl,  // SBPRHL
@@ -297,7 +293,6 @@ pub enum BarIndicatorId {
     Pvt,  // PVT
     Pzo,  // PZO
     Rvol,  // RVOL
-    Trin,  // TRIN
     Vdelta,  // VDELTA
     Vfi,  // VFI
     Vo,  // VO

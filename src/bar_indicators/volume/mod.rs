@@ -4,11 +4,9 @@ pub mod mfi;
 pub mod nvi_pvi;
 pub mod vpt;
 pub mod vroc;
-pub mod trin;
 pub mod poc_detector;
 pub mod pvo;
 pub mod pvt;
-pub mod pzo;
 pub mod relative_volume;
 pub mod vfi;
 pub mod volume_oscillator;
@@ -22,7 +20,7 @@ pub use mfi::*;
 pub use nvi_pvi::*;
 pub use vpt::*;
 pub use vroc::*;
-pub use trin::*; 
+ 
 
 
 

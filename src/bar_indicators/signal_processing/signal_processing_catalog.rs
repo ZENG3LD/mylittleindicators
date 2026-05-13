@@ -7,7 +7,6 @@ use crate::catalog::{
     IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
     IndicatorRoleKind,
 };
-use crate::bar_indicators::average::moving_average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
@@ -553,77 +552,6 @@ pub fn signature_regime_composite() -> IndicatorSignature {
         .alias("regime_composite")
         .alias("REGIME_COMPOSITE")
         .alias("Regime_Composite")
-        .build()
-}
-
-/// Regime Composite v2
-pub fn signature_regime_composite_v2() -> IndicatorSignature {
-    IndicatorSignature::builder("RC2", CATEGORY)
-        .name("Regime Composite v2")
-        .description("Enhanced composite indicator for regime detection")
-        .add_constraint(ParamConstraint::period(10, 100, 20))
-        .add_constraint(ParamConstraint::ma_type(MovingAverageType::RMA))
-        .metadata("category", "regime")
-        .metadata("note", "Uses ATR with configurable MA type (default Wilder)")
-        .machine_id(BarIndicatorId::Rc2) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Regime)
-        .output_kind(IndicatorValueKind::Single)
-        .validated()
-        // Note: "RC2" is already the main ID, no need for alias
-        .alias("Rc2")
-        .alias("rc2")
-        .alias("REGIMECOMPOSITEV2")
-        .alias("RegimeCompositev2")
-        .alias("regimecompositev2")
-        .alias("regime_composite_v2")
-        .alias("REGIME_COMPOSITE_V2")
-        .alias("Regime_Composite_V2")
-        .build()
-}
-
-/// Regime Composite v3
-pub fn signature_regime_composite_v3() -> IndicatorSignature {
-    IndicatorSignature::builder("RC3", CATEGORY)
-        .name("Regime Composite v3")
-        .description("Advanced composite indicator for regime detection")
-        .add_constraint(ParamConstraint::period(10, 100, 20))
-        .metadata("category", "regime")
-        .machine_id(BarIndicatorId::Rc3) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Regime)
-        .output_kind(IndicatorValueKind::Single)
-        .validated()
-        // Note: "RC3" is already the main ID, no need for alias
-        .alias("Rc3")
-        .alias("rc3")
-        .alias("REGIMECOMPOSITEV3")
-        .alias("RegimeCompositev3")
-        .alias("regimecompositev3")
-        .alias("regime_composite_v3")
-        .alias("REGIME_COMPOSITE_V3")
-        .alias("Regime_Composite_V3")
-        .build()
-}
-
-/// Regime Composite v4
-pub fn signature_regime_composite_v4() -> IndicatorSignature {
-    IndicatorSignature::builder("RC4", CATEGORY)
-        .name("Regime Composite v4")
-        .description("Latest composite indicator for regime detection")
-        .add_constraint(ParamConstraint::period(10, 100, 20))
-        .metadata("category", "regime")
-        .machine_id(BarIndicatorId::Rc4) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Regime)
-        .output_kind(IndicatorValueKind::Single)
-        .validated()
-        // Note: "RC4" is already the main ID, no need for alias
-        .alias("Rc4")
-        .alias("rc4")
-        .alias("REGIMECOMPOSITEV4")
-        .alias("RegimeCompositev4")
-        .alias("regimecompositev4")
-        .alias("regime_composite_v4")
-        .alias("REGIME_COMPOSITE_V4")
-        .alias("Regime_Composite_V4")
         .build()
 }
 
@@ -1445,9 +1373,6 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("LOGICSIGN", signature_sign_combiner as fn() -> IndicatorSignature),
     ("MRF", signature_market_regime_filter as fn() -> IndicatorSignature),
     ("RC", signature_regime_composite as fn() -> IndicatorSignature),
-    ("RC2", signature_regime_composite_v2 as fn() -> IndicatorSignature),
-    ("RC3", signature_regime_composite_v3 as fn() -> IndicatorSignature),
-    ("RC4", signature_regime_composite_v4 as fn() -> IndicatorSignature),
     ("ROOF", signature_roofing_filter as fn() -> IndicatorSignature),
     ("SG", signature_savitzky_golay as fn() -> IndicatorSignature),
     ("SBP", signature_spectral_bandpower as fn() -> IndicatorSignature),
@@ -1550,6 +1475,6 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 55);
+        assert_eq!(count(), 52);
     }
 }
