@@ -8,8 +8,6 @@ pub mod stochastikd;
 pub mod vhf;
 pub mod vhf_ma;
 pub mod obv;
-pub mod swings;
-pub mod swings_soft;
 pub mod pressure;
 pub mod psl;
 pub mod kvo;
@@ -20,7 +18,6 @@ pub mod amat;
 pub mod aroon;
 pub mod bb_period;
 pub mod dm;
-pub mod auto_fibo;
 pub mod adx;
 pub mod di_plus_minus;
 
@@ -99,8 +96,7 @@ pub mod sweep_reversion;
 pub mod swing_age;
 pub mod tdi;
 pub mod ultimate_oscillator_smooth;
-pub mod zigzag;
-// pub mod box_momentum;
+// pub mod box_momentum:
 
 // Universal Indicator System catalog
 pub mod momentum_catalog;
@@ -112,7 +108,6 @@ pub use cci::*;
 pub use stochastics::*;
 pub use obv::*;
 pub use vhf::*;
-pub use swings::*;
 pub use pressure::*;
 pub use psl::*;
 pub use kvo::*;
@@ -124,8 +119,6 @@ pub use bb_period::*;
 pub use dm::*;
 pub use vhf_ma::*;
 pub use stochastikd::*;
-pub use swings_soft::*;
-pub use auto_fibo::*;
 pub use highest::*;
 pub use lowest::*;
 pub use candle_patterns::*;

@@ -39,7 +39,6 @@ pub enum BarIndicatorId {
     AroonOsc,  // AROON_OSC
     AroonUp,  // AROON_UP
     AtrRsi,  // ATR_RSI
-    AutoFibo,  // AUTO_FIBO
     BbPeriod,  // BB_PERIOD
     Bias,  // BIAS
     Bop,  // BOP
@@ -111,8 +110,6 @@ pub enum BarIndicatorId {
     Stochkd,  // STOCHKD
     SweepRev,  // SWEEP_REV
     SwingAge,  // SWING_AGE
-    Swings,  // SWINGS
-    SwingsSoft,  // SWINGS_SOFT
     Tdi,  // TDI
     Trix,  // TRIX
     Tsi,  // TSI
@@ -196,7 +193,6 @@ pub enum BarIndicatorId {
     Dpobands,  // DPOBANDS
     Envbw,  // ENVBW
     Envelope,  // ENVELOPE
-    Fibochan,  // FIBOCHAN
     Ichimoku,  // ICHIMOKU
     Ichimokupos,  // ICHIMOKUPOS
     Ichimokuthick,  // ICHIMOKUTHICK
@@ -512,12 +508,6 @@ pub enum BarIndicatorId {
     // All OHLCV variants replaced by MovingAverageWithField
     // Use: MovingAverageWithField::new(MovingAverageType, period, OhlcvField)
 
-    // Zigzag (5 indicators)
-    ZigzagAtr,  // ZIGZAG_ATR
-    ZigzagCandle,  // ZIGZAG_CANDLE
-    ZigzagClassic,  // ZIGZAG_CLASSIC
-    ZigzagLookahead,  // ZIGZAG_LOOKAHEAD
-    ZigzagTime,  // ZIGZAG_TIME
 
 }
 

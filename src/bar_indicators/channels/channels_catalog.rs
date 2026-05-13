@@ -383,29 +383,6 @@ pub fn signature_envelope_channels() -> IndicatorSignature {
         .build()
 }
 
-/// Fibonacci Channels
-pub fn signature_fibonacci_channels() -> IndicatorSignature {
-    IndicatorSignature::builder("FIBOCHAN", CATEGORY)
-        .name("Fibonacci Channels")
-        .description("Channels based on Fibonacci retracement levels")
-        .add_constraint(ParamConstraint::period(5, 200, 50))
-        .metadata("fibonacci", "true")
-        .machine_id(BarIndicatorId::Fibochan) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Channel)
-        .output_kind(IndicatorValueKind::Channel3)
-        .validated()
-        // Note: "FIBOCHAN" is already the main ID, no need for alias
-        .alias("Fibochan")
-        .alias("fibochan")
-        .alias("FIBONACCICHANNELS")
-        .alias("FibonacciChannels")
-        .alias("fibonaccichannels")
-        .alias("fibonacci_channels")
-        .alias("FIBONACCI_CHANNELS")
-        .alias("Fibonacci_Channels")
-        .build()
-}
-
 /// Ichimoku Cloud
 pub fn signature_ichimoku_cloud() -> IndicatorSignature {
     IndicatorSignature::builder("ICHIMOKU", CATEGORY)
@@ -1122,7 +1099,6 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("DPOBANDS", signature_dpo_bands as fn() -> IndicatorSignature),
     ("ENVBW", signature_envelope_bandwidth as fn() -> IndicatorSignature),
     ("ENVELOPE", signature_envelope_channels as fn() -> IndicatorSignature),
-    ("FIBOCHAN", signature_fibonacci_channels as fn() -> IndicatorSignature),
     ("ICHIMOKU", signature_ichimoku_cloud as fn() -> IndicatorSignature),
     ("ICHIMOKUPOS", signature_ichimoku_cloud_position as fn() -> IndicatorSignature),
     ("ICHIMOKUTHICK", signature_ichimoku_cloud_thickness as fn() -> IndicatorSignature),
@@ -1220,6 +1196,6 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 42); // All channel indicators
+        assert_eq!(count(), 41); // All channel indicators (Fibochan removed — backed by SwingDetection)
     }
 }

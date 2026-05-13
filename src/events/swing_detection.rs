@@ -30,6 +30,9 @@ pub enum SwingMode {
     /// Look-ahead confirmation: pivot fires on bar i once `n` future bars
     /// haven't exceeded its extreme. Reports the pivot bar after lag of `n`.
     Lookahead { n: usize },
+    /// Forced segmentation: a new swing is recorded every `n_bars` bars.
+    /// Direction = close > last_extreme ? High : Low.
+    Time { n_bars: usize },
 }
 
 impl Default for SwingMode {
@@ -56,6 +59,10 @@ pub struct SwingDetection {
     /// Track whether we're currently trending up or down for reversal modes.
     trending_up: Option<bool>,
     bars_seen: usize,
+    /// Bar index of last forced swing (used by Time mode).
+    last_forced_bar: usize,
+    /// Last extreme price (used by Time mode).
+    last_extreme: f64,
 }
 
 impl std::fmt::Debug for SwingDetection {
@@ -84,6 +91,8 @@ impl SwingDetection {
             last_event: 0,
             trending_up: None,
             bars_seen: 0,
+            last_forced_bar: 0,
+            last_extreme: 0.0,
         }
     }
 
@@ -128,6 +137,7 @@ impl SwingDetection {
             }
             SwingMode::NBarExtreme { n } => self.detect_n_bar_extreme(n),
             SwingMode::Lookahead { n } => self.detect_lookahead(n),
+            SwingMode::Time { n_bars } => self.detect_time(close, n_bars),
         };
 
         self.last_event = signal;
@@ -235,6 +245,24 @@ impl SwingDetection {
         }
     }
 
+    fn detect_time(&mut self, close: f64, n_bars: usize) -> i8 {
+        let n = n_bars.max(1);
+        // First bar: initialise anchor.
+        if self.bars_seen == 1 {
+            self.last_forced_bar = 1;
+            self.last_extreme = close;
+            return 0;
+        }
+        if self.bars_seen - self.last_forced_bar >= n {
+            let signal = if close > self.last_extreme { 1 } else { -1 };
+            self.last_forced_bar = self.bars_seen;
+            self.last_extreme = close;
+            signal
+        } else {
+            0
+        }
+    }
+
     pub fn value(&self) -> IndicatorValue {
         IndicatorValue::Signal(self.last_swing)
     }
@@ -273,6 +301,8 @@ impl SwingDetection {
         self.last_event = 0;
         self.trending_up = None;
         self.bars_seen = 0;
+        self.last_forced_bar = 0;
+        self.last_extreme = 0.0;
         if let Some(atr) = self.atr_source.as_mut() {
             atr.reset();
         }
@@ -317,6 +347,7 @@ impl SwingDetection {
             }
             SwingMode::NBarExtreme { n } => self.detect_n_bar_extreme(n),
             SwingMode::Lookahead { n } => self.detect_lookahead(n),
+            SwingMode::Time { n_bars } => self.detect_time(_close, n_bars),
         };
 
         self.last_event = signal;

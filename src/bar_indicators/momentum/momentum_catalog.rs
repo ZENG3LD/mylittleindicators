@@ -228,27 +228,6 @@ pub fn signature_atr_rsi() -> IndicatorSignature {
         .build()
 }
 
-/// Automatic Fibonacci - автоматические уровни Фибоначчи
-pub fn signature_auto_fibo() -> IndicatorSignature {
-    IndicatorSignature::builder("AUTO_FIBO", CATEGORY)
-        .name("Automatic Fibonacci")
-        .description("Automatic Fibonacci retracement levels")
-        .add_constraint(ParamConstraint::period(2, 200, 50))
-        .machine_id(BarIndicatorId::AutoFibo)
-        .role_kind(IndicatorRoleKind::Level)
-        .output_kind(IndicatorValueKind::Single)
-        // Note: "AUTO_FIBO" is already the main ID, no need for alias
-        .alias("AutoFibo")
-        .alias("auto_fibo")
-        .alias("AUTOMATICFIBONACCI")
-        .alias("AutomaticFibonacci")
-        .alias("automaticfibonacci")
-        .alias("automatic_fibonacci")
-        .alias("AUTOMATIC_FIBONACCI")
-        .alias("Automatic_Fibonacci")
-        .build()
-}
-
 /// Bollinger Band Period - динамический период на основе BB
 pub fn signature_bb_period() -> IndicatorSignature {
     IndicatorSignature::builder("BB_PERIOD", CATEGORY)
@@ -1985,39 +1964,6 @@ pub fn signature_swing_age() -> IndicatorSignature {
         .build()
 }
 
-/// Swings - определение swing high/low
-pub fn signature_swings() -> IndicatorSignature {
-    IndicatorSignature::builder("SWINGS", CATEGORY)
-        .name("Swings")
-        .description("Identifies swing highs and lows")
-        .add_constraint(ParamConstraint::period(2, 200, 5))
-        .machine_id(BarIndicatorId::Swings)
-        .role_kind(IndicatorRoleKind::Other)
-        .output_kind(IndicatorValueKind::Double)
-        // Note: "SWINGS" is already the main ID, no need for alias
-        .alias("Swings")
-        .alias("swings")
-        .build()
-}
-
-/// Swings Soft - мягкое определение свингов
-pub fn signature_swings_soft() -> IndicatorSignature {
-    IndicatorSignature::builder("SWINGS_SOFT", CATEGORY)
-        .name("Swings Soft")
-        .description("Soft swing detection")
-        .add_constraint(ParamConstraint::period(2, 200, 5))
-        .machine_id(BarIndicatorId::SwingsSoft)
-        .role_kind(IndicatorRoleKind::Other)
-        .output_kind(IndicatorValueKind::Double)
-        // Note: "SWINGS_SOFT" is already the main ID, no need for alias
-        .alias("SwingsSoft")
-        .alias("swings_soft")
-        .alias("SWINGSSOFT")
-        .alias("swingssoft")
-        .alias("Swings_Soft")
-        .build()
-}
-
 /// Traders Dynamic Index
 pub fn signature_tdi() -> IndicatorSignature {
     IndicatorSignature::builder("TDI", CATEGORY)
@@ -2351,7 +2297,6 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("AROON_OSC", signature_aroon_oscillator as fn() -> IndicatorSignature),
     ("AROON_UP", signature_aroon_up as fn() -> IndicatorSignature),
     ("ATR_RSI", signature_atr_rsi as fn() -> IndicatorSignature),
-    ("AUTO_FIBO", signature_auto_fibo as fn() -> IndicatorSignature),
     ("BB_PERIOD", signature_bb_period as fn() -> IndicatorSignature),
     ("BIAS", signature_bias as fn() -> IndicatorSignature),
     ("BOP", signature_bop as fn() -> IndicatorSignature),
@@ -2423,8 +2368,6 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("STOCHKD", signature_stochastikd as fn() -> IndicatorSignature),
     ("SWEEP_REV", signature_sweep_reversion as fn() -> IndicatorSignature),
     ("SWING_AGE", signature_swing_age as fn() -> IndicatorSignature),
-    ("SWINGS", signature_swings as fn() -> IndicatorSignature),
-    ("SWINGS_SOFT", signature_swings_soft as fn() -> IndicatorSignature),
     ("TDI", signature_tdi as fn() -> IndicatorSignature),
     ("TRIX", signature_trix as fn() -> IndicatorSignature),
     ("TSI", signature_tsi as fn() -> IndicatorSignature),
@@ -2518,7 +2461,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 94); // 95 momentum indicators
+        assert_eq!(count(), 91); // Reduced by 3: AutoFibo, Swings, SwingsSoft removed (backed by SwingDetection)
     }
 
     #[test]

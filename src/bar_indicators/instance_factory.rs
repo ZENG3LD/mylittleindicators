@@ -84,7 +84,7 @@ use crate::bar_indicators::momentum::{
     williams_r::WilliamsR,
 };
 use crate::bar_indicators::momentum::{
-    dm::Dm, psl::Psl, stochastikd::StochastikD, swings::Swings, swings_soft::SwingsSoft,
+    dm::Dm, psl::Psl, stochastikd::StochastikD,
     vhf::Vhf as VhfSimple, vhf_ma::VhfMa,
 };
 
@@ -114,9 +114,6 @@ use crate::bar_indicators::channels::donchian_width::DonchianWidth;
 use crate::bar_indicators::channels::dpo_bands::DpoBands;
 use crate::bar_indicators::channels::envelope_bandwidth::EnvelopeBandwidth;
 use crate::bar_indicators::channels::envelope_channels::EnvelopeChannels;
-use crate::bar_indicators::channels::fibonacci_channels::{
-    FibonacciChannelMode, FibonacciChannels,
-};
 use crate::bar_indicators::channels::ichimoku_cloud::IchimokuCloud;
 use crate::bar_indicators::channels::ichimoku_cloud_position::IchimokuCloudPosition;
 use crate::bar_indicators::channels::ichimoku_cloud_thickness::IchimokuCloudThickness;
@@ -543,14 +540,6 @@ use crate::bar_indicators::volume::vzo::Vzo;
 // ========================================
 // POC (1)
 use crate::bar_indicators::volume::poc_detector::PocDetector;
-// ZIGZAG FAMILY (5 main variants)
-use crate::bar_indicators::zigzag::zigzag_classic::ZigZagClassic;
-use crate::bar_indicators::zigzag::zigzag_atr::ZigZagAtr;
-use crate::bar_indicators::zigzag::zigzag_candle::ZigZagCandle;
-use crate::bar_indicators::zigzag::zigzag_lookahead::ZigZagLookahead;
-use crate::bar_indicators::zigzag::zigzag_time::ZigZagTime;
-// AUTO FIBO (1)
-use crate::bar_indicators::momentum::auto_fibo::AutoFibo;
 // ========================================
 // PHASE 5 ADDITIONS (3 FVG indicators - Final push to 100%)
 // ========================================
@@ -854,7 +843,6 @@ pub enum IndicatorInstance {
     TheilSenChannels(Box<TheilSenChannels>),
     ProjectionBands(Box<ProjectionBands>),
     VolumeProfileChannels(Box<VolumeProfileChannels>),
-    FibonacciChannels(Box<FibonacciChannels>),
     DarvasBox(Box<DarvasBox>),
 
     // Momentum extras
@@ -863,7 +851,6 @@ pub enum IndicatorInstance {
     Stochastics(Box<Stochastics>),
     Obv(Box<Obv>),
     Vhf(Box<VhfSimple>),
-    Swings(Box<Swings>),
     Psl(Box<Psl>),
     // BOOK category (4 indicators)
     BookImb(Box<BookImbalanceRatio>),
@@ -886,8 +873,6 @@ pub enum IndicatorInstance {
     Dm(Box<Dm>),
     VhfMa(Box<VhfMa>),
     StochastikD(Box<StochastikD>),
-    SwingsSoft(Box<SwingsSoft>),
-
     // Additional momentum
     Adx(Box<AdxIndicator>),
     DiPlusMinus(Box<DiPlusMinus>),
@@ -1382,19 +1367,15 @@ pub enum IndicatorInstance {
 
 
     // ========================================
-    // PHASE 4 ADDITIONS (9 indicators - Poc + AutoFibo + 7 ZigZag variants)
+    // PHASE 4 ADDITIONS (POC only; ZigZag family replaced by SwingDetection)
     // ========================================
     // POC (1)
     Poc(Box<PocDetector>),
-    // AUTO FIBO (1)
-    AutoFibo(Box<AutoFibo>),
-    // ZIGZAG FAMILY (6 variants)
-    Zigzag(Box<ZigZagClassic>),  // Uses deviation parameter
-    ZigzagClassic(Box<ZigZagClassic>),  // Uses threshold_percent/threshold_abs
-    ZigzagAtr(Box<ZigZagAtr>),
-    ZigzagCandle(Box<ZigZagCandle>),
-    ZigzagLookahead(Box<ZigZagLookahead>),
-    ZigzagTime(Box<ZigZagTime>),
+    // ZIGZAG (deviation-based legacy alias — backed by SwingDetection Percent mode)
+    // NOTE: Zigzag variant kept for any code that pattern-matches on it; backed by
+    // a heap-allocated SwingDetection instead of ZigZagClassic.
+    // REMOVED: AutoFibo, ZigzagClassic, ZigzagAtr, ZigzagCandle, ZigzagLookahead, ZigzagTime
+    // All redirected to SwingDetection in the factory and enum.
 
     // ========================================
     // PHASE 5 ADDITIONS (3 FVG indicators - Final push to 100%)
@@ -1413,6 +1394,13 @@ pub enum IndicatorInstance {
     /// - `IndicatorValue::Double(osc, type_signal)` — layer 2
     /// - `IndicatorValue::Triple(osc, type_signal, strength)` — layer 3
     OscillatorWithDivergence(Box<crate::events::OscillatorWithDivergence>),
+
+    // ========================================
+    // SWING DETECTION (unified)
+    // ========================================
+    /// Canonical swing detector replacing ZigzagClassic, ZigzagAtr, ZigzagTime,
+    /// ZigzagCandle, ZigzagLookahead, Swings, SwingsSoft.
+    SwingDetection(Box<crate::events::SwingDetection>),
 }
 
 impl IndicatorInstance {
@@ -1905,15 +1893,6 @@ impl IndicatorInstance {
             BarIndicatorId::Percentilech => Ok(Self::Percentilech(Box::new(PercentileChannels::with_source(period, PercentileBasis::Close, 0.25, 0.75, config.source)))),
             // Duplicate short form removed; detailed arm below
             // Duplicate short form removed; detailed arm below
-            BarIndicatorId::Fibochan => {
-                let zigzag = config.periods.first().copied().unwrap_or(20);
-                let atr_p = config.periods.get(1).copied().unwrap_or(14);
-                let mult = config.additional_params.get("atr_multiplier").copied().unwrap_or(2.0);
-                let mode_code = config.additional_params.get("mode").copied().unwrap_or(0.0) as i32;
-                let mode = match mode_code { 1 => FibonacciChannelMode::Extension, 2 => FibonacciChannelMode::Combined, _ => FibonacciChannelMode::Retracement };
-                Ok(Self::FibonacciChannels(Box::new(FibonacciChannels::new(zigzag, atr_p, mult, mode))))
-            }
-            ,
             // DarvasBox variant not present in BarIndicatorId; skip wiring here.
             BarIndicatorId::Adaptivechan => {
                 let mode_code = config.additional_params.get("adaptation_mode").copied().unwrap_or(3.0) as i32; // Combined
@@ -1963,7 +1942,6 @@ impl IndicatorInstance {
             }
             BarIndicatorId::MoObv => Ok(Self::Obv(Box::new(Obv::with_source(config.source)))), // momentum/ version (accumulation/ has plain Obv)
             BarIndicatorId::Vhf => Ok(Self::Vhf(Box::new(VhfSimple::with_source(period, config.source)))),
-            BarIndicatorId::Swings => Ok(Self::Swings(Box::new(Swings::new(period)))),
             BarIndicatorId::Psl => {
                 let inner = Box::new(Self::Psl(Box::new(Psl::with_source(period, config.source))));
                 Ok(*Self::wrap_with_divergence_if_requested(inner, config))
@@ -2030,7 +2008,6 @@ impl IndicatorInstance {
                 let inner = Box::new(Self::StochastikD(Box::new(StochastikD::new(period_k, period_d))));
                 Ok(*Self::wrap_with_divergence_if_requested(inner, config))
             }
-            BarIndicatorId::SwingsSoft => Ok(Self::SwingsSoft(Box::new(SwingsSoft::new(period)))),
             BarIndicatorId::WilliamsR => {
                 let inner = Box::new(Self::WilliamsR(Box::new(WilliamsR::new(period))));
                 Ok(*Self::wrap_with_divergence_if_requested(inner, config))
@@ -4065,94 +4042,88 @@ impl IndicatorInstance {
                 )))
             }
 
-            BarIndicatorId::AutoFibo => {
-                let zigzag_period = config.periods.first().copied().unwrap_or(20);
-                let atr_period = config.periods.get(1).copied().unwrap_or(14);
-                let atr_multiplier = config.additional_params.get("atr_multiplier").copied()
-                    .unwrap_or(1.5);
-
-                Ok(Self::AutoFibo(Box::new(
-                    AutoFibo::new(zigzag_period, atr_period, atr_multiplier)
-                )))
-            }
-
             BarIndicatorId::Zigzag => {
-                // Zigzag uses deviation parameter (0.01-1.0, converted to percent)
-                let period = config.periods.first().copied().unwrap_or(20);
-                let deviation = config.additional_params.get("deviation")
+                use crate::events::swing_detection::SwingMode;
+
+                // swing_mode selects the detection strategy:
+                //   0 = Percent (default), 1 = AtrMultiple, 2 = NBarExtreme,
+                //   3 = Lookahead, 4 = Time
+                let mode_code = config.additional_params.get("swing_mode")
                     .copied()
-                    .unwrap_or(0.05);
-                // Convert deviation (0.05 = 5%) to threshold_percent
-                let threshold_percent = Some(deviation * 100.0);
+                    .unwrap_or(0.0) as i32;
 
-                Ok(Self::Zigzag(Box::new(
-                    ZigZagClassic::with_source(period, threshold_percent, None, config.source)
-                )))
-            }
-
-            BarIndicatorId::ZigzagClassic => {
-                // ZigzagClassic uses threshold_percent or threshold_abs directly
-                let period = config.periods.first().copied().unwrap_or(20);
-                let threshold_percent = config.additional_params.get("threshold_percent")
-                    .copied();
-                let threshold_abs = config.additional_params.get("threshold_abs")
-                    .copied();
-
-                // If both None, use default threshold_percent
-                let threshold_percent = if threshold_percent.is_none() && threshold_abs.is_none() {
-                    Some(5.0)
-                } else {
-                    threshold_percent
-                };
-
-                Ok(Self::ZigzagClassic(Box::new(
-                    ZigZagClassic::with_source(period, threshold_percent, threshold_abs, config.source)
-                )))
-            }
-
-            BarIndicatorId::ZigzagAtr => {
-                let zigzag_period = config.periods.first().copied().unwrap_or(20);
-                let atr_period = config.periods.get(1).copied().unwrap_or(14);
-                let atr_multiplier = config.additional_params.get("atr_multiplier").copied()
-                    .unwrap_or(1.5);
-
-                Ok(Self::ZigzagAtr(Box::new(
-                    ZigZagAtr::new(zigzag_period, atr_period, atr_multiplier)
-                )))
-            }
-
-            BarIndicatorId::ZigzagCandle => {
-                let period = config.periods.first().copied().unwrap_or(20);
-                let swing_bars = config.periods.get(1).copied().unwrap_or(3);
-
-                Ok(Self::ZigzagCandle(Box::new(
-                    ZigZagCandle::new(period, swing_bars)
-                )))
-            }
-
-            BarIndicatorId::ZigzagLookahead => {
-                let period = config.periods.first().copied().unwrap_or(20);
-                let lookahead = config.periods.get(1).copied().unwrap_or(5);
-
-                Ok(Self::ZigzagLookahead(Box::new(
-                    ZigZagLookahead::with_source(period, lookahead, config.source)
-                )))
-            }
-
-            BarIndicatorId::ZigzagTime => {
-                let period = config.periods.first().copied().unwrap_or(20);
-                let min_bars = config.periods.get(1).copied().unwrap_or(10);
-
-                Ok(Self::ZigzagTime(Box::new(
-                    ZigZagTime::with_source(period, min_bars, config.source)
-                )))
+                match mode_code {
+                    0 => {
+                        // Support both "threshold_pct" and legacy "deviation" (scaled ×100).
+                        let threshold_pct = config.additional_params
+                            .get("threshold_pct")
+                            .copied()
+                            .unwrap_or_else(|| {
+                                config.additional_params
+                                    .get("deviation")
+                                    .copied()
+                                    .unwrap_or(0.05) * 100.0
+                            });
+                        Ok(Self::SwingDetection(Box::new(
+                            crate::events::SwingDetection::new(SwingMode::Percent { threshold_pct })
+                        )))
+                    }
+                    1 => {
+                        let mult = config.additional_params.get("atr_multiplier")
+                            .copied()
+                            .unwrap_or(2.0);
+                        let atr_period = config.additional_params.get("atr_period")
+                            .copied()
+                            .unwrap_or(14.0) as usize;
+                        let atr = Self::Atr(Box::new(
+                            crate::bar_indicators::volatility::atr::Atr::new(
+                                atr_period.max(2),
+                                MovingAverageType::RMA,
+                            )
+                        ));
+                        Ok(Self::SwingDetection(Box::new(
+                            crate::events::SwingDetection::with_atr_source(
+                                SwingMode::AtrMultiple { mult },
+                                atr,
+                            )
+                        )))
+                    }
+                    2 => {
+                        let n = config.additional_params.get("n")
+                            .copied()
+                            .unwrap_or(5.0) as usize;
+                        Ok(Self::SwingDetection(Box::new(
+                            crate::events::SwingDetection::new(SwingMode::NBarExtreme { n })
+                        )))
+                    }
+                    3 => {
+                        let n = config.additional_params.get("lookahead")
+                            .copied()
+                            .unwrap_or(3.0) as usize;
+                        Ok(Self::SwingDetection(Box::new(
+                            crate::events::SwingDetection::new(SwingMode::Lookahead { n })
+                        )))
+                    }
+                    4 => {
+                        let n_bars = config.additional_params.get("n_bars")
+                            .copied()
+                            .unwrap_or(10.0) as usize;
+                        Ok(Self::SwingDetection(Box::new(
+                            crate::events::SwingDetection::new(SwingMode::Time { n_bars })
+                        )))
+                    }
+                    other => Err(format!(
+                        "Zigzag: unknown swing_mode={other}, expected 0..4"
+                    )),
+                }
             }
 
             BarIndicatorId::ZigzagDiv => {
-                // FIXME: ZigzagDiv implementation not found - using ZigzagClassic as fallback
-                let period = config.periods.first().copied().unwrap_or(20);
-                Ok(Self::ZigzagClassic(Box::new(
-                    ZigZagClassic::with_source(period, Some(5.0), None, config.source)
+                // Fallback: percent-based swing detection
+                Ok(Self::SwingDetection(Box::new(
+                    crate::events::SwingDetection::new(
+                        crate::events::swing_detection::SwingMode::Percent { threshold_pct: 5.0 }
+                    )
                 )))
             }
 
@@ -4665,10 +4636,6 @@ impl IndicatorInstance {
                 x.value()
             }
             Self::EwmacRobust(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::FibonacciChannels(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -5796,6 +5763,10 @@ impl IndicatorInstance {
             Self::OscillatorWithDivergence(x) => {
                 x.update_bar(open, high, low, close, volume)
             }
+            Self::SwingDetection(x) => {
+                x.update_bar(open, high, low, close, volume);
+                x.value()
+            }
             // ========================================
             // PHASE 1: Simple update(close) indicators
             // ========================================
@@ -5868,14 +5839,6 @@ impl IndicatorInstance {
             // ========================================
             // PHASE 2: update_bar(h, l, c) indicators
             // ========================================
-            Self::Swings(x) => {
-                x.update_bar(high, low, close, volume);
-                x.value()
-            }
-            Self::SwingsSoft(x) => {
-                x.update_bar(high, low, close, volume);
-                x.value()
-            }
             Self::Fractals(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -5965,37 +5928,6 @@ impl IndicatorInstance {
                 // Return POC price from analysis
                 let poc_price = x.get_current_poc().map(|poc| poc.price).unwrap_or(close);
                 IndicatorValue::Single(poc_price)
-            }
-            Self::AutoFibo(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            // ========================================
-            // PHASE 5: ZigZag indicators with idx
-            // ========================================
-            Self::Zigzag(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::ZigzagClassic(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::ZigzagAtr(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::ZigzagCandle(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::ZigzagLookahead(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::ZigzagTime(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
             }
             // ========== PHASE 6: Previously missing indicators ==========
             Self::Stochastics(x) => {
@@ -6184,7 +6116,6 @@ impl IndicatorInstance {
             Self::Ess(ind) => ind.value(),
             Self::Eveningstar(ind) => ind.value(),
             Self::Ewmac(ind) => ind.value(),
-            Self::FibonacciChannels(ind) => ind.value(),
             Self::FisherTransform(ind) => ind.value(),
             Self::ForceIndex(ind) => ind.value(),
             Self::Framaadv(ind) => ind.value(),
@@ -6368,8 +6299,6 @@ impl IndicatorInstance {
             Self::Supertrend(ind) => ind.value(),
             Self::Supts(ind) => ind.value(),
             Self::SweepReversionIndex(ind) => ind.value(),
-            Self::Swings(ind) => ind.value(),
-            Self::SwingsSoft(ind) => ind.value(),
             Self::SwingStop(ind) => ind.value(),
             Self::T3(ind) => ind.value(),
             Self::Tema(ind) => ind.value(),
@@ -6424,8 +6353,6 @@ impl IndicatorInstance {
             Self::Wvf(ind) => ind.value(),
             Self::XorGate(ind) => IndicatorValue::Flag(ind.value()),
             Self::Za(ind) => ind.value(),
-            Self::Zigzag(ind) => ind.value(),
-            Self::ZigzagClassic(ind) => ind.value(),
             Self::ZlSma(ind) => ind.value(),
             Self::Stochastics(ind) => ind.value(),
             Self::PivotPoints(ind) => ind.value(),
@@ -6447,6 +6374,7 @@ impl IndicatorInstance {
             Self::Fvgdur(ind) => ind.value(),
             Self::Fvgrev(ind) => ind.value(),
             Self::OscillatorWithDivergence(ind) => ind.value(),
+            Self::SwingDetection(ind) => ind.value(),
             // ========================================
             // MISSING VALUE() HANDLERS - BATCH FIX
             // ========================================
@@ -6456,7 +6384,6 @@ impl IndicatorInstance {
             Self::ArchLmPval(ind) => ind.value(),
             Self::Arima(ind) => ind.value(),
             Self::ArimaX(ind) => ind.value(),
-            Self::AutoFibo(ind) => ind.value(),
             Self::AvwapDistance(ind) => ind.value(),
             Self::AvwapMultiAnchorReversion(ind) => ind.value(),
             Self::AvwapTouchProbability(ind) => ind.value(),
@@ -6547,10 +6474,6 @@ impl IndicatorInstance {
             Self::WickSpike(ind) => ind.value(),
             Self::WoodiePivots(ind) => ind.value(),
             Self::Xmil(ind) => ind.value(),
-            Self::ZigzagAtr(ind) => ind.value(),
-            Self::ZigzagCandle(ind) => ind.value(),
-            Self::ZigzagLookahead(ind) => ind.value(),
-            Self::ZigzagTime(ind) => ind.value(),
         }
     }
 
@@ -6596,7 +6519,6 @@ impl IndicatorInstance {
             Self::Atrts(ind) => ind.is_ready(),
             Self::AtrZscore(ind) => ind.is_ready(),
             Self::Autocorr(ind) => ind.is_ready(),
-            Self::AutoFibo(ind) => ind.is_ready(),
             Self::AvFrama(ind) => ind.is_ready(),
             Self::AvVidya(ind) => ind.is_ready(),
             Self::AvwapDistance(ind) => ind.is_ready(),
@@ -6695,7 +6617,6 @@ impl IndicatorInstance {
             Self::EwmacRobust(ind) => ind.is_ready(),
             Self::ExtendedKalmanFilter(ind) => ind.is_ready(),
             Self::FastFourierTransform(ind) => ind.is_ready(),
-            Self::FibonacciChannels(ind) => ind.is_ready(),
             Self::FisherTransform(ind) => ind.is_ready(),
             Self::FloorTraderPivots(ind) => ind.is_ready(),
             Self::ForceIndex(ind) => ind.is_ready(),
@@ -6708,6 +6629,7 @@ impl IndicatorInstance {
             Self::Fvgdur(ind) => ind.is_ready(),
             Self::Fvgrev(ind) => ind.is_ready(),
             Self::OscillatorWithDivergence(ind) => ind.is_ready(),
+            Self::SwingDetection(ind) => ind.is_ready(),
             Self::GannHilo(ind) => ind.is_ready(),
             Self::Gapo(ind) => ind.is_ready(),
             Self::Garch(ind) => ind.is_ready(),
@@ -6927,8 +6849,6 @@ impl IndicatorInstance {
             Self::Supts(ind) => ind.is_ready(),
             Self::SweepReversionIndex(ind) => ind.is_ready(),
             Self::SwingAge(ind) => ind.is_ready(),
-            Self::Swings(ind) => ind.is_ready(),
-            Self::SwingsSoft(ind) => ind.is_ready(),
             Self::SwingStop(ind) => ind.is_ready(),
             Self::SwingStrengthScore(ind) => ind.is_ready(),
             Self::T3(ind) => ind.is_ready(),
@@ -7003,12 +6923,6 @@ impl IndicatorInstance {
             Self::Xmil(ind) => ind.is_ready(),
             Self::XorGate(ind) => ind.is_ready(),
             Self::Za(ind) => ind.is_ready(),
-            Self::Zigzag(ind) => ind.is_ready(),
-            Self::ZigzagAtr(ind) => ind.is_ready(),
-            Self::ZigzagCandle(ind) => ind.is_ready(),
-            Self::ZigzagClassic(ind) => ind.is_ready(),
-            Self::ZigzagLookahead(ind) => ind.is_ready(),
-            Self::ZigzagTime(ind) => ind.is_ready(),
             Self::ZlSma(ind) => ind.is_ready(),
         }
     }
@@ -7055,7 +6969,6 @@ impl IndicatorInstance {
             Self::Atrts(ind) => ind.reset(),
             Self::AtrZscore(ind) => ind.reset(),
             Self::Autocorr(ind) => ind.reset(),
-            Self::AutoFibo(ind) => ind.reset(),
             Self::AvFrama(ind) => ind.reset(),
             Self::AvVidya(ind) => ind.reset(),
             Self::AvwapDistance(ind) => ind.reset(),
@@ -7154,7 +7067,6 @@ impl IndicatorInstance {
             Self::EwmacRobust(ind) => ind.reset(),
             Self::ExtendedKalmanFilter(ind) => ind.reset(),
             Self::FastFourierTransform(ind) => ind.reset(),
-            Self::FibonacciChannels(ind) => ind.reset(),
             Self::FisherTransform(ind) => ind.reset(),
             Self::FloorTraderPivots(ind) => ind.reset(),
             Self::ForceIndex(ind) => ind.reset(),
@@ -7167,6 +7079,7 @@ impl IndicatorInstance {
             Self::Fvgdur(ind) => ind.reset(),
             Self::Fvgrev(ind) => ind.reset(),
             Self::OscillatorWithDivergence(ind) => ind.reset(),
+            Self::SwingDetection(ind) => ind.reset(),
             Self::GannHilo(ind) => ind.reset(),
             Self::Gapo(ind) => ind.reset(),
             Self::Garch(ind) => ind.reset(),
@@ -7386,8 +7299,6 @@ impl IndicatorInstance {
             Self::Supts(ind) => ind.reset(),
             Self::SweepReversionIndex(ind) => ind.reset(),
             Self::SwingAge(ind) => ind.reset(),
-            Self::Swings(ind) => ind.reset(),
-            Self::SwingsSoft(ind) => ind.reset(),
             Self::SwingStop(ind) => ind.reset(),
             Self::SwingStrengthScore(ind) => ind.reset(),
             Self::T3(ind) => ind.reset(),
@@ -7462,12 +7373,6 @@ impl IndicatorInstance {
             Self::Xmil(ind) => ind.reset(),
             Self::XorGate(ind) => ind.reset(),
             Self::Za(ind) => ind.reset(),
-            Self::Zigzag(ind) => ind.reset(),
-            Self::ZigzagAtr(ind) => ind.reset(),
-            Self::ZigzagCandle(ind) => ind.reset(),
-            Self::ZigzagClassic(ind) => ind.reset(),
-            Self::ZigzagLookahead(ind) => ind.reset(),
-            Self::ZigzagTime(ind) => ind.reset(),
             Self::ZlSma(ind) => ind.reset(),
         }
     }

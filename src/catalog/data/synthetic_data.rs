@@ -958,10 +958,6 @@ pub fn recommended_data_type(indicator_name: &str) -> DataType {
     let name_lower = indicator_name.to_lowercase();
 
     // Specific indicators that need exact matching (check before generic patterns)
-    // ZigzagCandle needs ZigZagSwings, not CandlePatterns
-    if name_lower == "zigzagcandle" || name_lower == "zigzag_candle" {
-        return DataType::ZigZagSwings;
-    }
     // TickVolume needs TickData, not Calendar
     if name_lower == "tickvolume" || name_lower == "tick_volume" || name_lower == "tickvol" {
         return DataType::TickData;
@@ -1172,7 +1168,6 @@ mod tests {
         assert_eq!(recommended_data_type("Sma"), DataType::Smooth);
         // New types
         assert_eq!(recommended_data_type("SweepRev"), DataType::SweepReversion);
-        assert_eq!(recommended_data_type("ZigzagCandle"), DataType::ZigZagSwings);
         assert_eq!(recommended_data_type("TickVolume"), DataType::TickData);
     }
 

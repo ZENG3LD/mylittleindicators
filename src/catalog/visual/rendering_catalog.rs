@@ -787,15 +787,6 @@ fn register_momentum_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingM
             .build()
     );
 
-    // Auto Fibonacci
-    catalog.insert(BarIndicatorId::AutoFibo,
-        RenderingMetadata::builder("AUTO_FIBO")
-            .overlay()
-            .line_output("fibo", "Auto Fibo", COLOR_ORANGE)
-            .precision(4)
-            .build()
-    );
-
     // BB Period
     catalog.insert(BarIndicatorId::BbPeriod,
         RenderingMetadata::builder("BB_PERIOD")
@@ -1320,26 +1311,6 @@ fn register_momentum_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingM
             .build()
     );
 
-    // Swings
-    catalog.insert(BarIndicatorId::Swings,
-        RenderingMetadata::builder("SWINGS")
-            .overlay()
-            .output(OutputSpec::line("high", "Swing High", COLOR_GREEN, 2.0, ValueExtractor::Double(DoublePart::First)))
-            .output(OutputSpec::line("low", "Swing Low", COLOR_RED, 2.0, ValueExtractor::Double(DoublePart::Second)))
-            .precision(4)
-            .build()
-    );
-
-    // Swings Soft
-    catalog.insert(BarIndicatorId::SwingsSoft,
-        RenderingMetadata::builder("SWINGS_SOFT")
-            .overlay()
-            .output(OutputSpec::line("high", "Swing High", COLOR_GREEN, 2.0, ValueExtractor::Double(DoublePart::First)))
-            .output(OutputSpec::line("low", "Swing Low", COLOR_RED, 2.0, ValueExtractor::Double(DoublePart::Second)))
-            .precision(4)
-            .build()
-    );
-
     // TDI - Traders Dynamic Index
     catalog.insert(BarIndicatorId::Tdi,
         RenderingMetadata::builder("TDI")
@@ -1595,17 +1566,6 @@ fn register_channel_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMe
             .overlay()
             .output(OutputSpec::line("upper", "Box Top", COLOR_GREEN, 2.0, ValueExtractor::Double(DoublePart::First)))
             .output(OutputSpec::line("lower", "Box Bottom", COLOR_RED, 2.0, ValueExtractor::Double(DoublePart::Second)))
-            .precision(4)
-            .build()
-    );
-
-    // Fibonacci Channels
-    catalog.insert(BarIndicatorId::Fibochan,
-        RenderingMetadata::builder("FIBOCHAN")
-            .overlay()
-            .output(OutputSpec::line("upper", "Upper", COLOR_CHANNEL_UPPER, 1.0, ValueExtractor::Channel(ChannelPart::Upper)))
-            .output(OutputSpec::line("middle", "Middle", COLOR_CHANNEL_MIDDLE, 1.0, ValueExtractor::Channel(ChannelPart::Middle)))
-            .output(OutputSpec::line("lower", "Lower", COLOR_CHANNEL_LOWER, 1.0, ValueExtractor::Channel(ChannelPart::Lower)))
             .precision(4)
             .build()
     );
@@ -5068,51 +5028,9 @@ fn register_statistics_indicators(catalog: &mut HashMap<BarIndicatorId, Renderin
 // ZIGZAG INDICATORS
 // ============================================================================
 
-fn register_zigzag_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMetadata>) {
-    // Zigzag ATR
-    catalog.insert(BarIndicatorId::ZigzagAtr,
-        RenderingMetadata::builder("ZIGZAG_ATR")
-            .overlay()
-            .line_output("zigzag", "Zigzag ATR", COLOR_BLUE)
-            .precision(4)
-            .build()
-    );
-
-    // Zigzag Candle
-    catalog.insert(BarIndicatorId::ZigzagCandle,
-        RenderingMetadata::builder("ZIGZAG_CANDLE")
-            .overlay()
-            .line_output("zigzag", "Zigzag Candle", COLOR_PURPLE)
-            .precision(4)
-            .build()
-    );
-
-    // Zigzag Classic
-    catalog.insert(BarIndicatorId::ZigzagClassic,
-        RenderingMetadata::builder("ZIGZAG_CLASSIC")
-            .overlay()
-            .line_output("zigzag", "Zigzag Classic", COLOR_ORANGE)
-            .precision(4)
-            .build()
-    );
-
-    // Zigzag Lookahead
-    catalog.insert(BarIndicatorId::ZigzagLookahead,
-        RenderingMetadata::builder("ZIGZAG_LOOKAHEAD")
-            .overlay()
-            .line_output("zigzag", "Zigzag Lookahead", COLOR_TEAL)
-            .precision(4)
-            .build()
-    );
-
-    // Zigzag Time
-    catalog.insert(BarIndicatorId::ZigzagTime,
-        RenderingMetadata::builder("ZIGZAG_TIME")
-            .overlay()
-            .line_output("zigzag", "Zigzag Time", COLOR_CYAN)
-            .precision(4)
-            .build()
-    );
+fn register_zigzag_indicators(_catalog: &mut HashMap<BarIndicatorId, RenderingMetadata>) {
+    // ZigZag legacy variants removed — all backed by SwingDetection.
+    // SwingDetection rendering is registered separately if needed.
 }
 
 // ============================================================================
@@ -5405,22 +5323,6 @@ fn register_missing_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMe
         );
     }
 
-    // ========================================================================
-    // ZIGZAG (missing)
-    // ========================================================================
-
-    let zigzag_ids = [
-        BarIndicatorId::ZigzagAtr, BarIndicatorId::ZigzagCandle, BarIndicatorId::ZigzagClassic, BarIndicatorId::ZigzagLookahead, BarIndicatorId::ZigzagTime
-    ];
-    for id in zigzag_ids {
-        catalog.insert(id,
-            RenderingMetadata::builder(format!("{:?}", id))
-                .overlay()
-                .line_output("zigzag", "Zigzag", COLOR_PURPLE)
-                .precision(4)
-                .build()
-        );
-    }
 }
 
 // ============================================================================
@@ -5581,8 +5483,9 @@ mod tests {
         println!("\n=== RENDERING CATALOG COVERAGE ===");
         println!("Total indicators in rendering catalog: {}", count);
 
-        // We should have 460+ indicators (nearly all BarIndicatorId variants)
-        assert!(count >= 460, "Should have at least 460 indicators with rendering, got {}", count);
+        // We should have 450+ indicators (nearly all BarIndicatorId variants)
+        // Reduced by ~8: AutoFibo, Swings, SwingsSoft, Fibochan, ZigzagAtr/Classic/Candle/Lookahead/Time
+        assert!(count >= 450, "Should have at least 450 indicators with rendering, got {}", count);
 
         // Verify some key indicators exist
         let key_indicators = [

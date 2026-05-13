@@ -154,7 +154,6 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Regchan
         | BarIndicatorId::Starc
         | BarIndicatorId::Adaptivebb
-        | BarIndicatorId::Fibochan
         | BarIndicatorId::Vwapchan
         | BarIndicatorId::Projbands
         | BarIndicatorId::Theilsenchan
@@ -267,8 +266,6 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::Zigzag
         | BarIndicatorId::Pivot
         | BarIndicatorId::Floorpivot
-        | BarIndicatorId::Swings
-        | BarIndicatorId::SwingsSoft
         | BarIndicatorId::SwingAge
         | BarIndicatorId::Bos
         | BarIndicatorId::Camarilla
