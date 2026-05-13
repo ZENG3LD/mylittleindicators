@@ -302,7 +302,7 @@ pub fn signature_frama_advanced() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .metadata("author", "John Ehlers")
         .metadata("variant", "advanced")
-        .machine_id(BarIndicatorId::Framaadv) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Framaadv)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "FRAMAADV" is already the main ID, no need for alias
@@ -324,7 +324,7 @@ pub fn signature_lr() -> IndicatorSignature {
         .description("Linear regression line over N periods")
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .metadata("aka", "Linear Regression Line")
-        .machine_id(BarIndicatorId::Lr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Lr)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "LR" is already the main ID, no need for alias
@@ -346,7 +346,7 @@ pub fn signature_ehlers_fractal_adaptive_ma() -> IndicatorSignature {
         .description("Ehlers' implementation of fractal adaptive smoothing")
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .metadata("author", "John Ehlers")
-        .machine_id(BarIndicatorId::Ehlersfa) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ehlersfa)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "EHLERSFA" is already the main ID, no need for alias
@@ -369,7 +369,7 @@ pub fn signature_ehlers_zero_lag_ema() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .metadata("author", "John Ehlers")
         .metadata("feature", "reduced lag")
-        .machine_id(BarIndicatorId::Ehlersz) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ehlersz)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "EHLERSZ" is already the main ID, no need for alias
@@ -431,7 +431,7 @@ pub fn signature_jurik_ma() -> IndicatorSignature {
                 .with_default(ParamValue::F64(0.0))
         )
         .metadata("author", "Mark Jurik")
-        .machine_id(BarIndicatorId::Jma) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Jma)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "JMA" is already the main ID, no need for alias
@@ -454,7 +454,7 @@ pub fn signature_mcginley_dynamic() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .metadata("author", "John McGinley")
         .metadata("feature", "auto-adjusting")
-        .machine_id(BarIndicatorId::Mcginley) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Mcginley)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "MCGINLEY" is already the main ID, no need for alias
@@ -482,7 +482,7 @@ pub fn signature_t3() -> IndicatorSignature {
                 .with_default(ParamValue::F64(0.7))
         )
         .metadata("author", "Tim Tillson")
-        .machine_id(BarIndicatorId::T3) // TODO: Add to enum
+        .machine_id(BarIndicatorId::T3)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "T3" is already the main ID, no need for alias

@@ -42,7 +42,7 @@ pub fn signature_approximate_entropy() -> IndicatorSignature {
         )
         .metadata("range", "0.0-2.0+")
         .metadata("interpretation", "0.0 = maximally regular, higher = less regular")
-        .machine_id(BarIndicatorId::Apen) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Apen)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         // Note: "APEN" is already the main ID, no need for alias
@@ -70,7 +70,7 @@ pub fn signature_conditional_entropy() -> IndicatorSignature {
                 .with_default(ParamValue::USize(10))
                 .required()
         )
-        .machine_id(BarIndicatorId::Conden) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Conden)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         // Note: "CONDEN" is already the main ID, no need for alias
@@ -105,7 +105,7 @@ pub fn signature_cross_mutual_information_lags() -> IndicatorSignature {
                 .with_default(ParamValue::USize(10))
                 .required()
         )
-        .machine_id(BarIndicatorId::Xmil) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Xmil)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         // Note: "XMIL" is already the main ID, no need for alias
@@ -133,7 +133,7 @@ pub fn signature_fisher_information() -> IndicatorSignature {
                 .with_default(ParamValue::USize(10))
                 .required()
         )
-        .machine_id(BarIndicatorId::Fisher) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Fisher)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         // Note: "FISHER" is already the main ID, no need for alias
@@ -161,7 +161,7 @@ pub fn signature_information_gain() -> IndicatorSignature {
                 .with_default(ParamValue::USize(10))
                 .required()
         )
-        .machine_id(BarIndicatorId::Infog) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Infog)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         // Note: "INFOG" is already the main ID, no need for alias
@@ -198,7 +198,7 @@ pub fn signature_js_divergence() -> IndicatorSignature {
         )
         .metadata("range", "0.0-1.0")
         .metadata("interpretation", "0.0 = identical distributions, 1.0 = maximally different")
-        .machine_id(BarIndicatorId::Jsd) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Jsd)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
@@ -236,7 +236,7 @@ pub fn signature_kl_divergence() -> IndicatorSignature {
         )
         .metadata("range", "0.0+")
         .metadata("interpretation", "0.0 = identical distributions, higher = more different")
-        .machine_id(BarIndicatorId::Kld) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Kld)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         // Note: "KLD" is already the main ID, no need for alias
@@ -280,7 +280,7 @@ pub fn signature_mutual_information() -> IndicatorSignature {
         )
         .metadata("range", "0.0+")
         .metadata("complexity", "O(1) with rolling histogram")
-        .machine_id(BarIndicatorId::Mi) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Mi)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         // Note: "MI" is already the main ID, no need for alias
@@ -317,7 +317,7 @@ pub fn signature_permutation_entropy() -> IndicatorSignature {
         )
         .metadata("range", "0.0-1.0 (normalized)")
         .metadata("interpretation", "0.0 = one pattern, 1.0 = all patterns equally probable")
-        .machine_id(BarIndicatorId::Pe) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Pe)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
@@ -355,7 +355,7 @@ pub fn signature_sample_entropy() -> IndicatorSignature {
         )
         .metadata("range", "0.0-3.0+")
         .metadata("interpretation", "0.0 = maximally predictable, higher = more complex")
-        .machine_id(BarIndicatorId::Sampen) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sampen)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         // Note: "SAMPEN" is already the main ID, no need for alias
@@ -385,7 +385,7 @@ pub fn signature_shannon_entropy() -> IndicatorSignature {
         )
         .metadata("range", "0.0-1.0 (normalized)")
         .metadata("interpretation", "0.0 = fully predictable, 1.0 = maximally random")
-        .machine_id(BarIndicatorId::Shannon) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Shannon)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
@@ -430,7 +430,7 @@ pub fn signature_transfer_entropy() -> IndicatorSignature {
         )
         .metadata("range", "0.0+")
         .metadata("interpretation", "Higher values indicate stronger directional causality")
-        .machine_id(BarIndicatorId::Te) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Te)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         // Note: "TE" is already the main ID, no need for alias

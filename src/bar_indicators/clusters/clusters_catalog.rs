@@ -28,7 +28,7 @@ pub fn signature_market_microstructure() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 512, 50))
         .metadata("outputs", "liquidity_score, efficiency_score, execution_score, microstructure_score")
         .metadata("metrics", "spread, depth, price_impact, discovery_speed, volatility_clustering")
-        .machine_id(BarIndicatorId::MarketMicro) // TODO: Add to enum
+        .machine_id(BarIndicatorId::MarketMicro)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
@@ -51,7 +51,7 @@ pub fn signature_order_book_slope() -> IndicatorSignature {
         .description("Approximates order book slope using OHLCV data")
         .metadata("formula", "ln(volume) / (high - low)")
         .metadata("proxy", "true")
-        .machine_id(BarIndicatorId::OrderBookSlope) // TODO: Add to enum
+        .machine_id(BarIndicatorId::OrderBookSlope)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
@@ -78,7 +78,7 @@ pub fn signature_order_flow_imbalance() -> IndicatorSignature {
         )
         .metadata("outputs", "total_imbalance, avg_imbalance, dominant_side, imbalance_strength")
         .metadata("uses_volume", "true")
-        .machine_id(BarIndicatorId::OrderFlowImb) // TODO: Add to enum
+        .machine_id(BarIndicatorId::OrderFlowImb)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
@@ -126,7 +126,7 @@ pub fn signature_tick_volume_analyzer() -> IndicatorSignature {
         .metadata("outputs", "volume_delta, volume_ratio, buy_pct, avg_spread, market_pressure")
         .metadata("uses_volume", "true")
         .metadata("uses_ticks", "true")
-        .machine_id(BarIndicatorId::TickVolume) // TODO: Add to enum
+        .machine_id(BarIndicatorId::TickVolume)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
@@ -156,7 +156,7 @@ pub fn signature_volume_weighted_price_levels() -> IndicatorSignature {
         )
         .metadata("outputs", "vwap, support_levels, resistance_levels, high_volume_nodes")
         .metadata("uses_volume", "true")
-        .machine_id(BarIndicatorId::VwapLevels) // TODO: Add to enum
+        .machine_id(BarIndicatorId::VwapLevels)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()

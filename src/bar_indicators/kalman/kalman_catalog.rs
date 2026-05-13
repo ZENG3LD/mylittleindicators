@@ -48,7 +48,7 @@ pub fn signature_basic_kalman_filter() -> IndicatorSignature {
         )
         .metadata("complexity", "Constant velocity model")
         .metadata("outputs", "position, velocity, acceleration")
-        .machine_id(BarIndicatorId::Kalman) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Kalman)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "KALMAN" is already the main ID, no need for alias
@@ -91,7 +91,7 @@ pub fn signature_extended_kalman_filter() -> IndicatorSignature {
         )
         .metadata("complexity", "Nonlinear with Jacobian")
         .metadata("models", "friction, nonlinear observation")
-        .machine_id(BarIndicatorId::Ekf) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ekf)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "EKF" is already the main ID, no need for alias
@@ -134,7 +134,7 @@ pub fn signature_unscented_kalman_filter() -> IndicatorSignature {
         )
         .metadata("complexity", "Unscented transform")
         .metadata("feature", "no Jacobian needed")
-        .machine_id(BarIndicatorId::Ukf) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ukf)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "UKF" is already the main ID, no need for alias
@@ -184,7 +184,7 @@ pub fn signature_particle_filter() -> IndicatorSignature {
         )
         .metadata("complexity", "Monte Carlo sampling")
         .metadata("feature", "effective sample size tracking")
-        .machine_id(BarIndicatorId::Particle) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Particle)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "PARTICLE" is already the main ID, no need for alias
@@ -207,7 +207,7 @@ pub fn signature_alpha_beta_gamma_filter() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .metadata("model", "constant acceleration")
         .metadata("implementation", "EMA chain proxy")
-        .machine_id(BarIndicatorId::Abgfilter) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Abgfilter)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "ABGFILTER" is already the main ID, no need for alias
@@ -229,7 +229,7 @@ pub fn signature_rts_smoother() -> IndicatorSignature {
         .description("Backward smoothing over Kalman filter for optimal past state estimates")
         .metadata("complexity", "Forward-backward pass")
         .metadata("note", "Streaming proxy implementation")
-        .machine_id(BarIndicatorId::Rts) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Rts)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "RTS" is already the main ID, no need for alias
@@ -278,7 +278,7 @@ pub fn signature_kalman_trend_slope() -> IndicatorSignature {
                 .required()
         )
         .metadata("outputs", "slope, slope_z")
-        .machine_id(BarIndicatorId::Kslope) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Kslope)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Double)
         // Note: "KSLOPE" is already the main ID, no need for alias
@@ -327,7 +327,7 @@ pub fn signature_kalman_slope_zscore() -> IndicatorSignature {
                 .required()
         )
         .metadata("feature", "normalized velocity")
-        .machine_id(BarIndicatorId::Kslopez) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Kslopez)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         // Note: "KSLOPEZ" is already the main ID, no need for alias
@@ -376,7 +376,7 @@ pub fn signature_kalman_trend_regime() -> IndicatorSignature {
                 .required()
         )
         .metadata("output", "discrete regime: -1, 0, 1")
-        .machine_id(BarIndicatorId::Kregime) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Kregime)
         .role_kind(IndicatorRoleKind::Regime)
         .output_kind(IndicatorValueKind::Signal)
         // Note: "KREGIME" is already the main ID, no need for alias
@@ -433,7 +433,7 @@ pub fn signature_kalman_regime_score() -> IndicatorSignature {
         )
         .metadata("output", "continuous 0-1 score")
         .metadata("transform", "tanh sigmoid")
-        .machine_id(BarIndicatorId::Kscr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Kscr)
         .role_kind(IndicatorRoleKind::Regime)
         .output_kind(IndicatorValueKind::Single)
         // Note: "KSCR" is already the main ID, no need for alias
@@ -539,7 +539,7 @@ pub fn signature_kalman_regime_composite() -> IndicatorSignature {
         )
         .metadata("complexity", "Multi-component composite")
         .metadata("combines", "Kalman + ATR + Vol percentiles")
-        .machine_id(BarIndicatorId::Kcomp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Kcomp)
         .role_kind(IndicatorRoleKind::Regime)
         .output_kind(IndicatorValueKind::Single)
         // Note: "KCOMP" is already the main ID, no need for alias

@@ -49,7 +49,7 @@ pub fn signature_kama() -> IndicatorSignature {
         .metadata("author", "Perry Kaufman")
         .metadata("complexity", "Efficiency Ratio based")
         .metadata("adaptive_type", "efficiency")
-        .machine_id(BarIndicatorId::Kama) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Kama)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "KAMA" is already the main ID, no need for alias
@@ -137,7 +137,7 @@ pub fn signature_mama() -> IndicatorSignature {
         .metadata("complexity", "Hilbert Transform based")
         .metadata("adaptive_type", "cycle")
         .metadata("method", "MESA (Maximum Entropy Spectral Analysis)")
-        .machine_id(BarIndicatorId::Mama) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Mama)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "MAMA" is already the main ID, no need for alias
@@ -162,7 +162,7 @@ pub fn signature_adaptive_ma() -> IndicatorSignature {
         .metadata("adaptive_type", "multi")
         .metadata("modes", "Volatility, Volume, Trend, Momentum, Combined, Market")
         .metadata("efficiency_methods", "Kaufman, Fractal, DirectionalMovement, TrendStrength, NoiseRatio")
-        .machine_id(BarIndicatorId::Adaptivema) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Adaptivema)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "ADAPTIVEMA" is already the main ID, no need for alias

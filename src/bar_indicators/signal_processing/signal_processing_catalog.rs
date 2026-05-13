@@ -62,7 +62,7 @@ pub fn signature_butterworth() -> IndicatorSignature {
         )
         .metadata("author", "Stephen Butterworth")
         .metadata("category", "filter")
-        .machine_id(BarIndicatorId::Butter) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Butter)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -100,7 +100,7 @@ pub fn signature_chebyshev() -> IndicatorSignature {
         )
         .metadata("author", "Pafnuty Chebyshev")
         .metadata("category", "filter")
-        .machine_id(BarIndicatorId::Cheby) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Cheby)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -129,7 +129,7 @@ pub fn signature_cusum_filter() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "change_detection")
-        .machine_id(BarIndicatorId::Cusum) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Cusum)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -153,7 +153,7 @@ pub fn signature_cyber_cycle() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("author", "John Ehlers")
         .metadata("category", "cycle")
-        .machine_id(BarIndicatorId::Cyber) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Cyber)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -177,7 +177,7 @@ pub fn signature_decycler() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("author", "John Ehlers")
         .metadata("category", "filter")
-        .machine_id(BarIndicatorId::Decyc) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Decyc)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -198,7 +198,7 @@ pub fn signature_ehlers_sinewave() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("author", "John Ehlers")
         .metadata("category", "cycle")
-        .machine_id(BarIndicatorId::Esine) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Esine)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -222,7 +222,7 @@ pub fn signature_ehlers_super_smoother() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 100, 10))
         .metadata("author", "John Ehlers")
         .metadata("category", "filter")
-        .machine_id(BarIndicatorId::Ess) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ess)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -246,7 +246,7 @@ pub fn signature_fft() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(8, 256, 64))
         .metadata("category", "transform")
         .metadata("complexity", "O(n log n)")
-        .machine_id(BarIndicatorId::Fft) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Fft)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -276,7 +276,7 @@ pub fn signature_hampel_filter() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "filter")
-        .machine_id(BarIndicatorId::Hampel) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Hampel)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -299,7 +299,7 @@ pub fn signature_higher_moments() -> IndicatorSignature {
         .description("Skewness and kurtosis of price distribution")
         .add_constraint(ParamConstraint::period(10, 200, 20))
         .metadata("category", "statistical")
-        .machine_id(BarIndicatorId::Hmom) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Hmom)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -322,7 +322,7 @@ pub fn signature_hilbert() -> IndicatorSignature {
         .description("Analytic signal decomposition for phase and amplitude")
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("category", "transform")
-        .machine_id(BarIndicatorId::Hilb) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Hilb)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Hilbert)
         .validated()
@@ -346,7 +346,7 @@ pub fn signature_hilbert_dominant_cycle() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("author", "John Ehlers")
         .metadata("category", "cycle")
-        .machine_id(BarIndicatorId::Hdc) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Hdc)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -382,7 +382,7 @@ pub fn signature_hysteresis_gate() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "gate")
-        .machine_id(BarIndicatorId::Hyst) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Hyst)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Flag)
         .validated()
@@ -405,7 +405,7 @@ pub fn signature_lempel_ziv() -> IndicatorSignature {
         .description("Measures signal complexity and randomness")
         .add_constraint(ParamConstraint::period(10, 200, 50))
         .metadata("category", "complexity")
-        .machine_id(BarIndicatorId::Lz) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Lz)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -516,7 +516,7 @@ pub fn signature_market_regime_filter() -> IndicatorSignature {
         .description("Adaptive filter for detecting market regimes")
         .add_constraint(ParamConstraint::period(10, 100, 20))
         .metadata("category", "regime")
-        .machine_id(BarIndicatorId::Mrf) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Mrf)
         .role_kind(IndicatorRoleKind::Regime)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -539,7 +539,7 @@ pub fn signature_regime_composite() -> IndicatorSignature {
         .description("Composite indicator for regime detection")
         .add_constraint(ParamConstraint::period(10, 100, 20))
         .metadata("category", "regime")
-        .machine_id(BarIndicatorId::Rc) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Rc)
         .role_kind(IndicatorRoleKind::Regime)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -563,7 +563,7 @@ pub fn signature_roofing_filter() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("author", "John Ehlers")
         .metadata("category", "filter")
-        .machine_id(BarIndicatorId::Roof) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Roof)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -594,7 +594,7 @@ pub fn signature_savitzky_golay() -> IndicatorSignature {
         )
         .metadata("author", "Abraham Savitzky and Marcel J.E. Golay")
         .metadata("category", "filter")
-        .machine_id(BarIndicatorId::Sg) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sg)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -617,7 +617,7 @@ pub fn signature_spectral_bandpower() -> IndicatorSignature {
         .description("Power in specific frequency bands")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sbp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sbp)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -640,7 +640,7 @@ pub fn signature_spectral_bandpower_ratio_hl() -> IndicatorSignature {
         .description("Ratio of high to low frequency bandpower")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sbprhl) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sbprhl)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -663,7 +663,7 @@ pub fn signature_spectral_bandwidth_feature() -> IndicatorSignature {
         .description("Bandwidth of frequency spectrum")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sbwf) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sbwf)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -686,7 +686,7 @@ pub fn signature_spectral_centroid_feature() -> IndicatorSignature {
         .description("Center of mass of frequency spectrum")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Scf) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Scf)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -709,7 +709,7 @@ pub fn signature_spectral_crest() -> IndicatorSignature {
         .description("Peak-to-average ratio in frequency domain")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Screst) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Screst)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -739,7 +739,7 @@ pub fn signature_spectral_crest_percentile() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Screstp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Screstp)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -762,7 +762,7 @@ pub fn signature_spectral_energy_ratio() -> IndicatorSignature {
         .description("Ratio of energy in different frequency bands")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Ser) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ser)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -785,7 +785,7 @@ pub fn signature_spectral_entropy() -> IndicatorSignature {
         .description("Entropy of frequency spectrum")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sent) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sent)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -808,7 +808,7 @@ pub fn signature_spectral_entropy_of_entropy() -> IndicatorSignature {
         .description("Second-order entropy of spectrum")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sentent) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sentent)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -831,7 +831,7 @@ pub fn signature_spectral_entropy_rate() -> IndicatorSignature {
         .description("Rate of change of spectral entropy")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sentr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sentr)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -854,7 +854,7 @@ pub fn signature_spectral_flatness() -> IndicatorSignature {
         .description("Measure of noise-like vs tone-like spectrum")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sflat) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sflat)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -884,7 +884,7 @@ pub fn signature_spectral_flatness_percentile() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sflatp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sflatp)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -907,7 +907,7 @@ pub fn signature_spectral_flux_proxy() -> IndicatorSignature {
         .description("Rate of change of spectrum over time")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sflux) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sflux)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -930,7 +930,7 @@ pub fn signature_spectral_high_mid_power_ratio() -> IndicatorSignature {
         .description("Ratio of high to mid frequency power")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Shmpr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Shmpr)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -953,7 +953,7 @@ pub fn signature_spectral_low_mid_power_ratio() -> IndicatorSignature {
         .description("Ratio of low to mid frequency power")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Slmpr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Slmpr)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -976,7 +976,7 @@ pub fn signature_spectral_rolloff() -> IndicatorSignature {
         .description("Frequency below which specified percentage of energy lies")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sroll) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sroll)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -999,7 +999,7 @@ pub fn signature_spectral_rolloff_95() -> IndicatorSignature {
         .description("Frequency below which 95% of energy lies")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sroll95) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sroll95)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -1029,7 +1029,7 @@ pub fn signature_spectral_rolloff_percentile() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Srollp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Srollp)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -1059,7 +1059,7 @@ pub fn signature_spectral_rolloff_robust_percentile() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Srollrp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Srollrp)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -1082,7 +1082,7 @@ pub fn signature_spectral_slope() -> IndicatorSignature {
         .description("Linear regression slope of frequency spectrum")
         .add_constraint(ParamConstraint::period(16, 256, 64))
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sslope) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sslope)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -1112,7 +1112,7 @@ pub fn signature_spectral_slope_percentile() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sslopep) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sslopep)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -1142,7 +1142,7 @@ pub fn signature_spectral_slope_robust_percentile() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Ssloperp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ssloperp)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -1172,7 +1172,7 @@ pub fn signature_spectral_slope_zscore() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "spectral")
-        .machine_id(BarIndicatorId::Sslopez) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sslopez)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -1202,7 +1202,7 @@ pub fn signature_stft_features() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "transform")
-        .machine_id(BarIndicatorId::Stft) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Stft)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -1231,7 +1231,7 @@ pub fn signature_threshold_gate() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "gate")
-        .machine_id(BarIndicatorId::Thresh) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Thresh)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Flag)
         .validated()
@@ -1253,7 +1253,7 @@ pub fn signature_time_encoders() -> IndicatorSignature {
         .name("Time Encoders")
         .description("Cyclic time encoding (hour, day, week)")
         .metadata("category", "encoding")
-        .machine_id(BarIndicatorId::Tenc) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Tenc)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -1283,7 +1283,7 @@ pub fn signature_wavelet() -> IndicatorSignature {
                 .required()
         )
         .metadata("category", "transform")
-        .machine_id(BarIndicatorId::Wave) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Wave)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -1306,7 +1306,7 @@ pub fn signature_weighted_composite() -> IndicatorSignature {
         .description("Weighted combination of multiple signals")
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("category", "composite")
-        .machine_id(BarIndicatorId::Wcomp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Wcomp)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -1329,7 +1329,7 @@ pub fn signature_zscore_price_mad() -> IndicatorSignature {
         .description("Z-score using median absolute deviation")
         .add_constraint(ParamConstraint::period(10, 200, 20))
         .metadata("category", "statistical")
-        .machine_id(BarIndicatorId::Zmad) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Zmad)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()

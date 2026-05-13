@@ -28,7 +28,7 @@ pub fn signature_adf_proxy() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(20, 500, 100))
         .metadata("test_type", "stationarity")
         .metadata("null_hypothesis", "unit root (non-stationary)")
-        .machine_id(BarIndicatorId::Adf) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Adf)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -52,7 +52,7 @@ pub fn signature_kpss_proxy() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(20, 500, 100))
         .metadata("test_type", "stationarity")
         .metadata("null_hypothesis", "stationary")
-        .machine_id(BarIndicatorId::Kpss) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Kpss)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -76,7 +76,7 @@ pub fn signature_kpss_trend_proxy() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(20, 500, 100))
         .metadata("test_type", "stationarity")
         .metadata("trend", "true")
-        .machine_id(BarIndicatorId::KpssTrend) // TODO: Add to enum
+        .machine_id(BarIndicatorId::KpssTrend)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -99,7 +99,7 @@ pub fn signature_kpss_z_proxy() -> IndicatorSignature {
         .description("KPSS z-statistic proxy")
         .add_constraint(ParamConstraint::period(20, 500, 100))
         .metadata("test_type", "stationarity")
-        .machine_id(BarIndicatorId::KpssZ) // TODO: Add to enum
+        .machine_id(BarIndicatorId::KpssZ)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -123,7 +123,7 @@ pub fn signature_adf_kpss_composite() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(20, 500, 100))
         .metadata("test_type", "stationarity")
         .metadata("composite", "true")
-        .machine_id(BarIndicatorId::AdfKpss) // TODO: Add to enum
+        .machine_id(BarIndicatorId::AdfKpss)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -146,7 +146,7 @@ pub fn signature_phillips_perron_proxy() -> IndicatorSignature {
         .description("Phillips-Perron unit root test proxy")
         .add_constraint(ParamConstraint::period(20, 500, 100))
         .metadata("test_type", "stationarity")
-        .machine_id(BarIndicatorId::Pp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Pp)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -169,7 +169,7 @@ pub fn signature_zivot_andrews_proxy() -> IndicatorSignature {
         .description("Zivot-Andrews structural break test")
         .add_constraint(ParamConstraint::period(50, 500, 100))
         .metadata("test_type", "structural_break")
-        .machine_id(BarIndicatorId::Za) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Za)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -198,7 +198,7 @@ pub fn signature_arch_lm_proxy() -> IndicatorSignature {
                 .with_default(ParamValue::USize(5))
         )
         .metadata("test_type", "heteroskedasticity")
-        .machine_id(BarIndicatorId::ArchLm) // TODO: Add to enum
+        .machine_id(BarIndicatorId::ArchLm)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -222,7 +222,7 @@ pub fn signature_arch_lm_pvalue_proxy() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(20, 500, 50))
         .metadata("test_type", "heteroskedasticity")
         .metadata("output", "p-value")
-        .machine_id(BarIndicatorId::ArchLmPval) // TODO: Add to enum
+        .machine_id(BarIndicatorId::ArchLmPval)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
@@ -305,7 +305,7 @@ pub fn signature_engle_granger_proxy() -> IndicatorSignature {
         .description("Engle-Granger cointegration test proxy")
         .add_constraint(ParamConstraint::period(50, 500, 100))
         .metadata("test_type", "cointegration")
-        .machine_id(BarIndicatorId::EgCoint) // TODO: Add to enum
+        .machine_id(BarIndicatorId::EgCoint)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -328,7 +328,7 @@ pub fn signature_engle_granger_adf_proxy() -> IndicatorSignature {
         .description("Engle-Granger residual ADF test")
         .add_constraint(ParamConstraint::period(50, 500, 100))
         .metadata("test_type", "cointegration")
-        .machine_id(BarIndicatorId::EgAdf) // TODO: Add to enum
+        .machine_id(BarIndicatorId::EgAdf)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -352,7 +352,7 @@ pub fn signature_engle_granger_trend_proxy() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(50, 500, 100))
         .metadata("test_type", "cointegration")
         .metadata("trend", "true")
-        .machine_id(BarIndicatorId::EgTrend) // TODO: Add to enum
+        .machine_id(BarIndicatorId::EgTrend)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -375,7 +375,7 @@ pub fn signature_cointegration_proxy() -> IndicatorSignature {
         .description("Generic cointegration test proxy")
         .add_constraint(ParamConstraint::period(50, 500, 100))
         .metadata("test_type", "cointegration")
-        .machine_id(BarIndicatorId::Coint) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Coint)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -422,7 +422,7 @@ pub fn signature_residual_stationarity() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(20, 500, 50))
         .metadata("test_type", "stationarity")
         .metadata("residual_based", "true")
-        .machine_id(BarIndicatorId::ResidStat) // TODO: Add to enum
+        .machine_id(BarIndicatorId::ResidStat)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -451,7 +451,7 @@ pub fn signature_variance_ratio() -> IndicatorSignature {
                 .with_default(ParamValue::USize(5))
         )
         .metadata("test_type", "random_walk")
-        .machine_id(BarIndicatorId::Vr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vr)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -475,7 +475,7 @@ pub fn signature_variance_ratio_aggregate() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(20, 500, 50))
         .metadata("test_type", "random_walk")
         .metadata("aggregate", "true")
-        .machine_id(BarIndicatorId::VrAgg) // TODO: Add to enum
+        .machine_id(BarIndicatorId::VrAgg)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -499,7 +499,7 @@ pub fn signature_variance_ratio_z_aggregate() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(20, 500, 50))
         .metadata("test_type", "random_walk")
         .metadata("output", "z-statistic")
-        .machine_id(BarIndicatorId::VrZAgg) // TODO: Add to enum
+        .machine_id(BarIndicatorId::VrZAgg)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -546,7 +546,7 @@ pub fn signature_bai_perron_cusum() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(50, 500, 100))
         .metadata("test_type", "structural_break")
         .metadata("multiple_breaks", "true")
-        .machine_id(BarIndicatorId::BpCusum) // TODO: Add to enum
+        .machine_id(BarIndicatorId::BpCusum)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -569,7 +569,7 @@ pub fn signature_price_volume_coherence_proxy() -> IndicatorSignature {
         .description("Spectral coherence between price and volume")
         .add_constraint(ParamConstraint::period(50, 500, 100))
         .metadata("test_type", "coherence")
-        .machine_id(BarIndicatorId::PvCoherence) // TODO: Add to enum
+        .machine_id(BarIndicatorId::PvCoherence)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
@@ -593,7 +593,7 @@ pub fn signature_price_zscore() -> IndicatorSignature {
         .description("Z-score normalized price")
         .add_constraint(ParamConstraint::period(20, 500, 50))
         .metadata("test_type", "normalization")
-        .machine_id(BarIndicatorId::PriceZscore) // TODO: Add to enum
+        .machine_id(BarIndicatorId::PriceZscore)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -616,7 +616,7 @@ pub fn signature_r_squared() -> IndicatorSignature {
         .description("Coefficient of determination for trend fit")
         .add_constraint(ParamConstraint::period(10, 500, 20))
         .metadata("test_type", "goodness_of_fit")
-        .machine_id(BarIndicatorId::RSquared) // TODO: Add to enum
+        .machine_id(BarIndicatorId::RSquared)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)

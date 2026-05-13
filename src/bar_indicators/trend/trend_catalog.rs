@@ -72,7 +72,7 @@ pub fn signature_didi_index() -> IndicatorSignature {
         .metadata("author", "Odir Aguiar")
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("ma_note", "Original default: EMA")
-        .machine_id(BarIndicatorId::Didi) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Didi)
         .role_kind(IndicatorRoleKind::Regime)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -119,7 +119,7 @@ pub fn signature_ehlers_instantaneous_trendline() -> IndicatorSignature {
         .description("Zero-lag trendline using Hilbert Transform")
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .metadata("author", "John Ehlers")
-        .machine_id(BarIndicatorId::Eit) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Eit)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -142,7 +142,7 @@ pub fn signature_gann_hilo_activator() -> IndicatorSignature {
         .description("Dynamic support/resistance trend follower")
         .add_constraint(ParamConstraint::period(2, 200, 10))
         .metadata("author", "W.D. Gann")
-        .machine_id(BarIndicatorId::GannHilo) // TODO: Add to enum
+        .machine_id(BarIndicatorId::GannHilo)
         .role_kind(IndicatorRoleKind::TrendStop)
         .output_kind(IndicatorValueKind::ValueFlag)
         .validated()
@@ -168,7 +168,7 @@ pub fn signature_gmma_compression() -> IndicatorSignature {
         .metadata("fast_periods", "3,5,8,10,12,15")
         .metadata("slow_periods", "30,35,40,45,50,60")
         .metadata("author", "Daryl Guppy")
-        .machine_id(BarIndicatorId::Gmma) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Gmma)
         .role_kind(IndicatorRoleKind::Regime)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -190,7 +190,7 @@ pub fn signature_heikin_ashi_trend() -> IndicatorSignature {
         .name("Heikin Ashi Trend")
         .description("Trend detection using smoothed candlesticks")
         .add_constraint(ParamConstraint::period(2, 100, 5))
-        .machine_id(BarIndicatorId::HaTrend) // TODO: Add to enum
+        .machine_id(BarIndicatorId::HaTrend)
         .role_kind(IndicatorRoleKind::Regime)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -227,7 +227,7 @@ pub fn signature_kama_slope() -> IndicatorSignature {
                 .required()
         )
         .metadata("based_on", "KAMA")
-        .machine_id(BarIndicatorId::KamaSlope) // TODO: Add to enum
+        .machine_id(BarIndicatorId::KamaSlope)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -247,7 +247,7 @@ pub fn signature_lr_slope() -> IndicatorSignature {
         .name("Linear Regression Slope")
         .description("Slope of linear regression line")
         .add_constraint(ParamConstraint::period(2, 200, 20))
-        .machine_id(BarIndicatorId::LrSlope) // TODO: Add to enum
+        .machine_id(BarIndicatorId::LrSlope)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -310,7 +310,7 @@ pub fn signature_slope_direction_line() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::SMA))
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
-        .machine_id(BarIndicatorId::Sdl) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sdl)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -335,7 +335,7 @@ pub fn signature_ssl_channel() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::SMA))
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("outputs", "ssl_up, ssl_down")
-        .machine_id(BarIndicatorId::Ssl) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ssl)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -376,7 +376,7 @@ pub fn signature_trend_intensity_index() -> IndicatorSignature {
         .description("Measures trend strength intensity")
         .add_constraint(ParamConstraint::period(5, 100, 30))
         .metadata("range", "0-100")
-        .machine_id(BarIndicatorId::Tii) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Tii)
         .role_kind(IndicatorRoleKind::OscillatorBounded)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -399,7 +399,7 @@ pub fn signature_zl_sma() -> IndicatorSignature {
         .description("Zero-lag simple moving average")
         .add_constraint(ParamConstraint::period(2, 200, 20))
         .metadata("feature", "reduced lag")
-        .machine_id(BarIndicatorId::Zlsma) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Zlsma)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         .validated()

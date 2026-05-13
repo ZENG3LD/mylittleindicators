@@ -91,7 +91,7 @@ pub fn signature_arimax() -> IndicatorSignature {
         )
         .metadata("outputs", "forecast, aic, bic, exog_coefficients")
         .metadata("min_observations", "30+")
-        .machine_id(BarIndicatorId::Arimax) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Arimax)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "ARIMAX" is already the main ID, no need for alias
@@ -123,7 +123,7 @@ pub fn signature_egarch() -> IndicatorSignature {
         .metadata("features", "asymmetric, leverage_effect")
         .metadata("min_observations", "50+")
         .metadata("author", "Nelson (1991)")
-        .machine_id(BarIndicatorId::Egarch) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Egarch)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "EGARCH" is already the main ID, no need for alias
@@ -178,7 +178,7 @@ pub fn signature_polynomial_regression() -> IndicatorSignature {
         .metadata("outputs", "forecast, r_squared, adjusted_r_squared, mse, rmse, first_derivative, second_derivative, trend_direction")
         .metadata("trend_directions", "StrongUptrend, Uptrend, Sideways, Downtrend, StrongDowntrend")
         .metadata("min_observations", "10+")
-        .machine_id(BarIndicatorId::PolyReg) // TODO: Add to enum
+        .machine_id(BarIndicatorId::PolyReg)
         .role_kind(IndicatorRoleKind::Smoother)
         .output_kind(IndicatorValueKind::Single)
         // Note: "POLY_REG" is already the main ID, no need for alias

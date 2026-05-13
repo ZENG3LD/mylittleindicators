@@ -28,7 +28,7 @@ pub fn signature_book_imbalance_ratio() -> IndicatorSignature {
         .metadata("parameters", "none")
         .metadata("requirements", "order_book_data")
         .metadata("interpretation", "Closer to 0 = ask pressure, closer to 1 = bid pressure")
-        .machine_id(BarIndicatorId::BookImb) // TODO: Add to enum
+        .machine_id(BarIndicatorId::BookImb)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
@@ -52,7 +52,7 @@ pub fn signature_order_book_slope() -> IndicatorSignature {
         .metadata("calculation", "ln(volume) / (high - low)")
         .metadata("category", "depth_proxy")
         .metadata("interpretation", "Higher values indicate steeper order book")
-        .machine_id(BarIndicatorId::BookSlope) // TODO: Add to enum
+        .machine_id(BarIndicatorId::BookSlope)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
@@ -90,7 +90,7 @@ pub fn signature_order_flow_imbalance() -> IndicatorSignature {
         .metadata("outputs", "total_imbalance, avg_imbalance, dominant_side, strength")
         .metadata("requirements", "volume_bars_with_buy_sell_split")
         .metadata("interpretation", "Positive = buy pressure, negative = sell pressure")
-        .machine_id(BarIndicatorId::Ofi) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ofi)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
@@ -115,7 +115,7 @@ pub fn signature_queue_imbalance() -> IndicatorSignature {
         .metadata("range", "-1 to +1")
         .metadata("category", "level1_proxy")
         .metadata("interpretation", "Positive = buying pressure, negative = selling pressure")
-        .machine_id(BarIndicatorId::QueueImb) // TODO: Add to enum
+        .machine_id(BarIndicatorId::QueueImb)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()

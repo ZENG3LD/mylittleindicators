@@ -31,7 +31,7 @@ pub fn signature_pivot_points() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(1, 168, 1))
         .metadata("author", "Classic TA")
         .metadata("levels", "7 (PP, R1-R3, S1-S3)")
-        .machine_id(BarIndicatorId::Pivot) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Pivot)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Triple)
         .validated()
@@ -55,7 +55,7 @@ pub fn signature_floor_trader_pivots() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(1, 168, 1))
         .metadata("author", "Floor Traders")
         .metadata("use_case", "intraday trading")
-        .machine_id(BarIndicatorId::Floorpivot) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Floorpivot)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -80,7 +80,7 @@ pub fn signature_camarilla_pivots() -> IndicatorSignature {
         .metadata("author", "Nick Stott")
         .metadata("levels", "9 (PP, R1-R4, S1-S4)")
         .metadata("multiplier", "1.1")
-        .machine_id(BarIndicatorId::Camarilla) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Camarilla)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -104,7 +104,7 @@ pub fn signature_woodie_pivots() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(1, 168, 1))
         .metadata("author", "Woodie")
         .metadata("emphasis", "current session")
-        .machine_id(BarIndicatorId::Woodie) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Woodie)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -128,7 +128,7 @@ pub fn signature_demark_pivots() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(1, 168, 1))
         .metadata("author", "Tom DeMark")
         .metadata("feature", "open/close relationship")
-        .machine_id(BarIndicatorId::Demark) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Demark)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -152,7 +152,7 @@ pub fn signature_anchored_vwap() -> IndicatorSignature {
         .metadata("uses_volume", "true")
         .metadata("anchor", "monthly")
         .metadata("reset", "calendar-based")
-        .machine_id(BarIndicatorId::Avwap) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Avwap)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -175,7 +175,7 @@ pub fn signature_avwap_multi_anchor_reversion() -> IndicatorSignature {
         .description("Reversion probability to multiple AVWAP anchor points")
         .metadata("uses_volume", "true")
         .metadata("multi_anchor", "true")
-        .machine_id(BarIndicatorId::Avwaprev) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Avwaprev)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -198,7 +198,7 @@ pub fn signature_avwap_touch_probability() -> IndicatorSignature {
         .description("Statistical probability of price touching AVWAP level")
         .metadata("uses_volume", "true")
         .metadata("statistical", "true")
-        .machine_id(BarIndicatorId::Avwaptouch) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Avwaptouch)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -222,7 +222,7 @@ pub fn signature_break_of_structure() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 50, 10))
         .metadata("pattern", "BOS/CHOCH")
         .metadata("use_case", "structure breaks")
-        .machine_id(BarIndicatorId::Bos) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Bos)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::DoubleFlag)
         .validated()
@@ -245,7 +245,7 @@ pub fn signature_fvg_detector() -> IndicatorSignature {
         .description("Detects Fair Value Gaps in 3-bar patterns")
         .metadata("pattern", "3-bar FVG")
         .metadata("type", "bull/bear gaps")
-        .machine_id(BarIndicatorId::Fvg) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Fvg)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::DoubleFlag)
         .validated()
@@ -267,7 +267,7 @@ pub fn signature_hl_value_area() -> IndicatorSignature {
         .name("High-Low Value Area")
         .description("Value area calculation based on high/low ranges")
         .metadata("basis", "high/low ranges")
-        .machine_id(BarIndicatorId::Hlva) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Hlva)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -290,7 +290,7 @@ pub fn signature_pivot_anchored_vwap() -> IndicatorSignature {
         .description("VWAP anchored to pivot point levels")
         .metadata("uses_volume", "true")
         .metadata("anchor", "pivot points")
-        .machine_id(BarIndicatorId::Pivavwap) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Pivavwap)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -313,7 +313,7 @@ pub fn signature_rolling_midline() -> IndicatorSignature {
         .description("Rolling average of (High + Low) / 2")
         .add_constraint(ParamConstraint::period(1, 200, 20))
         .metadata("formula", "(H+L)/2 average")
-        .machine_id(BarIndicatorId::Rmid) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Rmid)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -337,7 +337,7 @@ pub fn signature_rolling_quartiles() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(1, 200, 20))
         .metadata("outputs", "Q1, Q2, Q3")
         .metadata("complexity", "O(N log N) per update")
-        .machine_id(BarIndicatorId::Rquart) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Rquart)
         .role_kind(IndicatorRoleKind::Level)
         .output_kind(IndicatorValueKind::Triple)
         .validated()

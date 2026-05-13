@@ -52,7 +52,7 @@ pub fn signature_nvi_pvi() -> IndicatorSignature {
         .description("Cumulative indicators based on volume changes")
         .metadata("outputs", "nvi, pvi")
         .metadata("parameters", "none")
-        .machine_id(BarIndicatorId::NviPvi) // TODO: Add to enum
+        .machine_id(BarIndicatorId::NviPvi)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -76,7 +76,7 @@ pub fn signature_poc_detector() -> IndicatorSignature {
         .description("Detects price level with highest volume")
         .add_constraint(ParamConstraint::period(10, 200, 50))
         .metadata("category", "volume_profile")
-        .machine_id(BarIndicatorId::Poc) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Poc)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
@@ -132,7 +132,7 @@ pub fn signature_pvo() -> IndicatorSignature {
             ParamConstraint::new("signal_ma_type", ParamType::MaType)
                 .with_default(ParamValue::MaType(MovingAverageType::EMA))
         )
-        .machine_id(BarIndicatorId::Pvo) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Pvo)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -156,7 +156,7 @@ pub fn signature_pvt() -> IndicatorSignature {
         .description("Cumulative volume based on price change percentage")
         .metadata("category", "cumulative")
         .metadata("parameters", "none")
-        .machine_id(BarIndicatorId::Pvt) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Pvt)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -179,7 +179,7 @@ pub fn signature_relative_volume() -> IndicatorSignature {
         .name("Relative Volume")
         .description("Current volume compared to average volume")
         .add_constraint(ParamConstraint::period(5, 200, 20))
-        .machine_id(BarIndicatorId::Rvol) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Rvol)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -209,7 +209,7 @@ pub fn signature_vfi() -> IndicatorSignature {
                 .with_default(ParamValue::F64(0.2))
                 .required()
         )
-        .machine_id(BarIndicatorId::Vfi) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vfi)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -232,7 +232,7 @@ pub fn signature_volume_delta() -> IndicatorSignature {
         .name("Volume Delta")
         .description("Difference between buying and selling volume")
         .metadata("requirements", "bid_ask_volume")
-        .machine_id(BarIndicatorId::Vdelta) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vdelta)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
@@ -269,7 +269,7 @@ pub fn signature_volume_oscillator() -> IndicatorSignature {
                 .with_default(ParamValue::USize(10))
                 .required()
         )
-        .machine_id(BarIndicatorId::Vo) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vo)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -306,7 +306,7 @@ pub fn signature_volume_profile() -> IndicatorSignature {
                 .required()
         )
         .metadata("outputs", "poc, vah, val, profile")
-        .machine_id(BarIndicatorId::Vprofile) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vprofile)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
@@ -330,7 +330,7 @@ pub fn signature_volume_zscore() -> IndicatorSignature {
         .name("Volume Z-Score")
         .description("Standardized volume using z-score")
         .add_constraint(ParamConstraint::period(10, 200, 20))
-        .machine_id(BarIndicatorId::Vz) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vz)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -373,7 +373,7 @@ pub fn signature_vpt() -> IndicatorSignature {
         .description("Cumulative volume adjusted by price change")
         .metadata("category", "cumulative")
         .metadata("parameters", "none")
-        .machine_id(BarIndicatorId::Vpt) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vpt)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -396,7 +396,7 @@ pub fn signature_vroc() -> IndicatorSignature {
         .name("Volume Rate of Change")
         .description("Rate of change applied to volume")
         .add_constraint(ParamConstraint::period(5, 100, 14))
-        .machine_id(BarIndicatorId::Vroc) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vroc)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -420,7 +420,7 @@ pub fn signature_vzo() -> IndicatorSignature {
         .description("Relates volume to price direction")
         .add_constraint(ParamConstraint::period(5, 100, 14))
         .metadata("range", "-60 to +60")
-        .machine_id(BarIndicatorId::Vzo) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vzo)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .validated()

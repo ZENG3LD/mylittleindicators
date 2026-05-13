@@ -90,7 +90,7 @@ pub fn signature_adaptive_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .metadata("adaptive", "true")
-        .machine_id(BarIndicatorId::Adaptivechan) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Adaptivechan)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -119,7 +119,7 @@ pub fn signature_atr_channels() -> IndicatorSignature {
         .metadata("outputs", "upper, middle, lower")
         .metadata("center_ma_desc", "Center line MA type")
         .metadata("atr_ma_desc", "ATR smoothing MA type")
-        .machine_id(BarIndicatorId::Atrchan) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Atrchan)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -148,7 +148,7 @@ pub fn signature_bollinger_bands() -> IndicatorSignature {
         )
         .metadata("author", "John Bollinger")
         .metadata("outputs", "upper, middle, lower, bandwidth, percent_b")
-        .machine_id(BarIndicatorId::Bb) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Bb)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -171,7 +171,7 @@ pub fn signature_bollinger_metrics() -> IndicatorSignature {
         .description("Additional metrics for Bollinger Bands analysis")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("outputs", "bandwidth, percent_b, squeeze")
-        .machine_id(BarIndicatorId::Bbmetrics) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Bbmetrics)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -195,7 +195,7 @@ pub fn signature_darvas_box() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 50, 5))
         .metadata("author", "Nicolas Darvas")
         .metadata("trend_following", "true")
-        .machine_id(BarIndicatorId::Darvas) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Darvas)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -219,7 +219,7 @@ pub fn signature_donchian_channel() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("author", "Richard Donchian")
         .metadata("outputs", "upper, middle, lower")
-        .machine_id(BarIndicatorId::Dc) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Dc)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -242,7 +242,7 @@ pub fn signature_donchian_channel_metrics() -> IndicatorSignature {
         .description("Additional metrics for Donchian Channels")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("outputs", "width, position")
-        .machine_id(BarIndicatorId::Dcmetrics) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Dcmetrics)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -265,7 +265,7 @@ pub fn signature_donchian_position() -> IndicatorSignature {
         .description("Position of price within Donchian Channel (0-1)")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("range", "0-1")
-        .machine_id(BarIndicatorId::Dcpos) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Dcpos)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -287,7 +287,7 @@ pub fn signature_donchian_width() -> IndicatorSignature {
         .name("Donchian Width")
         .description("Width of Donchian Channel as percentage")
         .add_constraint(ParamConstraint::period(5, 200, 20))
-        .machine_id(BarIndicatorId::Dcwidth) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Dcwidth)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -310,7 +310,7 @@ pub fn signature_dpo_bands() -> IndicatorSignature {
         .description("Bands based on detrended price oscillator")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
-        .machine_id(BarIndicatorId::Dpobands) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Dpobands)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -338,7 +338,7 @@ pub fn signature_envelope_bandwidth() -> IndicatorSignature {
                 .with_max(ParamValue::F64(20.0))
                 .with_default(ParamValue::F64(2.5))
         )
-        .machine_id(BarIndicatorId::Envbw) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Envbw)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -367,7 +367,7 @@ pub fn signature_envelope_channels() -> IndicatorSignature {
                 .with_default(ParamValue::F64(2.5))
         )
         .metadata("outputs", "upper, middle, lower")
-        .machine_id(BarIndicatorId::Envelope) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Envelope)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -408,7 +408,7 @@ pub fn signature_ichimoku_cloud() -> IndicatorSignature {
         )
         .metadata("author", "Goichi Hosoda")
         .metadata("outputs", "tenkan, kijun, senkou_a, senkou_b, chikou")
-        .machine_id(BarIndicatorId::Ichimoku) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ichimoku)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Ichimoku)
         .validated()
@@ -431,7 +431,7 @@ pub fn signature_ichimoku_cloud_position() -> IndicatorSignature {
         .description("Position of price relative to Ichimoku cloud")
         .add_constraint(ParamConstraint::period(2, 100, 9))
         .metadata("range", "above_cloud, in_cloud, below_cloud")
-        .machine_id(BarIndicatorId::Ichimokupos) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ichimokupos)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -453,7 +453,7 @@ pub fn signature_ichimoku_cloud_thickness() -> IndicatorSignature {
         .name("Ichimoku Cloud Thickness")
         .description("Thickness of Ichimoku cloud as volatility measure")
         .add_constraint(ParamConstraint::period(2, 100, 9))
-        .machine_id(BarIndicatorId::Ichimokuthick) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ichimokuthick)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -476,7 +476,7 @@ pub fn signature_keltner_bandwidth() -> IndicatorSignature {
         .description("Bandwidth of Keltner Channel")
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
-        .machine_id(BarIndicatorId::Keltbw) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Keltbw)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -509,7 +509,7 @@ pub fn signature_keltner_channel() -> IndicatorSignature {
         )
         .metadata("author", "Chester Keltner")
         .metadata("outputs", "upper, middle, lower")
-        .machine_id(BarIndicatorId::Kc) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Kc)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -532,7 +532,7 @@ pub fn signature_keltner_channel_metrics() -> IndicatorSignature {
         .description("Additional metrics for Keltner Channels")
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("outputs", "bandwidth, distance, position")
-        .machine_id(BarIndicatorId::Kcmetrics) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Kcmetrics)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -555,7 +555,7 @@ pub fn signature_keltner_distance() -> IndicatorSignature {
         .description("Distance of price from Keltner middle line")
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
-        .machine_id(BarIndicatorId::Keltdist) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Keltdist)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -578,7 +578,7 @@ pub fn signature_keltner_position() -> IndicatorSignature {
         .description("Position of price within Keltner Channel (0-1)")
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("range", "0-1")
-        .machine_id(BarIndicatorId::Keltpos) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Keltpos)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -601,7 +601,7 @@ pub fn signature_median_channel_position() -> IndicatorSignature {
         .description("Position within median-based channels")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("range", "0-1")
-        .machine_id(BarIndicatorId::Medchanpos) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Medchanpos)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -624,7 +624,7 @@ pub fn signature_median_channels() -> IndicatorSignature {
         .description("Channels based on median prices")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
-        .machine_id(BarIndicatorId::Medchan) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Medchan)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -650,7 +650,7 @@ pub fn signature_percent_b() -> IndicatorSignature {
         .metadata("range", "0-1")
         .metadata("overbought", ">1.0")
         .metadata("oversold", "<0.0")
-        .machine_id(BarIndicatorId::Percentb) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Percentb)
         .role_kind(IndicatorRoleKind::OscillatorBounded)
         .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 100.0)
@@ -684,7 +684,7 @@ pub fn signature_percentile_channels() -> IndicatorSignature {
                 .with_max(ParamValue::F64(50.0))
                 .with_default(ParamValue::F64(10.0))
         )
-        .machine_id(BarIndicatorId::Percentilech) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Percentilech)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -707,7 +707,7 @@ pub fn signature_pivot_channels() -> IndicatorSignature {
         .description("Channels based on pivot points")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("pivot_based", "true")
-        .machine_id(BarIndicatorId::Pivotchan) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Pivotchan)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -730,7 +730,7 @@ pub fn signature_price_channel_oscillator() -> IndicatorSignature {
         .description("Oscillator showing position within price channel")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("range", "-100 to +100")
-        .machine_id(BarIndicatorId::Pchosc) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Pchosc)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -752,7 +752,7 @@ pub fn signature_price_channel_width() -> IndicatorSignature {
         .name("Price Channel Width")
         .description("Width of price channel as volatility measure")
         .add_constraint(ParamConstraint::period(5, 200, 20))
-        .machine_id(BarIndicatorId::Pchwidth) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Pchwidth)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -775,7 +775,7 @@ pub fn signature_price_channels() -> IndicatorSignature {
         .description("Simple highest/lowest price channels")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .metadata("outputs", "upper, middle, lower")
-        .machine_id(BarIndicatorId::Pricechan) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Pricechan)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -798,7 +798,7 @@ pub fn signature_projection_bands() -> IndicatorSignature {
         .description("Forward-looking projection bands")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
-        .machine_id(BarIndicatorId::Projbands) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Projbands)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -827,7 +827,7 @@ pub fn signature_quantile_regression_channels() -> IndicatorSignature {
                 .with_default(ParamValue::F64(0.25))
         )
         .metadata("regression_based", "true")
-        .machine_id(BarIndicatorId::Qrchan) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Qrchan)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -849,7 +849,7 @@ pub fn signature_regression_channel_width() -> IndicatorSignature {
         .name("Regression Channel Width")
         .description("Width of regression-based channels")
         .add_constraint(ParamConstraint::period(10, 200, 50))
-        .machine_id(BarIndicatorId::Regchanwidth) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Regchanwidth)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -874,7 +874,7 @@ pub fn signature_regression_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::multiplier(1.0, 5.0, 2.0))
         .metadata("regression_based", "true")
         .metadata("outputs", "upper, middle, lower")
-        .machine_id(BarIndicatorId::Regchan) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Regchan)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -898,7 +898,7 @@ pub fn signature_standard_deviation_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .metadata("outputs", "upper, middle, lower")
-        .machine_id(BarIndicatorId::Stddevchan) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Stddevchan)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -925,7 +925,7 @@ pub fn signature_starc_bands() -> IndicatorSignature {
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("author", "Manning Stoller")
         .metadata("atr_based", "true")
-        .machine_id(BarIndicatorId::Starc) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Starc)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -947,7 +947,7 @@ pub fn signature_stddev_channel_width() -> IndicatorSignature {
         .name("Standard Deviation Channel Width")
         .description("Width of standard deviation channels")
         .add_constraint(ParamConstraint::period(5, 200, 20))
-        .machine_id(BarIndicatorId::Stddevwidth) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Stddevwidth)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -971,7 +971,7 @@ pub fn signature_theil_sen_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(10, 200, 50))
         .add_constraint(ParamConstraint::multiplier(1.0, 5.0, 2.0))
         .metadata("robust_regression", "true")
-        .machine_id(BarIndicatorId::Theilsenchan) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Theilsenchan)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -994,7 +994,7 @@ pub fn signature_trima_bands() -> IndicatorSignature {
         .description("Bands based on Triangular Moving Average")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
-        .machine_id(BarIndicatorId::Trimabands) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Trimabands)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -1016,7 +1016,7 @@ pub fn signature_volume_profile_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(10, 200, 50))
         .metadata("volume_based", "true")
         .metadata("outputs", "value_area_high, value_area_low, poc")
-        .machine_id(BarIndicatorId::Volprofchan) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Volprofchan)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -1038,7 +1038,7 @@ pub fn signature_vwap_channel_width() -> IndicatorSignature {
         .name("VWAP Channel Width")
         .description("Width of VWAP-based channels")
         .add_constraint(ParamConstraint::period(5, 200, 20))
-        .machine_id(BarIndicatorId::Vwapchanwidth) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vwapchanwidth)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -1063,7 +1063,7 @@ pub fn signature_vwap_channels() -> IndicatorSignature {
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
         .metadata("volume_based", "true")
         .metadata("outputs", "upper, vwap, lower")
-        .machine_id(BarIndicatorId::Vwapchan) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vwapchan)
         .role_kind(IndicatorRoleKind::Channel)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()

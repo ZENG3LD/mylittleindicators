@@ -29,7 +29,7 @@ pub fn signature_adaptive_bollinger_bands() -> IndicatorSignature {
         .description("Bollinger Bands with adaptive standard deviation")
         .add_constraint(ParamConstraint::period(5, 200, 20))
         .add_constraint(ParamConstraint::multiplier(0.5, 5.0, 2.0))
-        .machine_id(BarIndicatorId::Abb) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Abb)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -51,7 +51,7 @@ pub fn signature_adaptive_volatility_regime() -> IndicatorSignature {
         .name("Adaptive Volatility Regime")
         .description("Adaptive regime classification based on volatility")
         .add_constraint(ParamConstraint::period(5, 100, 20))
-        .machine_id(BarIndicatorId::Avr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Avr)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -100,7 +100,7 @@ pub fn signature_atr_bandwidth() -> IndicatorSignature {
         .description("ATR bandwidth as percentage of price")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::RMA))
-        .machine_id(BarIndicatorId::Atrbw) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Atrbw)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -123,7 +123,7 @@ pub fn signature_atr_channels() -> IndicatorSignature {
         .description("Price channels based on ATR")
         .add_constraint(ParamConstraint::period(2, 200, 14))
         .add_constraint(ParamConstraint::multiplier(0.5, 10.0, 2.0))
-        .machine_id(BarIndicatorId::Atrc) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Atrc)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()
@@ -146,7 +146,7 @@ pub fn signature_atr_percentile() -> IndicatorSignature {
         .description("ATR percentile rank over lookback period")
         .add_constraint(ParamConstraint::period(10, 200, 50))
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::RMA))
-        .machine_id(BarIndicatorId::Atrp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Atrp)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -175,7 +175,7 @@ pub fn signature_atr_percentile_trend() -> IndicatorSignature {
                 .with_default(ParamValue::USize(10))
                 .required()
         )
-        .machine_id(BarIndicatorId::Atrpt) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Atrpt)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -198,7 +198,7 @@ pub fn signature_atr_zscore() -> IndicatorSignature {
         .description("Standardized ATR using z-score")
         .add_constraint(ParamConstraint::period(10, 200, 20))
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::RMA))
-        .machine_id(BarIndicatorId::Atrz) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Atrz)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -221,7 +221,7 @@ pub fn signature_bipower_variance() -> IndicatorSignature {
         .description("Jump-robust volatility estimator")
         .add_constraint(ParamConstraint::period(10, 200, 20))
         .metadata("category", "realized_volatility")
-        .machine_id(BarIndicatorId::Bpv) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Bpv)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -254,7 +254,7 @@ pub fn signature_chaikin_volatility() -> IndicatorSignature {
         .metadata("author", "Marc Chaikin")
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("ma_note", "Original default: EMA")
-        .machine_id(BarIndicatorId::Cv) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Cv)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -277,7 +277,7 @@ pub fn signature_choppiness_index() -> IndicatorSignature {
         .description("Market choppiness indicator (100=choppy, 0=trending)")
         .add_constraint(ParamConstraint::period(5, 100, 14))
         .metadata("range", "0-100")
-        .machine_id(BarIndicatorId::Chop) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Chop)
         .role_kind(IndicatorRoleKind::OscillatorBounded)
         .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 100.0)
@@ -301,7 +301,7 @@ pub fn signature_close_to_close_vol_percentile() -> IndicatorSignature {
         .name("Close-to-Close Volatility Percentile")
         .description("Percentile rank of close-to-close volatility")
         .add_constraint(ParamConstraint::period(10, 200, 20))
-        .machine_id(BarIndicatorId::C2cvp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::C2cvp)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -345,7 +345,7 @@ pub fn signature_dynamic_volatility_regime() -> IndicatorSignature {
         .name("Dynamic Volatility Regime")
         .description("Dynamic regime classification based on multiple volatility metrics")
         .add_constraint(ParamConstraint::period(10, 100, 20))
-        .machine_id(BarIndicatorId::Dvr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Dvr)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -367,7 +367,7 @@ pub fn signature_fuzzy() -> IndicatorSignature {
         .name("Fuzzy Volatility")
         .description("Fuzzy logic-based volatility measure")
         .add_constraint(ParamConstraint::period(5, 100, 14))
-        .machine_id(BarIndicatorId::Fuzzy) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Fuzzy)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::FuzzyCandle)
         .validated()
@@ -390,7 +390,7 @@ pub fn signature_har_rv() -> IndicatorSignature {
         .description("Multi-period realized volatility model")
         .add_constraint(ParamConstraint::period(10, 100, 22))
         .metadata("category", "realized_volatility")
-        .machine_id(BarIndicatorId::Har) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Har)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -412,7 +412,7 @@ pub fn signature_hv_c2c() -> IndicatorSignature {
         .name("Historical Volatility (Close-to-Close)")
         .description("Standard deviation of log returns")
         .add_constraint(ParamConstraint::period(10, 200, 20))
-        .machine_id(BarIndicatorId::Hvc2c) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Hvc2c)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -537,7 +537,7 @@ pub fn signature_nr_range() -> IndicatorSignature {
         .name("Narrow Range")
         .description("Detects narrow range bars (NR4, NR7)")
         .add_constraint(ParamConstraint::period(4, 20, 7))
-        .machine_id(BarIndicatorId::Nr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Nr)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -560,7 +560,7 @@ pub fn signature_park_gk_rs_yz() -> IndicatorSignature {
         .description("Parkinson, GK, RS, YZ volatility estimators")
         .add_constraint(ParamConstraint::period(10, 200, 20))
         .metadata("category", "realized_volatility")
-        .machine_id(BarIndicatorId::Pgry) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Pgry)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -589,7 +589,7 @@ pub fn signature_range_compression_burst() -> IndicatorSignature {
                 .with_default(ParamValue::F64(1.5))
                 .required()
         )
-        .machine_id(BarIndicatorId::Rcb) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Rcb)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -611,7 +611,7 @@ pub fn signature_range_percentile() -> IndicatorSignature {
         .name("Range Percentile")
         .description("Percentile rank of price range")
         .add_constraint(ParamConstraint::period(10, 200, 50))
-        .machine_id(BarIndicatorId::Rp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Rp)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -634,7 +634,7 @@ pub fn signature_rbv_jump_test() -> IndicatorSignature {
         .description("Realized bipower variation jump test")
         .add_constraint(ParamConstraint::period(10, 100, 20))
         .metadata("category", "jump_detection")
-        .machine_id(BarIndicatorId::Rbvj) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Rbvj)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -657,7 +657,7 @@ pub fn signature_realized_quarticity() -> IndicatorSignature {
         .description("Fourth moment of realized volatility")
         .add_constraint(ParamConstraint::period(10, 100, 20))
         .metadata("category", "realized_volatility")
-        .machine_id(BarIndicatorId::Rq) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Rq)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -680,7 +680,7 @@ pub fn signature_realized_vol() -> IndicatorSignature {
         .description("Sum of squared returns")
         .add_constraint(ParamConstraint::period(10, 200, 20))
         .metadata("category", "realized_volatility")
-        .machine_id(BarIndicatorId::Rv) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Rv)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -702,7 +702,7 @@ pub fn signature_realized_vol_zscore() -> IndicatorSignature {
         .name("Realized Volatility Z-Score")
         .description("Standardized realized volatility")
         .add_constraint(ParamConstraint::period(10, 200, 20))
-        .machine_id(BarIndicatorId::Rvz) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Rvz)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -763,7 +763,7 @@ pub fn signature_squeeze_momentum() -> IndicatorSignature {
         .metadata("bb_ma_desc", "Bollinger Bands MA type")
         .metadata("kc_ma_desc", "Keltner Channel MA type")
         .metadata("author", "John Carter")
-        .machine_id(BarIndicatorId::Sqmom) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Sqmom)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::ValueFlag)
         .validated()
@@ -786,7 +786,7 @@ pub fn signature_true_range() -> IndicatorSignature {
         .description("Wilder's True Range (single bar)")
         .metadata("author", "J. Welles Wilder")
         .metadata("parameters", "none")
-        .machine_id(BarIndicatorId::Tr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Tr)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -809,7 +809,7 @@ pub fn signature_ulcer_index() -> IndicatorSignature {
         .description("Downside volatility measure")
         .add_constraint(ParamConstraint::period(5, 100, 14))
         .metadata("category", "downside_risk")
-        .machine_id(BarIndicatorId::Ui) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ui)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -838,7 +838,7 @@ pub fn signature_vol_of_vol() -> IndicatorSignature {
                 .with_default(ParamValue::USize(10))
                 .required()
         )
-        .machine_id(BarIndicatorId::Vov) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vov)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -860,7 +860,7 @@ pub fn signature_vol_of_vol_percentile() -> IndicatorSignature {
         .name("Volatility of Volatility Percentile")
         .description("Percentile rank of volatility of volatility")
         .add_constraint(ParamConstraint::period(10, 100, 50))
-        .machine_id(BarIndicatorId::Vovp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vovp)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -889,7 +889,7 @@ pub fn signature_vol_of_vol_percentile_trend() -> IndicatorSignature {
                 .with_default(ParamValue::USize(10))
                 .required()
         )
-        .machine_id(BarIndicatorId::Vovpt) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vovpt)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -918,7 +918,7 @@ pub fn signature_volatility_break_exp() -> IndicatorSignature {
                 .with_default(ParamValue::F64(2.0))
                 .required()
         )
-        .machine_id(BarIndicatorId::Vbexp) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vbexp)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -947,7 +947,7 @@ pub fn signature_volatility_breakout_detector() -> IndicatorSignature {
                 .with_default(ParamValue::F64(2.0))
                 .required()
         )
-        .machine_id(BarIndicatorId::Vbd) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vbd)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Signal)
         .validated()
@@ -983,7 +983,7 @@ pub fn signature_volatility_percentile_rank_bands() -> IndicatorSignature {
                 .with_default(ParamValue::F64(20.0))
                 .required()
         )
-        .machine_id(BarIndicatorId::Vprb) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Vprb)
         .role_kind(IndicatorRoleKind::Volatility)
         .output_kind(IndicatorValueKind::Channel3)
         .validated()

@@ -29,7 +29,7 @@ pub fn signature_efficiency_ratio() -> IndicatorSignature {
         .metadata("author", "Perry Kaufman")
         .metadata("range", "0-1")
         .metadata("description", "Ratio of net price change to sum of absolute price changes")
-        .machine_id(BarIndicatorId::Er) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Er)
         .role_kind(IndicatorRoleKind::OscillatorBounded)
         .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
@@ -54,7 +54,7 @@ pub fn signature_efficiency_ratio_ring() -> IndicatorSignature {
         .metadata("author", "Perry Kaufman")
         .metadata("range", "0-1")
         .metadata("implementation", "fixed memory ring buffer")
-        .machine_id(BarIndicatorId::ErRing) // TODO: Add to enum
+        .machine_id(BarIndicatorId::ErRing)
         .role_kind(IndicatorRoleKind::OscillatorBounded)
         .output_kind(IndicatorValueKind::Single)
         .output_bounds(0.0, 1.0)
@@ -79,7 +79,7 @@ pub fn signature_range_to_atr() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::RMA))
         .metadata("interpretation", ">1 means larger than average range, <1 means smaller")
         .metadata("note", "Traditionally uses Wilder MA for ATR, but can optimize with any type")
-        .machine_id(BarIndicatorId::RangeAtr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::RangeAtr)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         // Note: "RANGE_ATR" is already the main ID, no need for alias

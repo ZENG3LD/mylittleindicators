@@ -25,7 +25,7 @@ pub fn signature_avwap_distance() -> IndicatorSignature {
         .name("Anchored VWAP Distance")
         .description("Relative distance to anchored VWAP")
         .metadata("type", "distance")
-        .machine_id(BarIndicatorId::AvwapDist) // TODO: Add to enum
+        .machine_id(BarIndicatorId::AvwapDist)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -47,7 +47,7 @@ pub fn signature_vwap_distance() -> IndicatorSignature {
         .name("VWAP Distance")
         .description("Relative distance to VWAP")
         .metadata("type", "distance")
-        .machine_id(BarIndicatorId::VwapDist) // TODO: Add to enum
+        .machine_id(BarIndicatorId::VwapDist)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -70,7 +70,7 @@ pub fn signature_central_pivot_range() -> IndicatorSignature {
         .description("Central pivot range for support/resistance")
         .metadata("type", "pivot")
         .metadata("timeframe", "daily")
-        .machine_id(BarIndicatorId::Cpr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Cpr)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Triple)
         .validated()
@@ -93,7 +93,7 @@ pub fn signature_day_of_week_in_month() -> IndicatorSignature {
         .description("Which week of the month (1st, 2nd, 3rd, 4th, 5th)")
         .metadata("type", "temporal")
         .metadata("category", "calendar")
-        .machine_id(BarIndicatorId::DayWeekMonth) // TODO: Add to enum
+        .machine_id(BarIndicatorId::DayWeekMonth)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -116,7 +116,7 @@ pub fn signature_dayofmonth_weekofquarter_effect() -> IndicatorSignature {
         .description("Combined day of month and week of quarter seasonality")
         .metadata("type", "temporal")
         .metadata("category", "calendar")
-        .machine_id(BarIndicatorId::DomWoq) // TODO: Add to enum
+        .machine_id(BarIndicatorId::DomWoq)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -139,7 +139,7 @@ pub fn signature_distance_to_levels() -> IndicatorSignature {
         .description("Distance to support/resistance levels")
         .add_constraint(ParamConstraint::period(10, 500, 50))
         .metadata("type", "distance")
-        .machine_id(BarIndicatorId::DistLevels) // TODO: Add to enum
+        .machine_id(BarIndicatorId::DistLevels)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -162,7 +162,7 @@ pub fn signature_holiday_weekend_proximity() -> IndicatorSignature {
         .description("Proximity to holidays and weekends")
         .metadata("type", "temporal")
         .metadata("category", "calendar")
-        .machine_id(BarIndicatorId::HolidayProx) // TODO: Add to enum
+        .machine_id(BarIndicatorId::HolidayProx)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -185,7 +185,7 @@ pub fn signature_hour_of_day_effect() -> IndicatorSignature {
         .description("Hour of the day effect (0-23)")
         .metadata("type", "temporal")
         .metadata("category", "intraday")
-        .machine_id(BarIndicatorId::HourDay) // TODO: Add to enum
+        .machine_id(BarIndicatorId::HourDay)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -208,7 +208,7 @@ pub fn signature_month_quarter_effect() -> IndicatorSignature {
         .description("Month and quarter seasonality effects")
         .metadata("type", "temporal")
         .metadata("category", "calendar")
-        .machine_id(BarIndicatorId::MonthQtr) // TODO: Add to enum
+        .machine_id(BarIndicatorId::MonthQtr)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -231,7 +231,7 @@ pub fn signature_month_turn_effect() -> IndicatorSignature {
         .description("Turn of the month effect")
         .metadata("type", "temporal")
         .metadata("category", "calendar")
-        .machine_id(BarIndicatorId::MonthTurn) // TODO: Add to enum
+        .machine_id(BarIndicatorId::MonthTurn)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -254,7 +254,7 @@ pub fn signature_quarter_turn_effect() -> IndicatorSignature {
         .description("Turn of the quarter effect")
         .metadata("type", "temporal")
         .metadata("category", "calendar")
-        .machine_id(BarIndicatorId::QtrTurn) // TODO: Add to enum
+        .machine_id(BarIndicatorId::QtrTurn)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -277,7 +277,7 @@ pub fn signature_relative_trend_position() -> IndicatorSignature {
         .description("Relative position to SMA200 and anchored VWAP")
         .add_constraint(ParamConstraint::period(50, 500, 200))
         .metadata("type", "position")
-        .machine_id(BarIndicatorId::RelTrendPos) // TODO: Add to enum
+        .machine_id(BarIndicatorId::RelTrendPos)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -300,7 +300,7 @@ pub fn signature_session_effect() -> IndicatorSignature {
         .description("Trading session indicator")
         .metadata("type", "temporal")
         .metadata("category", "intraday")
-        .machine_id(BarIndicatorId::Session) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Session)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -323,7 +323,7 @@ pub fn signature_start_end_of_month_flags() -> IndicatorSignature {
         .description("Binary flags for start and end of month")
         .metadata("type", "temporal")
         .metadata("category", "calendar")
-        .machine_id(BarIndicatorId::SomEom) // TODO: Add to enum
+        .machine_id(BarIndicatorId::SomEom)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -346,7 +346,7 @@ pub fn signature_start_end_of_quarter_flags() -> IndicatorSignature {
         .description("Binary flags for start and end of quarter")
         .metadata("type", "temporal")
         .metadata("category", "calendar")
-        .machine_id(BarIndicatorId::SoqEoq) // TODO: Add to enum
+        .machine_id(BarIndicatorId::SoqEoq)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -369,7 +369,7 @@ pub fn signature_start_end_of_week_flags() -> IndicatorSignature {
         .description("Binary flags for start and end of week")
         .metadata("type", "temporal")
         .metadata("category", "calendar")
-        .machine_id(BarIndicatorId::SowEow) // TODO: Add to enum
+        .machine_id(BarIndicatorId::SowEow)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -392,7 +392,7 @@ pub fn signature_week_in_month_effect() -> IndicatorSignature {
         .description("Week of the month effect (1-5)")
         .metadata("type", "temporal")
         .metadata("category", "calendar")
-        .machine_id(BarIndicatorId::WeekMonth) // TODO: Add to enum
+        .machine_id(BarIndicatorId::WeekMonth)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()
@@ -415,7 +415,7 @@ pub fn signature_weekday_effect() -> IndicatorSignature {
         .description("Day of the week seasonality")
         .metadata("type", "temporal")
         .metadata("category", "calendar")
-        .machine_id(BarIndicatorId::Weekday) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Weekday)
         .role_kind(IndicatorRoleKind::Other)
         .output_kind(IndicatorValueKind::Single)
         .validated()

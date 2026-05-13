@@ -29,7 +29,7 @@ pub fn signature_accumulation_distribution() -> IndicatorSignature {
         .metadata("formula", "AD = Previous AD + Money Flow Multiplier × Volume")
         .metadata("author", "Marc Chaikin")
         .metadata("parameters", "none")
-        .machine_id(BarIndicatorId::Ad) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ad)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "AD" is already the main ID, no need for alias
@@ -59,7 +59,7 @@ pub fn signature_accumulative_swing_index() -> IndicatorSignature {
         )
         .metadata("author", "J. Welles Wilder")
         .metadata("category", "cumulative")
-        .machine_id(BarIndicatorId::Asi) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Asi)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "ASI" is already the main ID, no need for alias
@@ -83,7 +83,7 @@ pub fn signature_chaikin_money_flow() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("author", "Marc Chaikin")
         .metadata("range", "-1 to +1")
-        .machine_id(BarIndicatorId::Cmf) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Cmf)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "CMF" is already the main ID, no need for alias
@@ -121,7 +121,7 @@ pub fn signature_chaikin_oscillator() -> IndicatorSignature {
         .add_constraint(ParamConstraint::ma_type(MovingAverageType::EMA))
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("author", "Marc Chaikin")
-        .machine_id(BarIndicatorId::Cho) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Cho)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "CHO" is already the main ID, no need for alias
@@ -144,7 +144,7 @@ pub fn signature_demand_index() -> IndicatorSignature {
         .source_type(SourceType::PriceAndVolume)
         .add_constraint(ParamConstraint::period(5, 100, 20))
         .metadata("category", "volume_based")
-        .machine_id(BarIndicatorId::Di) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Di)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "DI" is already the main ID, no need for alias
@@ -173,7 +173,7 @@ pub fn signature_ease_of_movement() -> IndicatorSignature {
                 .with_default(ParamValue::F64(1000.0))
         )
         .metadata("author", "Richard Arms")
-        .machine_id(BarIndicatorId::Eom) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Eom)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "EOM" is already the main ID, no need for alias
@@ -206,7 +206,7 @@ pub fn signature_force_index() -> IndicatorSignature {
         .metadata("popular_periods", "2, 13")
         .metadata("ma_support", "Supports all 11 MA types for smoothing")
         .metadata("ma_note", "Original default: EMA")
-        .machine_id(BarIndicatorId::Fi) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Fi)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "FI" is already the main ID, no need for alias
@@ -229,7 +229,7 @@ pub fn signature_intraday_intensity() -> IndicatorSignature {
         .source_type(SourceType::PriceAndVolume)
         .add_constraint(ParamConstraint::period(5, 100, 21))
         .metadata("category", "intrabar_analysis")
-        .machine_id(BarIndicatorId::Ii) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Ii)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "II" is already the main ID, no need for alias
@@ -253,7 +253,7 @@ pub fn signature_intraday_intensity_percent() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 21))
         .metadata("category", "intrabar_analysis")
         .metadata("range", "percentage")
-        .machine_id(BarIndicatorId::Iip) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Iip)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "IIP" is already the main ID, no need for alias
@@ -276,7 +276,7 @@ pub fn signature_intraday_intensity_ratio() -> IndicatorSignature {
         .source_type(SourceType::PriceAndVolume)
         .add_constraint(ParamConstraint::period(5, 100, 21))
         .metadata("category", "intrabar_analysis")
-        .machine_id(BarIndicatorId::Iir) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Iir)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "IIR" is already the main ID, no need for alias
@@ -300,7 +300,7 @@ pub fn signature_twiggs_money_flow() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(5, 100, 21))
         .metadata("author", "Colin Twiggs")
         .metadata("range", "-1 to +1")
-        .machine_id(BarIndicatorId::Tmf) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Tmf)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "TMF" is already the main ID, no need for alias
@@ -323,7 +323,7 @@ pub fn signature_williams_ad() -> IndicatorSignature {
         .source_type(SourceType::PriceAndVolume)
         .metadata("author", "Larry Williams")
         .metadata("parameters", "none")
-        .machine_id(BarIndicatorId::Wad) // TODO: Add to enum
+        .machine_id(BarIndicatorId::Wad)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         // Note: "WAD" is already the main ID, no need for alias
