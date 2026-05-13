@@ -1,6 +1,6 @@
 // Alternative FVG intensity score: exponential weighting of recent FVG gaps magnitude
 
-use crate::bar_indicators::levels::fvg_detector::FvgDetector;
+use crate::events::FvgEventDetector as FvgDetector;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use std::collections::VecDeque;
 

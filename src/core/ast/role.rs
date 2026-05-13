@@ -267,7 +267,6 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Pivot
         | BarIndicatorId::Floorpivot
         | BarIndicatorId::SwingAge
-        | BarIndicatorId::Bos
         | BarIndicatorId::Camarilla
         | BarIndicatorId::Demark
         | BarIndicatorId::Woodie
@@ -278,7 +277,6 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Avwap
         | BarIndicatorId::Avwaprev
         | BarIndicatorId::Avwaptouch
-        | BarIndicatorId::Fvg
         | BarIndicatorId::Fvgalt
         | BarIndicatorId::Fvgdur
         | BarIndicatorId::Fvgrev
@@ -286,7 +284,9 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Liqgap => RoleKind::PivotIndicator,
 
         // ── Pattern Detectors ─────────────────────────────────────────────────
-        BarIndicatorId::Candleanatomy
+        BarIndicatorId::Bos
+        | BarIndicatorId::Fvg
+        | BarIndicatorId::Candleanatomy
         | BarIndicatorId::Heikinashi
         | BarIndicatorId::Wickspike => RoleKind::PatternDetector,
 

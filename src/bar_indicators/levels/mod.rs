@@ -6,8 +6,6 @@ pub mod demark_pivots;
 pub mod anchored_vwap;
 pub mod avwap_multi_anchor_reversion;
 pub mod avwap_touch_probability;
-pub mod break_of_structure;
-pub mod fvg_detector;
 pub mod fvg_duration_intensity_score;
 pub mod fvg_intensity_alt_score;
 pub mod fvg_reversion_probability;

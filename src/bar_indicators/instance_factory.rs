@@ -338,8 +338,7 @@ use crate::events::StatisticalWickDetector;
 // use crate::bar_indicators::average::ohlcv_average::{...};
 // OhlcvField is now imported from moving_average module above (line 22)
 // Calendar/time effects excluded
-use crate::bar_indicators::levels::break_of_structure::BosChochDetector;
-use crate::bar_indicators::levels::fvg_detector::FvgDetector;
+use crate::events::{BosEventDetector, FvgEventDetector};
 // ZigZag family
 // ZigZag excluded
 // Clusters / Orderflow / Book
@@ -1132,8 +1131,8 @@ pub enum IndicatorInstance {
     RangeCompressionBurst(Box<RangeCompressionBurst>),
     TimeEncoders(Box<TimeEncoders>),
     // Calendar/time effects are not part of universal OHLC constructor; excluded
-    FvgDetector(Box<FvgDetector>),
-    BosChochDetector(Box<BosChochDetector>),
+    FvgEventDetector(Box<FvgEventDetector>),
+    BosEventDetector(Box<BosEventDetector>),
 
     // ZigZag
     // ZigZag family requires index/time; excluded from universal OHLC path
@@ -3030,10 +3029,10 @@ impl IndicatorInstance {
                 Ok(Self::StftBandEnergyRatio(Box::new(StftBandEnergyRatio::new(window, split))))
             }
             // Calendar/time effects excluded from universal constructor
-            BarIndicatorId::Fvg => Ok(Self::FvgDetector(Box::default())),
+            BarIndicatorId::Fvg => Ok(Self::FvgEventDetector(Box::default())),
             BarIndicatorId::Bos => {
                 let lb = config.periods.first().copied().unwrap_or(20);
-                Ok(Self::BosChochDetector(Box::new(BosChochDetector::new(lb))))
+                Ok(Self::BosEventDetector(Box::new(BosEventDetector::new(lb))))
             }
 
             // ZigZag
@@ -4249,7 +4248,7 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::BosChochDetector(x) => {
+            Self::BosEventDetector(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -5575,7 +5574,7 @@ impl IndicatorInstance {
             // ========================================
             // FVG INDICATORS (4)
             // ========================================
-            Self::FvgDetector(x) => {
+            Self::FvgEventDetector(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -6188,7 +6187,7 @@ impl IndicatorInstance {
             Self::QtrTurn(ind) => ind.value(),
             Self::DayWeekMonth(ind) => ind.value(),
             // FVG INDICATORS
-            Self::FvgDetector(ind) => ind.value(),
+            Self::FvgEventDetector(ind) => ind.value(),
             Self::Fvgalt(ind) => ind.value(),
             Self::Fvgdur(ind) => ind.value(),
             Self::Fvgrev(ind) => ind.value(),
@@ -6206,7 +6205,7 @@ impl IndicatorInstance {
             Self::AvwapMultiAnchorReversion(ind) => ind.value(),
             Self::AvwapTouchProbability(ind) => ind.value(),
             Self::BasicKalmanFilter(ind) => ind.value(),
-            Self::BosChochDetector(ind) => ind.value(),
+            Self::BosEventDetector(ind) => ind.value(),
             Self::BpCusum(ind) => ind.value(),
             Self::CamarillaPivots(ind) => ind.value(),
             Self::ChaosOscillator(ind) => ind.value(),
@@ -6339,7 +6338,7 @@ impl IndicatorInstance {
             Self::BookImb(ind) => ind.is_ready(),
             Self::BookSlope(ind) => ind.is_ready(),
             Self::Bop(ind) => ind.is_ready(),
-            Self::BosChochDetector(ind) => ind.is_ready(),
+            Self::BosEventDetector(ind) => ind.is_ready(),
             Self::BpCusum(ind) => ind.is_ready(),
             Self::ButterworthFilter(ind) => ind.is_ready(),
             Self::CamarillaPivots(ind) => ind.is_ready(),
@@ -6425,7 +6424,7 @@ impl IndicatorInstance {
             Self::Framaadv(ind) => ind.is_ready(),
             Self::FuzzyCandlesticks(ind) => ind.is_ready(),
             Self::Fvgalt(ind) => ind.is_ready(),
-            Self::FvgDetector(ind) => ind.is_ready(),
+            Self::FvgEventDetector(ind) => ind.is_ready(),
             Self::Fvgdur(ind) => ind.is_ready(),
             Self::Fvgrev(ind) => ind.is_ready(),
             Self::OscillatorWithDivergence(ind) => ind.is_ready(),
@@ -6774,7 +6773,7 @@ impl IndicatorInstance {
             Self::BookImb(ind) => ind.reset(),
             Self::BookSlope(ind) => ind.reset(),
             Self::Bop(ind) => ind.reset(),
-            Self::BosChochDetector(ind) => ind.reset(),
+            Self::BosEventDetector(ind) => ind.reset(),
             Self::BpCusum(ind) => ind.reset(),
             Self::ButterworthFilter(ind) => ind.reset(),
             Self::CamarillaPivots(ind) => ind.reset(),
@@ -6860,7 +6859,7 @@ impl IndicatorInstance {
             Self::Framaadv(ind) => ind.reset(),
             Self::FuzzyCandlesticks(ind) => ind.reset(),
             Self::Fvgalt(ind) => ind.reset(),
-            Self::FvgDetector(ind) => ind.reset(),
+            Self::FvgEventDetector(ind) => ind.reset(),
             Self::Fvgdur(ind) => ind.reset(),
             Self::Fvgrev(ind) => ind.reset(),
             Self::OscillatorWithDivergence(ind) => ind.reset(),

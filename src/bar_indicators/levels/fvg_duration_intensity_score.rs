@@ -1,6 +1,6 @@
 // FVG duration/intensity score based on recent detected gaps
 
-use crate::bar_indicators::levels::fvg_detector::FvgDetector;
+use crate::events::FvgEventDetector as FvgDetector;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use std::collections::VecDeque;
 

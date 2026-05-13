@@ -11,6 +11,8 @@
 //! at the slice-cache layer through `IndicatorKey.param_hash` which folds
 //! inner-indicator configs recursively.
 
+pub mod bos_event_detector;
+pub mod fvg_event_detector;
 pub mod candle_pattern;
 pub mod confluence;
 pub mod direction_detector;
@@ -27,6 +29,8 @@ pub mod threshold;
 pub mod volatility_regime;
 pub mod volume_event;
 
+pub use bos_event_detector::BosEventDetector;
+pub use fvg_event_detector::FvgEventDetector;
 pub use candle_pattern::{CandlePatternDetector, CandlePatternKind};
 pub use statistical_wick_detector::StatisticalWickDetector;
 pub use confluence::Confluence;
