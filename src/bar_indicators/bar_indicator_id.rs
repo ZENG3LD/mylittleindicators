@@ -476,8 +476,9 @@ pub enum BarIndicatorId {
     VrZAgg,  // VR_Z_AGG
     Za,  // ZA
 
-    // Book (4 indicators)
+    // Book (5 indicators)
     BookImb,  // BOOK_IMB
+    BookMicroprice,  // BOOK_MICROPRICE
     BookSlope,  // BOOK_SLOPE
     Ofi,  // OFI
     QueueImb,  // QUEUE_IMB

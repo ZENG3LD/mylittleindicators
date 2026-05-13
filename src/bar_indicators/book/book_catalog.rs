@@ -44,6 +44,27 @@ pub fn signature_book_imbalance_ratio() -> IndicatorSignature {
         .build()
 }
 
+/// Microprice — bid-ask size-weighted mid price
+pub fn signature_microprice() -> IndicatorSignature {
+    IndicatorSignature::builder("BOOK_MICROPRICE", CATEGORY)
+        .name("Microprice")
+        .description("Bid-ask size-weighted mid price (better next-trade price predictor than simple mid)")
+        .metadata("range", "positive real (price units)")
+        .metadata("parameters", "none")
+        .metadata("requirements", "L2 orderbook top-of-book")
+        .metadata("interpretation", "Weighted toward side with smaller quote; pulls toward pressure side")
+        .machine_id(BarIndicatorId::BookMicroprice)
+        .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
+        .requires_l2()
+        .alias("Microprice")
+        .alias("microprice")
+        .alias("MICROPRICE")
+        .alias("book_microprice")
+        .alias("BookMicroprice")
+        .build()
+}
+
 /// Order Book Slope
 pub fn signature_order_book_slope() -> IndicatorSignature {
     IndicatorSignature::builder("BOOK_SLOPE", CATEGORY)
@@ -139,6 +160,7 @@ pub fn signature_queue_imbalance() -> IndicatorSignature {
 /// Base catalog with main IDs only (used for initialization)
 const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("BOOK_IMB", signature_book_imbalance_ratio as fn() -> IndicatorSignature),
+    ("BOOK_MICROPRICE", signature_microprice as fn() -> IndicatorSignature),
     ("BOOK_SLOPE", signature_order_book_slope as fn() -> IndicatorSignature),
     ("OFI", signature_order_flow_imbalance as fn() -> IndicatorSignature),
     ("QUEUE_IMB", signature_queue_imbalance as fn() -> IndicatorSignature),
@@ -206,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 4);
+        assert_eq!(count(), 5);
     }
 
     #[test]

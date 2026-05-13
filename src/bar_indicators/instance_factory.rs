@@ -311,6 +311,9 @@ use crate::bar_indicators::signal_processing::hampel_filter::HampelFilter;
 // (TheilSenChannels, ProjectionBands) already imported earlier if present
 // BOOK/CLUSTERS/ENTROPY categories
 use crate::bar_indicators::book::imbalance::BookImbalanceRatio;
+use crate::bar_indicators::book::microprice::Microprice as BookMicroprice;
+use crate::core::types::OrderBook;
+use crate::bar_indicators::order_book_consumer::OrderBookConsumer;
 use crate::bar_indicators::clusters::{
     market_microstructure::MarketMicrostructure,
     order_book_slope::OrderBookSlope,
@@ -828,8 +831,9 @@ pub enum IndicatorInstance {
     Obv(Box<Obv>),
     Vhf(Box<VhfSimple>),
     Psl(Box<Psl>),
-    // BOOK category (4 indicators)
+    // BOOK category (5 indicators)
     BookImb(Box<BookImbalanceRatio>),
+    BookMicroprice(Box<BookMicroprice>),
     BookSlope(Box<OrderBookSlope>),
     Ofi(Box<OrderFlowImbalance>),
     QueueImb(Box<QueueImbalance>),
@@ -1901,8 +1905,9 @@ impl IndicatorInstance {
                 let inner = Box::new(Self::Psl(Box::new(Psl::with_source(period, config.source))));
                 Ok(*Self::wrap_with_divergence_if_requested(inner, config))
             }
-            // BOOK category (4 indicators)
+            // BOOK category (5 indicators)
             BarIndicatorId::BookImb => Ok(Self::BookImb(Box::default())),
+            BarIndicatorId::BookMicroprice => Ok(Self::BookMicroprice(Box::default())),
             BarIndicatorId::BookSlope => Ok(Self::BookSlope(Box::default())),
             BarIndicatorId::Ofi => {
                 let tick_size = config.additional_params.get("tick_size").copied().unwrap_or(0.01);
@@ -4193,10 +4198,9 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::BookImb(x) => {
-                let bid = low; let ask = high; x.update_book(bid, ask);
-                x.value()
-            }
+            // L2 indicators — bar pipeline is a no-op; use update_orderbook instead
+            Self::BookImb(x) => x.value(),
+            Self::BookMicroprice(x) => x.value(),
             Self::BookSlope(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -5821,6 +5825,7 @@ impl IndicatorInstance {
             Self::BollingerBands(ind) => ind.value(),
             Self::BollingerMetrics(ind) => ind.value(),
             Self::BookImb(ind) => ind.value(),
+            Self::BookMicroprice(ind) => ind.value(),
             Self::BookSlope(ind) => ind.value(),
             Self::Bop(ind) => ind.value(),
             Self::ButterworthFilter(ind) => ind.value(),
@@ -6272,6 +6277,7 @@ impl IndicatorInstance {
             Self::BollingerBands(ind) => ind.is_ready(),
             Self::BollingerMetrics(ind) => ind.is_ready(),
             Self::BookImb(ind) => ind.is_ready(),
+            Self::BookMicroprice(ind) => ind.is_ready(),
             Self::BookSlope(ind) => ind.is_ready(),
             Self::Bop(ind) => ind.is_ready(),
             Self::BosEventDetector(ind) => ind.is_ready(),
@@ -6702,6 +6708,7 @@ impl IndicatorInstance {
             Self::BollingerBands(ind) => ind.reset(),
             Self::BollingerMetrics(ind) => ind.reset(),
             Self::BookImb(ind) => ind.reset(),
+            Self::BookMicroprice(ind) => ind.reset(),
             Self::BookSlope(ind) => ind.reset(),
             Self::Bop(ind) => ind.reset(),
             Self::BosEventDetector(ind) => ind.reset(),
@@ -7075,6 +7082,16 @@ impl IndicatorInstance {
             Self::XorGate(ind) => ind.reset(),
             Self::Za(ind) => ind.reset(),
             Self::ZlSma(ind) => ind.reset(),
+        }
+    }
+
+    /// Process an L2 orderbook snapshot.
+    /// Only L2-aware indicators consume this; all others return their current value unchanged.
+    pub fn update_orderbook(&mut self, book: &OrderBook) -> IndicatorValue {
+        match self {
+            Self::BookImb(x) => x.update_orderbook(book),
+            Self::BookMicroprice(x) => x.update_orderbook(book),
+            _ => self.value(),
         }
     }
 }

@@ -306,6 +306,9 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::HaTrend
         | BarIndicatorId::Kregime => RoleKind::RegimeFilter,
 
+        // ── Book / L2 derived prices ──────────────────────────────────────────
+        BarIndicatorId::BookMicroprice => RoleKind::Smoother,
+
         // ── Everything else ───────────────────────────────────────────────────
         _ => RoleKind::Other,
     }

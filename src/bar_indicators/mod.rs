@@ -29,8 +29,11 @@ pub mod indicator_value;
 pub mod utils;
 pub mod ohlcv_field;
 
+pub mod order_book_consumer;
+
 pub use indicator_value::{IndicatorValue, IndicatorValueKind};
 pub use ohlcv_field::OhlcvField;
+pub use order_book_consumer::OrderBookConsumer;
 
 
 

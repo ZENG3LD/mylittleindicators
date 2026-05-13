@@ -39,7 +39,7 @@ pub use catalog::{
     param_value::ParamValue,
 };
 
-pub use core::types::{Bar, Tick, CalendarService, TimeService};
+pub use core::types::{Bar, Tick, CalendarService, TimeService, OrderBook, OrderBookLevel};
 
 // Signal taxonomy re-exports (runtime layer)
 pub use core::signal::{
