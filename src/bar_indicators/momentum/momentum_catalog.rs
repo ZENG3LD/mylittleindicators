@@ -1891,24 +1891,6 @@ pub fn signature_sweep_reversion() -> IndicatorSignature {
         .build()
 }
 
-/// Swing Age - возраст текущего свинга
-pub fn signature_swing_age() -> IndicatorSignature {
-    IndicatorSignature::builder("SWING_AGE", CATEGORY)
-        .name("Swing Age")
-        .description("Age of current swing in bars")
-        .add_constraint(ParamConstraint::period(2, 200, 5))
-        .machine_id(BarIndicatorId::SwingAge)
-        .role_kind(IndicatorRoleKind::Other)
-        .output_kind(IndicatorValueKind::Double)
-        // Note: "SWING_AGE" is already the main ID, no need for alias
-        .alias("SwingAge")
-        .alias("swing_age")
-        .alias("SWINGAGE")
-        .alias("swingage")
-        .alias("Swing_Age")
-        .build()
-}
-
 /// Traders Dynamic Index
 pub fn signature_tdi() -> IndicatorSignature {
     IndicatorSignature::builder("TDI", CATEGORY)
@@ -2310,7 +2292,6 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("STOCH", signature_stochastics as fn() -> IndicatorSignature),
     ("STOCHKD", signature_stochastikd as fn() -> IndicatorSignature),
     ("SWEEP_REV", signature_sweep_reversion as fn() -> IndicatorSignature),
-    ("SWING_AGE", signature_swing_age as fn() -> IndicatorSignature),
     ("TDI", signature_tdi as fn() -> IndicatorSignature),
     ("TRIX", signature_trix as fn() -> IndicatorSignature),
     ("TSI", signature_tsi as fn() -> IndicatorSignature),
@@ -2404,7 +2385,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 89); // CandlePatterns removed (superseded by events::CandlePatternDetector)
+        assert_eq!(count(), 88); // CandlePatterns removed; SwingAge moved to statistical_scoring
     }
 
     #[test]

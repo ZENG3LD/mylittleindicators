@@ -19,6 +19,7 @@ pub mod adaptive;
 pub mod channels;
 pub mod accumulation;
 pub mod levels;
+pub mod statistical_scoring;
 pub mod trend;
 pub mod trend_stop;
 pub mod candles;

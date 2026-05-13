@@ -326,9 +326,9 @@ use crate::bar_indicators::candles::candle_anatomy::CandleAnatomy;
 use crate::bar_indicators::momentum::neural_momentum_network::NeuralMomentumNetwork;
 use crate::bar_indicators::volatility::adaptive_volatility_regime::AdaptiveVolatilityRegime;
 // Price action / structure helpers
-use crate::bar_indicators::levels::liquidity_gap_density::LiquidityGapDensity;
-use crate::bar_indicators::levels::swing_strength_score::SwingStrengthScore;
-use crate::bar_indicators::momentum::swing_age::SwingAge;
+use crate::bar_indicators::statistical_scoring::LiquidityGapDensity;
+use crate::bar_indicators::statistical_scoring::SwingStrengthScore;
+use crate::bar_indicators::statistical_scoring::SwingAge;
 use crate::bar_indicators::volatility::range_compression_burst::RangeCompressionBurst;
 use crate::bar_indicators::candles::heikin_ashi::HeikinAshi;
 // Statistical wick detector (replaces WickSpike)
@@ -526,9 +526,9 @@ use crate::bar_indicators::volume::poc_detector::PocDetector;
 // PHASE 5 ADDITIONS (3 FVG indicators - Final push to 100%)
 // ========================================
 // FVG FAMILY (3 indicators)
-use crate::bar_indicators::levels::fvg_intensity_alt_score::FvgIntensityAltScore;
-use crate::bar_indicators::levels::fvg_duration_intensity_score::FvgDurationIntensityScore;
-use crate::bar_indicators::levels::fvg_reversion_probability::FvgReversionProbability;
+use crate::bar_indicators::statistical_scoring::FvgIntensityAltScore;
+use crate::bar_indicators::statistical_scoring::FvgDurationIntensityScore;
+use crate::bar_indicators::statistical_scoring::FvgReversionProbability;
 
 /// Configuration for an individual component within a composite indicator
 ///

@@ -91,7 +91,6 @@ pub mod rwi;
 pub mod smi;
 pub mod stc;
 pub mod sweep_reversion;
-pub mod swing_age;
 pub mod tdi;
 pub mod ultimate_oscillator_smooth;
 // pub mod box_momentum:

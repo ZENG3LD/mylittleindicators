@@ -34,6 +34,11 @@ pub enum RoleKind {
     /// Outputs a single value positioned above or below price.
     /// The "side" flip (stop crosses price) is the primary event.
     TrendStop,
+    /// Normalized scalar measurement: probability, density, tanh-strength, EMA magnitude.
+    ///
+    /// Output is a `Single(f64)` in [0,1] or [-1,1]. Not events, not price levels.
+    /// Examples: FVG reversion probability, liquidity gap density, swing strength score.
+    StatisticalScoring,
     /// Unknown / uncategorised — treated as general-purpose.
     Other,
 }
@@ -266,22 +271,24 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::Zigzag
         | BarIndicatorId::Pivot
         | BarIndicatorId::Floorpivot
-        | BarIndicatorId::SwingAge
         | BarIndicatorId::Camarilla
         | BarIndicatorId::Demark
         | BarIndicatorId::Woodie
         | BarIndicatorId::Rmid
         | BarIndicatorId::Rquart
-        | BarIndicatorId::Swingstr
         | BarIndicatorId::Pivavwap
         | BarIndicatorId::Avwap
         | BarIndicatorId::Avwaprev
         | BarIndicatorId::Avwaptouch
-        | BarIndicatorId::Fvgalt
+        | BarIndicatorId::Hlva => RoleKind::PivotIndicator,
+
+        // ── Statistical Scoring ───────────────────────────────────────────────
+        BarIndicatorId::Fvgrev
         | BarIndicatorId::Fvgdur
-        | BarIndicatorId::Fvgrev
-        | BarIndicatorId::Hlva
-        | BarIndicatorId::Liqgap => RoleKind::PivotIndicator,
+        | BarIndicatorId::Fvgalt
+        | BarIndicatorId::Liqgap
+        | BarIndicatorId::Swingstr
+        | BarIndicatorId::SwingAge => RoleKind::StatisticalScoring,
 
         // ── Pattern Detectors ─────────────────────────────────────────────────
         BarIndicatorId::Bos

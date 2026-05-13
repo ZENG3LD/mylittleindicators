@@ -1,10 +1,13 @@
 //! levels_catalog.rs: Catalog of all Price Levels indicators
 //!
 //! Auto-generated catalog based on actual indicator implementations.
-//! Contains IndicatorSignature definitions for 19 price level indicators.
+//! Contains IndicatorSignature definitions for 14 price level indicators.
+//!
+//! Note: FVG scoring (FVGREV, FVGDUR, FVGALT), LIQGAP, SWINGSTR were moved
+//! to `bar_indicators::statistical_scoring::statistical_scoring_catalog`.
 
 use crate::catalog::{
-    IndicatorSignature, IndicatorCategory, ParamConstraint, ParamType, ParamValue,
+    IndicatorSignature, IndicatorCategory, ParamConstraint,
     IndicatorRoleKind,
 };
 use crate::bar_indicators::indicator_value::IndicatorValueKind;
@@ -258,74 +261,6 @@ pub fn signature_fvg_detector() -> IndicatorSignature {
         .build()
 }
 
-/// FVG Duration Intensity Score - scoring FVG duration and intensity
-pub fn signature_fvg_duration_intensity() -> IndicatorSignature {
-    IndicatorSignature::builder("FVGDUR", CATEGORY)
-        .name("FVG Duration Intensity Score")
-        .description("Measures duration and intensity of Fair Value Gaps")
-        .metadata("scoring", "duration + intensity")
-        .machine_id(BarIndicatorId::Fvgdur) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Level)
-        .output_kind(IndicatorValueKind::Single)
-        .validated()
-        // Note: "FVGDUR" is already the main ID, no need for alias
-        .alias("Fvgdur")
-        .alias("fvgdur")
-        .alias("FVGDURATIONINTENSITYSCORE")
-        .alias("FVGDurationIntensityScore")
-        .alias("fvgdurationintensityscore")
-        .alias("fvg_duration_intensity_score")
-        .alias("FVG_DURATION_INTENSITY_SCORE")
-        .alias("Fvg_Duration_Intensity_Score")
-        .build()
-}
-
-/// FVG Intensity Alternative Score - alternative FVG intensity calculation
-pub fn signature_fvg_intensity_alt() -> IndicatorSignature {
-    IndicatorSignature::builder("FVGALT", CATEGORY)
-        .name("FVG Intensity Alt Score")
-        .description("Alternative intensity scoring for Fair Value Gaps")
-        .metadata("scoring", "alternative method")
-        .machine_id(BarIndicatorId::Fvgalt) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Level)
-        .output_kind(IndicatorValueKind::Single)
-        .validated()
-        // Note: "FVGALT" is already the main ID, no need for alias
-        .alias("Fvgalt")
-        .alias("fvgalt")
-        .alias("FVGINTENSITYALTSCORE")
-        .alias("FVGIntensityAltScore")
-        .alias("fvgintensityaltscore")
-        .alias("fvg_intensity_alt_score")
-        .alias("FVG_INTENSITY_ALT_SCORE")
-        .alias("Fvg_Intensity_Alt_Score")
-        .build()
-}
-
-/// FVG Reversion Probability - probability of FVG fill
-pub fn signature_fvg_reversion_probability() -> IndicatorSignature {
-    IndicatorSignature::builder("FVGREV", CATEGORY)
-        .name("FVG Reversion Probability")
-        .description("Probability of Fair Value Gap being filled within horizon")
-        .add_constraint(ParamConstraint::period(1, 50, 10))
-        .metadata("statistical", "true")
-        .metadata("horizon", "H bars")
-        .machine_id(BarIndicatorId::Fvgrev) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Level)
-        .output_kind(IndicatorValueKind::Single)
-        .validated()
-        // Note: "FVGREV" is already the main ID, no need for alias
-        .alias("Fvgrev")
-        .alias("fvgrev")
-        .alias("FVGREVERSIONPROBABILITY")
-        .alias("FVGReversionProbability")
-        .alias("fvgreversionprobability")
-        .alias("fvg_reversion_probability")
-        .alias("FVG_REVERSION_PROBABILITY")
-        .alias("Fvg_Reversion_Probability")
-        .build()
-}
-
 /// High-Low Value Area - value area based on high/low ranges
 pub fn signature_hl_value_area() -> IndicatorSignature {
     IndicatorSignature::builder("HLVA", CATEGORY)
@@ -345,28 +280,6 @@ pub fn signature_hl_value_area() -> IndicatorSignature {
         .alias("high_low_value_area")
         .alias("HIGH_LOW_VALUE_AREA")
         .alias("High_Low_Value_Area")
-        .build()
-}
-
-/// Liquidity Gap Density - measure liquidity gap concentration
-pub fn signature_liquidity_gap_density() -> IndicatorSignature {
-    IndicatorSignature::builder("LIQGAP", CATEGORY)
-        .name("Liquidity Gap Density")
-        .description("Measures concentration and density of liquidity gaps")
-        .metadata("feature", "gap concentration")
-        .machine_id(BarIndicatorId::Liqgap) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Level)
-        .output_kind(IndicatorValueKind::Single)
-        .validated()
-        // Note: "LIQGAP" is already the main ID, no need for alias
-        .alias("Liqgap")
-        .alias("liqgap")
-        .alias("LIQUIDITYGAPDENSITY")
-        .alias("LiquidityGapDensity")
-        .alias("liquiditygapdensity")
-        .alias("liquidity_gap_density")
-        .alias("LIQUIDITY_GAP_DENSITY")
-        .alias("Liquidity_Gap_Density")
         .build()
 }
 
@@ -440,43 +353,6 @@ pub fn signature_rolling_quartiles() -> IndicatorSignature {
         .build()
 }
 
-/// Swing Strength Score - normalized strength of swing highs/lows
-pub fn signature_swing_strength_score() -> IndicatorSignature {
-    IndicatorSignature::builder("SWINGSTR", CATEGORY)
-        .name("Swing Strength Score")
-        .description("Normalized strength score for swing highs and lows")
-        .add_constraint(
-            ParamConstraint::new("left", ParamType::USize)
-                .with_min(ParamValue::USize(1))
-                .with_max(ParamValue::USize(10))
-                .with_default(ParamValue::USize(3))
-                .required()
-        )
-        .add_constraint(
-            ParamConstraint::new("right", ParamType::USize)
-                .with_min(ParamValue::USize(1))
-                .with_max(ParamValue::USize(10))
-                .with_default(ParamValue::USize(3))
-                .required()
-        )
-        .metadata("normalization", "ATR-normalized")
-        .metadata("output", "tanh-bounded")
-        .machine_id(BarIndicatorId::Swingstr) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Level)
-        .output_kind(IndicatorValueKind::Single)
-        .validated()
-        // Note: "SWINGSTR" is already the main ID, no need for alias
-        .alias("Swingstr")
-        .alias("swingstr")
-        .alias("SWINGSTRENGTHSCORE")
-        .alias("SwingStrengthScore")
-        .alias("swingstrengthscore")
-        .alias("swing_strength_score")
-        .alias("SWING_STRENGTH_SCORE")
-        .alias("Swing_Strength_Score")
-        .build()
-}
-
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -494,15 +370,10 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("AVWAPTOUCH", signature_avwap_touch_probability as fn() -> IndicatorSignature),
     ("BOS", signature_break_of_structure as fn() -> IndicatorSignature),
     ("FVG", signature_fvg_detector as fn() -> IndicatorSignature),
-    ("FVGDUR", signature_fvg_duration_intensity as fn() -> IndicatorSignature),
-    ("FVGALT", signature_fvg_intensity_alt as fn() -> IndicatorSignature),
-    ("FVGREV", signature_fvg_reversion_probability as fn() -> IndicatorSignature),
     ("HLVA", signature_hl_value_area as fn() -> IndicatorSignature),
-    ("LIQGAP", signature_liquidity_gap_density as fn() -> IndicatorSignature),
     ("PIVAVWAP", signature_pivot_anchored_vwap as fn() -> IndicatorSignature),
     ("RMID", signature_rolling_midline as fn() -> IndicatorSignature),
     ("RQUART", signature_rolling_quartiles as fn() -> IndicatorSignature),
-    ("SWINGSTR", signature_swing_strength_score as fn() -> IndicatorSignature),
 ];
 
 /// Expanded catalog with all aliases auto-generated from signatures
@@ -560,6 +431,7 @@ pub fn count() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::catalog::ParamValue;
 
     #[test]
     fn test_get_pivot_signature() {
@@ -577,14 +449,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_swing_strength_signature() {
-        let sig = get_signature("SWINGSTR").unwrap();
-        assert_eq!(sig.id, "SWINGSTR");
-        // SWINGSTR has 2 required parameters (left, right)
-        assert_eq!(sig.required_params().len(), 2);
-    }
-
-    #[test]
     fn test_all_signatures_valid() {
         for id in all_indicator_ids() {
             let sig = get_signature(id).unwrap();
@@ -595,7 +459,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 19); // 19 level indicators
+        assert_eq!(count(), 14); // 14 level indicators (5 scoring moved to statistical_scoring)
     }
 
     #[test]
@@ -620,19 +484,6 @@ mod tests {
     }
 
     #[test]
-    fn test_swing_strength_cache_key() {
-        let sig = get_signature("SWINGSTR").unwrap();
-        let params = vec![
-            ("left", ParamValue::USize(3)),
-            ("right", ParamValue::USize(3)),
-        ];
-        let key = sig.cache_key(&params);
-        // Keys are sorted alphabetically
-        assert!(key.contains("SWINGSTR"));
-        assert!(key.contains("3"));
-    }
-
-    #[test]
     fn test_bos_signature() {
         let sig = get_signature("BOS").unwrap();
         assert_eq!(sig.id, "BOS");
@@ -640,10 +491,4 @@ mod tests {
         assert_eq!(sig.required_params().len(), 1);
     }
 
-    #[test]
-    fn test_fvg_reversion_signature() {
-        let sig = get_signature("FVGREV").unwrap();
-        assert_eq!(sig.id, "FVGREV");
-        assert_eq!(sig.required_params().len(), 1);
-    }
 }

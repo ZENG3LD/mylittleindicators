@@ -160,6 +160,7 @@ impl UnifiedIndicatorCatalog {
             IndicatorCategory::TrendStop,
             IndicatorCategory::Position,
             IndicatorCategory::Statistics,
+            IndicatorCategory::StatisticalScoring,
         ] {
             if let Ok(indicators) = self.get_category_indicators(category) {
                 result.extend(indicators);

@@ -108,8 +108,9 @@ pub enum IndicatorCategory {
     Divergence,       // 6 indicators
     Clusters,         // 5 indicators
     Book,             // 2 indicators
-    Position,         // 19 indicators (seasonality, temporal, position-based)
-    Statistics,       // 26 indicators (statistical tests, stationarity, etc.)
+    Position,           // 19 indicators (seasonality, temporal, position-based)
+    Statistics,         // 26 indicators (statistical tests, stationarity, etc.)
+    StatisticalScoring, // 6 indicators (normalized scalar: probability, density, tanh-strength)
 
     // Reserved for future expansion
     Custom,
@@ -145,6 +146,7 @@ impl IndicatorCategory {
             "book" => Self::Book,
             "position" => Self::Position,
             "statistics" | "stats" => Self::Statistics,
+            "statistical_scoring" | "statisticalscoring" | "scoring" => Self::StatisticalScoring,
             "custom" => Self::Custom,
             "composite" => Self::Composite,
             "experimental" => Self::Experimental,
@@ -178,6 +180,7 @@ impl IndicatorCategory {
             Self::Book => "book",
             Self::Position => "position",
             Self::Statistics => "statistics",
+            Self::StatisticalScoring => "statistical_scoring",
             Self::Custom => "custom",
             Self::Composite => "composite",
             Self::Experimental => "experimental",
@@ -353,6 +356,7 @@ impl IndicatorSignature {
             IndicatorCategory::Levels | IndicatorCategory::Zigzag => IndicatorRoleKind::Level,
             IndicatorCategory::Candles => IndicatorRoleKind::Pattern,
             IndicatorCategory::Statistics => IndicatorRoleKind::Statistical,
+            IndicatorCategory::StatisticalScoring => IndicatorRoleKind::Statistical,
             IndicatorCategory::Momentum => IndicatorRoleKind::OscillatorUnbounded,
             IndicatorCategory::Trend => IndicatorRoleKind::Regime,
             _ => IndicatorRoleKind::Other,

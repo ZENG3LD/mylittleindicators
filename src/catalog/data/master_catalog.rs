@@ -55,6 +55,7 @@ use crate::bar_indicators::ratio::ratio_catalog;
 use crate::bar_indicators::trend_stop::trend_stop_catalog;
 use crate::bar_indicators::position::position_catalog;
 use crate::bar_indicators::statistics::statistics_catalog;
+use crate::bar_indicators::statistical_scoring::statistical_scoring_catalog;
 // Note: zigzag_catalog not exported from zigzag module yet
 
 /// Error type for catalog operations
@@ -172,6 +173,7 @@ impl MasterIndicatorCatalog {
             (IndicatorCategory::TrendStop, trend_stop_catalog::get_signature, trend_stop_catalog::all_indicator_ids()),
             (IndicatorCategory::Position, position_catalog::get_signature, position_catalog::all_indicator_ids()),
             (IndicatorCategory::Statistics, statistics_catalog::get_signature, statistics_catalog::all_indicator_ids()),
+            (IndicatorCategory::StatisticalScoring, statistical_scoring_catalog::get_signature, statistical_scoring_catalog::all_indicator_ids()),
             // Note: Zigzag catalog will be added when exported from zigzag module
         ];
 
@@ -440,9 +442,9 @@ mod tests {
         let master = MasterIndicatorCatalog::new();
         let stats = master.stats();
 
-        assert_eq!(stats.total_categories, 22);
+        assert_eq!(stats.total_categories, 23);
         assert!(stats.total_indicators > 430);
-        assert_eq!(stats.category_counts.len(), 22);
+        assert_eq!(stats.category_counts.len(), 23);
     }
 
     #[test]
