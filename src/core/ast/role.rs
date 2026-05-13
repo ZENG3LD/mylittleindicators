@@ -67,6 +67,7 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Lr
         | BarIndicatorId::Vwap
         | BarIndicatorId::Vwma
+        | BarIndicatorId::SessionVwap
         | BarIndicatorId::AvFrama
         | BarIndicatorId::AvVidya
         | BarIndicatorId::Ehlersfa
@@ -248,11 +249,13 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Pvo
         | BarIndicatorId::Rvol
         | BarIndicatorId::Vdelta
+        | BarIndicatorId::Cvd
         | BarIndicatorId::Vo
         | BarIndicatorId::Vpin
         | BarIndicatorId::Vroc
         | BarIndicatorId::Vz
         | BarIndicatorId::Vprofile
+        | BarIndicatorId::Rvp
         | BarIndicatorId::Di
         | BarIndicatorId::Tmf
         | BarIndicatorId::Wad

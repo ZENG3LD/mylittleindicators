@@ -437,6 +437,76 @@ pub fn signature_vzo() -> IndicatorSignature {
         .build()
 }
 
+/// Session VWAP
+pub fn signature_session_vwap() -> IndicatorSignature {
+    IndicatorSignature::builder("SESSION_VWAP", CATEGORY)
+        .name("Session VWAP")
+        .description("Cumulative VWAP with explicit session reset — caller resets at session boundary")
+        .metadata("formula", "Σ(typical_price × volume) / Σ(volume)")
+        .metadata("typical_price", "(high + low + close) / 3")
+        .machine_id(BarIndicatorId::SessionVwap)
+        .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Single)
+        .validated()
+        .alias("SessionVwap")
+        .alias("session_vwap")
+        .alias("SESSIONVWAP")
+        .alias("SessionVWAP")
+        .alias("sessionvwap")
+        .source_type(SourceType::PriceAndVolume)
+        .build()
+}
+
+/// Cumulative Volume Delta (rolling)
+pub fn signature_cvd() -> IndicatorSignature {
+    IndicatorSignature::builder("CVD", CATEGORY)
+        .name("Cumulative Volume Delta")
+        .description("Rolling sum of synthetic buy/sell delta estimated from candle direction")
+        .add_constraint(ParamConstraint::period(10, 500, 50))
+        .metadata("estimate", "close > open → +volume; close < open → −volume")
+        .machine_id(BarIndicatorId::Cvd)
+        .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Single)
+        .validated()
+        .alias("Cvd")
+        .alias("cvd")
+        .alias("CUMULATIVEVOLUMEDELTMA")
+        .alias("CumulativeVolumeDelta")
+        .alias("cumulative_volume_delta")
+        .source_type(SourceType::VolumeOnly)
+        .build()
+}
+
+/// Rolling Volume Profile (POC / VAH / VAL)
+pub fn signature_rvp() -> IndicatorSignature {
+    IndicatorSignature::builder("RVP", CATEGORY)
+        .name("Rolling Volume Profile")
+        .description("Point of Control, Value Area High, Value Area Low over a rolling window")
+        .add_constraint(ParamConstraint::period(20, 500, 50))
+        .add_constraint(
+            ParamConstraint::new("bucket_size", ParamType::F64)
+                .with_default(ParamValue::F64(1.0))
+        )
+        .add_constraint(
+            ParamConstraint::new("value_area_pct", ParamType::F64)
+                .with_min(ParamValue::F64(0.01))
+                .with_max(ParamValue::F64(0.99))
+                .with_default(ParamValue::F64(0.7))
+        )
+        .metadata("outputs", "poc, vah, val")
+        .machine_id(BarIndicatorId::Rvp)
+        .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Triple)
+        .validated()
+        .alias("Rvp")
+        .alias("rvp")
+        .alias("ROLLINGVOLUMEPROFILE")
+        .alias("RollingVolumeProfile")
+        .alias("rolling_volume_profile")
+        .source_type(SourceType::PriceAndVolume)
+        .build()
+}
+
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -444,12 +514,15 @@ pub fn signature_vzo() -> IndicatorSignature {
 /// Static catalog of all volume indicators
 /// Base catalog with main IDs only (used for initialization)
 const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
+    ("CVD", signature_cvd as fn() -> IndicatorSignature),
     ("MFI", signature_mfi as fn() -> IndicatorSignature),
     ("NVI_PVI", signature_nvi_pvi as fn() -> IndicatorSignature),
     ("POC", signature_poc_detector as fn() -> IndicatorSignature),
     ("PVO", signature_pvo as fn() -> IndicatorSignature),
     ("PVT", signature_pvt as fn() -> IndicatorSignature),
     ("RVOL", signature_relative_volume as fn() -> IndicatorSignature),
+    ("RVP", signature_rvp as fn() -> IndicatorSignature),
+    ("SESSION_VWAP", signature_session_vwap as fn() -> IndicatorSignature),
     ("VDELTA", signature_volume_delta as fn() -> IndicatorSignature),
     ("VFI", signature_vfi as fn() -> IndicatorSignature),
     ("VO", signature_volume_oscillator as fn() -> IndicatorSignature),
@@ -523,6 +596,6 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 15);
+        assert_eq!(count(), 18);
     }
 }

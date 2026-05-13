@@ -1,3 +1,6 @@
+pub mod cumulative_volume_delta;
+pub mod rolling_volume_profile;
+pub mod session_vwap;
 pub mod volume_delta;
 pub mod volume_profile;
 pub mod mfi;

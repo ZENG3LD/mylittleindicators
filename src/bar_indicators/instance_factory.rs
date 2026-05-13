@@ -190,8 +190,11 @@ use crate::bar_indicators::trend_stop::swing_stop::SwingStop;
 use crate::bar_indicators::trend_stop::volatility_stop::{
     VolatilityStop, VolatilityType,
 };
+use crate::bar_indicators::volume::cumulative_volume_delta::CumulativeVolumeDelta;
 use crate::bar_indicators::volume::mfi::Mfi;
 use crate::bar_indicators::volume::nvi_pvi::NegativePositiveVolumeIndex;
+use crate::bar_indicators::volume::rolling_volume_profile::RollingVolumeProfile;
+use crate::bar_indicators::volume::session_vwap::SessionVwap;
 use crate::bar_indicators::volume::volume_delta::VolumeDelta;
 use crate::bar_indicators::volume::volume_profile::VolumeProfile;
 use crate::bar_indicators::volume::vpin::Vpin;
@@ -1355,11 +1358,32 @@ pub enum IndicatorInstance {
     OscillatorWithDivergence(Box<crate::events::OscillatorWithDivergence>),
 
     // ========================================
+    // OSCILLATOR WITH VOLUME WEIGHT WRAPPER
+    // ========================================
+    /// Universal oscillator+volume-event wrapper (layer 2 / layer 3).
+    ///
+    /// Produced by `wrap_with_volume_weight_if_requested` when
+    /// `config.flags["with_volume_event"] = true`. Output:
+    /// - `IndicatorValue::Double(osc, vw_signal)` — layer 2
+    /// - `IndicatorValue::Triple(osc, vw_signal, strength)` — layer 3
+    OscillatorWithVolumeWeight(Box<crate::events::OscillatorWithVolumeWeight>),
+
+    // ========================================
     // SWING DETECTION (unified)
     // ========================================
     /// Canonical swing detector replacing ZigzagClassic, ZigzagAtr, ZigzagTime,
     /// ZigzagCandle, ZigzagLookahead, Swings, SwingsSoft.
     SwingDetection(Box<crate::events::SwingDetection>),
+
+    // ========================================
+    // PHASE 6 VOLUME ADDITIONS
+    // ========================================
+    /// Session VWAP — cumulative VWAP with explicit session reset.
+    SessionVwap(Box<SessionVwap>),
+    /// Rolling Cumulative Volume Delta.
+    Cvd(Box<CumulativeVolumeDelta>),
+    /// Rolling Volume Profile — POC, VAH, VAL. Output: `Triple`.
+    RollingVolumeProfile(Box<RollingVolumeProfile>),
 }
 
 impl IndicatorInstance {
@@ -1449,7 +1473,7 @@ impl IndicatorInstance {
 
             // VolumeOnly indicators - only use volume data
             Obv | MoObv | Vdelta | Vprofile | Vpt | Vroc | NviPvi | Vpin | TickVolume |
-            Pvo | Pvt | Rvol | Vo | Vz | Poc |
+            Pvo | Pvt | Rvol | Vo | Vz | Poc | Cvd | Rvp | SessionVwap |
 
             // Additional accumulation indicators that use volume internally
             Ad // Accumulation/Distribution uses volume
@@ -1545,6 +1569,63 @@ impl IndicatorInstance {
         )))
     }
 
+    /// Applies both divergence and volume-weight wrappers to `inner` based on config flags.
+    ///
+    /// Applies divergence first, then volume-weight on top. If both
+    /// `with_divergence` and `with_volume_event` are set simultaneously,
+    /// the VW wrapper observes the raw inner value (`.main()`) from the
+    /// divergence wrapper output. To avoid ambiguity, prefer setting only
+    /// one of the two flags at a time.
+    fn wrap_oscillator(
+        inner: Box<IndicatorInstance>,
+        config: &IndicatorConfig,
+    ) -> Box<IndicatorInstance> {
+        let after_div = Self::wrap_with_divergence_if_requested(inner, config);
+        Self::wrap_with_volume_weight_if_requested(after_div, config)
+    }
+
+    /// Wraps `inner` with `OscillatorWithVolumeWeight` when
+    /// `config.flags["with_volume_event"]` is `true`; returns `inner` unchanged otherwise.
+    ///
+    /// Config keys:
+    /// - `flags["with_volume_event"]`      — enable wrapper (required)
+    /// - `flags["vw_with_strength"]`       — upgrade to layer-3 `Triple` output
+    /// - `additional_params["vw_baseline_period"]` — rolling window for volume baseline (default 20)
+    /// - `additional_params["vw_spike_threshold"]` — multiplier for spike detection (default 2.5)
+    fn wrap_with_volume_weight_if_requested(
+        inner: Box<IndicatorInstance>,
+        config: &IndicatorConfig,
+    ) -> Box<IndicatorInstance> {
+        if !config.flags.get("with_volume_event").copied().unwrap_or(false) {
+            return inner;
+        }
+        let baseline_period = config
+            .additional_params
+            .get("vw_baseline_period")
+            .copied()
+            .unwrap_or(20.0) as usize;
+        let spike_threshold = config
+            .additional_params
+            .get("vw_spike_threshold")
+            .copied()
+            .unwrap_or(2.5);
+        let with_strength = config
+            .flags
+            .get("vw_with_strength")
+            .copied()
+            .unwrap_or(false);
+
+        Box::new(IndicatorInstance::OscillatorWithVolumeWeight(Box::new(
+            crate::events::OscillatorWithVolumeWeight::new(
+                inner,
+                baseline_period,
+                spike_threshold,
+                true,
+                with_strength,
+            ),
+        )))
+    }
+
     pub fn create(config: &IndicatorConfig) -> Result<Self, String> {
         // Ensure minimal valid period for all periodized indicators
         let period = config.periods.first().copied().unwrap_or(14).clamp(2, 512);
@@ -1591,7 +1672,7 @@ impl IndicatorInstance {
                 let inner = Box::new(Self::Rsi(Box::new(
                     Rsi::with_source(period, MovingAverageType::RMA, config.source),
                 )));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Macd => {
                 let fast = config.periods.first().copied().unwrap_or(12);
@@ -1621,7 +1702,7 @@ impl IndicatorInstance {
                     fast_ma_type, slow_ma_type, signal_ma_type,
                     fast_source, slow_source
                 ))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Ppo => {
                 let fast = config.periods.first().copied().unwrap_or(12);
@@ -1652,7 +1733,7 @@ impl IndicatorInstance {
                 } else {
                     Box::new(Self::Ppo(Box::new(Ppo::new(fast, slow, signal))))
                 };
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::BbPeriod => {
                 let std_dev = config.additional_params.get("std_dev").copied().unwrap_or(2.0);
@@ -1882,28 +1963,28 @@ impl IndicatorInstance {
             BarIndicatorId::Roc => {
                 let use_log = config.additional_params.get("use_log").map(|&v| v != 0.0).unwrap_or(false);
                 let inner = Box::new(Self::Roc(Box::new(Roc::with_source(period, use_log, config.source))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Cci => {
                 let scalar = config.additional_params.get("scalar").copied().unwrap_or(0.015);
                 let inner = Box::new(Self::Cci(Box::new(Cci::new(period, scalar, None))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Stoch => {
                 let period_k = config.periods.first().copied().unwrap_or(14).clamp(2, 512);
                 let period_d = config.periods.get(1).copied().unwrap_or(3).clamp(1, 512);
                 let inner = Box::new(Self::Stochastics(Box::new(Stochastics::new(period_k, period_d))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Obv => {
                 let inner = Box::new(Self::Obv(Box::new(Obv::with_source(config.source))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::MoObv => Ok(Self::Obv(Box::new(Obv::with_source(config.source)))), // momentum/ version (accumulation/ has plain Obv)
             BarIndicatorId::Vhf => Ok(Self::Vhf(Box::new(VhfSimple::with_source(period, config.source)))),
             BarIndicatorId::Psl => {
                 let inner = Box::new(Self::Psl(Box::new(Psl::with_source(period, config.source))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             // BOOK category (5 indicators)
             BarIndicatorId::BookImb => Ok(Self::BookImb(Box::default())),
@@ -1941,11 +2022,11 @@ impl IndicatorInstance {
             }
             BarIndicatorId::Cmo => {
                 let inner = Box::new(Self::Cmo(Box::new(Cmo::with_source(period, config.source))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Bias => {
                 let inner = Box::new(Self::Bias(Box::new(Bias::with_source(period, None, config.source))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Amat => {
                 let fast = config.periods.first().copied().unwrap_or(10);
@@ -1966,15 +2047,15 @@ impl IndicatorInstance {
                 let period_k = config.periods.first().copied().unwrap_or(14);
                 let period_d = config.periods.get(1).copied().unwrap_or(3);
                 let inner = Box::new(Self::StochastikD(Box::new(StochastikD::new(period_k, period_d))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::WilliamsR => {
                 let inner = Box::new(Self::WilliamsR(Box::new(WilliamsR::new(period))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Demarker => {
                 let inner = Box::new(Self::Demarker(Box::new(Demarker::new(period))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Psar => {
                 let af_start = config.additional_params.get("af_start").copied().unwrap_or(0.02);
@@ -1985,7 +2066,7 @@ impl IndicatorInstance {
             BarIndicatorId::Uo => {
                 // Ensure increasing default periods (7,14,28)
                 let inner = Box::new(Self::UltimateOscillator(Box::new(UltimateOscillator::with_periods(7, 14, 28))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::UoSmooth => {
                 let p1 = config.periods.first().copied().unwrap_or(7);
@@ -1993,12 +2074,12 @@ impl IndicatorInstance {
                 let p3 = config.periods.get(2).copied().unwrap_or(28);
                 let smooth = config.periods.get(3).copied().unwrap_or(9);
                 let inner = Box::new(Self::UltimateOscillatorSmooth(Box::new(UltimateOscillatorSmooth::new(p1,p2,p3,smooth))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Rwi => Ok(Self::Rwi(Box::new(Rwi::new(period)))),
             BarIndicatorId::Bop => {
                 let inner = Box::new(Self::Bop(Box::default()));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Cfo => Ok(Self::Cfo(Box::new(Cfo::new(period)))),
             BarIndicatorId::Rmi => {
@@ -2018,20 +2099,20 @@ impl IndicatorInstance {
                 } else {
                     Box::new(Self::CoppockCurve(Box::new(CoppockCurve::new(r1, r2, wma))))
                 };
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Apo => {
                 let fast = config.periods.first().copied().unwrap_or(12);
                 let slow = config.periods.get(1).copied().unwrap_or(26);
                 let inner = Box::new(Self::Apo(Box::new(Apo::new(fast, slow))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Pmo => {
                 let roc_p = config.periods.first().copied().unwrap_or(10);
                 let s1 = config.periods.get(1).copied().unwrap_or(10);
                 let s2 = config.periods.get(2).copied().unwrap_or(10);
                 let inner = Box::new(Self::Pmo(Box::new(Pmo::new(roc_p, s1, s2))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Tsi => {
                 let p1 = config.periods.first().copied().unwrap_or(25);
@@ -2058,7 +2139,7 @@ impl IndicatorInstance {
                 } else {
                     Box::new(Self::TrueStrengthIndex(Box::new(TrueStrengthIndex::with_params_default(p1, p2, sig))))
                 };
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Dpo => {
                 // Check if we have custom source
@@ -2067,7 +2148,7 @@ impl IndicatorInstance {
                 } else {
                     Box::new(Self::DetrendedPriceOscillator(Box::new(DetrendedPriceOscillator::with_period(period))))
                 };
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Kst => {
                 // KST uses default params: roc=[10,15,20,30], sma=[10,10,10,15], signal=9
@@ -2107,19 +2188,19 @@ impl IndicatorInstance {
                         roc_periods, sma_periods, signal_period
                     ))))
                 };
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Rvgi => {
                 let p = config.periods.first().copied().unwrap_or(14);
                 let sig = config.periods.get(1).copied().unwrap_or(9);
                 let inner = Box::new(Self::Rvgi(Box::new(Rvgi::new(p, sig))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Smi => {
                 let p = config.periods.first().copied().unwrap_or(14);
                 let sig = config.periods.get(1).copied().unwrap_or(3);
                 let inner = Box::new(Self::Smi(Box::new(Smi::new(p, sig))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Stc => {
                 let fast = config.periods.first().copied().unwrap_or(12);
@@ -2127,7 +2208,7 @@ impl IndicatorInstance {
                 let kp = config.periods.get(2).copied().unwrap_or(10);
                 let dp = config.periods.get(3).copied().unwrap_or(3);
                 let inner = Box::new(Self::Stc(Box::new(Stc::new(fast, slow, kp, dp))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::ElderImpulse => {
                 let ema_period = config.periods.first().copied().unwrap_or(13);
@@ -2176,7 +2257,7 @@ impl IndicatorInstance {
                 } else {
                     Box::new(Self::StochasticRsi(Box::new(StochasticRsi::new(rsi_p, stoch_p, k_p, d_p))))
                 };
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::MoFisher => {
                 let p = config.periods.first().copied().unwrap_or(10);
@@ -2185,27 +2266,27 @@ impl IndicatorInstance {
             }
             BarIndicatorId::Rsx => {
                 let inner = Box::new(Self::Rsx(Box::new(Rsx::new(period))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Qqe => {
                 let p = config.periods.first().copied().unwrap_or(14);
                 let sm = config.periods.get(1).copied().unwrap_or(5);
                 let mult = config.additional_params.get("threshold_mult").copied().unwrap_or(1.5);
                 let inner = Box::new(Self::Qqe(Box::new(Qqe::new(p, sm, mult))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Kdj => {
                 let k = config.periods.first().copied().unwrap_or(14);
                 let d = config.periods.get(1).copied().unwrap_or(3);
                 let inner = Box::new(Self::Kdj(Box::new(Kdj::new(k, d))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::ConnorsRsi => {
                 let rsi_p = config.periods.first().copied().unwrap_or(3);
                 let up_p = config.periods.get(1).copied().unwrap_or(2);
                 let roc_p = config.periods.get(2).copied().unwrap_or(100);
                 let inner = Box::new(Self::ConnorsRsi(Box::new(ConnorsRsi::with_periods_and_source(rsi_p, up_p, roc_p, config.source))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Trix => {
                 let p = config.periods.first().copied().unwrap_or(14);
@@ -2231,15 +2312,15 @@ impl IndicatorInstance {
                 } else {
                     Box::new(Self::Trix(Box::new(Trix::with_params_default(p, sig))))
                 };
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::IftRsi => {
                 let inner = Box::new(Self::IftRsi(Box::new(IftRsi::new(period))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::DpoPct => {
                 let inner = Box::new(Self::DpoPercent(Box::new(DpoPercent::new(period))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Dsp => Ok(Self::DetrendedSyntheticPrice(Box::new(DetrendedSyntheticPrice::new(period)))),
             BarIndicatorId::RsiPctRank => {
@@ -2259,7 +2340,7 @@ impl IndicatorInstance {
             }
             BarIndicatorId::Imi => {
                 let inner = Box::new(Self::IntradayMomentumIndex(Box::new(IntradayMomentumIndex::new(period))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
 
             // Volatility & Channels
@@ -2320,7 +2401,7 @@ impl IndicatorInstance {
             BarIndicatorId::Mfi => {
                 let p = config.periods.first().copied().unwrap_or(14);
                 let inner = Box::new(Self::Mfi(Box::new(Mfi::new(p))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Wad => Ok(Self::WilliamsAd(Box::default())),
             BarIndicatorId::Vdelta => {
@@ -2331,6 +2412,19 @@ impl IndicatorInstance {
                 let tick = config.additional_params.get("tick_size").copied().unwrap_or(0.01);
                 let sess = config.additional_params.get("session_duration").copied().unwrap_or(0.0) as i64;
                 Ok(Self::VolumeProfile(Box::new(VolumeProfile::new(tick.max(1e-6), sess))))
+            }
+            BarIndicatorId::SessionVwap => {
+                Ok(Self::SessionVwap(Box::new(SessionVwap::new())))
+            }
+            BarIndicatorId::Cvd => {
+                let w = config.periods.first().copied().unwrap_or(50);
+                Ok(Self::Cvd(Box::new(CumulativeVolumeDelta::new(w))))
+            }
+            BarIndicatorId::Rvp => {
+                let w = config.periods.first().copied().unwrap_or(50);
+                let bucket = config.additional_params.get("bucket_size").copied().unwrap_or(1.0);
+                let va_pct = config.additional_params.get("value_area_pct").copied().unwrap_or(0.7);
+                Ok(Self::RollingVolumeProfile(Box::new(RollingVolumeProfile::new(w, bucket, va_pct))))
             }
             BarIndicatorId::Vpt => {
                 let sp = config.periods.first().copied().unwrap_or(21);
@@ -2354,7 +2448,7 @@ impl IndicatorInstance {
             BarIndicatorId::Cmf => {
                 let p = config.periods.first().copied().unwrap_or(20);
                 let inner = Box::new(Self::Cmf(Box::new(ChaikinMoneyFlow::new(p))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Eom => {
                 let smooth = config.periods.first().copied().unwrap_or(14);
@@ -2369,7 +2463,7 @@ impl IndicatorInstance {
                 let fast = config.periods.first().copied().unwrap_or(3);
                 let slow = config.periods.get(1).copied().unwrap_or(10);
                 let inner = Box::new(Self::Cho(Box::new(ChaikinOscillator::new(fast, slow))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Ii => {
                 let p = config.periods.first().copied().unwrap_or(14);
@@ -2744,17 +2838,17 @@ impl IndicatorInstance {
             // RSI variants
             BarIndicatorId::AtrRsi => {
                 let inner = Box::new(Self::AtrRsi(Box::new(AtrRsi::new())));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Vwrsi => {
                 let inner = Box::new(Self::VolumeWeightedRsi(Box::new(VolumeWeightedRsi::with_source(14, 20, config.source))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Rsioma => {
                 let rsi_p = config.periods.first().copied().unwrap_or(14);
                 let ema_p = config.periods.get(1).copied().unwrap_or(9);
                 let inner = Box::new(Self::RsiOma(Box::new(RsiOma::new(rsi_p, ema_p))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Tdi => {
                 let rsi_period = config.periods.first().copied().unwrap_or(13);
@@ -2798,7 +2892,7 @@ impl IndicatorInstance {
                 let p = config.periods.first().copied().unwrap_or(10);
                 let win = config.periods.get(1).copied().unwrap_or(200);
                 let inner = Box::new(Self::RocPercentile(Box::new(RocPercentile::new(p, win))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Nr => {
                 let win = config.periods.first().copied().unwrap_or(20);
@@ -2809,7 +2903,7 @@ impl IndicatorInstance {
             BarIndicatorId::Mrf => Ok(Self::MarketRegimeFilter(Box::new(MarketRegimeFilter::new()))),
             BarIndicatorId::AdaptiveStoch => {
                 let inner = Box::new(Self::AdaptiveStochastic(Box::new(AdaptiveStochastic::new())));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
 
             // Breakout/filters
@@ -3604,7 +3698,7 @@ impl IndicatorInstance {
             BarIndicatorId::Cog => {
                 let period = config.periods.first().copied().unwrap_or(10).max(2);
                 let inner = Box::new(Self::Cog(Box::new(CenterOfGravity::new(period))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Pfe => {
                 let window = config.periods.first().copied().unwrap_or(10).max(2);
@@ -3644,21 +3738,21 @@ impl IndicatorInstance {
                 } else {
                     Box::new(Self::Gator(Box::new(GatorOscillator::new(fast_period, slow_period))))
                 };
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::MacdHist => {
                 let fast = config.periods.first().copied().unwrap_or(12).max(1);
                 let slow = config.periods.get(1).copied().unwrap_or(26).max(1);
                 let signal = config.periods.get(2).copied().unwrap_or(9).max(1);
                 let inner = Box::new(Self::MacdHist(Box::new(MacdHistogram::new(fast, slow, signal))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::MacdSignal => {
                 let fast = config.periods.first().copied().unwrap_or(12).max(2);
                 let slow = config.periods.get(1).copied().unwrap_or(26).max(2);
                 let signal = config.periods.get(2).copied().unwrap_or(9).max(2);
                 let inner = Box::new(Self::MacdSignal(Box::new(MacdSignal::new(fast, slow, signal))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::PpoSignal => {
                 let fast = config.periods.first().copied().unwrap_or(12).max(2);
@@ -3711,12 +3805,12 @@ impl IndicatorInstance {
             BarIndicatorId::Vfi => {
                 let window = config.periods.first().copied().unwrap_or(130).max(1);
                 let inner = Box::new(Self::Vfi(Box::new(Vfi::new(window))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Vzo => {
                 let period = config.periods.first().copied().unwrap_or(14).max(2);
                 let inner = Box::new(Self::Vzo(Box::new(Vzo::new(period))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, config))
+                Ok(*Self::wrap_oscillator(inner, config))
             }
 
             // ========================================
@@ -5538,9 +5632,21 @@ impl IndicatorInstance {
             Self::OscillatorWithDivergence(x) => {
                 x.update_bar(open, high, low, close, volume)
             }
+            Self::OscillatorWithVolumeWeight(x) => {
+                x.update_bar(open, high, low, close, volume)
+            }
             Self::SwingDetection(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
+            }
+            Self::SessionVwap(x) => {
+                x.update_bar(open, high, low, close, volume)
+            }
+            Self::Cvd(x) => {
+                x.update_bar(open, high, low, close, volume)
+            }
+            Self::RollingVolumeProfile(x) => {
+                x.update_bar(open, high, low, close, volume)
             }
             // ========================================
             // PHASE 1: Simple update(close) indicators
@@ -6133,7 +6239,11 @@ impl IndicatorInstance {
             Self::Fvgdur(ind) => ind.value(),
             Self::Fvgrev(ind) => ind.value(),
             Self::OscillatorWithDivergence(ind) => ind.value(),
+            Self::OscillatorWithVolumeWeight(ind) => ind.value(),
             Self::SwingDetection(ind) => ind.value(),
+            Self::SessionVwap(ind) => ind.value(),
+            Self::Cvd(ind) => ind.value(),
+            Self::RollingVolumeProfile(ind) => ind.value(),
             // ========================================
             // MISSING VALUE() HANDLERS - BATCH FIX
             // ========================================
@@ -6370,7 +6480,11 @@ impl IndicatorInstance {
             Self::Fvgdur(ind) => ind.is_ready(),
             Self::Fvgrev(ind) => ind.is_ready(),
             Self::OscillatorWithDivergence(ind) => ind.is_ready(),
+            Self::OscillatorWithVolumeWeight(ind) => ind.is_ready(),
             Self::SwingDetection(ind) => ind.is_ready(),
+            Self::SessionVwap(ind) => ind.is_ready(),
+            Self::Cvd(ind) => ind.is_ready(),
+            Self::RollingVolumeProfile(ind) => ind.is_ready(),
             Self::GannHilo(ind) => ind.is_ready(),
             Self::Gapo(ind) => ind.is_ready(),
             Self::Garch(ind) => ind.is_ready(),
@@ -6801,7 +6915,11 @@ impl IndicatorInstance {
             Self::Fvgdur(ind) => ind.reset(),
             Self::Fvgrev(ind) => ind.reset(),
             Self::OscillatorWithDivergence(ind) => ind.reset(),
+            Self::OscillatorWithVolumeWeight(ind) => ind.reset(),
             Self::SwingDetection(ind) => ind.reset(),
+            Self::SessionVwap(ind) => ind.reset(),
+            Self::Cvd(ind) => ind.reset(),
+            Self::RollingVolumeProfile(ind) => ind.reset(),
             Self::GannHilo(ind) => ind.reset(),
             Self::Gapo(ind) => ind.reset(),
             Self::Garch(ind) => ind.reset(),
