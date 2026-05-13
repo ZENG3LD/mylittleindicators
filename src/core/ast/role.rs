@@ -80,19 +80,16 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Abgfilter
         | BarIndicatorId::Ekf
         | BarIndicatorId::Kalman
-        | BarIndicatorId::Kcomp
-        | BarIndicatorId::Kregime
-        | BarIndicatorId::Kscr
         | BarIndicatorId::Kslope
         | BarIndicatorId::Kslopez
         | BarIndicatorId::Particle
         | BarIndicatorId::Rts
-        | BarIndicatorId::Zlsma
+        | BarIndicatorId::Zlsma => RoleKind::Smoother,
+
+        // ── Trend Stops ───────────────────────────────────────────────────────
+        BarIndicatorId::Supertrend
         | BarIndicatorId::Ssl
-        | BarIndicatorId::GannHilo
-        | BarIndicatorId::HaTrend
-        | BarIndicatorId::Didi
-        | BarIndicatorId::Supertrend => RoleKind::Smoother,
+        | BarIndicatorId::GannHilo => RoleKind::TrendStop,
 
         // ── Bounded Oscillators ──────────────────────────────────────────────
         BarIndicatorId::Rsi
@@ -148,7 +145,8 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::MoFisher
         | BarIndicatorId::Dss
         | BarIndicatorId::Gator
-        | BarIndicatorId::Cog => RoleKind::OscillatorUnbounded,
+        | BarIndicatorId::Cog
+        | BarIndicatorId::Didi => RoleKind::OscillatorUnbounded,
 
         // ── Channels ────────────────────────────────────────────────────────
         BarIndicatorId::Bb
@@ -286,7 +284,9 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Fvgalt
         | BarIndicatorId::Liqgap
         | BarIndicatorId::Swingstr
-        | BarIndicatorId::SwingAge => RoleKind::StatisticalScoring,
+        | BarIndicatorId::SwingAge
+        | BarIndicatorId::Kcomp
+        | BarIndicatorId::Kscr => RoleKind::StatisticalScoring,
 
         // ── Pattern Detectors ─────────────────────────────────────────────────
         BarIndicatorId::Bos
@@ -302,7 +302,9 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Logicor
         | BarIndicatorId::Logicxor
         | BarIndicatorId::Wcomp
-        | BarIndicatorId::Logicsign => RoleKind::RegimeFilter,
+        | BarIndicatorId::Logicsign
+        | BarIndicatorId::HaTrend
+        | BarIndicatorId::Kregime => RoleKind::RegimeFilter,
 
         // ── Everything else ───────────────────────────────────────────────────
         _ => RoleKind::Other,
@@ -351,5 +353,45 @@ mod tests {
     #[test]
     fn mrf_is_regime_filter() {
         assert_eq!(role_kind_for(BarIndicatorId::Mrf), RoleKind::RegimeFilter);
+    }
+
+    #[test]
+    fn supertrend_is_trend_stop() {
+        assert_eq!(role_kind_for(BarIndicatorId::Supertrend), RoleKind::TrendStop);
+    }
+
+    #[test]
+    fn ssl_is_trend_stop() {
+        assert_eq!(role_kind_for(BarIndicatorId::Ssl), RoleKind::TrendStop);
+    }
+
+    #[test]
+    fn gann_hilo_is_trend_stop() {
+        assert_eq!(role_kind_for(BarIndicatorId::GannHilo), RoleKind::TrendStop);
+    }
+
+    #[test]
+    fn didi_is_oscillator_unbounded() {
+        assert_eq!(role_kind_for(BarIndicatorId::Didi), RoleKind::OscillatorUnbounded);
+    }
+
+    #[test]
+    fn hatrend_is_regime_filter() {
+        assert_eq!(role_kind_for(BarIndicatorId::HaTrend), RoleKind::RegimeFilter);
+    }
+
+    #[test]
+    fn kcomp_is_statistical_scoring() {
+        assert_eq!(role_kind_for(BarIndicatorId::Kcomp), RoleKind::StatisticalScoring);
+    }
+
+    #[test]
+    fn kregime_is_regime_filter() {
+        assert_eq!(role_kind_for(BarIndicatorId::Kregime), RoleKind::RegimeFilter);
+    }
+
+    #[test]
+    fn kscr_is_statistical_scoring() {
+        assert_eq!(role_kind_for(BarIndicatorId::Kscr), RoleKind::StatisticalScoring);
     }
 }
