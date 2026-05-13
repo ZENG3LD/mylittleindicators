@@ -30,11 +30,6 @@ pub struct IndicatorValidationResult {
     pub extractor_errors: Vec<String>,
 }
 
-impl IndicatorValidationResult {
-    pub fn is_fully_valid(&self) -> bool {
-        self.has_rendering && self.creates_ok && self.value_ok && self.extractor_errors.is_empty()
-    }
-}
 
 /// Validate a single indicator
 pub fn validate_indicator(id: BarIndicatorId) -> IndicatorValidationResult {
