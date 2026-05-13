@@ -323,32 +323,16 @@ use crate::bar_indicators::clusters::{
 use crate::bar_indicators::entropy::cross_mutual_information_lags::CrossMutualInformationLags;
 // Patterns/ML-style
 use crate::bar_indicators::candles::candle_anatomy::CandleAnatomy;
-use crate::bar_indicators::candles::pattern_recognition::AdvancedPatternRecognition;
 use crate::bar_indicators::momentum::neural_momentum_network::NeuralMomentumNetwork;
 use crate::bar_indicators::volatility::adaptive_volatility_regime::AdaptiveVolatilityRegime;
 // Price action / structure helpers
-use crate::bar_indicators::candles::wick_spike::WickSpike;
 use crate::bar_indicators::levels::liquidity_gap_density::LiquidityGapDensity;
 use crate::bar_indicators::levels::swing_strength_score::SwingStrengthScore;
 use crate::bar_indicators::momentum::swing_age::SwingAge;
 use crate::bar_indicators::volatility::range_compression_burst::RangeCompressionBurst;
-// Candlestick patterns (Batch 1)
-use crate::bar_indicators::candles::patterns::{
-    doji::Doji,
-    engulfing::Engulfing,
-    hammer::Hammer,
-    harami::Harami,
-    marubozu::Marubozu,
-    morning_star::MorningStar,
-    piercing_pattern::PiercingPattern,
-    shooting_star::ShootingStar,
-    three_white_soldiers::ThreeWhiteSoldiers,
-    tweezer::Tweezer,
-    dark_cloud_cover::DarkCloudCover,
-    evening_star::EveningStar,
-    three_black_crows::ThreeBlackCrows,
-};
 use crate::bar_indicators::candles::heikin_ashi::HeikinAshi;
+// Statistical wick detector (replaces WickSpike)
+use crate::events::StatisticalWickDetector;
 // Average indicators (Batch 1) - Already imported above in the main average block
 // REMOVED: OhlcvAverage imports - replaced by MovingAverageWithField
 // use crate::bar_indicators::average::ohlcv_average::{...};
@@ -372,7 +356,6 @@ use crate::bar_indicators::momentum::aroon::Aroon;
 use crate::bar_indicators::momentum::aroon_down::AroonDown;
 use crate::bar_indicators::momentum::aroon_oscillator::AroonOscillator;
 use crate::bar_indicators::momentum::aroon_up::AroonUp;
-use crate::bar_indicators::momentum::candle_patterns::CandlePatterns;
 use crate::bar_indicators::momentum::highest::Highest;
 use crate::bar_indicators::momentum::lowest::Lowest;
 use crate::bar_indicators::momentum::pressure::Pressure;
@@ -1135,7 +1118,6 @@ pub enum IndicatorInstance {
     Hampel(Box<HampelFilter>),
 
     // Patterns/ML-style
-    AdvancedPatternRecognition(Box<AdvancedPatternRecognition>),
     AdaptiveVolatilityRegime(Box<AdaptiveVolatilityRegime>),
     NeuralMomentumNetwork(Box<NeuralMomentumNetwork>),
     CandleAnatomy(Box<CandleAnatomy>),
@@ -1143,7 +1125,7 @@ pub enum IndicatorInstance {
     // Price action / structure helpers
     SwingStrengthScore(Box<SwingStrengthScore>),
     Liqgap(Box<LiquidityGapDensity>),
-    WickSpike(Box<WickSpike>),
+    StatisticalWickDetector(Box<StatisticalWickDetector>),
     SwingAge(Box<SwingAge>),
 
     // Regime/time effects and structures
@@ -1175,8 +1157,6 @@ pub enum IndicatorInstance {
     Highest(Box<Highest>),
     Lowest(Box<Lowest>),
     Pressure(Box<Pressure>),
-    CandlePatterns(Box<CandlePatterns>),
-
     // Accumulation
     TwiggsMoneyFlow(Box<Tmf>),
 
@@ -1274,21 +1254,8 @@ pub enum IndicatorInstance {
     // Already present: Abb (AdaptiveBollingerBands), Cv (ChaikinVolatility), Ui (UlcerIndex)
     Dvr(Box<DynamicVolatilityRegime>),
 
-    // CANDLES (14 patterns) - Batch 1
-    Doji(Box<Doji>),
-    Engulfing(Box<Engulfing>),
-    Hammer(Box<Hammer>),
-    Harami(Box<Harami>),
+    // CANDLES
     Heikinashi(Box<HeikinAshi>),
-    Marubozu(Box<Marubozu>),
-    Morningstar(Box<MorningStar>),
-    Piercingpattern(Box<PiercingPattern>),
-    Shootingstar(Box<ShootingStar>),
-    Threewhitesoldiers(Box<ThreeWhiteSoldiers>),
-    Tweezer(Box<Tweezer>),
-    Darkcloudcover(Box<DarkCloudCover>),
-    Eveningstar(Box<EveningStar>),
-    Threeblackcrows(Box<ThreeBlackCrows>),
 
     // ACCUMULATION (1) - Batch 1
     Di(Box<DemandIndex>),
@@ -3025,7 +2992,6 @@ impl IndicatorInstance {
             }
 
             // Patterns/ML-style
-            BarIndicatorId::Patternrec => Ok(Self::AdvancedPatternRecognition(Box::default())),
             BarIndicatorId::Avr => Ok(Self::AdaptiveVolatilityRegime(Box::new(AdaptiveVolatilityRegime::new()))),
             BarIndicatorId::NeuralMom => Ok(Self::NeuralMomentumNetwork(Box::new(NeuralMomentumNetwork::new()))),
             BarIndicatorId::Candleanatomy => {
@@ -3046,7 +3012,7 @@ impl IndicatorInstance {
             }
             BarIndicatorId::Wickspike => {
                 let win = config.periods.first().copied().unwrap_or(50);
-                Ok(Self::WickSpike(Box::new(WickSpike::new(win))))
+                Ok(Self::StatisticalWickDetector(Box::new(StatisticalWickDetector::new(win))))
             }
             BarIndicatorId::SwingAge => {
                 let look = config.periods.first().copied().unwrap_or(20);
@@ -3140,11 +3106,6 @@ impl IndicatorInstance {
                 let ma_type = config.ma_types.get("ma_type").copied().unwrap_or(MovingAverageType::SMA);
                 Ok(Self::Pressure(Box::new(Pressure::new(p, ma_type))))
             }
-            BarIndicatorId::CandlePatterns => {
-                let min_pct = config.additional_params.get("min_candle_size_pct").copied().unwrap_or(0.5);
-                Ok(Self::CandlePatterns(Box::new(CandlePatterns::new(min_pct))))
-            }
-
             // Accumulation
             BarIndicatorId::Tmf => {
                 let p = config.periods.first().copied().unwrap_or(21);
@@ -3629,61 +3590,12 @@ impl IndicatorInstance {
                 Ok(Self::EfficiencyRatio(Box::new(EfficiencyRatio::new(period))))
             }
 
-            // CANDLES (11 patterns) - Batch 1
-            BarIndicatorId::Doji => {
-                let body_ratio_max = config.additional_params.get("body_ratio_max").copied().unwrap_or(0.1);
-                Ok(Self::Doji(Box::new(Doji::new(body_ratio_max))))
-            }
-            BarIndicatorId::Engulfing => {
-                let min_size_ratio = config.additional_params.get("min_size_ratio").copied().unwrap_or(1.2);
-                Ok(Self::Engulfing(Box::new(Engulfing::new(min_size_ratio))))
-            }
-            BarIndicatorId::Hammer => {
-                let shadow_ratio_min = config.additional_params.get("shadow_ratio_min").copied().unwrap_or(2.0);
-                let opposite_shadow_max = config.additional_params.get("opposite_shadow_max").copied().unwrap_or(0.1);
-                Ok(Self::Hammer(Box::new(Hammer::new(shadow_ratio_min, opposite_shadow_max))))
-            }
-            BarIndicatorId::Harami => {
-                let min_first_body_ratio = config.additional_params.get("min_first_body_ratio").copied().unwrap_or(0.6);
-                Ok(Self::Harami(Box::new(Harami::new(min_first_body_ratio))))
-            }
+            // CANDLES
             BarIndicatorId::Heikinashi => {
                 Ok(Self::Heikinashi(Box::new(HeikinAshi::new())))
             }
-            BarIndicatorId::Marubozu => {
-                let body_ratio_min = config.additional_params.get("body_ratio_min").copied().unwrap_or(0.9);
-                Ok(Self::Marubozu(Box::new(Marubozu::new(body_ratio_min))))
-            }
-            BarIndicatorId::Morningstar => {
-                let max_star_ratio = config.additional_params.get("max_star_ratio").copied().unwrap_or(0.3);
-                Ok(Self::Morningstar(Box::new(MorningStar::new(max_star_ratio))))
-            }
-            BarIndicatorId::Piercingpattern => {
-                let min_penetration = config.additional_params.get("min_penetration").copied().unwrap_or(0.5);
-                Ok(Self::Piercingpattern(Box::new(PiercingPattern::new(min_penetration))))
-            }
-            BarIndicatorId::Shootingstar => {
-                let shadow_ratio_min = config.additional_params.get("shadow_ratio_min").copied().unwrap_or(2.0);
-                let opposite_shadow_max = config.additional_params.get("opposite_shadow_max").copied().unwrap_or(0.1);
-                Ok(Self::Shootingstar(Box::new(ShootingStar::new(shadow_ratio_min, opposite_shadow_max))))
-            }
-            BarIndicatorId::Threewhitesoldiers => {
-                let min_body_ratio = config.additional_params.get("min_body_ratio").copied().unwrap_or(0.6);
-                Ok(Self::Threewhitesoldiers(Box::new(ThreeWhiteSoldiers::new(min_body_ratio))))
-            }
-            BarIndicatorId::Tweezer => {
-                let max_diff_ratio = config.additional_params.get("max_diff_ratio").copied().unwrap_or(0.01);
-                Ok(Self::Tweezer(Box::new(Tweezer::new(max_diff_ratio))))
-            }
-            BarIndicatorId::Darkcloudcover => {
-                Ok(Self::Darkcloudcover(Box::default()))
-            }
-            BarIndicatorId::Eveningstar => {
-                Ok(Self::Eveningstar(Box::default()))
-            }
-            BarIndicatorId::Threeblackcrows => {
-                Ok(Self::Threeblackcrows(Box::default()))
-            }
+
+            // (legacy individual patterns removed — use events::CandlePatternDetector)
 
             // ACCUMULATION (1) - Batch 1
 
@@ -4202,10 +4114,6 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::AdvancedPatternRecognition(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
             Self::Alligator(x) => {
                 x.update_bar(open, high, low, close, volume)
             }
@@ -4353,18 +4261,6 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::CandlePatterns(x) => {
-                let pattern = x.update_bar(open, high, low, close, volume);
-                // Convert CandlePattern to numeric: 0=None, 1=BullishEngulfing, -1=BearishEngulfing, 2=Hammer, -2=ShootingStar
-                let v = match pattern {
-                    crate::bar_indicators::momentum::candle_patterns::CandlePattern::None => 0.0,
-                    crate::bar_indicators::momentum::candle_patterns::CandlePattern::BullishEngulfing => 1.0,
-                    crate::bar_indicators::momentum::candle_patterns::CandlePattern::BearishEngulfing => -1.0,
-                    crate::bar_indicators::momentum::candle_patterns::CandlePattern::Hammer => 2.0,
-                    crate::bar_indicators::momentum::candle_patterns::CandlePattern::ShootingStar => -2.0,
-                };
-                IndicatorValue::Single(v)
-            }
             Self::Cci(x) => {
                 x.update_bar(high, low, close, volume);
                 x.value()
@@ -4444,10 +4340,6 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::Darkcloudcover(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
             Self::DarvasBox(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -4505,10 +4397,6 @@ impl IndicatorInstance {
                 x.value()
             }
             Self::Dm(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::Doji(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -4592,10 +4480,6 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::Engulfing(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
             Self::EngleGrangerProxy(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -4617,10 +4501,6 @@ impl IndicatorInstance {
                 x.value()
             }
             Self::Ess(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::Eveningstar(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -4667,15 +4547,7 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::Hammer(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
             Self::Hampel(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::Harami(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -4901,10 +4773,6 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::Marubozu(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
             Self::MassIndex(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -4930,10 +4798,6 @@ impl IndicatorInstance {
                 x.value()
             }
             Self::MomentumZscore(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::Morningstar(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -5014,10 +4878,6 @@ impl IndicatorInstance {
                 x.value()
             }
             Self::Pfe(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::Piercingpattern(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -5277,10 +5137,6 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::Shootingstar(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
             Self::SignCombiner(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -5429,14 +5285,6 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::Threeblackcrows(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::Threewhitesoldiers(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
             Self::Thresh(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -5478,10 +5326,6 @@ impl IndicatorInstance {
                 x.value()
             }
             Self::TrueStrengthIndex(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::Tweezer(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -5639,7 +5483,7 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::WickSpike(x) => {
+            Self::StatisticalWickDetector(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -6061,7 +5905,6 @@ impl IndicatorInstance {
             Self::CoppockCurve(ind) => ind.value(),
             Self::CusumFilter(ind) => ind.value(),
             Self::Cyber(ind) => ind.value(),
-            Self::Darkcloudcover(ind) => ind.value(),
             Self::DarvasBox(ind) => ind.value(),
             Self::Dc(ind) => ind.value(),
             Self::Dcwidth(ind) => ind.value(),
@@ -6076,7 +5919,6 @@ impl IndicatorInstance {
             Self::DiPlusMinus(ind) => ind.value(),
             Self::Didi(ind) => ind.value(),
             Self::Dm(ind) => ind.value(),
-            Self::Doji(ind) => ind.value(),
             Self::DonchianBreakout(ind) => ind.value(),
             Self::DonchianChannel(ind) => ind.value(),
             Self::DonchianPosition(ind) => ind.value(),
@@ -6096,12 +5938,10 @@ impl IndicatorInstance {
             Self::ElderRay(ind) => ind.value(),
             Self::Ema(ind) => ind.value(),
             Self::EmaSlope(ind) => ind.value(),
-            Self::Engulfing(ind) => ind.value(),
             Self::Envbw(ind) => ind.value(),
             Self::EnvelopeChannels(ind) => ind.value(),
             Self::Esine(ind) => ind.value(),
             Self::Ess(ind) => ind.value(),
-            Self::Eveningstar(ind) => ind.value(),
             Self::Ewmac(ind) => ind.value(),
             Self::FisherTransform(ind) => ind.value(),
             Self::ForceIndex(ind) => ind.value(),
@@ -6111,9 +5951,7 @@ impl IndicatorInstance {
             Self::Gapo(ind) => ind.value(),
             Self::Gator(ind) => ind.value(),
             Self::GmmaCompression(ind) => ind.value(),
-            Self::Hammer(ind) => ind.value(),
             Self::Hampel(ind) => ind.value(),
-            Self::Harami(ind) => ind.value(),
             Self::HarRv(ind) => ind.value(),
             Self::HaTrend(ind) => ind.value(),
             Self::Heikinashi(ind) => ind.value(),
@@ -6162,7 +6000,6 @@ impl IndicatorInstance {
             Self::PriceLineCross(ind) => ind.value(),
             Self::MarketFacilitationIndex(ind) => ind.value(),
             Self::MarketRegimeFilter(ind) => ind.value(),
-            Self::Marubozu(ind) => ind.value(),
             Self::MassIndex(ind) => ind.value(),
             Self::McGinley(ind) => ind.value(),
             Self::Medchan(ind) => ind.value(),
@@ -6170,7 +6007,6 @@ impl IndicatorInstance {
             Self::MesaAdaptiveMA(ind) => ind.value(),
             Self::Mfi(ind) => ind.value(),
             Self::MomentumZscore(ind) => ind.value(),
-            Self::Morningstar(ind) => ind.value(),
             Self::MovingAverage(ind) => ind.value(),
             Self::MultiTimeframeMomentumDivergence(ind) => ind.value(),
             Self::MutualInformation(ind) => ind.value(),
@@ -6189,7 +6025,6 @@ impl IndicatorInstance {
             Self::Percentilech(ind) => ind.value(),
             Self::PermutationEntropy(ind) => ind.value(),
             Self::Pfe(ind) => ind.value(),
-            Self::Piercingpattern(ind) => ind.value(),
             Self::PivotAnchoredVwap(ind) => ind.value(),
             Self::Pivotchan(ind) => ind.value(),
             Self::Pmo(ind) => ind.value(),
@@ -6253,7 +6088,6 @@ impl IndicatorInstance {
             Self::Sg(ind) => ind.value(),
             Self::StftBandEnergyRatio(ind) => ind.value(),
             Self::ShannonEntropy(ind) => ind.value(),
-            Self::Shootingstar(ind) => ind.value(),
             Self::SignCombiner(ind) => ind.value(),
             Self::Slmpr(ind) => ind.value(),
             Self::SlopeDirectionLine(ind) => ind.value(),
@@ -6291,8 +6125,6 @@ impl IndicatorInstance {
             Self::T3(ind) => ind.value(),
             Self::Tema(ind) => ind.value(),
             Self::TheilSenChannels(ind) => ind.value(),
-            Self::Threeblackcrows(ind) => ind.value(),
-            Self::Threewhitesoldiers(ind) => ind.value(),
             Self::Thresh(ind) => ind.value(),
             Self::Tii(ind) => ind.value(),
             Self::Tma(ind) => ind.value(),
@@ -6304,7 +6136,6 @@ impl IndicatorInstance {
             Self::Trix(ind) => ind.value(),
             Self::TrueRange(ind) => ind.value(),
             Self::TrueStrengthIndex(ind) => ind.value(),
-            Self::Tweezer(ind) => ind.value(),
             Self::TwiggsMoneyFlow(ind) => ind.value(),
             Self::UlcerIndex(ind) => ind.value(),
             Self::UltimateOscillator(ind) => ind.value(),
@@ -6367,7 +6198,6 @@ impl IndicatorInstance {
             // MISSING VALUE() HANDLERS - BATCH FIX
             // ========================================
             Self::AdaptiveVolatilityRegime(ind) => ind.value(),
-            Self::AdvancedPatternRecognition(ind) => ind.value(),
             Self::ArchLmProxy(ind) => ind.value(),
             Self::ArchLmPval(ind) => ind.value(),
             Self::Arima(ind) => ind.value(),
@@ -6379,17 +6209,6 @@ impl IndicatorInstance {
             Self::BosChochDetector(ind) => ind.value(),
             Self::BpCusum(ind) => ind.value(),
             Self::CamarillaPivots(ind) => ind.value(),
-            Self::CandlePatterns(ind) => {
-                let pattern = ind.value();
-                let v = match pattern {
-                    crate::bar_indicators::momentum::candle_patterns::CandlePattern::None => 0.0,
-                    crate::bar_indicators::momentum::candle_patterns::CandlePattern::BullishEngulfing => 1.0,
-                    crate::bar_indicators::momentum::candle_patterns::CandlePattern::BearishEngulfing => -1.0,
-                    crate::bar_indicators::momentum::candle_patterns::CandlePattern::Hammer => 2.0,
-                    crate::bar_indicators::momentum::candle_patterns::CandlePattern::ShootingStar => -2.0,
-                };
-                IndicatorValue::Single(v)
-            }
             Self::ChaosOscillator(ind) => ind.value(),
             Self::Dcmetrics(ind) => ind.value(),
             Self::Dfa(ind) => ind.value(),
@@ -6458,7 +6277,7 @@ impl IndicatorInstance {
             Self::Wave(ind) => ind.value(),
             Self::Wcomp(ind) => ind.value(),
             Self::Weekday(ind) => ind.value(),
-            Self::WickSpike(ind) => ind.value(),
+            Self::StatisticalWickDetector(ind) => ind.value(),
             Self::WoodiePivots(ind) => ind.value(),
             Self::Xmil(ind) => ind.value(),
         }
@@ -6478,7 +6297,6 @@ impl IndicatorInstance {
             Self::AdaptiveVolatilityRegime(ind) => ind.is_ready(),
             Self::AdfKpss(ind) => ind.is_ready(),
             Self::AdfProxy(ind) => ind.is_ready(),
-            Self::AdvancedPatternRecognition(ind) => ind.is_ready(),
             Self::Adx(ind) => ind.is_ready(),
             Self::DiPlusMinus(ind) => ind.is_ready(),
             Self::AdxSlope(ind) => ind.is_ready(),
@@ -6526,7 +6344,6 @@ impl IndicatorInstance {
             Self::ButterworthFilter(ind) => ind.is_ready(),
             Self::CamarillaPivots(ind) => ind.is_ready(),
             Self::CandleAnatomy(ind) => ind.is_ready(),
-            Self::CandlePatterns(ind) => ind.is_ready(),
             Self::Cci(ind) => ind.is_ready(),
             Self::CentralPivotRange(ind) => ind.is_ready(),
             Self::Cfo(ind) => ind.is_ready(),
@@ -6548,7 +6365,6 @@ impl IndicatorInstance {
             Self::CoppockCurve(ind) => ind.is_ready(),
             Self::CusumFilter(ind) => ind.is_ready(),
             Self::Cyber(ind) => ind.is_ready(),
-            Self::Darkcloudcover(ind) => ind.is_ready(),
             Self::DarvasBox(ind) => ind.is_ready(),
             Self::DayWeekMonth(ind) => ind.is_ready(),
             Self::Dc(ind) => ind.is_ready(),
@@ -6567,7 +6383,6 @@ impl IndicatorInstance {
             Self::Didi(ind) => ind.is_ready(),
             Self::DistLevels(ind) => ind.is_ready(),
             Self::Dm(ind) => ind.is_ready(),
-            Self::Doji(ind) => ind.is_ready(),
             Self::DomWoq(ind) => ind.is_ready(),
             Self::DonchianBreakout(ind) => ind.is_ready(),
             Self::DonchianChannel(ind) => ind.is_ready(),
@@ -6594,12 +6409,10 @@ impl IndicatorInstance {
             Self::EngleGrangerAdfProxy(ind) => ind.is_ready(),
             Self::EngleGrangerProxy(ind) => ind.is_ready(),
             Self::EngleGrangerTrendProxy(ind) => ind.is_ready(),
-            Self::Engulfing(ind) => ind.is_ready(),
             Self::Envbw(ind) => ind.is_ready(),
             Self::EnvelopeChannels(ind) => ind.is_ready(),
             Self::Esine(ind) => ind.is_ready(),
             Self::Ess(ind) => ind.is_ready(),
-            Self::Eveningstar(ind) => ind.is_ready(),
             Self::Ewmac(ind) => ind.is_ready(),
             Self::EwmacRobust(ind) => ind.is_ready(),
             Self::ExtendedKalmanFilter(ind) => ind.is_ready(),
@@ -6623,9 +6436,7 @@ impl IndicatorInstance {
             Self::Gator(ind) => ind.is_ready(),
             Self::GmmaCompression(ind) => ind.is_ready(),
             Self::HalfLifeMr(ind) => ind.is_ready(),
-            Self::Hammer(ind) => ind.is_ready(),
             Self::Hampel(ind) => ind.is_ready(),
-            Self::Harami(ind) => ind.is_ready(),
             Self::HarRv(ind) => ind.is_ready(),
             Self::HaTrend(ind) => ind.is_ready(),
             Self::Heikinashi(ind) => ind.is_ready(),
@@ -6690,7 +6501,6 @@ impl IndicatorInstance {
             Self::MarketFacilitationIndex(ind) => ind.is_ready(),
             Self::MarketMicro(ind) => ind.is_ready(),
             Self::MarketRegimeFilter(ind) => ind.is_ready(),
-            Self::Marubozu(ind) => ind.is_ready(),
             Self::MassIndex(ind) => ind.is_ready(),
             Self::McGinley(ind) => ind.is_ready(),
             Self::Medchan(ind) => ind.is_ready(),
@@ -6700,7 +6510,6 @@ impl IndicatorInstance {
             Self::MomentumZscore(ind) => ind.is_ready(),
             Self::MonthQtr(ind) => ind.is_ready(),
             Self::MonthTurn(ind) => ind.is_ready(),
-            Self::Morningstar(ind) => ind.is_ready(),
             Self::MovingAverage(ind) => ind.is_ready(),
             Self::MultiTimeframeMomentumDivergence(ind) => ind.is_ready(),
             Self::MutualInformation(ind) => ind.is_ready(),
@@ -6723,7 +6532,6 @@ impl IndicatorInstance {
             Self::Percentilech(ind) => ind.is_ready(),
             Self::PermutationEntropy(ind) => ind.is_ready(),
             Self::Pfe(ind) => ind.is_ready(),
-            Self::Piercingpattern(ind) => ind.is_ready(),
             Self::PivotAnchoredVwap(ind) => ind.is_ready(),
             Self::Pivotchan(ind) => ind.is_ready(),
             Self::PivotPoints(ind) => ind.is_ready(),
@@ -6797,7 +6605,6 @@ impl IndicatorInstance {
             Self::Sg(ind) => ind.is_ready(),
             Self::StftBandEnergyRatio(ind) => ind.is_ready(),
             Self::ShannonEntropy(ind) => ind.is_ready(),
-            Self::Shootingstar(ind) => ind.is_ready(),
             Self::SignCombiner(ind) => ind.is_ready(),
             Self::Slmpr(ind) => ind.is_ready(),
             Self::SlopeDirectionLine(ind) => ind.is_ready(),
@@ -6843,8 +6650,6 @@ impl IndicatorInstance {
             Self::Tema(ind) => ind.is_ready(),
             Self::Tenc(ind) => ind.is_ready(),
             Self::TheilSenChannels(ind) => ind.is_ready(),
-            Self::Threeblackcrows(ind) => ind.is_ready(),
-            Self::Threewhitesoldiers(ind) => ind.is_ready(),
             Self::Thresh(ind) => ind.is_ready(),
             Self::TickVolume(ind) => ind.is_ready(),
             Self::Tii(ind) => ind.is_ready(),
@@ -6857,7 +6662,6 @@ impl IndicatorInstance {
             Self::Trix(ind) => ind.is_ready(),
             Self::TrueRange(ind) => ind.is_ready(),
             Self::TrueStrengthIndex(ind) => ind.is_ready(),
-            Self::Tweezer(ind) => ind.is_ready(),
             Self::TwiggsMoneyFlow(ind) => ind.is_ready(),
             Self::UlcerIndex(ind) => ind.is_ready(),
             Self::UltimateOscillator(ind) => ind.is_ready(),
@@ -6901,7 +6705,7 @@ impl IndicatorInstance {
             Self::Weekday(ind) => ind.is_ready(),
             Self::WeekMonth(ind) => ind.is_ready(),
             Self::WeightedComposite(ind) => ind.is_ready(),
-            Self::WickSpike(ind) => ind.is_ready(),
+            Self::StatisticalWickDetector(ind) => ind.is_ready(),
             Self::WilliamsAd(ind) => ind.is_ready(),
             Self::WilliamsR(ind) => ind.is_ready(),
             Self::Wma(ind) => ind.is_ready(),
@@ -6928,7 +6732,6 @@ impl IndicatorInstance {
             Self::AdaptiveVolatilityRegime(ind) => ind.reset(),
             Self::AdfKpss(ind) => ind.reset(),
             Self::AdfProxy(ind) => ind.reset(),
-            Self::AdvancedPatternRecognition(ind) => ind.reset(),
             Self::Adx(ind) => ind.reset(),
             Self::DiPlusMinus(ind) => ind.reset(),
             Self::AdxSlope(ind) => ind.reset(),
@@ -6976,7 +6779,6 @@ impl IndicatorInstance {
             Self::ButterworthFilter(ind) => ind.reset(),
             Self::CamarillaPivots(ind) => ind.reset(),
             Self::CandleAnatomy(ind) => ind.reset(),
-            Self::CandlePatterns(ind) => ind.reset(),
             Self::Cci(ind) => ind.reset(),
             Self::CentralPivotRange(ind) => ind.reset(),
             Self::Cfo(ind) => ind.reset(),
@@ -6998,7 +6800,6 @@ impl IndicatorInstance {
             Self::CoppockCurve(ind) => ind.reset(),
             Self::CusumFilter(ind) => ind.reset(),
             Self::Cyber(ind) => ind.reset(),
-            Self::Darkcloudcover(ind) => ind.reset(),
             Self::DarvasBox(ind) => ind.reset(),
             Self::DayWeekMonth(ind) => ind.reset(),
             Self::Dc(ind) => ind.reset(),
@@ -7017,7 +6818,6 @@ impl IndicatorInstance {
             Self::Didi(ind) => ind.reset(),
             Self::DistLevels(ind) => ind.reset(),
             Self::Dm(ind) => ind.reset(),
-            Self::Doji(ind) => ind.reset(),
             Self::DomWoq(ind) => ind.reset(),
             Self::DonchianBreakout(ind) => ind.reset(),
             Self::DonchianChannel(ind) => ind.reset(),
@@ -7044,12 +6844,10 @@ impl IndicatorInstance {
             Self::EngleGrangerAdfProxy(ind) => ind.reset(),
             Self::EngleGrangerProxy(ind) => ind.reset(),
             Self::EngleGrangerTrendProxy(ind) => ind.reset(),
-            Self::Engulfing(ind) => ind.reset(),
             Self::Envbw(ind) => ind.reset(),
             Self::EnvelopeChannels(ind) => ind.reset(),
             Self::Esine(ind) => ind.reset(),
             Self::Ess(ind) => ind.reset(),
-            Self::Eveningstar(ind) => ind.reset(),
             Self::Ewmac(ind) => ind.reset(),
             Self::EwmacRobust(ind) => ind.reset(),
             Self::ExtendedKalmanFilter(ind) => ind.reset(),
@@ -7073,9 +6871,7 @@ impl IndicatorInstance {
             Self::Gator(ind) => ind.reset(),
             Self::GmmaCompression(ind) => ind.reset(),
             Self::HalfLifeMr(ind) => ind.reset(),
-            Self::Hammer(ind) => ind.reset(),
             Self::Hampel(ind) => ind.reset(),
-            Self::Harami(ind) => ind.reset(),
             Self::HarRv(ind) => ind.reset(),
             Self::HaTrend(ind) => ind.reset(),
             Self::Heikinashi(ind) => ind.reset(),
@@ -7140,7 +6936,6 @@ impl IndicatorInstance {
             Self::MarketFacilitationIndex(ind) => ind.reset(),
             Self::MarketMicro(ind) => ind.reset(),
             Self::MarketRegimeFilter(ind) => ind.reset(),
-            Self::Marubozu(ind) => ind.reset(),
             Self::MassIndex(ind) => ind.reset(),
             Self::McGinley(ind) => ind.reset(),
             Self::Medchan(ind) => ind.reset(),
@@ -7150,7 +6945,6 @@ impl IndicatorInstance {
             Self::MomentumZscore(ind) => ind.reset(),
             Self::MonthQtr(ind) => ind.reset(),
             Self::MonthTurn(ind) => ind.reset(),
-            Self::Morningstar(ind) => ind.reset(),
             Self::MovingAverage(ind) => ind.reset(),
             Self::MultiTimeframeMomentumDivergence(ind) => ind.reset(),
             Self::MutualInformation(ind) => ind.reset(),
@@ -7173,7 +6967,6 @@ impl IndicatorInstance {
             Self::Percentilech(ind) => ind.reset(),
             Self::PermutationEntropy(ind) => ind.reset(),
             Self::Pfe(ind) => ind.reset(),
-            Self::Piercingpattern(ind) => ind.reset(),
             Self::PivotAnchoredVwap(ind) => ind.reset(),
             Self::Pivotchan(ind) => ind.reset(),
             Self::PivotPoints(ind) => ind.reset(),
@@ -7247,7 +7040,6 @@ impl IndicatorInstance {
             Self::Sg(ind) => ind.reset(),
             Self::StftBandEnergyRatio(ind) => ind.reset(),
             Self::ShannonEntropy(ind) => ind.reset(),
-            Self::Shootingstar(ind) => ind.reset(),
             Self::SignCombiner(ind) => ind.reset(),
             Self::Slmpr(ind) => ind.reset(),
             Self::SlopeDirectionLine(ind) => ind.reset(),
@@ -7293,8 +7085,6 @@ impl IndicatorInstance {
             Self::Tema(ind) => ind.reset(),
             Self::Tenc(ind) => ind.reset(),
             Self::TheilSenChannels(ind) => ind.reset(),
-            Self::Threeblackcrows(ind) => ind.reset(),
-            Self::Threewhitesoldiers(ind) => ind.reset(),
             Self::Thresh(ind) => ind.reset(),
             Self::TickVolume(ind) => ind.reset(),
             Self::Tii(ind) => ind.reset(),
@@ -7307,7 +7097,6 @@ impl IndicatorInstance {
             Self::Trix(ind) => ind.reset(),
             Self::TrueRange(ind) => ind.reset(),
             Self::TrueStrengthIndex(ind) => ind.reset(),
-            Self::Tweezer(ind) => ind.reset(),
             Self::TwiggsMoneyFlow(ind) => ind.reset(),
             Self::UlcerIndex(ind) => ind.reset(),
             Self::UltimateOscillator(ind) => ind.reset(),
@@ -7351,7 +7140,7 @@ impl IndicatorInstance {
             Self::Weekday(ind) => ind.reset(),
             Self::WeekMonth(ind) => ind.reset(),
             Self::WeightedComposite(ind) => ind.reset(),
-            Self::WickSpike(ind) => ind.reset(),
+            Self::StatisticalWickDetector(ind) => ind.reset(),
             Self::WilliamsAd(ind) => ind.reset(),
             Self::WilliamsR(ind) => ind.reset(),
             Self::Wma(ind) => ind.reset(),

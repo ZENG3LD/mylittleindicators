@@ -287,23 +287,8 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
 
         // ── Pattern Detectors ─────────────────────────────────────────────────
         BarIndicatorId::Candleanatomy
-        | BarIndicatorId::Darkcloudcover
-        | BarIndicatorId::Doji
-        | BarIndicatorId::Engulfing
-        | BarIndicatorId::Eveningstar
-        | BarIndicatorId::Hammer
-        | BarIndicatorId::Harami
         | BarIndicatorId::Heikinashi
-        | BarIndicatorId::Marubozu
-        | BarIndicatorId::Morningstar
-        | BarIndicatorId::Patternrec
-        | BarIndicatorId::Piercingpattern
-        | BarIndicatorId::Shootingstar
-        | BarIndicatorId::Threeblackcrows
-        | BarIndicatorId::Threewhitesoldiers
-        | BarIndicatorId::Tweezer
-        | BarIndicatorId::Wickspike
-        | BarIndicatorId::CandlePatterns => RoleKind::PatternDetector,
+        | BarIndicatorId::Wickspike => RoleKind::PatternDetector,
 
         // ── Regime Filters ────────────────────────────────────────────────────
         BarIndicatorId::Mrf
@@ -354,8 +339,8 @@ mod tests {
     }
 
     #[test]
-    fn doji_is_pattern_detector() {
-        assert_eq!(role_kind_for(BarIndicatorId::Doji), RoleKind::PatternDetector);
+    fn wickspike_is_pattern_detector() {
+        assert_eq!(role_kind_for(BarIndicatorId::Wickspike), RoleKind::PatternDetector);
     }
 
     #[test]

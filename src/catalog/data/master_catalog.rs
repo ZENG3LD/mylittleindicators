@@ -363,7 +363,7 @@ mod tests {
     #[test]
     fn test_master_catalog_creation() {
         let master = MasterIndicatorCatalog::new();
-        assert!(master.total_count() > 450, "Should have 450+ indicators");
+        assert!(master.total_count() > 430, "Should have 430+ indicators");
     }
 
     #[test]
@@ -441,7 +441,7 @@ mod tests {
         let stats = master.stats();
 
         assert_eq!(stats.total_categories, 22);
-        assert!(stats.total_indicators > 450);
+        assert!(stats.total_indicators > 430);
         assert_eq!(stats.category_counts.len(), 22);
     }
 
@@ -450,7 +450,7 @@ mod tests {
         // Access global catalog
         let master = catalog();
 
-        assert!(master.total_count() > 450);
+        assert!(master.total_count() > 430);
         assert!(master.contains("SMA"));
         assert!(master.contains("RSI"));
     }

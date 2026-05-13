@@ -287,24 +287,6 @@ pub fn signature_bop() -> IndicatorSignature {
         .build()
 }
 
-/// Candle Patterns - паттерны свечей
-pub fn signature_candle_patterns() -> IndicatorSignature {
-    IndicatorSignature::builder("CANDLE_PATTERNS", CATEGORY)
-        .name("Candle Patterns")
-        .description("Candlestick pattern recognition")
-        .add_constraint(ParamConstraint::period(2, 50, 3))
-        .machine_id(BarIndicatorId::CandlePatterns)
-        .role_kind(IndicatorRoleKind::Pattern)
-        .output_kind(IndicatorValueKind::Signal)
-        // Note: "CANDLE_PATTERNS" is already the main ID, no need for alias
-        .alias("CandlePatterns")
-        .alias("candle_patterns")
-        .alias("CANDLEPATTERNS")
-        .alias("candlepatterns")
-        .alias("Candle_Patterns")
-        .build()
-}
-
 /// Commodity Channel Index
 pub fn signature_cci() -> IndicatorSignature {
     IndicatorSignature::builder("CCI", CATEGORY)
@@ -2263,7 +2245,6 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("BB_PERIOD", signature_bb_period as fn() -> IndicatorSignature),
     ("BIAS", signature_bias as fn() -> IndicatorSignature),
     ("BOP", signature_bop as fn() -> IndicatorSignature),
-    ("CANDLE_PATTERNS", signature_candle_patterns as fn() -> IndicatorSignature),
     ("CCI", signature_cci as fn() -> IndicatorSignature),
     ("COG", signature_center_of_gravity as fn() -> IndicatorSignature),
     ("CFO", signature_cfo as fn() -> IndicatorSignature),
@@ -2423,7 +2404,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 90); // MaCross removed (superseded by events::LineCross)
+        assert_eq!(count(), 89); // CandlePatterns removed (superseded by events::CandlePatternDetector)
     }
 
     #[test]

@@ -796,15 +796,6 @@ fn register_momentum_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingM
             .build()
     );
 
-    // Candle Patterns
-    catalog.insert(BarIndicatorId::CandlePatterns,
-        RenderingMetadata::builder("CANDLE_PATTERNS")
-            .sub_pane()
-            .line_output("pattern", "Pattern", COLOR_PURPLE)
-            .precision(0)
-            .build()
-    );
-
     // CFO - Chande Forecast Oscillator
     catalog.insert(BarIndicatorId::Cfo,
         RenderingMetadata::builder("CFO")
@@ -3987,28 +3978,6 @@ fn register_book_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMetad
 // ============================================================================
 
 fn register_candle_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMetadata>) {
-    // Heikin Ashi (overlay as candles)
-
-    // Candle Pattern Score
-
-    // Doji Detector
-    catalog.insert(BarIndicatorId::Doji,
-        RenderingMetadata::builder("DOJI")
-            .sub_pane()
-            .output(OutputSpec::histogram("doji", "Doji", COLOR_PURPLE, ValueExtractor::Main))
-            .bounds(0.0, 1.0)
-            .precision(0)
-            .build()
-    );
-
-    // Body Size Ratio
-
-    // Wick Ratio
-
-    // Candle Direction
-
-    // === MISSING CANDLE INDICATORS ===
-
     // Candle Anatomy - returns CandleAnatomy variant
     catalog.insert(BarIndicatorId::Candleanatomy,
         RenderingMetadata::builder("CANDLEANATOMY")
@@ -4020,59 +3989,7 @@ fn register_candle_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMet
             .build()
     );
 
-    // Dark Cloud Cover
-    catalog.insert(BarIndicatorId::Darkcloudcover,
-        RenderingMetadata::builder("DARKCLOUDCOVER")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Dark Cloud", COLOR_RED, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .precision(0)
-            .build()
-    );
-
-    // Engulfing Pattern
-    catalog.insert(BarIndicatorId::Engulfing,
-        RenderingMetadata::builder("ENGULFING")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Engulfing", COLOR_PURPLE, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // Evening Star
-    catalog.insert(BarIndicatorId::Eveningstar,
-        RenderingMetadata::builder("EVENINGSTAR")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Evening Star", COLOR_RED, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .precision(0)
-            .build()
-    );
-
-    // Hammer
-    catalog.insert(BarIndicatorId::Hammer,
-        RenderingMetadata::builder("HAMMER")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Hammer", COLOR_GREEN, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .precision(0)
-            .build()
-    );
-
-    // Harami
-    catalog.insert(BarIndicatorId::Harami,
-        RenderingMetadata::builder("HARAMI")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Harami", COLOR_ORANGE, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // Heikin Ashi (alternate name)
+    // Heikin Ashi
     catalog.insert(BarIndicatorId::Heikinashi,
         RenderingMetadata::builder("HEIKINASHI")
             .overlay()
@@ -4081,90 +3998,7 @@ fn register_candle_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMet
             .build()
     );
 
-    // Marubozu
-    catalog.insert(BarIndicatorId::Marubozu,
-        RenderingMetadata::builder("MARUBOZU")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Marubozu", COLOR_TEAL, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // Morning Star
-    catalog.insert(BarIndicatorId::Morningstar,
-        RenderingMetadata::builder("MORNINGSTAR")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Morning Star", COLOR_GREEN, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .precision(0)
-            .build()
-    );
-
-    // Pattern Recognition
-    catalog.insert(BarIndicatorId::Patternrec,
-        RenderingMetadata::builder("PATTERNREC")
-            .sub_pane()
-            .output(OutputSpec::histogram("pattern", "Pattern Rec", COLOR_PURPLE, ValueExtractor::Main))
-            .bounds(-100.0, 100.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // Piercing Pattern
-    catalog.insert(BarIndicatorId::Piercingpattern,
-        RenderingMetadata::builder("PIERCINGPATTERN")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Piercing", COLOR_GREEN, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .precision(0)
-            .build()
-    );
-
-    // Shooting Star
-    catalog.insert(BarIndicatorId::Shootingstar,
-        RenderingMetadata::builder("SHOOTINGSTAR")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Shooting Star", COLOR_RED, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .precision(0)
-            .build()
-    );
-
-    // Three Black Crows
-    catalog.insert(BarIndicatorId::Threeblackcrows,
-        RenderingMetadata::builder("THREEBLACKCROWS")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Three Black Crows", COLOR_RED, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .precision(0)
-            .build()
-    );
-
-    // Three White Soldiers
-    catalog.insert(BarIndicatorId::Threewhitesoldiers,
-        RenderingMetadata::builder("THREEWHITESOLDIERS")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Three White Soldiers", COLOR_GREEN, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .precision(0)
-            .build()
-    );
-
-    // Tweezer
-    catalog.insert(BarIndicatorId::Tweezer,
-        RenderingMetadata::builder("TWEEZER")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "Tweezer", COLOR_ORANGE, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // Wick Spike
+    // Wick Spike (StatisticalWickDetector)
     catalog.insert(BarIndicatorId::Wickspike,
         RenderingMetadata::builder("WICKSPIKE")
             .sub_pane()
@@ -5072,28 +4906,8 @@ fn register_missing_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMe
     );
 
     // ========================================================================
-    // CANDLES (missing)
+    // CANDLES (legacy individual patterns removed — use events::CandlePatternDetector)
     // ========================================================================
-
-    // Candle pattern indicators
-    let candle_patterns = [
-        BarIndicatorId::Darkcloudcover, BarIndicatorId::Engulfing, BarIndicatorId::Eveningstar,
-        BarIndicatorId::Hammer, BarIndicatorId::Harami, BarIndicatorId::Marubozu,
-        BarIndicatorId::Morningstar, BarIndicatorId::Patternrec, BarIndicatorId::Piercingpattern,
-        BarIndicatorId::Shootingstar, BarIndicatorId::Threeblackcrows, BarIndicatorId::Threewhitesoldiers,
-        BarIndicatorId::Tweezer
-    ];
-    for id in candle_patterns {
-        catalog.insert(id,
-            RenderingMetadata::builder(format!("{:?}", id))
-                .sub_pane()
-                .output(OutputSpec::histogram("pattern", "Pattern", COLOR_GREEN, ValueExtractor::Main))
-                .bounds(-1.0, 1.0)
-                .histogram_style(HistogramStyle::Centered)
-                .precision(0)
-                .build()
-        );
-    }
 
     // ========================================================================
     // VOLUME (missing)
@@ -5463,9 +5277,10 @@ mod tests {
         println!("\n=== RENDERING CATALOG COVERAGE ===");
         println!("Total indicators in rendering catalog: {}", count);
 
-        // We should have 450+ indicators (nearly all BarIndicatorId variants)
+        // We should have 430+ indicators (nearly all BarIndicatorId variants)
         // Reduced by ~8: AutoFibo, Swings, SwingsSoft, Fibochan, ZigzagAtr/Classic/Candle/Lookahead/Time
-        assert!(count >= 450, "Should have at least 450 indicators with rendering, got {}", count);
+        // Reduced by ~15 more: 13 individual candle patterns + AdvancedPatternRecognition + CandlePatterns
+        assert!(count >= 430, "Should have at least 430 indicators with rendering, got {}", count);
 
         // Verify some key indicators exist
         let key_indicators = [

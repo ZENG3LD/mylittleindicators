@@ -24,7 +24,6 @@ pub mod di_plus_minus;
 // Новые индикаторы для Multi-Signal Generator
 pub mod highest;
 pub mod lowest;
-pub mod candle_patterns;
 pub mod williams_r;
 pub mod parabolic_sar;
 pub mod ultimate_oscillator;
@@ -120,7 +119,6 @@ pub use vhf_ma::*;
 pub use stochastikd::*;
 pub use highest::*;
 pub use lowest::*;
-pub use candle_patterns::*;
 pub use williams_r::*;
 pub use parabolic_sar::*;
 pub use ultimate_oscillator::*;

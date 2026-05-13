@@ -72,6 +72,8 @@ pub struct PriceLineCross {
     /// Whether close was above line on the previous bar (used by CloseAbove/CloseBelow/WickReject).
     prev_close_above: Option<bool>,
     last_signal: i8,
+    /// Stateful candle pattern detector used when mode == WithCandle.
+    candle_detector: Option<crate::events::candle_pattern::CandlePatternDetector>,
 }
 
 impl fmt::Debug for PriceLineCross {
@@ -88,11 +90,17 @@ impl fmt::Debug for PriceLineCross {
 impl PriceLineCross {
     /// Construct with given line source and touch mode.
     pub fn new(line: LineSource, mode: TouchMode) -> Self {
+        let candle_detector = if let TouchMode::WithCandle(kind) = mode {
+            Some(crate::events::candle_pattern::CandlePatternDetector::new(kind))
+        } else {
+            None
+        };
         Self {
             line,
             mode,
             prev_close_above: None,
             last_signal: 0,
+            candle_detector,
         }
     }
 
@@ -160,14 +168,19 @@ impl PriceLineCross {
                     let near_low = (low - line_val).abs() <= tolerance;
                     if near_high || near_low { 1 } else { 0 }
                 }
-                TouchMode::WithCandle(pattern) => {
+                TouchMode::WithCandle(_) => {
                     // Cross direction: CloseAbove semantics.
                     let crossed = match self.prev_close_above {
                         Some(false) if close > line_val => true,
                         Some(true) if close < line_val => true,
                         _ => false,
                     };
-                    if crossed && check_candle_pattern(open, high, low, close, pattern) {
+                    let pattern_match = if let Some(ref mut det) = self.candle_detector {
+                        det.detect_from_values(open, high, low, close).is_some()
+                    } else {
+                        false
+                    };
+                    if crossed && pattern_match {
                         if close > line_val { 1 } else { -1 }
                     } else {
                         0
@@ -201,45 +214,12 @@ impl PriceLineCross {
         }
         self.prev_close_above = None;
         self.last_signal = 0;
+        if let Some(ref mut det) = self.candle_detector {
+            det.reset();
+        }
     }
 }
 
-/// Inline candle pattern check — same logic as `CandlePatternDetector` but
-/// stateless and single-bar (no Engulfing since it needs prev bar).
-fn check_candle_pattern(o: f64, h: f64, l: f64, c: f64, kind: CandlePatternKind) -> bool {
-    let range = h - l;
-    if range < f64::EPSILON {
-        return false;
-    }
-    match kind {
-        CandlePatternKind::Doji => {
-            let body = (c - o).abs();
-            body / range <= 0.10
-        }
-        CandlePatternKind::Hammer => {
-            let body = (c - o).abs();
-            let body_bot = c.min(o);
-            let body_top = c.max(o);
-            let lower_wick = body_bot - l;
-            let upper_wick = h - body_top;
-            lower_wick >= 2.0 * body.max(f64::EPSILON)
-                && upper_wick <= body.max(f64::EPSILON)
-                && body_bot >= l + range * 0.5
-        }
-        CandlePatternKind::ShootingStar => {
-            let body = (c - o).abs();
-            let body_top = c.max(o);
-            let body_bot = c.min(o);
-            let upper_wick = h - body_top;
-            let lower_wick = body_bot - l;
-            upper_wick >= 2.0 * body.max(f64::EPSILON)
-                && lower_wick <= body.max(f64::EPSILON)
-                && body_top <= l + range * 0.5
-        }
-        // Engulfing requires two bars — not applicable to single-bar inline check.
-        CandlePatternKind::Engulfing => false,
-    }
-}
 
 #[cfg(test)]
 mod tests {

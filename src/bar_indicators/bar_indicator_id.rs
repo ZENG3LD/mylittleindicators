@@ -42,7 +42,6 @@ pub enum BarIndicatorId {
     BbPeriod,  // BB_PERIOD
     Bias,  // BIAS
     Bop,  // BOP
-    CandlePatterns,  // CANDLE_PATTERNS
     Cci,  // CCI
     Cfo,  // CFO
     Cmo,  // CMO
@@ -285,24 +284,10 @@ pub enum BarIndicatorId {
     Swingstr,  // SWINGSTR
     Woodie,  // WOODIE
 
-    // Candles (19 indicators)
+    // Candles (4 indicators)
     Candleanatomy,  // CANDLEANATOMY
-    Darkcloudcover,  // DARKCLOUDCOVER
-    Doji,  // DOJI
-    Engulfing,  // ENGULFING
-    Eveningstar,  // EVENINGSTAR
-    Hammer,  // HAMMER
-    Harami,  // HARAMI
     Heikinashi,  // HEIKINASHI
-    Marubozu,  // MARUBOZU
-    Morningstar,  // MORNINGSTAR
-    Patternrec,  // PATTERNREC
-    Piercingpattern,  // PIERCINGPATTERN
-    Shootingstar,  // SHOOTINGSTAR
-    Threeblackcrows,  // THREEBLACKCROWS
-    Threewhitesoldiers,  // THREEWHITESOLDIERS
-    Tweezer,  // TWEEZER
-    Wickspike,  // WICKSPIKE
+    Wickspike,  // WICKSPIKE (StatisticalWickDetector)
 
     // Volume (22 indicators)
     Mfi,  // MFI

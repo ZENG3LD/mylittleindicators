@@ -593,13 +593,12 @@ mod tests {
 #[test]
 fn debug_candle_pattern_detection() {
     use crate::catalog::synthetic_data::{generate_bars, DataType};
-    use crate::bar_indicators::candles::patterns::hammer::Hammer;
-    use crate::bar_indicators::candles::patterns::doji::Doji;
+    use crate::events::candle_pattern::{CandlePatternDetector, CandlePatternKind};
 
     let bars = generate_bars(DataType::CandlePatterns, 100, 0);
 
     println!("\n=== DEBUG: Hammer Detection ===");
-    let mut hammer = Hammer::new(2.0, 0.5);
+    let mut hammer = CandlePatternDetector::new(CandlePatternKind::Hammer);
     let mut hammer_detections = 0;
 
     for (i, bar) in bars.iter().enumerate() {
@@ -614,23 +613,26 @@ fn debug_candle_pattern_detection() {
         // Check bars that SHOULD be hammers (every 40 bars at position 5)
         if i % 40 == 5 {
             println!("Bar {}: O={:.2} H={:.2} L={:.2} C={:.2}", i, bar.open, bar.high, bar.low, bar.close);
-            println!("  range={:.2}, body={:.2}, body_ratio={:.3}", range, body, body/range);
+            println!("  range={:.2}, body={:.2}, body_ratio={:.3}", range, body, if range > 0.0 { body/range } else { 0.0 });
             println!("  lower_shadow={:.2}, upper_shadow={:.2}", lower_shadow, upper_shadow);
             if body > 0.0 {
                 println!("  lower_shadow_ratio={:.2}, upper_shadow_ratio={:.2}", lower_shadow/body, upper_shadow/body);
             }
-            println!("  DETECTED={}, strength={:.2}", val > 0.0, val);
+            use crate::bar_indicators::indicator_value::IndicatorValue;
+            let detected = matches!(val, IndicatorValue::Signal(s) if s > 0);
+            println!("  DETECTED={}", detected);
         }
 
-        if val > 0.0 {
+        use crate::bar_indicators::indicator_value::IndicatorValue;
+        if matches!(val, IndicatorValue::Signal(s) if s > 0) {
             hammer_detections += 1;
-            println!("Bar {}: Hammer detected! val={:.2}", i, val);
+            println!("Bar {}: Hammer detected!", i);
         }
     }
     println!("Total hammer detections: {}", hammer_detections);
 
     println!("\n=== DEBUG: Doji Detection ===");
-    let mut doji = Doji::new(0.1);
+    let mut doji = CandlePatternDetector::new(CandlePatternKind::Doji);
     let mut doji_detections = 0;
 
     for (i, bar) in bars.iter().enumerate() {
@@ -641,11 +643,14 @@ fn debug_candle_pattern_detection() {
             let range = bar.high - bar.low;
             let body = (bar.close - bar.open).abs();
             println!("Bar {}: O={:.2} H={:.2} L={:.2} C={:.2}", i, bar.open, bar.high, bar.low, bar.close);
-            println!("  range={:.2}, body={:.2}, body_ratio={:.3}", range, body, body/range);
-            println!("  DETECTED={}, strength={:.2}", val > 0.0, val);
+            println!("  range={:.2}, body={:.2}, body_ratio={:.3}", range, body, if range > 0.0 { body/range } else { 0.0 });
+            use crate::bar_indicators::indicator_value::IndicatorValue;
+            let detected = matches!(val, IndicatorValue::Signal(s) if s > 0);
+            println!("  DETECTED={}", detected);
         }
 
-        if val > 0.0 {
+        use crate::bar_indicators::indicator_value::IndicatorValue;
+        if matches!(val, IndicatorValue::Signal(s) if s > 0) {
             doji_detections += 1;
         }
     }

@@ -21,12 +21,14 @@ pub mod pivot;
 pub mod price_line_cross;
 pub mod regime_gate;
 pub mod relative_position;
+pub mod statistical_wick_detector;
 pub mod swing_detection;
 pub mod threshold;
 pub mod volatility_regime;
 pub mod volume_event;
 
 pub use candle_pattern::{CandlePatternDetector, CandlePatternKind};
+pub use statistical_wick_detector::StatisticalWickDetector;
 pub use confluence::Confluence;
 pub use direction_detector::DirectionDetector;
 pub use divergence::Divergence;

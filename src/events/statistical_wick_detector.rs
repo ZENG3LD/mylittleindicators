@@ -1,9 +1,13 @@
-// Wick Spike Detector: flags unusually long wicks vs rolling percentile
+//! StatisticalWickDetector — flags unusually long wicks vs rolling 95th percentile.
+//!
+//! Ported from `bar_indicators/candles/wick_spike.rs`.
+//! Output: `IndicatorValue::DoubleFlag(upper_spike, lower_spike)`.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
+/// Detects statistically extreme wicks using a rolling percentile window.
 #[derive(Clone)]
-pub struct WickSpike {
+pub struct StatisticalWickDetector {
     window: usize,
     upper_buf: Vec<f64>,
     lower_buf: Vec<f64>,
@@ -15,12 +19,13 @@ pub struct WickSpike {
     pub lower_percentile: f64,
 }
 
-impl WickSpike {
+impl StatisticalWickDetector {
     pub fn new(window: usize) -> Self {
+        let w = window.max(1);
         Self {
-            window: window.max(1),
-            upper_buf: vec![0.0; window.max(1)],
-            lower_buf: vec![0.0; window.max(1)],
+            window: w,
+            upper_buf: vec![0.0; w],
+            lower_buf: vec![0.0; w],
             idx: 0,
             filled: false,
             is_upper_spike: false,
@@ -80,7 +85,6 @@ impl WickSpike {
             self.upper_percentile = cnt_u as f64 / len as f64;
             self.lower_percentile = cnt_l as f64 / len as f64;
         }
-        // spikes at extreme percentiles
         self.is_upper_spike = self.upper_percentile >= 0.95;
         self.is_lower_spike = self.lower_percentile >= 0.95;
         (self.is_upper_spike, self.is_lower_spike)
@@ -91,31 +95,42 @@ impl WickSpike {
     }
 }
 
+impl std::fmt::Debug for StatisticalWickDetector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StatisticalWickDetector")
+            .field("window", &self.window)
+            .field("filled", &self.filled)
+            .field("is_upper_spike", &self.is_upper_spike)
+            .field("is_lower_spike", &self.is_lower_spike)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_wick_spike_creation() {
-        let ind = WickSpike::new(20);
+    fn creation() {
+        let ind = StatisticalWickDetector::new(20);
         assert!(!ind.is_ready());
         assert!(!ind.is_upper_spike);
         assert!(!ind.is_lower_spike);
     }
 
     #[test]
-    fn test_wick_spike_warmup() {
-        let mut ind = WickSpike::new(10);
+    fn warmup() {
+        let mut ind = StatisticalWickDetector::new(10);
         for i in 0..15 {
-            let price = 100.0 + (i as f64 * 0.1).sin() * 5.0;
+            let price = 100.0 + (i as f64 * 0.1_f64).sin() * 5.0;
             ind.update_bar(price, price + 2.0, price - 2.0, price + 1.0, 1000.0);
         }
         assert!(ind.is_ready());
     }
 
     #[test]
-    fn test_wick_spike_percentiles() {
-        let mut ind = WickSpike::new(10);
+    fn percentiles_in_range() {
+        let mut ind = StatisticalWickDetector::new(10);
         for i in 0..15 {
             let price = 100.0 + i as f64;
             ind.update_bar(price, price + 2.0, price - 2.0, price + 1.0, 1000.0);
@@ -125,8 +140,8 @@ mod tests {
     }
 
     #[test]
-    fn test_wick_spike_reset() {
-        let mut ind = WickSpike::new(10);
+    fn reset_clears() {
+        let mut ind = StatisticalWickDetector::new(10);
         for i in 0..15 {
             let price = 100.0 + i as f64;
             ind.update_bar(price, price + 2.0, price - 2.0, price + 1.0, 1000.0);
