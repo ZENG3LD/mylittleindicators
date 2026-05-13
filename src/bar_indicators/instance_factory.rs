@@ -279,8 +279,9 @@ use crate::bar_indicators::signal_processing::lempel_ziv::LempelZivComplexity;
 // Gates/composites
 use crate::bar_indicators::signal_processing::hysteresis_gate::HysteresisGate;
 use crate::bar_indicators::signal_processing::weighted_composite::WeightedComposite;
-// Candles/patterns
-use crate::bar_indicators::candles::sfp_detector::SfpDetector;
+// Events: canonical cross detectors
+use crate::events::line_cross::LineCross;
+use crate::events::price_line_cross::PriceLineCross;
 // Momentum extras
 use crate::bar_indicators::momentum::ehlers_rocket_rsi::EhlersRocketRsi;
 use crate::bar_indicators::momentum::ehlers_cyber_cycle::EhlersCyberCycle;
@@ -374,7 +375,6 @@ use crate::bar_indicators::momentum::aroon_up::AroonUp;
 use crate::bar_indicators::momentum::candle_patterns::CandlePatterns;
 use crate::bar_indicators::momentum::highest::Highest;
 use crate::bar_indicators::momentum::lowest::Lowest;
-use crate::bar_indicators::momentum::ma_cross::MaCross;
 use crate::bar_indicators::momentum::pressure::Pressure;
 // Accumulation: Twiggs Money Flow
 use crate::bar_indicators::accumulation::tmf::Tmf;
@@ -657,7 +657,7 @@ impl IndicatorConfig {
     /// the typed `IndicatorKey` slots (`period[0]`, `ma_types["ma_type"]`, `output`).
     ///
     /// This includes:
-    /// - `periods[1..]` — secondary periods (MACD slow/signal, MaCross slow)
+    /// - `periods[1..]` — secondary periods (MACD slow/signal, Amat slow)
     /// - `additional_params` — named scalar floats (sorted by key)
     /// - `ma_types` — named MA types except the unnamed `"ma_type"` slot (sorted by key)
     /// - `flags` — boolean flags (sorted by key)
@@ -1107,8 +1107,9 @@ pub enum IndicatorInstance {
     Hyst(Box<HysteresisGate>),
     WeightedComposite(Box<WeightedComposite>),
 
-    // Candles/patterns
-    SfpDetector(Box<SfpDetector>),
+    // Event cross detectors
+    LineCross(Box<LineCross>),
+    PriceLineCross(Box<PriceLineCross>),
 
     // Momentum/trend/distance
     EhlersRocketRsi(Box<EhlersRocketRsi>),
@@ -1166,7 +1167,7 @@ pub enum IndicatorInstance {
     Var(Box<Var>),
     PolyReg(Box<PolynomialRegression>),
 
-    // Momentum extras (Aroon family, extremes, pressure, MA cross, simple candle patterns)
+    // Momentum extras (Aroon family, extremes, pressure, simple candle patterns)
     Aroon(Box<Aroon>),
     AroonOscillator(Box<AroonOscillator>),
     AroonUp(Box<AroonUp>),
@@ -1174,7 +1175,6 @@ pub enum IndicatorInstance {
     Highest(Box<Highest>),
     Lowest(Box<Lowest>),
     Pressure(Box<Pressure>),
-    MaCross(Box<MaCross>),
     CandlePatterns(Box<CandlePatterns>),
 
     // Accumulation
@@ -2928,11 +2928,11 @@ impl IndicatorInstance {
                 Ok(Self::WeightedComposite(Box::new(WeightedComposite::new(w1, w2, w3, w4, norm))))
             }
 
-            // Candles/patterns
-            BarIndicatorId::Sfp => {
-                let lb = config.periods.first().copied().unwrap_or(20);
-                Ok(Self::SfpDetector(Box::new(SfpDetector::new(lb))))
-            }
+            // Event cross detectors — LineCross / PriceLineCross are constructed
+            // via composition (Box<IndicatorInstance> operands), not from flat config.
+            // The factory arms below handle the degenerate constant × constant case
+            // for completeness; real use is via direct construction.
+            // (No BarIndicatorId variants for these — they are events-layer primitives.)
 
             // Momentum/trend/distance
             BarIndicatorId::EhlersRocket => Ok(Self::EhlersRocketRsi(Box::new(EhlersRocketRsi::with_source(config.source)))),
@@ -3139,13 +3139,6 @@ impl IndicatorInstance {
                 let p = config.periods.first().copied().unwrap_or(14);
                 let ma_type = config.ma_types.get("ma_type").copied().unwrap_or(MovingAverageType::SMA);
                 Ok(Self::Pressure(Box::new(Pressure::new(p, ma_type))))
-            }
-            BarIndicatorId::MaCross => {
-                let fast = config.periods.first().copied().unwrap_or(9);
-                let slow = config.periods.get(1).copied().unwrap_or(21);
-                let fast_ma = config.ma_types.get("fast_ma").copied().unwrap_or(MovingAverageType::EMA);
-                let slow_ma = config.ma_types.get("slow_ma").copied().unwrap_or(MovingAverageType::EMA);
-                Ok(Self::MaCross(Box::new(MaCross::with_source(fast, slow, fast_ma, slow_ma, config.source))))
             }
             BarIndicatorId::CandlePatterns => {
                 let min_pct = config.additional_params.get("min_candle_size_pct").copied().unwrap_or(0.5);
@@ -4894,10 +4887,8 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
-            Self::MaCross(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
+            Self::LineCross(x) => x.update_bar(open, high, low, close, volume),
+            Self::PriceLineCross(x) => x.update_bar(open, high, low, close, volume),
             Self::MarketFacilitationIndex(x) => {
                 x.update(high, low, volume);
                 x.value()
@@ -5271,10 +5262,6 @@ impl IndicatorInstance {
                 x.value()
             }
             Self::Sflat(x) => {
-                x.update_bar(open, high, low, close, volume);
-                x.value()
-            }
-            Self::SfpDetector(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
@@ -6171,7 +6158,8 @@ impl IndicatorInstance {
             Self::MacdHist(ind) => ind.value(),
             Self::MacdHistZscore(ind) => ind.value(),
             Self::MacdSignal(ind) => ind.value(),
-            Self::MaCross(ind) => ind.value(),
+            Self::LineCross(ind) => ind.value(),
+            Self::PriceLineCross(ind) => ind.value(),
             Self::MarketFacilitationIndex(ind) => ind.value(),
             Self::MarketRegimeFilter(ind) => ind.value(),
             Self::Marubozu(ind) => ind.value(),
@@ -6451,7 +6439,6 @@ impl IndicatorInstance {
             Self::RelTrendPos(ind) => ind.value(),
             Self::ResidStat(ind) => ind.value(),
             Self::Session(ind) => ind.value(),
-            Self::SfpDetector(ind) => ind.value(),
             Self::SwingAge(ind) => ind.value(),
             Self::SwingStrengthScore(ind) => ind.value(),
             Self::TickVolume(ind) => ind.value(),
@@ -6698,7 +6685,8 @@ impl IndicatorInstance {
             Self::MacdHist(ind) => ind.is_ready(),
             Self::MacdHistZscore(ind) => ind.is_ready(),
             Self::MacdSignal(ind) => ind.is_ready(),
-            Self::MaCross(ind) => ind.is_ready(),
+            Self::LineCross(ind) => ind.is_ready(),
+            Self::PriceLineCross(ind) => ind.is_ready(),
             Self::MarketFacilitationIndex(ind) => ind.is_ready(),
             Self::MarketMicro(ind) => ind.is_ready(),
             Self::MarketRegimeFilter(ind) => ind.is_ready(),
@@ -6806,7 +6794,6 @@ impl IndicatorInstance {
             Self::Ser(ind) => ind.is_ready(),
             Self::Session(ind) => ind.is_ready(),
             Self::Sflat(ind) => ind.is_ready(),
-            Self::SfpDetector(ind) => ind.is_ready(),
             Self::Sg(ind) => ind.is_ready(),
             Self::StftBandEnergyRatio(ind) => ind.is_ready(),
             Self::ShannonEntropy(ind) => ind.is_ready(),
@@ -7148,7 +7135,8 @@ impl IndicatorInstance {
             Self::MacdHist(ind) => ind.reset(),
             Self::MacdHistZscore(ind) => ind.reset(),
             Self::MacdSignal(ind) => ind.reset(),
-            Self::MaCross(ind) => ind.reset(),
+            Self::LineCross(ind) => ind.reset(),
+            Self::PriceLineCross(ind) => ind.reset(),
             Self::MarketFacilitationIndex(ind) => ind.reset(),
             Self::MarketMicro(ind) => ind.reset(),
             Self::MarketRegimeFilter(ind) => ind.reset(),
@@ -7256,7 +7244,6 @@ impl IndicatorInstance {
             Self::Ser(ind) => ind.reset(),
             Self::Session(ind) => ind.reset(),
             Self::Sflat(ind) => ind.reset(),
-            Self::SfpDetector(ind) => ind.reset(),
             Self::Sg(ind) => ind.reset(),
             Self::StftBandEnergyRatio(ind) => ind.reset(),
             Self::ShannonEntropy(ind) => ind.reset(),
@@ -7398,9 +7385,9 @@ mod compute_param_hash_tests {
 
     #[test]
     fn secondary_period_is_hashed() {
-        let cfg_a = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 21]);
-        let cfg_b = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 30]);
-        let cfg_c = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 21]);
+        let cfg_a = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9]);
+        let cfg_b = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 14]);
+        let cfg_c = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9]);
 
         assert_ne!(cfg_a.compute_param_hash(), 0);
         assert_ne!(cfg_a.compute_param_hash(), cfg_b.compute_param_hash());
@@ -7500,25 +7487,25 @@ mod compute_param_hash_tests {
     // ──────────────────────────────────────────────────────────────────────
 
     #[test]
-    fn legacy_macross_distinct_slow_periods_have_distinct_hashes() {
-        // Before param_hash: MaCross(9, 21) and MaCross(9, 30) → same IndicatorKey.
-        let cfg_21 = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 21])
+    fn legacy_macd_distinct_slow_periods_have_distinct_hashes() {
+        // Macd(12, 21, 9) and Macd(12, 26, 9) → different secondary period.
+        let cfg_21 = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 21, 9])
             .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
             .with_named_ma_type("slow_ma_type", MovingAverageType::EMA);
-        let cfg_30 = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 30])
+        let cfg_26 = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9])
             .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
             .with_named_ma_type("slow_ma_type", MovingAverageType::EMA);
 
-        assert_ne!(cfg_21.compute_param_hash(), cfg_30.compute_param_hash());
+        assert_ne!(cfg_21.compute_param_hash(), cfg_26.compute_param_hash());
     }
 
     #[test]
-    fn legacy_macross_distinct_ma_combos_have_distinct_hashes() {
-        // MaCross(EMA/EMA) vs MaCross(EMA/SMA) — both inner ma_types matter.
-        let cfg_ema_ema = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 21])
+    fn legacy_macd_distinct_ma_combos_have_distinct_hashes() {
+        // Macd(EMA/EMA) vs Macd(EMA/SMA) — slow ma_type matters.
+        let cfg_ema_ema = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9])
             .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
             .with_named_ma_type("slow_ma_type", MovingAverageType::EMA);
-        let cfg_ema_sma = IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![9, 21])
+        let cfg_ema_sma = IndicatorConfig::new(BarIndicatorId::Macd, "Macd".into(), vec![12, 26, 9])
             .with_named_ma_type("fast_ma_type", MovingAverageType::EMA)
             .with_named_ma_type("slow_ma_type", MovingAverageType::SMA);
 
@@ -7587,8 +7574,8 @@ mod compute_param_hash_tests {
     fn inner_recursive_hash_propagates() {
         // Outer wraps inner that has its own param_hash extras.
         // Two outers identical except inner's secondary period → different outer param_hash.
-        let inner_a = IndicatorConfig::new(BarIndicatorId::MaCross, "Inner".into(), vec![9, 21]);
-        let inner_b = IndicatorConfig::new(BarIndicatorId::MaCross, "Inner".into(), vec![9, 30]);
+        let inner_a = IndicatorConfig::new(BarIndicatorId::Macd, "Inner".into(), vec![12, 21, 9]);
+        let inner_b = IndicatorConfig::new(BarIndicatorId::Macd, "Inner".into(), vec![12, 26, 9]);
 
         let cfg_a = IndicatorConfig::new(BarIndicatorId::Sma, "Outer".into(), vec![])
             .with_inner(inner_a);

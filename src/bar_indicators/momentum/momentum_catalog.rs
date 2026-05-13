@@ -1046,43 +1046,6 @@ pub fn signature_lowest() -> IndicatorSignature {
         .build()
 }
 
-/// Moving Average Cross
-pub fn signature_ma_cross() -> IndicatorSignature {
-    IndicatorSignature::builder("MA_CROSS", CATEGORY)
-        .name("MA Cross")
-        .description("Moving average crossover signals")
-        .add_constraint(
-            ParamConstraint::new("fast_period", ParamType::USize)
-                .with_min(ParamValue::USize(2))
-                .with_max(ParamValue::USize(200))
-                .with_default(ParamValue::USize(12))
-                .required()
-        )
-        .add_constraint(
-            ParamConstraint::new("slow_period", ParamType::USize)
-                .with_min(ParamValue::USize(2))
-                .with_max(ParamValue::USize(200))
-                .with_default(ParamValue::USize(26))
-                .required()
-        )
-        .add_constraint(ParamConstraint::ma_type_named("fast_ma", MovingAverageType::EMA))
-        .add_constraint(ParamConstraint::ma_type_named("slow_ma", MovingAverageType::EMA))
-        .metadata("fast_ma_desc", "Fast MA type")
-        .metadata("slow_ma_desc", "Slow MA type")
-        .machine_id(BarIndicatorId::MaCross)
-        .role_kind(IndicatorRoleKind::OscillatorBounded)
-        .output_kind(IndicatorValueKind::Signal)
-        .output_bounds(-1.0, 1.0)
-        // Note: "MA_CROSS" is already the main ID, no need for alias
-        .alias("MaCross")
-        .alias("ma_cross")
-        .alias("MACROSS")
-        .alias("MACross")
-        .alias("macross")
-        .alias("Ma_Cross")
-        .build()
-}
-
 /// MACD - Moving Average Convergence Divergence
 pub fn signature_macd() -> IndicatorSignature {
     IndicatorSignature::builder("MACD", CATEGORY)
@@ -2331,7 +2294,6 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("KVO", signature_kvo as fn() -> IndicatorSignature),
     ("LAGUERRE_RSI", signature_laguerre_rsi as fn() -> IndicatorSignature),
     ("LOWEST", signature_lowest as fn() -> IndicatorSignature),
-    ("MA_CROSS", signature_ma_cross as fn() -> IndicatorSignature),
     ("MACD", signature_macd as fn() -> IndicatorSignature),
     ("MACD_HIST_Z", signature_macd_hist_zscore as fn() -> IndicatorSignature),
     ("MACD_HIST", signature_macd_histogram as fn() -> IndicatorSignature),
@@ -2461,7 +2423,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 91); // Reduced by 3: AutoFibo, Swings, SwingsSoft removed (backed by SwingDetection)
+        assert_eq!(count(), 90); // MaCross removed (superseded by events::LineCross)
     }
 
     #[test]

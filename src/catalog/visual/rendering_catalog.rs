@@ -1033,15 +1033,6 @@ fn register_momentum_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingM
             .build()
     );
 
-    // MA Cross
-    catalog.insert(BarIndicatorId::MaCross,
-        RenderingMetadata::builder("MA_CROSS")
-            .sub_pane()
-            .line_output("cross", "MA Cross", COLOR_BLUE)
-            .precision(0)
-            .build()
-    );
-
     // MACD Histogram (standalone)
     catalog.insert(BarIndicatorId::MacdHist,
         RenderingMetadata::builder("MACD_HIST")
@@ -4128,17 +4119,6 @@ fn register_candle_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMet
             .sub_pane()
             .output(OutputSpec::histogram("signal", "Piercing", COLOR_GREEN, ValueExtractor::Main))
             .bounds(-1.0, 1.0)
-            .precision(0)
-            .build()
-    );
-
-    // Swing Failure Pattern
-    catalog.insert(BarIndicatorId::Sfp,
-        RenderingMetadata::builder("SFP")
-            .sub_pane()
-            .output(OutputSpec::histogram("signal", "SFP", COLOR_CYAN, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
             .precision(0)
             .build()
     );

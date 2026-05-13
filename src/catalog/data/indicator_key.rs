@@ -514,10 +514,10 @@ mod tests {
 
     #[test]
     fn test_param_hash_distinguishes_secondary_params() {
-        // Without param_hash, MaCross(9, 21) and MaCross(9, 30) collided.
-        let a = IndicatorKey::new(BarIndicatorId::MaCross, 9, None).with_param_hash(0x1234);
-        let b = IndicatorKey::new(BarIndicatorId::MaCross, 9, None).with_param_hash(0x5678);
-        let c = IndicatorKey::new(BarIndicatorId::MaCross, 9, None).with_param_hash(0x1234);
+        // param_hash distinguishes indicators with the same primary period but different secondary periods.
+        let a = IndicatorKey::new(BarIndicatorId::Macd, 12, None).with_param_hash(0x1234);
+        let b = IndicatorKey::new(BarIndicatorId::Macd, 12, None).with_param_hash(0x5678);
+        let c = IndicatorKey::new(BarIndicatorId::Macd, 12, None).with_param_hash(0x1234);
 
         assert_ne!(a, b);
         assert_eq!(a, c);

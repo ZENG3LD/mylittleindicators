@@ -72,7 +72,6 @@ pub enum BarIndicatorId {
     Kvo,  // KVO
     LaguerreRsi,  // LAGUERRE_RSI
     Lowest,  // LOWEST
-    MaCross,  // MA_CROSS
     Macd,  // MACD
     MacdHist,  // MACD_HIST
     MacdHistZ,  // MACD_HIST_Z
@@ -299,7 +298,6 @@ pub enum BarIndicatorId {
     Morningstar,  // MORNINGSTAR
     Patternrec,  // PATTERNREC
     Piercingpattern,  // PIERCINGPATTERN
-    Sfp,  // SFP
     Shootingstar,  // SHOOTINGSTAR
     Threeblackcrows,  // THREEBLACKCROWS
     Threewhitesoldiers,  // THREEWHITESOLDIERS

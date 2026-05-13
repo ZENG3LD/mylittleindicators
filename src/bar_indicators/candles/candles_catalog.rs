@@ -114,30 +114,6 @@ pub fn signature_pattern_recognition() -> IndicatorSignature {
         .build()
 }
 
-/// SFP Detector - Swing Failure Pattern detection
-pub fn signature_sfp_detector() -> IndicatorSignature {
-    IndicatorSignature::builder("SFP", CATEGORY)
-        .name("Swing Failure Pattern")
-        .description("Detects liquidity sweeps followed by rejection")
-        .add_constraint(ParamConstraint::period(5, 100, 20))
-        .metadata("aka", "Stop Hunt, Liquidity Grab")
-        .metadata("outputs", "bull_sfp, bear_sfp")
-        .metadata("complexity", "O(1) with ring buffer")
-        .machine_id(BarIndicatorId::Sfp) // TODO: Add to enum
-        .role_kind(IndicatorRoleKind::Pattern)
-        .output_kind(IndicatorValueKind::Flag)
-        // Note: "SFP" is already the main ID, no need for alias
-        .alias("Sfp")
-        .alias("sfp")
-        .alias("SWINGFAILUREPATTERN")
-        .alias("SwingFailurePattern")
-        .alias("swingfailurepattern")
-        .alias("swing_failure_pattern")
-        .alias("SWING_FAILURE_PATTERN")
-        .alias("Swing_Failure_Pattern")
-        .build()
-}
-
 /// Wick Spike - Detects unusually long wicks
 pub fn signature_wick_spike() -> IndicatorSignature {
     IndicatorSignature::builder("WICKSPIKE", CATEGORY)
@@ -509,7 +485,6 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("HEIKINASHI", signature_heikin_ashi as fn() -> IndicatorSignature),
     ("CANDLEANATOMY", signature_candle_anatomy as fn() -> IndicatorSignature),
     ("PATTERNREC", signature_pattern_recognition as fn() -> IndicatorSignature),
-    ("SFP", signature_sfp_detector as fn() -> IndicatorSignature),
     ("WICKSPIKE", signature_wick_spike as fn() -> IndicatorSignature),
     ("DOJI", signature_doji as fn() -> IndicatorSignature),
     ("HAMMER", signature_hammer as fn() -> IndicatorSignature),
@@ -597,13 +572,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_sfp_signature() {
-        let sig = get_signature("SFP").unwrap();
-        assert_eq!(sig.id, "SFP");
-        assert!(sig.required_params().len() >= 1);
-    }
-
-    #[test]
     fn test_all_signatures_valid() {
         for id in all_indicator_ids() {
             let sig = get_signature(id).unwrap();
@@ -614,7 +582,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 18); // 18 candle indicators
+        assert_eq!(count(), 17); // 17 candle indicators (SFP moved to PriceLineCross)
     }
 
     #[test]
@@ -628,14 +596,6 @@ mod tests {
         // Invalid: out of range
         let params = vec![("long_wick_ratio_threshold", ParamValue::F64(2.0))];
         assert!(sig.validate_params(&params).is_err());
-    }
-
-    #[test]
-    fn test_cache_key_generation() {
-        let sig = get_signature("SFP").unwrap();
-        let params = vec![("period", ParamValue::USize(20))];
-        let key = sig.cache_key(&params);
-        assert_eq!(key, "SFP_20");
     }
 
     #[test]

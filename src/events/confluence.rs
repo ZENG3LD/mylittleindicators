@@ -228,15 +228,12 @@ mod tests {
     use crate::bar_indicators::bar_indicator_id::BarIndicatorId;
     use crate::bar_indicators::instance_factory::{IndicatorConfig, IndicatorInstance};
 
-    /// Build a wrapper instance that always exposes a known signal — for unit testing
-    /// confluence aggregation without depending on real-indicator timing.
-    /// (We use real SMA-based RelativePosition since it produces stable ±1 in trends.)
+    /// Build a wrapper instance that exposes a known signal — for unit testing
+    /// confluence aggregation. Uses `Amat` which emits `Signal(±1)` after warmup.
     fn rp(fast: usize, slow: usize) -> IndicatorInstance {
-        // RelativePosition isn't yet wired into IndicatorInstance factory — we need
-        // any inner that emits signal values. Use MaCross from legacy factory which
-        // outputs Signal(±1) on uptrend/downtrend.
+        // Amat(fast, slow, signal_period=3) emits Signal(±1) based on MA alignment.
         IndicatorInstance::create(
-            &IndicatorConfig::new(BarIndicatorId::MaCross, "MaCross".into(), vec![fast, slow]),
+            &IndicatorConfig::new(BarIndicatorId::Amat, "Amat".into(), vec![fast, slow, 3]),
         )
         .unwrap()
     }

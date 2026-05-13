@@ -298,7 +298,6 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Morningstar
         | BarIndicatorId::Patternrec
         | BarIndicatorId::Piercingpattern
-        | BarIndicatorId::Sfp
         | BarIndicatorId::Shootingstar
         | BarIndicatorId::Threeblackcrows
         | BarIndicatorId::Threewhitesoldiers
