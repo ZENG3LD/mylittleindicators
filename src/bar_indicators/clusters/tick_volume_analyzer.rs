@@ -8,6 +8,7 @@
 //! This heuristic is only an approximation. Prefer `update` when ticks available.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::tick_consumer::TickConsumer;
 use crate::types::Tick;
 
 /// Tick Volume Analyzer.
@@ -125,6 +126,25 @@ impl TickVolumeAnalyzer {
         self.avg_tick_size = 0.0;
         self.avg_spread = 0.0;
         self.spread_samples = 0;
+    }
+}
+
+impl TickConsumer for TickVolumeAnalyzer {
+    fn update_tick(&mut self, tick: &Tick) -> IndicatorValue {
+        self.update(tick);
+        self.value()
+    }
+
+    fn value(&self) -> IndicatorValue {
+        self.value()
+    }
+
+    fn reset(&mut self) {
+        self.reset();
+    }
+
+    fn is_ready(&self) -> bool {
+        self.is_ready()
     }
 }
 

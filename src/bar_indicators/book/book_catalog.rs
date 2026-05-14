@@ -127,6 +127,109 @@ pub fn signature_order_flow_imbalance() -> IndicatorSignature {
         .build()
 }
 
+/// Liquidity Sweep — detects large orders consuming multiple price levels
+pub fn signature_liquidity_sweep() -> IndicatorSignature {
+    IndicatorSignature::builder("BOOK_LIQUIDITY_SWEEP", CATEGORY)
+        .name("Liquidity Sweep")
+        .description("Detects large orders sweeping ask (buy sweep) or bid (sell sweep) levels")
+        .metadata("outputs", "direction (+1/-1/0), magnitude (price distance swept)")
+        .metadata("requirements", "L2 orderbook consecutive snapshots")
+        .metadata("interpretation", "+1 = buy sweep, -1 = sell sweep, 0 = no sweep")
+        .machine_id(BarIndicatorId::LiquiditySweep)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Double)
+        .requires_l2()
+        .alias("LiquiditySweep")
+        .alias("liquidity_sweep")
+        .alias("LIQUIDITYSWEEP")
+        .alias("book_liquidity_sweep")
+        .build()
+}
+
+/// Book Pressure — slope momentum of bid/ask depth changes
+pub fn signature_book_pressure() -> IndicatorSignature {
+    IndicatorSignature::builder("BOOK_PRESSURE", CATEGORY)
+        .name("Book Pressure")
+        .description("Slope momentum of bid vs ask depth over rolling window: bid_slope - ask_slope")
+        .add_constraint(
+            ParamConstraint::new("period", ParamType::USize)
+                .with_min(ParamValue::USize(2))
+                .with_max(ParamValue::USize(200))
+                .with_default(ParamValue::USize(10))
+                .required()
+        )
+        .add_constraint(
+            ParamConstraint::new("levels", ParamType::USize)
+                .with_min(ParamValue::USize(1))
+                .with_max(ParamValue::USize(50))
+                .with_default(ParamValue::USize(5))
+                .required()
+        )
+        .metadata("outputs", "pressure (positive = bullish, negative = bearish)")
+        .metadata("requirements", "L2 orderbook snapshots")
+        .metadata("interpretation", "Positive = bid pressure growing faster; negative = ask growing faster")
+        .machine_id(BarIndicatorId::BookPressure)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Single)
+        .requires_l2()
+        .alias("BookPressure")
+        .alias("book_pressure")
+        .alias("BOOKPRESSURE")
+        .build()
+}
+
+/// Spread Distribution — rolling percentile rank of bid-ask spread
+pub fn signature_spread_distribution() -> IndicatorSignature {
+    IndicatorSignature::builder("BOOK_SPREAD_DIST", CATEGORY)
+        .name("Spread Distribution")
+        .description("Rolling percentile rank of bid-ask spread (100=tightest, 0=widest)")
+        .add_constraint(
+            ParamConstraint::new("period", ParamType::USize)
+                .with_min(ParamValue::USize(2))
+                .with_max(ParamValue::USize(500))
+                .with_default(ParamValue::USize(50))
+                .required()
+        )
+        .metadata("outputs", "spread, percentile (0-100)")
+        .metadata("requirements", "L2 orderbook top-of-book")
+        .metadata("interpretation", "100 = tightest historical spread; 0 = widest")
+        .machine_id(BarIndicatorId::SpreadDistribution)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_kind(IndicatorValueKind::Double)
+        .requires_l2()
+        .alias("SpreadDistribution")
+        .alias("spread_distribution")
+        .alias("SPREADDISTRIBUTION")
+        .alias("book_spread_dist")
+        .build()
+}
+
+/// Order Book Velocity — rolling average rate of orderbook level changes per snapshot
+pub fn signature_order_book_velocity() -> IndicatorSignature {
+    IndicatorSignature::builder("BOOK_OBV", CATEGORY)
+        .name("Order Book Velocity")
+        .description("Rolling average number of orderbook level changes per snapshot")
+        .add_constraint(
+            ParamConstraint::new("period", ParamType::USize)
+                .with_min(ParamValue::USize(1))
+                .with_max(ParamValue::USize(200))
+                .with_default(ParamValue::USize(10))
+                .required()
+        )
+        .metadata("outputs", "avg_changes_per_snapshot")
+        .metadata("requirements", "L2 orderbook consecutive snapshots")
+        .metadata("interpretation", "Higher = more active orderbook; lower = stable market")
+        .machine_id(BarIndicatorId::OrderBookVelocity)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Single)
+        .requires_l2()
+        .alias("OrderBookVelocity")
+        .alias("order_book_velocity")
+        .alias("ORDERBOOKVELOCITY")
+        .alias("book_obv")
+        .build()
+}
+
 /// Queue Imbalance
 pub fn signature_queue_imbalance() -> IndicatorSignature {
     IndicatorSignature::builder("QUEUE_IMB", CATEGORY)
@@ -164,6 +267,10 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("BOOK_SLOPE", signature_order_book_slope as fn() -> IndicatorSignature),
     ("OFI", signature_order_flow_imbalance as fn() -> IndicatorSignature),
     ("QUEUE_IMB", signature_queue_imbalance as fn() -> IndicatorSignature),
+    ("BOOK_LIQUIDITY_SWEEP", signature_liquidity_sweep as fn() -> IndicatorSignature),
+    ("BOOK_PRESSURE", signature_book_pressure as fn() -> IndicatorSignature),
+    ("BOOK_SPREAD_DIST", signature_spread_distribution as fn() -> IndicatorSignature),
+    ("BOOK_OBV", signature_order_book_velocity as fn() -> IndicatorSignature),
 ];
 
 /// Expanded catalog with all aliases auto-generated from signatures
@@ -228,7 +335,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 5);
+        assert_eq!(count(), 9);
     }
 
     #[test]

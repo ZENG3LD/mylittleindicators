@@ -507,6 +507,45 @@ pub fn signature_rvp() -> IndicatorSignature {
         .build()
 }
 
+/// Trade Flow Imbalance
+pub fn signature_trade_flow_imbalance() -> IndicatorSignature {
+    IndicatorSignature::builder("TRADE_FLOW_IMBALANCE", CATEGORY)
+        .name("Trade Flow Imbalance")
+        .description("Rolling signed buy/sell volume imbalance from tick stream [-1, 1]")
+        .add_constraint(ParamConstraint::period(2, 10000, 100))
+        .metadata("range", "-1 to +1")
+        .metadata("source", "tick_stream")
+        .machine_id(BarIndicatorId::TradeFlowImbalance)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_kind(IndicatorValueKind::Double)
+        .validated()
+        .alias("TradeFlowImbalance")
+        .alias("trade_flow_imbalance")
+        .alias("TFI")
+        .alias("tfi")
+        .source_type(SourceType::VolumeOnly)
+        .build()
+}
+
+/// Uptick/Downtick Volume
+pub fn signature_uptick_downtick_volume() -> IndicatorSignature {
+    IndicatorSignature::builder("UPTICK_DOWNTICK_VOLUME", CATEGORY)
+        .name("Uptick/Downtick Volume")
+        .description("Rolling separate buy (uptick) and sell (downtick) volume from tick stream")
+        .add_constraint(ParamConstraint::period(2, 10000, 100))
+        .metadata("source", "tick_stream")
+        .machine_id(BarIndicatorId::UptickDowntickVolume)
+        .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Double)
+        .validated()
+        .alias("UptickDowntickVolume")
+        .alias("uptick_downtick_volume")
+        .alias("UDV")
+        .alias("udv")
+        .source_type(SourceType::VolumeOnly)
+        .build()
+}
+
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -527,6 +566,8 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("VFI", signature_vfi as fn() -> IndicatorSignature),
     ("VO", signature_volume_oscillator as fn() -> IndicatorSignature),
     ("VPIN", signature_vpin as fn() -> IndicatorSignature),
+    ("TRADE_FLOW_IMBALANCE", signature_trade_flow_imbalance as fn() -> IndicatorSignature),
+    ("UPTICK_DOWNTICK_VOLUME", signature_uptick_downtick_volume as fn() -> IndicatorSignature),
     ("VPROFILE", signature_volume_profile as fn() -> IndicatorSignature),
     ("VPT", signature_vpt as fn() -> IndicatorSignature),
     ("VROC", signature_vroc as fn() -> IndicatorSignature),
@@ -596,6 +637,6 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 18);
+        assert_eq!(count(), 20);
     }
 }

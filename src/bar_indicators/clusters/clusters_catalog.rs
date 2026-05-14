@@ -142,6 +142,82 @@ pub fn signature_tick_volume_analyzer() -> IndicatorSignature {
         .build()
 }
 
+/// Footprint Chart - buy/sell volume breakdown by price level per bar
+pub fn signature_footprint_chart() -> IndicatorSignature {
+    IndicatorSignature::builder("FOOTPRINT_CHART", CATEGORY)
+        .name("Footprint Chart")
+        .description("Aggregates buy/sell volume per price bucket; outputs net_delta, POC price, total_volume")
+        .add_constraint(
+            ParamConstraint::new("price_bucket", ParamType::F64)
+                .with_min(ParamValue::F64(1e-9))
+                .with_max(ParamValue::F64(10000.0))
+                .with_default(ParamValue::F64(0.01))
+        )
+        .metadata("outputs", "net_delta, poc_price, total_volume")
+        .metadata("uses_ticks", "true")
+        .machine_id(BarIndicatorId::FootprintChart)
+        .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Triple)
+        .requires_l2()
+        .alias("FootprintChart")
+        .alias("footprint_chart")
+        .alias("FOOTPRINT")
+        .alias("footprint")
+        .build()
+}
+
+/// Footprint Imbalance - extreme buy/sell skew detector at price levels
+pub fn signature_footprint_imbalance() -> IndicatorSignature {
+    IndicatorSignature::builder("FOOTPRINT_IMB", CATEGORY)
+        .name("Footprint Imbalance")
+        .description("Detects price levels with extreme buy/sell skew above threshold_pct")
+        .add_constraint(
+            ParamConstraint::new("price_bucket", ParamType::F64)
+                .with_min(ParamValue::F64(1e-9))
+                .with_max(ParamValue::F64(10000.0))
+                .with_default(ParamValue::F64(0.01))
+        )
+        .add_constraint(
+            ParamConstraint::new("threshold_pct", ParamType::F64)
+                .with_min(ParamValue::F64(0.0))
+                .with_max(ParamValue::F64(100.0))
+                .with_default(ParamValue::F64(75.0))
+        )
+        .metadata("outputs", "signal, imb_price, imb_pct")
+        .metadata("uses_ticks", "true")
+        .machine_id(BarIndicatorId::FootprintImbalance)
+        .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Triple)
+        .requires_l2()
+        .alias("FootprintImbalance")
+        .alias("footprint_imbalance")
+        .alias("FOOTPRINT_IMBALANCE")
+        .build()
+}
+
+/// Footprint POC - Point of Control price level per bar
+pub fn signature_footprint_poc() -> IndicatorSignature {
+    IndicatorSignature::builder("FOOTPRINT_POC", CATEGORY)
+        .name("Footprint POC")
+        .description("Outputs the price level with maximum total volume in the current bar")
+        .add_constraint(
+            ParamConstraint::new("price_bucket", ParamType::F64)
+                .with_min(ParamValue::F64(1e-9))
+                .with_max(ParamValue::F64(10000.0))
+                .with_default(ParamValue::F64(0.01))
+        )
+        .metadata("outputs", "poc_price")
+        .metadata("uses_ticks", "true")
+        .machine_id(BarIndicatorId::FootprintPoc)
+        .role_kind(IndicatorRoleKind::Smoother)
+        .output_kind(IndicatorValueKind::Single)
+        .requires_l2()
+        .alias("FootprintPoc")
+        .alias("footprint_poc")
+        .alias("FOOTPRINT_POC")
+        .build()
+}
+
 /// Volume Weighted Price Levels - объемно-взвешенные ценовые уровни
 pub fn signature_volume_weighted_price_levels() -> IndicatorSignature {
     IndicatorSignature::builder("VWAP_LEVELS", CATEGORY)
@@ -185,6 +261,9 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("CL_QUEUE_IMB", signature_queue_imbalance as fn() -> IndicatorSignature),
     ("TICK_VOLUME", signature_tick_volume_analyzer as fn() -> IndicatorSignature),
     ("VWAP_LEVELS", signature_volume_weighted_price_levels as fn() -> IndicatorSignature),
+    ("FOOTPRINT_CHART", signature_footprint_chart as fn() -> IndicatorSignature),
+    ("FOOTPRINT_IMB", signature_footprint_imbalance as fn() -> IndicatorSignature),
+    ("FOOTPRINT_POC", signature_footprint_poc as fn() -> IndicatorSignature),
 ];
 
 /// Expanded catalog with all aliases auto-generated from signatures
@@ -267,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 6); // 6 cluster indicators
+        assert_eq!(count(), 9); // 9 cluster indicators
     }
 
     #[test]

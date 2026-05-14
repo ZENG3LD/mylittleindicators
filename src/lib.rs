@@ -40,6 +40,7 @@ pub use catalog::{
 };
 
 pub use core::types::{Bar, Tick, CalendarService, TimeService, OrderBook, OrderBookLevel};
+pub use bar_indicators::TickConsumer;
 
 // Signal taxonomy re-exports (runtime layer)
 pub use core::signal::{

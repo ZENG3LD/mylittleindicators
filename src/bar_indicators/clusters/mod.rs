@@ -5,6 +5,8 @@ pub mod market_microstructure;
 pub mod order_book_slope;
 pub mod queue_imbalance;
 pub mod footprint_chart;
+pub mod footprint_imbalance;
+pub mod footprint_poc;
 pub mod clusters_catalog;
 
 pub use tick_volume_analyzer::TickVolumeAnalyzer;
@@ -15,4 +17,6 @@ pub use market_microstructure::{
 };
 pub use order_book_slope::OrderBookSlope;
 pub use queue_imbalance::QueueImbalance;
-pub use footprint_chart::{FootprintChart, FootprintLevel};
+pub use footprint_chart::FootprintChart;
+pub use footprint_imbalance::FootprintImbalance;
+pub use footprint_poc::FootprintPoc;

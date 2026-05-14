@@ -16,6 +16,8 @@ pub mod volume_oscillator;
 pub mod volume_zscore;
 pub mod vpin;
 pub mod vzo;
+pub mod trade_flow_imbalance;
+pub mod uptick_downtick_volume;
 
 pub use volume_delta::*;
 pub use volume_profile::*;

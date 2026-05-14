@@ -285,7 +285,7 @@ pub enum BarIndicatorId {
     Heikinashi,  // HEIKINASHI
     Wickspike,  // WICKSPIKE (StatisticalWickDetector)
 
-    // Volume (25 indicators)
+    // Volume (27 indicators)
     Cvd,  // CVD — Cumulative Volume Delta (rolling)
     Mfi,  // MFI
     NviPvi,  // NVI_PVI
@@ -305,6 +305,8 @@ pub enum BarIndicatorId {
     Vroc,  // VROC
     Vz,  // VZ
     Vzo,  // VZO
+    TradeFlowImbalance,  // TRADE_FLOW_IMBALANCE
+    UptickDowntickVolume,  // UPTICK_DOWNTICK_VOLUME
 
     // Trend (19 indicators)
     AdxSlope,  // ADX_SLOPE
@@ -424,13 +426,16 @@ pub enum BarIndicatorId {
     RangeAtr,  // RANGE_ATR
     SpreadAnalyzer,  // SPREAD_ANALYZER
 
-    // Clusters (6 indicators)
+    // Clusters (9 indicators)
     ClQueueImb,  // CL_QUEUE_IMB
     MarketMicro,  // MARKET_MICRO
     OrderBookSlope,  // ORDER_BOOK_SLOPE
     OrderFlowImb,  // ORDER_FLOW_IMB
     TickVolume,  // TICK_VOLUME
     VwapLevels,  // VWAP_LEVELS
+    FootprintChart,  // FOOTPRINT_CHART
+    FootprintImbalance,  // FOOTPRINT_IMBALANCE
+    FootprintPoc,  // FOOTPRINT_POC
 
     // Position (19 indicators)
     AvwapDist,  // AVWAP_DIST
@@ -479,12 +484,16 @@ pub enum BarIndicatorId {
     VrZAgg,  // VR_Z_AGG
     Za,  // ZA
 
-    // Book (5 indicators)
+    // Book (9 indicators)
     BookImb,  // BOOK_IMB
     BookMicroprice,  // BOOK_MICROPRICE
     BookSlope,  // BOOK_SLOPE
     Ofi,  // OFI
     QueueImb,  // QUEUE_IMB
+    LiquiditySweep,  // BOOK_LIQUIDITY_SWEEP
+    BookPressure,  // BOOK_PRESSURE
+    SpreadDistribution,  // BOOK_SPREAD_DIST
+    OrderBookVelocity,  // BOOK_OBV
 
     // Ohlcv Average (15 indicators) - REMOVED
     // All OHLCV variants replaced by MovingAverageWithField
@@ -519,6 +528,6 @@ impl BarIndicatorId {
 }
 
 
-// Original variants: 482
+// Original variants: 484
 // Added long aliases: 155
 // Total: 637

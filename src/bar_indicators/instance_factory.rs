@@ -198,6 +198,8 @@ use crate::bar_indicators::volume::session_vwap::SessionVwap;
 use crate::bar_indicators::volume::volume_delta::VolumeDelta;
 use crate::bar_indicators::volume::volume_profile::VolumeProfile;
 use crate::bar_indicators::volume::vpin::Vpin;
+use crate::bar_indicators::volume::trade_flow_imbalance::TradeFlowImbalance;
+use crate::bar_indicators::volume::uptick_downtick_volume::UptickDowntickVolume;
 use crate::bar_indicators::volume::vpt::VolumePriceTrend;
 use crate::bar_indicators::volume::vroc::VolumeRateOfChange;
 // Support/Resistance Levels (Pivots)
@@ -315,8 +317,14 @@ use crate::bar_indicators::signal_processing::hampel_filter::HampelFilter;
 // BOOK/CLUSTERS/ENTROPY categories
 use crate::bar_indicators::book::imbalance::BookImbalanceRatio;
 use crate::bar_indicators::book::microprice::Microprice as BookMicroprice;
+use crate::bar_indicators::book::liquidity_sweep::LiquiditySweep as BookLiquiditySweep;
+use crate::bar_indicators::book::book_pressure::BookPressure as BookPressureIndicator;
+use crate::bar_indicators::book::spread_distribution::SpreadDistribution as BookSpreadDistribution;
+use crate::bar_indicators::book::order_book_velocity::OrderBookVelocity as BookOrderBookVelocity;
 use crate::core::types::OrderBook;
 use crate::bar_indicators::order_book_consumer::OrderBookConsumer;
+use crate::bar_indicators::tick_consumer::TickConsumer;
+use crate::core::types::Tick;
 use crate::bar_indicators::clusters::{
     market_microstructure::MarketMicrostructure,
     order_book_slope::OrderBookSlope,
@@ -324,6 +332,9 @@ use crate::bar_indicators::clusters::{
     queue_imbalance::QueueImbalance,
     tick_volume_analyzer::TickVolumeAnalyzer,
     volume_weighted_price_levels::VolumeWeightedPriceLevels,
+    footprint_chart::FootprintChart,
+    footprint_imbalance::FootprintImbalance,
+    footprint_poc::FootprintPoc,
 };
 use crate::bar_indicators::entropy::cross_mutual_information_lags::CrossMutualInformationLags;
 // Patterns/ML-style
@@ -834,19 +845,26 @@ pub enum IndicatorInstance {
     Obv(Box<Obv>),
     Vhf(Box<VhfSimple>),
     Psl(Box<Psl>),
-    // BOOK category (5 indicators)
+    // BOOK category (9 indicators)
     BookImb(Box<BookImbalanceRatio>),
     BookMicroprice(Box<BookMicroprice>),
     BookSlope(Box<OrderBookSlope>),
     Ofi(Box<OrderFlowImbalance>),
     QueueImb(Box<QueueImbalance>),
-    // CLUSTERS category (6 indicators)
+    LiquiditySweep(Box<BookLiquiditySweep>),
+    BookPressure(Box<BookPressureIndicator>),
+    SpreadDistribution(Box<BookSpreadDistribution>),
+    OrderBookVelocity(Box<BookOrderBookVelocity>),
+    // CLUSTERS category (9 indicators)
     ClQueueImb(Box<QueueImbalance>),
     MarketMicro(Box<MarketMicrostructure>),
     OrderBookSlope(Box<OrderBookSlope>),
     OrderFlowImb(Box<OrderFlowImbalance>),
     TickVolume(Box<TickVolumeAnalyzer>),
     VwapLevels(Box<VolumeWeightedPriceLevels>),
+    FootprintChart(Box<FootprintChart>),
+    FootprintImbalance(Box<FootprintImbalance>),
+    FootprintPoc(Box<FootprintPoc>),
     // ENTROPY category (2 indicators)
     Sampen(Box<SampleEntropy>),
     Xmil(Box<CrossMutualInformationLags>),
@@ -936,6 +954,8 @@ pub enum IndicatorInstance {
     VolumeRateOfChange(Box<VolumeRateOfChange>),
     NviPvi(Box<NegativePositiveVolumeIndex>),
     Vpin(Box<Vpin>),
+    TradeFlowImbalance(Box<TradeFlowImbalance>),
+    UptickDowntickVolume(Box<UptickDowntickVolume>),
     Cmf(Box<ChaikinMoneyFlow>),
     EaseOfMovement(Box<EaseOfMovement>),
     ForceIndex(Box<ForceIndex>),
@@ -1474,6 +1494,7 @@ impl IndicatorInstance {
             // VolumeOnly indicators - only use volume data
             Obv | MoObv | Vdelta | Vprofile | Vpt | Vroc | NviPvi | Vpin | TickVolume |
             Pvo | Pvt | Rvol | Vo | Vz | Poc | Cvd | Rvp | SessionVwap |
+            TradeFlowImbalance | UptickDowntickVolume |
 
             // Additional accumulation indicators that use volume internally
             Ad // Accumulation/Distribution uses volume
@@ -1986,7 +2007,7 @@ impl IndicatorInstance {
                 let inner = Box::new(Self::Psl(Box::new(Psl::with_source(period, config.source))));
                 Ok(*Self::wrap_oscillator(inner, config))
             }
-            // BOOK category (5 indicators)
+            // BOOK category (9 indicators)
             BarIndicatorId::BookImb => Ok(Self::BookImb(Box::default())),
             BarIndicatorId::BookMicroprice => Ok(Self::BookMicroprice(Box::default())),
             BarIndicatorId::BookSlope => Ok(Self::BookSlope(Box::default())),
@@ -1995,6 +2016,13 @@ impl IndicatorInstance {
                 Ok(Self::Ofi(Box::new(OrderFlowImbalance::new(period, tick_size))))
             }
             BarIndicatorId::QueueImb => Ok(Self::QueueImb(Box::default())),
+            BarIndicatorId::LiquiditySweep => Ok(Self::LiquiditySweep(Box::default())),
+            BarIndicatorId::BookPressure => {
+                let levels = config.additional_params.get("levels").copied().unwrap_or(5.0) as usize;
+                Ok(Self::BookPressure(Box::new(BookPressureIndicator::new(period, levels.max(1)))))
+            }
+            BarIndicatorId::SpreadDistribution => Ok(Self::SpreadDistribution(Box::new(BookSpreadDistribution::new(period)))),
+            BarIndicatorId::OrderBookVelocity => Ok(Self::OrderBookVelocity(Box::new(BookOrderBookVelocity::new(period)))),
             // CLUSTERS category (6 indicators)
             BarIndicatorId::ClQueueImb => Ok(Self::ClQueueImb(Box::default())),
             BarIndicatorId::MarketMicro => Ok(Self::MarketMicro(Box::new(MarketMicrostructure::new(period)))),
@@ -2007,6 +2035,19 @@ impl IndicatorInstance {
             BarIndicatorId::VwapLevels => {
                 let price_precision = config.additional_params.get("price_precision").copied().unwrap_or(0.01);
                 Ok(Self::VwapLevels(Box::new(VolumeWeightedPriceLevels::new(period, price_precision))))
+            }
+            BarIndicatorId::FootprintChart => {
+                let price_bucket = config.additional_params.get("price_bucket").copied().unwrap_or(0.01);
+                Ok(Self::FootprintChart(Box::new(FootprintChart::new(price_bucket))))
+            }
+            BarIndicatorId::FootprintImbalance => {
+                let price_bucket = config.additional_params.get("price_bucket").copied().unwrap_or(0.01);
+                let threshold_pct = config.additional_params.get("threshold_pct").copied().unwrap_or(75.0);
+                Ok(Self::FootprintImbalance(Box::new(FootprintImbalance::new(price_bucket, threshold_pct))))
+            }
+            BarIndicatorId::FootprintPoc => {
+                let price_bucket = config.additional_params.get("price_bucket").copied().unwrap_or(0.01);
+                Ok(Self::FootprintPoc(Box::new(FootprintPoc::new(price_bucket))))
             }
             // ENTROPY category (2 indicators)
             BarIndicatorId::Sampen => {
@@ -2441,9 +2482,17 @@ impl IndicatorInstance {
                 Ok(Self::NviPvi(Box::new(NegativePositiveVolumeIndex::with_source(nvi_ma, pvi_ma, config.source))))
             }
             BarIndicatorId::Vpin => {
-                let buckets = config.periods.first().copied().unwrap_or(50);
-                let bucket_volume = config.additional_params.get("bucket_volume").copied().unwrap_or(10_000.0);
-                Ok(Self::Vpin(Box::new(Vpin::new(buckets, bucket_volume))))
+                let bucket = config.additional_params.get("bucket_size").copied().unwrap_or(50.0);
+                let window = config.additional_params.get("smoothing_window").copied().unwrap_or(50.0) as usize;
+                Ok(Self::Vpin(Box::new(Vpin::new(bucket, window))))
+            }
+            BarIndicatorId::TradeFlowImbalance => {
+                let window = config.periods.first().copied().unwrap_or(100);
+                Ok(Self::TradeFlowImbalance(Box::new(TradeFlowImbalance::new(window))))
+            }
+            BarIndicatorId::UptickDowntickVolume => {
+                let window = config.periods.first().copied().unwrap_or(100);
+                Ok(Self::UptickDowntickVolume(Box::new(UptickDowntickVolume::new(window))))
             }
             BarIndicatorId::Cmf => {
                 let p = config.periods.first().copied().unwrap_or(20);
@@ -4295,6 +4344,10 @@ impl IndicatorInstance {
             // L2 indicators — bar pipeline is a no-op; use update_orderbook instead
             Self::BookImb(x) => x.value(),
             Self::BookMicroprice(x) => x.value(),
+            Self::LiquiditySweep(x) => x.value(),
+            Self::BookPressure(x) => x.value(),
+            Self::SpreadDistribution(x) => x.value(),
+            Self::OrderBookVelocity(x) => x.value(),
             Self::BookSlope(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -5463,6 +5516,9 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
+            // Tick-only indicators: no bar update, return current value unchanged
+            Self::TradeFlowImbalance(x) => x.value(),
+            Self::UptickDowntickVolume(x) => x.value(),
             Self::Vr(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -5933,6 +5989,10 @@ impl IndicatorInstance {
             Self::BookImb(ind) => ind.value(),
             Self::BookMicroprice(ind) => ind.value(),
             Self::BookSlope(ind) => ind.value(),
+            Self::LiquiditySweep(ind) => ind.value(),
+            Self::BookPressure(ind) => ind.value(),
+            Self::SpreadDistribution(ind) => ind.value(),
+            Self::OrderBookVelocity(ind) => ind.value(),
             Self::Bop(ind) => ind.value(),
             Self::ButterworthFilter(ind) => ind.value(),
             Self::CandleAnatomy(ind) => ind.value(),
@@ -6204,6 +6264,8 @@ impl IndicatorInstance {
             Self::VolumeZscore(ind) => ind.value(),
             Self::Vov(ind) => ind.value(),
             Self::Vpin(ind) => ind.value(),
+            Self::TradeFlowImbalance(ind) => ind.value(),
+            Self::UptickDowntickVolume(ind) => ind.value(),
             Self::Vr(ind) => ind.value(),
             Self::Vwap(ind) => ind.value(),
             Self::VwapChannels(ind) => ind.value(),
@@ -6324,6 +6386,9 @@ impl IndicatorInstance {
             }
             Self::VrZAgg(ind) => ind.value(),
             Self::VwapLevels(ind) => ind.value(),
+            Self::FootprintChart(ind) => ind.value(),
+            Self::FootprintImbalance(ind) => ind.value(),
+            Self::FootprintPoc(ind) => ind.value(),
             Self::Wave(ind) => ind.value(),
             Self::Wcomp(ind) => ind.value(),
             Self::Weekday(ind) => ind.value(),
@@ -6389,6 +6454,10 @@ impl IndicatorInstance {
             Self::BookImb(ind) => ind.is_ready(),
             Self::BookMicroprice(ind) => ind.is_ready(),
             Self::BookSlope(ind) => ind.is_ready(),
+            Self::LiquiditySweep(ind) => ind.is_ready(),
+            Self::BookPressure(ind) => ind.is_ready(),
+            Self::SpreadDistribution(ind) => ind.is_ready(),
+            Self::OrderBookVelocity(ind) => ind.is_ready(),
             Self::Bop(ind) => ind.is_ready(),
             Self::BosEventDetector(ind) => ind.is_ready(),
             Self::BpCusum(ind) => ind.is_ready(),
@@ -6741,6 +6810,8 @@ impl IndicatorInstance {
             Self::VortexIndicator(ind) => ind.is_ready(),
             Self::Vov(ind) => ind.is_ready(),
             Self::Vpin(ind) => ind.is_ready(),
+            Self::TradeFlowImbalance(ind) => ind.is_ready(),
+            Self::UptickDowntickVolume(ind) => ind.is_ready(),
             Self::Vr(ind) => ind.is_ready(),
             Self::VrZAgg(ind) => ind.is_ready(),
             Self::Vwap(ind) => ind.is_ready(),
@@ -6748,6 +6819,9 @@ impl IndicatorInstance {
             Self::VwapChannelWidth(ind) => ind.is_ready(),
             Self::VwapDistance(ind) => ind.is_ready(),
             Self::VwapLevels(ind) => ind.is_ready(),
+            Self::FootprintChart(ind) => ind.is_ready(),
+            Self::FootprintImbalance(ind) => ind.is_ready(),
+            Self::FootprintPoc(ind) => ind.is_ready(),
             Self::Vwma(ind) => ind.is_ready(),
             Self::Vzo(ind) => ind.is_ready(),
             Self::Wave(ind) => ind.is_ready(),
@@ -6824,6 +6898,10 @@ impl IndicatorInstance {
             Self::BookImb(ind) => ind.reset(),
             Self::BookMicroprice(ind) => ind.reset(),
             Self::BookSlope(ind) => ind.reset(),
+            Self::LiquiditySweep(ind) => ind.reset(),
+            Self::BookPressure(ind) => ind.reset(),
+            Self::SpreadDistribution(ind) => ind.reset(),
+            Self::OrderBookVelocity(ind) => ind.reset(),
             Self::Bop(ind) => ind.reset(),
             Self::BosEventDetector(ind) => ind.reset(),
             Self::BpCusum(ind) => ind.reset(),
@@ -7176,6 +7254,8 @@ impl IndicatorInstance {
             Self::VortexIndicator(ind) => ind.reset(),
             Self::Vov(ind) => ind.reset(),
             Self::Vpin(ind) => ind.reset(),
+            Self::TradeFlowImbalance(ind) => ind.reset(),
+            Self::UptickDowntickVolume(ind) => ind.reset(),
             Self::Vr(ind) => ind.reset(),
             Self::VrZAgg(ind) => ind.reset(),
             Self::Vwap(ind) => ind.reset(),
@@ -7183,6 +7263,9 @@ impl IndicatorInstance {
             Self::VwapChannelWidth(ind) => ind.reset(),
             Self::VwapDistance(ind) => ind.reset(),
             Self::VwapLevels(ind) => ind.reset(),
+            Self::FootprintChart(ind) => ind.reset(),
+            Self::FootprintImbalance(ind) => ind.reset(),
+            Self::FootprintPoc(ind) => ind.reset(),
             Self::Vwma(ind) => ind.reset(),
             Self::Vzo(ind) => ind.reset(),
             Self::Wave(ind) => ind.reset(),
@@ -7209,6 +7292,25 @@ impl IndicatorInstance {
         match self {
             Self::BookImb(x) => x.update_orderbook(book),
             Self::BookMicroprice(x) => x.update_orderbook(book),
+            Self::LiquiditySweep(x) => x.update_orderbook(book),
+            Self::BookPressure(x) => x.update_orderbook(book),
+            Self::SpreadDistribution(x) => x.update_orderbook(book),
+            Self::OrderBookVelocity(x) => x.update_orderbook(book),
+            _ => self.value(),
+        }
+    }
+
+    /// Process a single trade tick.
+    /// Only tick-aware indicators consume this; all others return their current value unchanged.
+    pub fn update_tick(&mut self, tick: &Tick) -> IndicatorValue {
+        match self {
+            Self::TickVolume(x) => x.update_tick(tick),
+            Self::FootprintChart(x) => x.update_tick(tick),
+            Self::FootprintImbalance(x) => x.update_tick(tick),
+            Self::FootprintPoc(x) => x.update_tick(tick),
+            Self::Vpin(x) => x.update_tick(tick),
+            Self::TradeFlowImbalance(x) => x.update_tick(tick),
+            Self::UptickDowntickVolume(x) => x.update_tick(tick),
             _ => self.value(),
         }
     }

@@ -85,7 +85,8 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Kslopez
         | BarIndicatorId::Particle
         | BarIndicatorId::Rts
-        | BarIndicatorId::Zlsma => RoleKind::Smoother,
+        | BarIndicatorId::Zlsma
+        | BarIndicatorId::FootprintPoc => RoleKind::Smoother,
 
         // ── Trend Stops ───────────────────────────────────────────────────────
         BarIndicatorId::Supertrend
@@ -264,7 +265,12 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Ii
         | BarIndicatorId::Iip
         | BarIndicatorId::Iir
-        | BarIndicatorId::MoObv => RoleKind::VolumeFlow,
+        | BarIndicatorId::MoObv
+        | BarIndicatorId::FootprintChart
+        | BarIndicatorId::FootprintImbalance
+        | BarIndicatorId::UptickDowntickVolume => RoleKind::VolumeFlow,
+
+        BarIndicatorId::TradeFlowImbalance => RoleKind::OscillatorBounded,
 
         // ── Pivot Indicators ──────────────────────────────────────────────────
         BarIndicatorId::Zigzag
@@ -311,6 +317,10 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
 
         // ── Book / L2 derived prices ──────────────────────────────────────────
         BarIndicatorId::BookMicroprice => RoleKind::Smoother,
+        BarIndicatorId::LiquiditySweep => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::BookPressure => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::SpreadDistribution => RoleKind::OscillatorBounded,
+        BarIndicatorId::OrderBookVelocity => RoleKind::Other,
 
         // ── Everything else ───────────────────────────────────────────────────
         _ => RoleKind::Other,
