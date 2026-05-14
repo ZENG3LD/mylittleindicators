@@ -521,6 +521,11 @@ pub enum BarIndicatorId {
     MarkPriceVsLast,  // MARK_PRICE_VS_LAST
     IndexPriceMomentum,  // INDEX_PRICE_MOMENTUM
 
+    // Ticker indicators (3 — consume Ticker / 24h stats)
+    Volume24hMomentum,  // VOLUME_24H_MOMENTUM
+    HighLowRangeRatio,  // HIGH_LOW_RANGE_RATIO
+    PriceChange24hZScore,  // PRICE_CHANGE_24H_ZSCORE
+
     // Ohlcv Average (15 indicators) - REMOVED
     // All OHLCV variants replaced by MovingAverageWithField
     // Use: MovingAverageWithField::new(MovingAverageType, period, OhlcvField)

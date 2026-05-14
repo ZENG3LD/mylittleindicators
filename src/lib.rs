@@ -42,9 +42,10 @@ pub use catalog::{
 pub use core::types::{
     Bar, Tick, CalendarService, TimeService,
     OrderBook, OrderBookLevel, OrderbookDelta,
-    FundingRate, MarkPrice, OpenInterest,
+    FundingRate, MarkPrice, OpenInterest, Ticker,
 };
 pub use bar_indicators::TickConsumer;
+pub use bar_indicators::TickerConsumer;
 pub use bar_indicators::orderbook_delta_consumer::OrderbookDeltaConsumer;
 pub use bar_indicators::funding_rate_consumer::FundingRateConsumer;
 pub use bar_indicators::mark_price_consumer::MarkPriceConsumer;

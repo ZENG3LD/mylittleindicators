@@ -564,6 +564,43 @@ pub fn signature_aggressor_imbalance() -> IndicatorSignature {
         .build()
 }
 
+/// Volume24hMomentum — rolling slope of 24-hour traded volume
+pub fn signature_volume_24h_momentum() -> IndicatorSignature {
+    IndicatorSignature::builder("VOLUME_24H_MOMENTUM", CATEGORY)
+        .name("Volume 24h Momentum")
+        .description("Rolling slope of 24-hour traded volume — positive = accelerating, negative = decelerating")
+        .add_constraint(ParamConstraint::period(3, 100, 10))
+        .metadata("input", "volume_24h from Ticker")
+        .metadata("uses_ticker", "true")
+        .machine_id(BarIndicatorId::Volume24hMomentum)
+        .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Single)
+        .validated()
+        .alias("Volume24hMomentum")
+        .alias("volume_24h_momentum")
+        .alias("VOLUME24HMOMENTUM")
+        .source_type(SourceType::VolumeOnly)
+        .build()
+}
+
+/// HighLowRangeRatio — (high_24h - low_24h) / last_price volatility proxy
+pub fn signature_high_low_range_ratio() -> IndicatorSignature {
+    IndicatorSignature::builder("HIGH_LOW_RANGE_RATIO", CATEGORY)
+        .name("High Low Range Ratio")
+        .description("Intraday volatility proxy: (high_24h - low_24h) / last_price")
+        .metadata("input", "high_24h, low_24h, last_price from Ticker")
+        .metadata("uses_ticker", "true")
+        .machine_id(BarIndicatorId::HighLowRangeRatio)
+        .role_kind(IndicatorRoleKind::Volatility)
+        .output_kind(IndicatorValueKind::Single)
+        .validated()
+        .alias("HighLowRangeRatio")
+        .alias("high_low_range_ratio")
+        .alias("HIGHLOWRANGERATIO")
+        .source_type(SourceType::PriceOnly)
+        .build()
+}
+
 /// Large Trade Filter — flags ticks above N× rolling median size
 pub fn signature_large_trade_filter() -> IndicatorSignature {
     IndicatorSignature::builder("LARGE_TRADE_FILTER", CATEGORY)
@@ -617,6 +654,8 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("VROC", signature_vroc as fn() -> IndicatorSignature),
     ("VZ", signature_volume_zscore as fn() -> IndicatorSignature),
     ("VZO", signature_vzo as fn() -> IndicatorSignature),
+    ("VOLUME_24H_MOMENTUM", signature_volume_24h_momentum as fn() -> IndicatorSignature),
+    ("HIGH_LOW_RANGE_RATIO", signature_high_low_range_ratio as fn() -> IndicatorSignature),
 ];
 
 /// Expanded catalog with all aliases auto-generated from signatures
@@ -681,6 +720,6 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 22);
+        assert_eq!(count(), 24);
     }
 }

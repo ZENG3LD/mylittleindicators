@@ -26,6 +26,8 @@ pub mod oi_change_rate;
 pub mod mark_price_vs_last;
 pub mod index_price_momentum;
 pub mod funding_price_divergence;
+pub mod volume_24h_momentum;
+pub mod high_low_range_ratio;
 
 pub use volume_delta::*;
 pub use volume_profile::*;

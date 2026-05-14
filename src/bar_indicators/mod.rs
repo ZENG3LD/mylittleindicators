@@ -35,6 +35,7 @@ pub mod funding_rate_consumer;
 pub mod mark_price_consumer;
 pub mod open_interest_consumer;
 pub mod tick_consumer;
+pub mod ticker_consumer;
 pub mod hybrid_tick_book_consumer;
 
 pub use indicator_value::{IndicatorValue, IndicatorValueKind};
@@ -45,6 +46,7 @@ pub use funding_rate_consumer::FundingRateConsumer;
 pub use mark_price_consumer::MarkPriceConsumer;
 pub use open_interest_consumer::OpenInterestConsumer;
 pub use tick_consumer::TickConsumer;
+pub use ticker_consumer::TickerConsumer;
 pub use hybrid_tick_book_consumer::HybridTickBookConsumer;
 
 

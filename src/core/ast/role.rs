@@ -330,6 +330,11 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::FundingZScore => RoleKind::OscillatorUnbounded,
         BarIndicatorId::OiChangeRate => RoleKind::OscillatorUnbounded,
 
+        // ── Ticker / 24h stats indicators ─────────────────────────────────────
+        BarIndicatorId::Volume24hMomentum => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::HighLowRangeRatio => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::PriceChange24hZScore => RoleKind::OscillatorBounded,
+
         // ── Everything else ───────────────────────────────────────────────────
         _ => RoleKind::Other,
     }

@@ -333,17 +333,22 @@ use crate::bar_indicators::volume::oi_change_rate::OiChangeRate;
 use crate::bar_indicators::volume::mark_price_vs_last::MarkPriceVsLast;
 use crate::bar_indicators::volume::index_price_momentum::IndexPriceMomentum;
 use crate::bar_indicators::volume::funding_price_divergence::FundingPriceMomentumDivergence;
+use crate::bar_indicators::volume::volume_24h_momentum::Volume24hMomentum;
+use crate::bar_indicators::volume::high_low_range_ratio::HighLowRangeRatio;
+use crate::bar_indicators::statistical_scoring::PriceChange24hZScore;
 use crate::core::types::OrderBook;
 use crate::core::types::OrderbookDelta;
 use crate::core::types::FundingRate;
 use crate::core::types::OpenInterest;
 use crate::core::types::MarkPrice;
+use crate::core::types::Ticker;
 use crate::bar_indicators::order_book_consumer::OrderBookConsumer;
 use crate::bar_indicators::orderbook_delta_consumer::OrderbookDeltaConsumer;
 use crate::bar_indicators::funding_rate_consumer::FundingRateConsumer;
 use crate::bar_indicators::mark_price_consumer::MarkPriceConsumer;
 use crate::bar_indicators::open_interest_consumer::OpenInterestConsumer;
 use crate::bar_indicators::tick_consumer::TickConsumer;
+use crate::bar_indicators::ticker_consumer::TickerConsumer;
 use crate::bar_indicators::hybrid_tick_book_consumer::HybridTickBookConsumer;
 use crate::core::types::Tick;
 use crate::bar_indicators::clusters::{
@@ -914,6 +919,10 @@ pub enum IndicatorInstance {
     // MARK PRICE category (2 indicators)
     MarkPriceVsLast(Box<MarkPriceVsLast>),
     IndexPriceMomentum(Box<IndexPriceMomentum>),
+    // TICKER category (3 indicators — consume Ticker / 24h stats)
+    Volume24hMomentum(Box<Volume24hMomentum>),
+    HighLowRangeRatio(Box<HighLowRangeRatio>),
+    PriceChange24hZScore(Box<PriceChange24hZScore>),
     // ENTROPY category (2 indicators)
     Sampen(Box<SampleEntropy>),
     Xmil(Box<CrossMutualInformationLags>),
@@ -1554,7 +1563,8 @@ impl IndicatorInstance {
             IcebergDetector | LevelReplenishRate | BookChurnRate |
             HiddenLiquidityDetector | TradeBookAbsorption | SweepImpactAnalyzer |
             FundingMomentum | FundingZScore | OiChangeRate | FundingPriceDivergence |
-            MarkPriceVsLast | IndexPriceMomentum
+            MarkPriceVsLast | IndexPriceMomentum |
+            Volume24hMomentum | HighLowRangeRatio | PriceChange24hZScore
 
             // Note: Most other indicators are PriceOnly and will use config.source
         )
@@ -2138,6 +2148,16 @@ impl IndicatorInstance {
             }
             BarIndicatorId::IndexPriceMomentum => {
                 Ok(Self::IndexPriceMomentum(Box::new(IndexPriceMomentum::new(period))))
+            }
+            // TICKER category (3 indicators)
+            BarIndicatorId::Volume24hMomentum => {
+                Ok(Self::Volume24hMomentum(Box::new(Volume24hMomentum::new(period))))
+            }
+            BarIndicatorId::HighLowRangeRatio => {
+                Ok(Self::HighLowRangeRatio(Box::new(HighLowRangeRatio::new())))
+            }
+            BarIndicatorId::PriceChange24hZScore => {
+                Ok(Self::PriceChange24hZScore(Box::new(PriceChange24hZScore::new(period))))
             }
             // CLUSTERS category (6 indicators)
             BarIndicatorId::ClQueueImb => Ok(Self::ClQueueImb(Box::default())),
@@ -4498,6 +4518,10 @@ impl IndicatorInstance {
             Self::FundingMomentum(x) => x.value(),
             Self::FundingZScore(x) => x.value(),
             Self::OiChangeRate(x) => x.value(),
+            // Ticker indicators — bar pipeline is a no-op; use update_ticker instead
+            Self::Volume24hMomentum(x) => x.value(),
+            Self::HighLowRangeRatio(x) => x.value(),
+            Self::PriceChange24hZScore(x) => x.value(),
             // Tick indicators — bar pipeline is a no-op; use update_tick instead
             Self::AbsorptionDetector(x) => x.value(),
             Self::TradeClusterDetector(x) => x.value(),
@@ -6162,6 +6186,10 @@ impl IndicatorInstance {
             Self::FundingPriceDivergence(ind) => ind.value(),
             Self::MarkPriceVsLast(ind) => ind.value(),
             Self::IndexPriceMomentum(ind) => ind.value(),
+            // Ticker indicators — bar pipeline is a no-op; use update_ticker instead
+            Self::Volume24hMomentum(ind) => ind.value(),
+            Self::HighLowRangeRatio(ind) => ind.value(),
+            Self::PriceChange24hZScore(ind) => ind.value(),
             Self::AbsorptionDetector(ind) => ind.value(),
             Self::TradeClusterDetector(ind) => ind.value(),
             Self::AggressorImbalance(ind) => ind.value(),
@@ -6645,6 +6673,9 @@ impl IndicatorInstance {
             Self::FundingPriceDivergence(ind) => ind.is_ready(),
             Self::MarkPriceVsLast(ind) => ind.is_ready(),
             Self::IndexPriceMomentum(ind) => ind.is_ready(),
+            Self::Volume24hMomentum(ind) => ind.is_ready(),
+            Self::HighLowRangeRatio(ind) => ind.is_ready(),
+            Self::PriceChange24hZScore(ind) => ind.is_ready(),
             Self::AbsorptionDetector(ind) => ind.is_ready(),
             Self::TradeClusterDetector(ind) => ind.is_ready(),
             Self::AggressorImbalance(ind) => ind.is_ready(),
@@ -7107,6 +7138,9 @@ impl IndicatorInstance {
             Self::FundingPriceDivergence(ind) => ind.reset(),
             Self::MarkPriceVsLast(ind) => ind.reset(),
             Self::IndexPriceMomentum(ind) => ind.reset(),
+            Self::Volume24hMomentum(ind) => ind.reset(),
+            Self::HighLowRangeRatio(ind) => ind.reset(),
+            Self::PriceChange24hZScore(ind) => ind.reset(),
             Self::AbsorptionDetector(ind) => ind.reset(),
             Self::TradeClusterDetector(ind) => ind.reset(),
             Self::AggressorImbalance(ind) => ind.reset(),
@@ -7548,6 +7582,17 @@ impl IndicatorInstance {
         match self {
             Self::MarkPriceVsLast(x) => x.update_mark(mp),
             Self::IndexPriceMomentum(x) => x.update_mark(mp),
+            _ => self.value(),
+        }
+    }
+
+    /// Process a ticker (24-hour statistics) snapshot.
+    /// Only ticker-aware indicators consume this; all others return their current value unchanged.
+    pub fn update_ticker(&mut self, ticker: &Ticker) -> IndicatorValue {
+        match self {
+            Self::Volume24hMomentum(x) => x.update_ticker(ticker),
+            Self::HighLowRangeRatio(x) => x.update_ticker(ticker),
+            Self::PriceChange24hZScore(x) => x.update_ticker(ticker),
             _ => self.value(),
         }
     }

@@ -160,6 +160,24 @@ pub fn signature_swing_age() -> IndicatorSignature {
         .build()
 }
 
+/// PriceChange24hZScore — rolling Z-score of 24-hour price-change percent
+pub fn signature_price_change_24h_z_score() -> IndicatorSignature {
+    IndicatorSignature::builder("PRICE_CHANGE_24H_ZSCORE", CATEGORY)
+        .name("Price Change 24h Z-Score")
+        .description("Rolling Z-score of 24-hour price-change percentage — measures statistical extremity of daily moves")
+        .add_constraint(ParamConstraint::period(5, 200, 20))
+        .metadata("input", "price_change_percent_24h from Ticker")
+        .metadata("uses_ticker", "true")
+        .machine_id(BarIndicatorId::PriceChange24hZScore)
+        .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
+        .validated()
+        .alias("PriceChange24hZScore")
+        .alias("price_change_24h_z_score")
+        .alias("PRICECHANGE24HZSCORE")
+        .build()
+}
+
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -172,6 +190,7 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("LIQGAP", signature_liquidity_gap_density as fn() -> IndicatorSignature),
     ("SWINGSTR", signature_swing_strength_score as fn() -> IndicatorSignature),
     ("SWING_AGE", signature_swing_age as fn() -> IndicatorSignature),
+    ("PRICE_CHANGE_24H_ZSCORE", signature_price_change_24h_z_score as fn() -> IndicatorSignature),
 ];
 
 /// Static catalog of all Statistical Scoring indicators
@@ -227,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 6);
+        assert_eq!(count(), 7);
     }
 
     #[test]
