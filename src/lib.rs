@@ -49,6 +49,7 @@ pub use bar_indicators::orderbook_delta_consumer::OrderbookDeltaConsumer;
 pub use bar_indicators::funding_rate_consumer::FundingRateConsumer;
 pub use bar_indicators::mark_price_consumer::MarkPriceConsumer;
 pub use bar_indicators::open_interest_consumer::OpenInterestConsumer;
+pub use bar_indicators::hybrid_tick_book_consumer::HybridTickBookConsumer;
 
 // Signal taxonomy re-exports (runtime layer)
 pub use core::signal::{

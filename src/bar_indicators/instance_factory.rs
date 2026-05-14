@@ -324,18 +324,27 @@ use crate::bar_indicators::book::order_book_velocity::OrderBookVelocity as BookO
 use crate::bar_indicators::book::iceberg_detector::IcebergDetector;
 use crate::bar_indicators::book::level_replenishment_rate::LevelReplenishmentRate;
 use crate::bar_indicators::book::book_churn_rate::BookChurnRate;
+use crate::bar_indicators::book::hidden_liquidity_detector::HiddenLiquidityDetector;
+use crate::bar_indicators::book::trade_book_absorption::TradeBookAbsorption as TradeBookAbsorptionIndicator;
+use crate::bar_indicators::book::sweep_impact_analyzer::SweepImpactAnalyzer;
 use crate::bar_indicators::volume::funding_momentum::FundingMomentum;
 use crate::bar_indicators::volume::funding_z_score::FundingZScore;
 use crate::bar_indicators::volume::oi_change_rate::OiChangeRate;
+use crate::bar_indicators::volume::mark_price_vs_last::MarkPriceVsLast;
+use crate::bar_indicators::volume::index_price_momentum::IndexPriceMomentum;
+use crate::bar_indicators::volume::funding_price_divergence::FundingPriceMomentumDivergence;
 use crate::core::types::OrderBook;
 use crate::core::types::OrderbookDelta;
 use crate::core::types::FundingRate;
 use crate::core::types::OpenInterest;
+use crate::core::types::MarkPrice;
 use crate::bar_indicators::order_book_consumer::OrderBookConsumer;
 use crate::bar_indicators::orderbook_delta_consumer::OrderbookDeltaConsumer;
 use crate::bar_indicators::funding_rate_consumer::FundingRateConsumer;
+use crate::bar_indicators::mark_price_consumer::MarkPriceConsumer;
 use crate::bar_indicators::open_interest_consumer::OpenInterestConsumer;
 use crate::bar_indicators::tick_consumer::TickConsumer;
+use crate::bar_indicators::hybrid_tick_book_consumer::HybridTickBookConsumer;
 use crate::core::types::Tick;
 use crate::bar_indicators::clusters::{
     market_microstructure::MarketMicrostructure,
@@ -893,10 +902,18 @@ pub enum IndicatorInstance {
     IcebergDetector(Box<IcebergDetector>),
     LevelReplenishRate(Box<LevelReplenishmentRate>),
     BookChurnRate(Box<BookChurnRate>),
+    // HYBRID TICK+BOOK category (3 indicators)
+    HiddenLiquidityDetector(Box<HiddenLiquidityDetector>),
+    TradeBookAbsorption(Box<TradeBookAbsorptionIndicator>),
+    SweepImpactAnalyzer(Box<SweepImpactAnalyzer>),
     // FUNDING / OI category (3 indicators)
     FundingMomentum(Box<FundingMomentum>),
     FundingZScore(Box<FundingZScore>),
     OiChangeRate(Box<OiChangeRate>),
+    FundingPriceDivergence(Box<FundingPriceMomentumDivergence>),
+    // MARK PRICE category (2 indicators)
+    MarkPriceVsLast(Box<MarkPriceVsLast>),
+    IndexPriceMomentum(Box<IndexPriceMomentum>),
     // ENTROPY category (2 indicators)
     Sampen(Box<SampleEntropy>),
     Xmil(Box<CrossMutualInformationLags>),
@@ -1529,7 +1546,15 @@ impl IndicatorInstance {
             TradeFlowImbalance | UptickDowntickVolume |
 
             // Additional accumulation indicators that use volume internally
-            Ad // Accumulation/Distribution uses volume
+            Ad | // Accumulation/Distribution uses volume
+
+            // L2 book / tick / funding / mark-price stream indicators — no OHLCV source
+            BookImb | BookMicroprice | LiquiditySweep | BookPressure | SpreadDistribution |
+            OrderBookVelocity | WallDetector | BookDepthChange |
+            IcebergDetector | LevelReplenishRate | BookChurnRate |
+            HiddenLiquidityDetector | TradeBookAbsorption | SweepImpactAnalyzer |
+            FundingMomentum | FundingZScore | OiChangeRate | FundingPriceDivergence |
+            MarkPriceVsLast | IndexPriceMomentum
 
             // Note: Most other indicators are PriceOnly and will use config.source
         )
@@ -2079,6 +2104,20 @@ impl IndicatorInstance {
                 let window = config.periods.first().copied().unwrap_or(20);
                 Ok(Self::BookChurnRate(Box::new(BookChurnRate::new(window))))
             }
+            // HYBRID TICK+BOOK category (3 indicators)
+            BarIndicatorId::HiddenLiquidityDetector => {
+                let price_bucket = config.additional_params.get("price_bucket").copied().unwrap_or(1.0);
+                let window = config.periods.first().copied().unwrap_or(50);
+                Ok(Self::HiddenLiquidityDetector(Box::new(HiddenLiquidityDetector::new(price_bucket, window))))
+            }
+            BarIndicatorId::TradeBookAbsorption => {
+                let window = config.periods.first().copied().unwrap_or(50);
+                Ok(Self::TradeBookAbsorption(Box::new(TradeBookAbsorptionIndicator::new(window))))
+            }
+            BarIndicatorId::SweepImpactAnalyzer => {
+                let window = config.periods.first().copied().unwrap_or(50);
+                Ok(Self::SweepImpactAnalyzer(Box::new(SweepImpactAnalyzer::new(window))))
+            }
             // FUNDING / OI category (3 indicators)
             BarIndicatorId::FundingMomentum => {
                 Ok(Self::FundingMomentum(Box::new(FundingMomentum::new(period))))
@@ -2088,6 +2127,17 @@ impl IndicatorInstance {
             }
             BarIndicatorId::OiChangeRate => {
                 Ok(Self::OiChangeRate(Box::new(OiChangeRate::new())))
+            }
+            BarIndicatorId::FundingPriceDivergence => {
+                let price_period = config.periods.get(1).copied().unwrap_or(period);
+                Ok(Self::FundingPriceDivergence(Box::new(FundingPriceMomentumDivergence::new(period, price_period))))
+            }
+            // MARK PRICE category (2 indicators)
+            BarIndicatorId::MarkPriceVsLast => {
+                Ok(Self::MarkPriceVsLast(Box::new(MarkPriceVsLast::new())))
+            }
+            BarIndicatorId::IndexPriceMomentum => {
+                Ok(Self::IndexPriceMomentum(Box::new(IndexPriceMomentum::new(period))))
             }
             // CLUSTERS category (6 indicators)
             BarIndicatorId::ClQueueImb => Ok(Self::ClQueueImb(Box::default())),
@@ -6103,9 +6153,15 @@ impl IndicatorInstance {
             Self::IcebergDetector(ind) => ind.value(),
             Self::LevelReplenishRate(ind) => ind.value(),
             Self::BookChurnRate(ind) => ind.value(),
+            Self::HiddenLiquidityDetector(ind) => ind.value(),
+            Self::TradeBookAbsorption(ind) => ind.value(),
+            Self::SweepImpactAnalyzer(ind) => ind.value(),
             Self::FundingMomentum(ind) => ind.value(),
             Self::FundingZScore(ind) => ind.value(),
             Self::OiChangeRate(ind) => ind.value(),
+            Self::FundingPriceDivergence(ind) => ind.value(),
+            Self::MarkPriceVsLast(ind) => ind.value(),
+            Self::IndexPriceMomentum(ind) => ind.value(),
             Self::AbsorptionDetector(ind) => ind.value(),
             Self::TradeClusterDetector(ind) => ind.value(),
             Self::AggressorImbalance(ind) => ind.value(),
@@ -6580,9 +6636,15 @@ impl IndicatorInstance {
             Self::IcebergDetector(ind) => ind.is_ready(),
             Self::LevelReplenishRate(ind) => ind.is_ready(),
             Self::BookChurnRate(ind) => ind.is_ready(),
+            Self::HiddenLiquidityDetector(ind) => ind.is_ready(),
+            Self::TradeBookAbsorption(ind) => ind.is_ready(),
+            Self::SweepImpactAnalyzer(ind) => ind.is_ready(),
             Self::FundingMomentum(ind) => ind.is_ready(),
             Self::FundingZScore(ind) => ind.is_ready(),
             Self::OiChangeRate(ind) => ind.is_ready(),
+            Self::FundingPriceDivergence(ind) => ind.is_ready(),
+            Self::MarkPriceVsLast(ind) => ind.is_ready(),
+            Self::IndexPriceMomentum(ind) => ind.is_ready(),
             Self::AbsorptionDetector(ind) => ind.is_ready(),
             Self::TradeClusterDetector(ind) => ind.is_ready(),
             Self::AggressorImbalance(ind) => ind.is_ready(),
@@ -7036,9 +7098,15 @@ impl IndicatorInstance {
             Self::IcebergDetector(ind) => ind.reset(),
             Self::LevelReplenishRate(ind) => ind.reset(),
             Self::BookChurnRate(ind) => ind.reset(),
+            Self::HiddenLiquidityDetector(ind) => ind.reset(),
+            Self::TradeBookAbsorption(ind) => ind.reset(),
+            Self::SweepImpactAnalyzer(ind) => ind.reset(),
             Self::FundingMomentum(ind) => ind.reset(),
             Self::FundingZScore(ind) => ind.reset(),
             Self::OiChangeRate(ind) => ind.reset(),
+            Self::FundingPriceDivergence(ind) => ind.reset(),
+            Self::MarkPriceVsLast(ind) => ind.reset(),
+            Self::IndexPriceMomentum(ind) => ind.reset(),
             Self::AbsorptionDetector(ind) => ind.reset(),
             Self::TradeClusterDetector(ind) => ind.reset(),
             Self::AggressorImbalance(ind) => ind.reset(),
@@ -7460,6 +7528,7 @@ impl IndicatorInstance {
         match self {
             Self::FundingMomentum(x) => x.update_funding(fr),
             Self::FundingZScore(x) => x.update_funding(fr),
+            Self::FundingPriceDivergence(x) => x.update_funding(fr),
             _ => self.value(),
         }
     }
@@ -7469,6 +7538,16 @@ impl IndicatorInstance {
     pub fn update_oi(&mut self, oi: &OpenInterest) -> IndicatorValue {
         match self {
             Self::OiChangeRate(x) => x.update_oi(oi),
+            _ => self.value(),
+        }
+    }
+
+    /// Process a mark price snapshot.
+    /// Only mark-price-aware indicators consume this; all others return their current value unchanged.
+    pub fn update_mark(&mut self, mp: &MarkPrice) -> IndicatorValue {
+        match self {
+            Self::MarkPriceVsLast(x) => x.update_mark(mp),
+            Self::IndexPriceMomentum(x) => x.update_mark(mp),
             _ => self.value(),
         }
     }
@@ -7489,6 +7568,28 @@ impl IndicatorInstance {
             Self::AggressorImbalance(x) => x.update_tick(tick),
             Self::LargeTradeFilter(x) => x.update_tick(tick),
             _ => self.value(),
+        }
+    }
+
+    /// Process a trade tick paired with the current orderbook snapshot.
+    /// Only hybrid Tick+Book indicators consume this; all others return their current value unchanged.
+    pub fn update_tick_with_book(&mut self, tick: &Tick, book: &OrderBook) -> IndicatorValue {
+        match self {
+            Self::HiddenLiquidityDetector(x) => x.update_tick_with_book(tick, book),
+            Self::TradeBookAbsorption(x) => x.update_tick_with_book(tick, book),
+            Self::SweepImpactAnalyzer(x) => x.update_tick_with_book(tick, book),
+            _ => self.value(),
+        }
+    }
+
+    /// Update book state for hybrid Tick+Book indicators without a trade.
+    /// Only HybridTickBookConsumer indicators respond; all others are a no-op.
+    pub fn update_book_only(&mut self, book: &OrderBook) {
+        match self {
+            Self::HiddenLiquidityDetector(x) => x.update_book_only(book),
+            Self::TradeBookAbsorption(x) => x.update_book_only(book),
+            Self::SweepImpactAnalyzer(x) => x.update_book_only(book),
+            _ => {}
         }
     }
 }

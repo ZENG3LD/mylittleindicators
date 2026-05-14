@@ -304,6 +304,76 @@ pub fn signature_book_depth_change() -> IndicatorSignature {
         .build()
 }
 
+/// Hidden Liquidity Detector — detects hidden/iceberg liquidity via trade-vs-book mismatch
+pub fn signature_hidden_liquidity_detector() -> IndicatorSignature {
+    IndicatorSignature::builder("HIDDEN_LIQUIDITY_DETECTOR", CATEGORY)
+        .name("Hidden Liquidity Detector")
+        .description("Detects hidden (iceberg) liquidity by comparing trade size vs visible book size at the traded price level")
+        .add_constraint(
+            ParamConstraint::new("price_bucket", ParamType::F64)
+                .with_min(ParamValue::F64(0.001))
+                .with_max(ParamValue::F64(1000.0))
+                .with_default(ParamValue::F64(1.0))
+                .required()
+        )
+        .add_constraint(
+            ParamConstraint::new("window", ParamType::USize)
+                .with_min(ParamValue::USize(1))
+                .with_max(ParamValue::USize(1000))
+                .with_default(ParamValue::USize(50))
+                .required()
+        )
+        .metadata("outputs", "side (+1/-1/0), last_hidden_vol, cumulative_hidden_vol")
+        .metadata("requirements", "synchronized tick + L2 orderbook")
+        .metadata("interpretation", "+1 = buy aggressor hit hidden ask, -1 = sell hit hidden bid")
+        .machine_id(BarIndicatorId::HiddenLiquidityDetector)
+        .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Triple)
+        .requires_l2()
+        .alias("HiddenLiquidityDetector")
+        .alias("hidden_liquidity_detector")
+        .alias("HIDDENLIQUIDITY")
+        .build()
+}
+
+/// Trade Book Absorption — detects absorption using real top-of-book state
+pub fn signature_trade_book_absorption() -> IndicatorSignature {
+    IndicatorSignature::builder("TRADE_BOOK_ABSORPTION", CATEGORY)
+        .name("Trade Book Absorption")
+        .description("Detects absorption at best bid/ask: trade size exceeds visible top-of-book yet price stays at level")
+        .add_constraint(ParamConstraint::period(1, 1000, 50))
+        .metadata("outputs", "side (+1/-1/0), last_absorbed_vol, cumulative_absorbed_vol")
+        .metadata("requirements", "synchronized tick + L2 orderbook")
+        .metadata("interpretation", "+1 = buy absorbed at ask, -1 = sell absorbed at bid")
+        .machine_id(BarIndicatorId::TradeBookAbsorption)
+        .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Triple)
+        .requires_l2()
+        .alias("TradeBookAbsorption")
+        .alias("trade_book_absorption")
+        .alias("TRADEBOOKABSORPTION")
+        .build()
+}
+
+/// Sweep Impact Analyzer — measures how many book levels a trade consumed
+pub fn signature_sweep_impact_analyzer() -> IndicatorSignature {
+    IndicatorSignature::builder("SWEEP_IMPACT_ANALYZER", CATEGORY)
+        .name("Sweep Impact Analyzer")
+        .description("Measures how many price levels a trade swept and the resulting slippage (effective price impact)")
+        .add_constraint(ParamConstraint::period(1, 1000, 50))
+        .metadata("outputs", "side (+1/-1/0), levels_swept, slippage")
+        .metadata("requirements", "synchronized tick + L2 orderbook")
+        .metadata("interpretation", "levels_swept ≥ 2 = real sweep; slippage = price distance from best to last level")
+        .machine_id(BarIndicatorId::SweepImpactAnalyzer)
+        .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Triple)
+        .requires_l2()
+        .alias("SweepImpactAnalyzer")
+        .alias("sweep_impact_analyzer")
+        .alias("SWEEPIMPACT")
+        .build()
+}
+
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -322,6 +392,9 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("BOOK_OBV", signature_order_book_velocity as fn() -> IndicatorSignature),
     ("WALL_DETECTOR", signature_wall_detector as fn() -> IndicatorSignature),
     ("BOOK_DEPTH_CHANGE", signature_book_depth_change as fn() -> IndicatorSignature),
+    ("HIDDEN_LIQUIDITY_DETECTOR", signature_hidden_liquidity_detector as fn() -> IndicatorSignature),
+    ("TRADE_BOOK_ABSORPTION", signature_trade_book_absorption as fn() -> IndicatorSignature),
+    ("SWEEP_IMPACT_ANALYZER", signature_sweep_impact_analyzer as fn() -> IndicatorSignature),
 ];
 
 /// Expanded catalog with all aliases auto-generated from signatures
@@ -386,7 +459,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 11);
+        assert_eq!(count(), 14);
     }
 
     #[test]

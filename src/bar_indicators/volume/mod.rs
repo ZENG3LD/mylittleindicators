@@ -23,6 +23,9 @@ pub mod large_trade_filter;
 pub mod funding_momentum;
 pub mod funding_z_score;
 pub mod oi_change_rate;
+pub mod mark_price_vs_last;
+pub mod index_price_momentum;
+pub mod funding_price_divergence;
 
 pub use volume_delta::*;
 pub use volume_profile::*;

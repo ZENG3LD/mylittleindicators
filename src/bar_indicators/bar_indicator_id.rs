@@ -506,10 +506,20 @@ pub enum BarIndicatorId {
     LevelReplenishRate,  // LEVEL_REPLENISH_RATE
     BookChurnRate,  // BOOK_CHURN_RATE
 
+    // Hybrid Tick+Book indicators (3 — consume Tick + OrderBook together)
+    HiddenLiquidityDetector,  // HIDDEN_LIQUIDITY_DETECTOR
+    TradeBookAbsorption,  // TRADE_BOOK_ABSORPTION
+    SweepImpactAnalyzer,  // SWEEP_IMPACT_ANALYZER
+
     // Funding / OI indicators (3 — consume FundingRate / OpenInterest)
     FundingMomentum,  // FUNDING_MOMENTUM
     FundingZScore,  // FUNDING_ZSCORE
     OiChangeRate,  // OI_CHANGE_RATE
+    FundingPriceDivergence,  // FUNDING_PRICE_DIVERGENCE
+
+    // MarkPrice indicators (2 — consume MarkPrice)
+    MarkPriceVsLast,  // MARK_PRICE_VS_LAST
+    IndexPriceMomentum,  // INDEX_PRICE_MOMENTUM
 
     // Ohlcv Average (15 indicators) - REMOVED
     // All OHLCV variants replaced by MovingAverageWithField
