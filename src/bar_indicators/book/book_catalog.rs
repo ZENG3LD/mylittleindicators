@@ -255,6 +255,55 @@ pub fn signature_queue_imbalance() -> IndicatorSignature {
         .build()
 }
 
+/// Wall Detector — percentile-based large size level detector
+pub fn signature_wall_detector() -> IndicatorSignature {
+    IndicatorSignature::builder("WALL_DETECTOR", CATEGORY)
+        .name("Wall Detector")
+        .description("Detects anomalously large bid/ask levels (walls) using rolling percentile threshold")
+        .add_constraint(ParamConstraint::period(10, 2000, 200))
+        .add_constraint(
+            ParamConstraint::new("percentile_threshold", ParamType::F64)
+                .with_min(ParamValue::F64(50.0))
+                .with_max(ParamValue::F64(99.9))
+                .with_default(ParamValue::F64(95.0))
+        )
+        .add_constraint(
+            ParamConstraint::new("levels_to_sample", ParamType::F64)
+                .with_min(ParamValue::F64(1.0))
+                .with_max(ParamValue::F64(50.0))
+                .with_default(ParamValue::F64(20.0))
+        )
+        .metadata("outputs", "bid_wall_price, ask_wall_price, total_wall_size")
+        .metadata("requirements", "L2 orderbook snapshots")
+        .machine_id(BarIndicatorId::WallDetector)
+        .role_kind(IndicatorRoleKind::Level)
+        .output_kind(IndicatorValueKind::Triple)
+        .requires_l2()
+        .alias("WallDetector")
+        .alias("wall_detector")
+        .alias("WALLDETECTOR")
+        .build()
+}
+
+/// Book Depth Change — delta of aggregated bid/ask depth between snapshots
+pub fn signature_book_depth_change() -> IndicatorSignature {
+    IndicatorSignature::builder("BOOK_DEPTH_CHANGE", CATEGORY)
+        .name("Book Depth Change")
+        .description("Delta of total bid and ask depth between consecutive orderbook snapshots")
+        .add_constraint(ParamConstraint::period(1, 100, 10))
+        .metadata("outputs", "bid_depth_change, ask_depth_change")
+        .metadata("requirements", "L2 orderbook consecutive snapshots")
+        .metadata("interpretation", "Positive bid_change = book deepening on bid side")
+        .machine_id(BarIndicatorId::BookDepthChange)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Double)
+        .requires_l2()
+        .alias("BookDepthChange")
+        .alias("book_depth_change")
+        .alias("BOOKDEPTHCHANGE")
+        .build()
+}
+
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -271,6 +320,8 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("BOOK_PRESSURE", signature_book_pressure as fn() -> IndicatorSignature),
     ("BOOK_SPREAD_DIST", signature_spread_distribution as fn() -> IndicatorSignature),
     ("BOOK_OBV", signature_order_book_velocity as fn() -> IndicatorSignature),
+    ("WALL_DETECTOR", signature_wall_detector as fn() -> IndicatorSignature),
+    ("BOOK_DEPTH_CHANGE", signature_book_depth_change as fn() -> IndicatorSignature),
 ];
 
 /// Expanded catalog with all aliases auto-generated from signatures
@@ -335,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 9);
+        assert_eq!(count(), 11);
     }
 
     #[test]

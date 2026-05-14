@@ -1,4 +1,10 @@
-// Center of Gravity (COG) - Ehlers proxy (placeholder)
+// Center of Gravity (COG) — Ehlers oscillator.
+//
+// Formula from John Ehlers "Cybernetic Analysis for Stocks and Futures":
+//   COG = -sum(price[i] * (i+1), i=0..N-1) / sum(price[i], i=0..N-1)  +  (N+1)/2
+//
+// The result is centred around 0. Negative = recent bars heavier (uptrend).
+// Positive = older bars heavier (downtrend).
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 

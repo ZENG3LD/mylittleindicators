@@ -307,6 +307,8 @@ pub enum BarIndicatorId {
     Vzo,  // VZO
     TradeFlowImbalance,  // TRADE_FLOW_IMBALANCE
     UptickDowntickVolume,  // UPTICK_DOWNTICK_VOLUME
+    AggressorImbalance,  // AGGRESSOR_IMBALANCE
+    LargeTradeFilter,  // LARGE_TRADE_FILTER
 
     // Trend (19 indicators)
     AdxSlope,  // ADX_SLOPE
@@ -426,7 +428,7 @@ pub enum BarIndicatorId {
     RangeAtr,  // RANGE_ATR
     SpreadAnalyzer,  // SPREAD_ANALYZER
 
-    // Clusters (9 indicators)
+    // Clusters (11 indicators)
     ClQueueImb,  // CL_QUEUE_IMB
     MarketMicro,  // MARKET_MICRO
     OrderBookSlope,  // ORDER_BOOK_SLOPE
@@ -436,6 +438,8 @@ pub enum BarIndicatorId {
     FootprintChart,  // FOOTPRINT_CHART
     FootprintImbalance,  // FOOTPRINT_IMBALANCE
     FootprintPoc,  // FOOTPRINT_POC
+    AbsorptionDetector,  // ABSORPTION_DETECTOR
+    TradeClusterDetector,  // TRADE_CLUSTER_DETECTOR
 
     // Position (19 indicators)
     AvwapDist,  // AVWAP_DIST
@@ -484,7 +488,7 @@ pub enum BarIndicatorId {
     VrZAgg,  // VR_Z_AGG
     Za,  // ZA
 
-    // Book (9 indicators)
+    // Book (11 indicators)
     BookImb,  // BOOK_IMB
     BookMicroprice,  // BOOK_MICROPRICE
     BookSlope,  // BOOK_SLOPE
@@ -494,6 +498,18 @@ pub enum BarIndicatorId {
     BookPressure,  // BOOK_PRESSURE
     SpreadDistribution,  // BOOK_SPREAD_DIST
     OrderBookVelocity,  // BOOK_OBV
+    WallDetector,  // WALL_DETECTOR
+    BookDepthChange,  // BOOK_DEPTH_CHANGE
+
+    // Book delta indicators (3 — consume OrderbookDelta)
+    IcebergDetector,  // ICEBERG_DETECTOR
+    LevelReplenishRate,  // LEVEL_REPLENISH_RATE
+    BookChurnRate,  // BOOK_CHURN_RATE
+
+    // Funding / OI indicators (3 — consume FundingRate / OpenInterest)
+    FundingMomentum,  // FUNDING_MOMENTUM
+    FundingZScore,  // FUNDING_ZSCORE
+    OiChangeRate,  // OI_CHANGE_RATE
 
     // Ohlcv Average (15 indicators) - REMOVED
     // All OHLCV variants replaced by MovingAverageWithField

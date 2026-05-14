@@ -21,6 +21,53 @@ use crate::bar_indicators::instance_factory::IndicatorInstance;
 /// A detected swing point: `(absolute_bar_index, price_value, oscillator_value)`.
 type SwingPoint = (usize, f64, f64);
 
+/// Compute the least-squares slope of a series of scalar values.
+///
+/// Returns the slope coefficient `b` in `y = a + b·x` where x = 0, 1, 2, …
+/// Returns `0.0` for series with fewer than 2 elements.
+fn compute_slope(values: &[f64]) -> f64 {
+    let n = values.len();
+    if n < 2 {
+        return 0.0;
+    }
+    let n_f = n as f64;
+    let sum_x: f64 = (0..n).map(|i| i as f64).sum();
+    let sum_y: f64 = values.iter().sum();
+    let sum_xy: f64 = values.iter().enumerate().map(|(i, &y)| i as f64 * y).sum();
+    let sum_x2: f64 = (0..n).map(|i| (i as f64).powi(2)).sum();
+    let denom = n_f * sum_x2 - sum_x * sum_x;
+    if denom.abs() < 1e-12 {
+        return 0.0;
+    }
+    (n_f * sum_xy - sum_x * sum_y) / denom
+}
+
+/// Multi-pivot divergence via linear regression over N swing points.
+///
+/// Returns `Some((signal_value, direction))` where `signal_value` encodes:
+/// - `+2.0` Bullish Regular (price slope < 0, osc slope > 0)
+/// - `-2.0` Bearish Regular (price slope > 0, osc slope < 0)
+/// - `None` otherwise.
+fn detect_multi_pivot_divergence(swings: &[SwingPoint], n: usize) -> Option<f64> {
+    if swings.len() < n {
+        return None;
+    }
+    let last_n = &swings[swings.len() - n..];
+    let prices: Vec<f64> = last_n.iter().map(|s| s.1).collect();
+    let oscs: Vec<f64> = last_n.iter().map(|s| s.2).collect();
+
+    let price_slope = compute_slope(&prices);
+    let osc_slope = compute_slope(&oscs);
+
+    if price_slope < 0.0 && osc_slope > 0.0 {
+        Some(2.0) // Bullish Regular
+    } else if price_slope > 0.0 && osc_slope < 0.0 {
+        Some(-2.0) // Bearish Regular
+    } else {
+        None
+    }
+}
+
 /// Computes divergence strength from two swing points.
 ///
 /// Returned value is in `[0.0, 1.0]`.
@@ -100,6 +147,11 @@ pub struct OscillatorWithDivergence {
 
     /// Optional ATR for strength normalisation (layer 3 only).
     atr: Option<Box<IndicatorInstance>>,
+
+    /// How many swing points to compare for divergence detection.
+    /// 2 = compare only last 2 (original behaviour, pairwise comparison).
+    /// 3-4 = compare last N via linear-regression slope analysis.
+    compare_swings: usize,
 }
 
 impl std::fmt::Debug for OscillatorWithDivergence {
@@ -122,11 +174,14 @@ impl OscillatorWithDivergence {
 
     /// Creates a new wrapper around `inner`.
     ///
-    /// - `swing_lookback` — bars left/right of candidate for swing comparison (min 2).
-    /// - `detect_regular` — enable regular divergence signals (`±2`).
-    /// - `detect_hidden`  — enable hidden divergence signals (`±1`).
-    /// - `with_strength`  — emit layer 3 `Triple` output; if `false` emits layer 2 `Double`.
-    /// - `atr`            — ATR instance for strength normalisation (layer 3 only).
+    /// - `swing_lookback`  — bars left/right of candidate for swing comparison (min 2).
+    /// - `detect_regular`  — enable regular divergence signals (`±2`).
+    /// - `detect_hidden`   — enable hidden divergence signals (`±1`).
+    /// - `with_strength`   — emit layer 3 `Triple` output; if `false` emits layer 2 `Double`.
+    /// - `atr`             — ATR instance for strength normalisation (layer 3 only).
+    /// - `compare_swings`  — how many swing points to include in divergence analysis
+    ///                       (2 = pairwise classic; 3-4 = linear-regression multi-pivot).
+    ///                       Clamped to `[2, MAX_SWINGS]`.
     pub fn new(
         inner: Box<IndicatorInstance>,
         swing_lookback: usize,
@@ -135,6 +190,20 @@ impl OscillatorWithDivergence {
         with_strength: bool,
         atr: Option<Box<IndicatorInstance>>,
     ) -> Self {
+        Self::with_compare_swings(inner, swing_lookback, detect_regular, detect_hidden, with_strength, atr, 2)
+    }
+
+    /// Like `new` but with an explicit `compare_swings` parameter.
+    pub fn with_compare_swings(
+        inner: Box<IndicatorInstance>,
+        swing_lookback: usize,
+        detect_regular: bool,
+        detect_hidden: bool,
+        with_strength: bool,
+        atr: Option<Box<IndicatorInstance>>,
+        compare_swings: usize,
+    ) -> Self {
+        let cs = compare_swings.clamp(2, Self::MAX_SWINGS);
         Self {
             inner,
             swing_lookback: swing_lookback.max(2),
@@ -147,6 +216,7 @@ impl OscillatorWithDivergence {
             swing_lows: Vec::with_capacity(Self::MAX_SWINGS + 1),
             bar_counter: 0,
             atr,
+            compare_swings: cs,
         }
     }
 
@@ -221,26 +291,38 @@ impl OscillatorWithDivergence {
                 if self.swing_highs.len() > Self::MAX_SWINGS {
                     self.swing_highs.remove(0);
                 }
-                if self.swing_highs.len() >= 2 {
-                    let n = self.swing_highs.len();
-                    let s0 = self.swing_highs[n - 2];
-                    let s1 = self.swing_highs[n - 1];
+                if self.compare_swings <= 2 {
+                    // Classic pairwise comparison.
+                    if self.swing_highs.len() >= 2 {
+                        let n = self.swing_highs.len();
+                        let s0 = self.swing_highs[n - 2];
+                        let s1 = self.swing_highs[n - 1];
 
-                    // Bearish Regular: price[1] > price[0] AND osc[1] < osc[0]
-                    let bearish_regular =
-                        self.detect_regular && s1.1 > s0.1 && s1.2 < s0.2;
-                    // Bearish Hidden: price[1] < price[0] AND osc[1] > osc[0]
-                    let bearish_hidden =
-                        self.detect_hidden && s1.1 < s0.1 && s1.2 > s0.2;
+                        let bearish_regular =
+                            self.detect_regular && s1.1 > s0.1 && s1.2 < s0.2;
+                        let bearish_hidden =
+                            self.detect_hidden && s1.1 < s0.1 && s1.2 > s0.2;
 
-                    if bearish_regular {
-                        new_signal = -2.0;
-                    } else if bearish_hidden {
-                        new_signal = -1.0;
+                        if bearish_regular {
+                            new_signal = -2.0;
+                        } else if bearish_hidden {
+                            new_signal = -1.0;
+                        }
+
+                        if new_signal != 0.0 && self.with_strength {
+                            new_strength = self.calc_strength(&s0, &s1, atr_now);
+                        }
                     }
-
-                    if new_signal != 0.0 && self.with_strength {
-                        new_strength = self.calc_strength(&s0, &s1, atr_now);
+                } else if self.detect_regular && self.swing_highs.len() >= self.compare_swings {
+                    // Multi-pivot: linear regression over last N swing-high points.
+                    if let Some(sig) = detect_multi_pivot_divergence(&self.swing_highs, self.compare_swings) {
+                        new_signal = sig;
+                        if self.with_strength && self.swing_highs.len() >= 2 {
+                            let n = self.swing_highs.len();
+                            let s0 = self.swing_highs[n - 2];
+                            let s1 = self.swing_highs[n - 1];
+                            new_strength = self.calc_strength(&s0, &s1, atr_now);
+                        }
                     }
                 }
             }
@@ -252,27 +334,40 @@ impl OscillatorWithDivergence {
                 if self.swing_lows.len() > Self::MAX_SWINGS {
                     self.swing_lows.remove(0);
                 }
-                if self.swing_lows.len() >= 2 {
-                    let n = self.swing_lows.len();
-                    let s0 = self.swing_lows[n - 2];
-                    let s1 = self.swing_lows[n - 1];
+                if self.compare_swings <= 2 {
+                    // Classic pairwise comparison.
+                    if self.swing_lows.len() >= 2 {
+                        let n = self.swing_lows.len();
+                        let s0 = self.swing_lows[n - 2];
+                        let s1 = self.swing_lows[n - 1];
 
-                    // Bullish Regular: price[1] < price[0] AND osc[1] > osc[0]
-                    let bull_regular =
-                        self.detect_regular && s1.1 < s0.1 && s1.2 > s0.2;
-                    // Bullish Hidden: price[1] > price[0] AND osc[1] < osc[0]
-                    let bull_hidden =
-                        self.detect_hidden && s1.1 > s0.1 && s1.2 < s0.2;
+                        let bull_regular =
+                            self.detect_regular && s1.1 < s0.1 && s1.2 > s0.2;
+                        let bull_hidden =
+                            self.detect_hidden && s1.1 > s0.1 && s1.2 < s0.2;
 
-                    // Prioritise Regular > Hidden; bullish only if no bearish signal yet.
-                    if new_signal == 0.0 {
-                        if bull_regular {
-                            new_signal = 2.0;
-                        } else if bull_hidden {
-                            new_signal = 1.0;
+                        if new_signal == 0.0 {
+                            if bull_regular {
+                                new_signal = 2.0;
+                            } else if bull_hidden {
+                                new_signal = 1.0;
+                            }
+
+                            if new_signal != 0.0 && self.with_strength {
+                                new_strength = self.calc_strength(&s0, &s1, atr_now);
+                            }
                         }
-
-                        if new_signal != 0.0 && self.with_strength {
+                    }
+                } else if self.detect_regular && new_signal == 0.0
+                    && self.swing_lows.len() >= self.compare_swings
+                {
+                    // Multi-pivot: linear regression over last N swing-low points.
+                    if let Some(sig) = detect_multi_pivot_divergence(&self.swing_lows, self.compare_swings) {
+                        new_signal = sig;
+                        if self.with_strength && self.swing_lows.len() >= 2 {
+                            let n = self.swing_lows.len();
+                            let s0 = self.swing_lows[n - 2];
+                            let s1 = self.swing_lows[n - 1];
                             new_strength = self.calc_strength(&s0, &s1, atr_now);
                         }
                     }
@@ -371,6 +466,11 @@ impl OscillatorWithDivergence {
     /// `true` if hidden divergence detection is enabled.
     pub fn detects_hidden(&self) -> bool {
         self.detect_hidden
+    }
+
+    /// Number of swing points used for divergence analysis.
+    pub fn compare_swings(&self) -> usize {
+        self.compare_swings
     }
 }
 
@@ -756,6 +856,90 @@ mod tests {
                 v
             );
         }
+    }
+
+    // ── Multi-pivot tests (compare_swings parameter) ──────────────────────────
+
+    #[test]
+    fn compare_swings_2_identical_to_classic_behavior() {
+        // compare_swings=2 should fire on the same pattern as the classic case.
+        let mut classic =
+            OscillatorWithDivergence::new(sma_inner(5), 3, true, true, false, None);
+        let mut multi =
+            OscillatorWithDivergence::with_compare_swings(sma_inner(5), 3, true, true, false, None, 2);
+
+        let mut classic_vals: Vec<IndicatorValue> = Vec::new();
+        let mut multi_vals: Vec<IndicatorValue> = Vec::new();
+
+        // Same bullish-regular sequence as `synthetic_bullish_regular_divergence`.
+        let feed_both = |c: &mut OscillatorWithDivergence, m: &mut OscillatorWithDivergence,
+                          vc: &mut Vec<IndicatorValue>, vm: &mut Vec<IndicatorValue>, price: f64| {
+            vc.push(feed(c, price, 1000.0));
+            vm.push(feed(m, price, 1000.0));
+        };
+
+        macro_rules! feed_flat_both {
+            ($c:expr, $m:expr, $vc:expr, $vm:expr, $p:expr, $n:expr) => {
+                for _ in 0..$n { feed_both($c, $m, $vc, $vm, $p); }
+            };
+        }
+
+        feed_flat_both!(&mut classic, &mut multi, &mut classic_vals, &mut multi_vals, 100.0, 8);
+        feed_flat_both!(&mut classic, &mut multi, &mut classic_vals, &mut multi_vals, 110.0, 4);
+
+        // Swing low 1
+        feed_flat_both!(&mut classic, &mut multi, &mut classic_vals, &mut multi_vals, 120.0, 4);
+        feed_both(&mut classic, &mut multi, &mut classic_vals, &mut multi_vals, 80.0);
+        feed_flat_both!(&mut classic, &mut multi, &mut classic_vals, &mut multi_vals, 120.0, 3);
+
+        feed_flat_both!(&mut classic, &mut multi, &mut classic_vals, &mut multi_vals, 140.0, 4);
+
+        // Swing low 2
+        feed_flat_both!(&mut classic, &mut multi, &mut classic_vals, &mut multi_vals, 150.0, 4);
+        feed_both(&mut classic, &mut multi, &mut classic_vals, &mut multi_vals, 70.0);
+        feed_flat_both!(&mut classic, &mut multi, &mut classic_vals, &mut multi_vals, 150.0, 3);
+
+        let c_sigs = collect_signals(&classic_vals);
+        let m_sigs = collect_signals(&multi_vals);
+        // Both should produce at least one +2.0 signal.
+        assert!(c_sigs.iter().any(|&s| s == 2.0), "classic missing +2: {:?}", c_sigs);
+        assert!(m_sigs.iter().any(|&s| s == 2.0), "multi cs=2 missing +2: {:?}", m_sigs);
+    }
+
+    #[test]
+    fn compare_swings_3_detects_trend_across_3_points() {
+        // Build 3 swing lows with:
+        //   price: 90, 80, 70  (declining — negative slope)
+        //   SMA at those bars: increasing (achieved by raising surrounding bars)
+        // → bullish regular divergence detected by regression.
+        //
+        // Swing low N: dip=D, surround=S → SMA(5) = (4S+D)/5
+        //   SL1: dip=90, surround=120 → SMA=(480+90)/5=114
+        //   SL2: dip=80, surround=130 → SMA=(520+80)/5=120  (120>114, 80<90 ✓)
+        //   SL3: dip=70, surround=140 → SMA=(560+70)/5=126  (126>120, 70<80 ✓)
+        // price_slope < 0, osc_slope > 0 → bullish regular via regression.
+
+        let mut ind =
+            OscillatorWithDivergence::with_compare_swings(sma_inner(5), 3, true, true, false, None, 3);
+        let mut all: Vec<IndicatorValue> = Vec::new();
+
+        all.extend(feed_flat(&mut ind, 100.0, 8));
+        all.extend(feed_flat(&mut ind, 115.0, 4));
+
+        all.extend(swing_low_segment(&mut ind, 90.0, 120.0));
+        all.extend(feed_flat(&mut ind, 125.0, 4));
+
+        all.extend(swing_low_segment(&mut ind, 80.0, 130.0));
+        all.extend(feed_flat(&mut ind, 135.0, 4));
+
+        all.extend(swing_low_segment(&mut ind, 70.0, 140.0));
+
+        let signals = collect_signals(&all);
+        assert!(
+            signals.iter().any(|&s| s == 2.0),
+            "compare_swings=3 should detect bullish regular via regression; signals: {:?}",
+            signals
+        );
     }
 
     #[test]

@@ -1,4 +1,11 @@
-// DSS Bressert (Double Smoothed Stochastic) - placeholder
+// DSS Bressert — Double Smoothed Stochastic oscillator.
+//
+// Algorithm:
+//   1. Raw %K over k_period bars: (close - min_low) / (max_high - min_low) * 100
+//   2. First EMA(smooth_period) of %K  → smoothed_k
+//   3. Second EMA(smooth_period) of smoothed_k  → DSS value
+//
+// Output in [0, 100]. Above 50 = bullish, below 50 = bearish.
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;

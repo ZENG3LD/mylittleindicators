@@ -1,4 +1,15 @@
-// STFT band energy ratio (placeholder using rolling var over subwindows)
+// STFT Band Energy Ratio — streaming high-vs-low frequency energy proxy.
+//
+// True STFT requires FFT (not available without external crates). This implementation
+// approximates spectral band energy by comparing variance of the oldest quarter of the
+// rolling window (low-frequency proxy) against the newest quarter (high-frequency proxy).
+//
+// Interpretation:
+//   ratio > 1 → recent price changes noisier than slower baseline (high-freq dominant)
+//   ratio < 1 → slow trend dominates over short-term noise
+//   ratio ≈ 1 → uniform energy across timescales
+//
+// `window` = total ring-buffer size (4–1024), `split` = fraction divisor (1–8).
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 

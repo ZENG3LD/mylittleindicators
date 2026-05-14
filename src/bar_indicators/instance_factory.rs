@@ -321,8 +321,20 @@ use crate::bar_indicators::book::liquidity_sweep::LiquiditySweep as BookLiquidit
 use crate::bar_indicators::book::book_pressure::BookPressure as BookPressureIndicator;
 use crate::bar_indicators::book::spread_distribution::SpreadDistribution as BookSpreadDistribution;
 use crate::bar_indicators::book::order_book_velocity::OrderBookVelocity as BookOrderBookVelocity;
+use crate::bar_indicators::book::iceberg_detector::IcebergDetector;
+use crate::bar_indicators::book::level_replenishment_rate::LevelReplenishmentRate;
+use crate::bar_indicators::book::book_churn_rate::BookChurnRate;
+use crate::bar_indicators::volume::funding_momentum::FundingMomentum;
+use crate::bar_indicators::volume::funding_z_score::FundingZScore;
+use crate::bar_indicators::volume::oi_change_rate::OiChangeRate;
 use crate::core::types::OrderBook;
+use crate::core::types::OrderbookDelta;
+use crate::core::types::FundingRate;
+use crate::core::types::OpenInterest;
 use crate::bar_indicators::order_book_consumer::OrderBookConsumer;
+use crate::bar_indicators::orderbook_delta_consumer::OrderbookDeltaConsumer;
+use crate::bar_indicators::funding_rate_consumer::FundingRateConsumer;
+use crate::bar_indicators::open_interest_consumer::OpenInterestConsumer;
 use crate::bar_indicators::tick_consumer::TickConsumer;
 use crate::core::types::Tick;
 use crate::bar_indicators::clusters::{
@@ -335,7 +347,13 @@ use crate::bar_indicators::clusters::{
     footprint_chart::FootprintChart,
     footprint_imbalance::FootprintImbalance,
     footprint_poc::FootprintPoc,
+    absorption_detector::AbsorptionDetector,
+    trade_cluster_detector::TradeClusterDetector,
 };
+use crate::bar_indicators::volume::aggressor_imbalance::AggressorImbalance;
+use crate::bar_indicators::volume::large_trade_filter::LargeTradeFilter;
+use crate::bar_indicators::book::wall_detector::WallDetector as BookWallDetector;
+use crate::bar_indicators::book::book_depth_change::BookDepthChange as BookDepthChangeIndicator;
 use crate::bar_indicators::entropy::cross_mutual_information_lags::CrossMutualInformationLags;
 // Patterns/ML-style
 use crate::bar_indicators::candles::candle_anatomy::CandleAnatomy;
@@ -865,6 +883,20 @@ pub enum IndicatorInstance {
     FootprintChart(Box<FootprintChart>),
     FootprintImbalance(Box<FootprintImbalance>),
     FootprintPoc(Box<FootprintPoc>),
+    AbsorptionDetector(Box<AbsorptionDetector>),
+    TradeClusterDetector(Box<TradeClusterDetector>),
+    AggressorImbalance(Box<AggressorImbalance>),
+    LargeTradeFilter(Box<LargeTradeFilter>),
+    WallDetector(Box<BookWallDetector>),
+    BookDepthChange(Box<BookDepthChangeIndicator>),
+    // BOOK DELTA category (3 indicators)
+    IcebergDetector(Box<IcebergDetector>),
+    LevelReplenishRate(Box<LevelReplenishmentRate>),
+    BookChurnRate(Box<BookChurnRate>),
+    // FUNDING / OI category (3 indicators)
+    FundingMomentum(Box<FundingMomentum>),
+    FundingZScore(Box<FundingZScore>),
+    OiChangeRate(Box<OiChangeRate>),
     // ENTROPY category (2 indicators)
     Sampen(Box<SampleEntropy>),
     Xmil(Box<CrossMutualInformationLags>),
@@ -2023,6 +2055,40 @@ impl IndicatorInstance {
             }
             BarIndicatorId::SpreadDistribution => Ok(Self::SpreadDistribution(Box::new(BookSpreadDistribution::new(period)))),
             BarIndicatorId::OrderBookVelocity => Ok(Self::OrderBookVelocity(Box::new(BookOrderBookVelocity::new(period)))),
+            BarIndicatorId::WallDetector => {
+                let history_window = config.periods.first().copied().unwrap_or(200);
+                let pct = config.additional_params.get("percentile_threshold").copied().unwrap_or(95.0);
+                let levels = config.additional_params.get("levels_to_sample").copied().unwrap_or(20.0) as usize;
+                Ok(Self::WallDetector(Box::new(BookWallDetector::new(history_window, pct, levels.max(1)))))
+            }
+            BarIndicatorId::BookDepthChange => {
+                let levels = config.periods.first().copied().unwrap_or(10);
+                Ok(Self::BookDepthChange(Box::new(BookDepthChangeIndicator::new(levels))))
+            }
+            // BOOK DELTA category (3 indicators)
+            BarIndicatorId::IcebergDetector => {
+                let price_bucket = config.additional_params.get("price_bucket").copied().unwrap_or(1.0);
+                let threshold = config.additional_params.get("threshold").copied().unwrap_or(3.0) as u32;
+                Ok(Self::IcebergDetector(Box::new(IcebergDetector::new(price_bucket, threshold))))
+            }
+            BarIndicatorId::LevelReplenishRate => {
+                let window = config.periods.first().copied().unwrap_or(100);
+                Ok(Self::LevelReplenishRate(Box::new(LevelReplenishmentRate::new(window))))
+            }
+            BarIndicatorId::BookChurnRate => {
+                let window = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::BookChurnRate(Box::new(BookChurnRate::new(window))))
+            }
+            // FUNDING / OI category (3 indicators)
+            BarIndicatorId::FundingMomentum => {
+                Ok(Self::FundingMomentum(Box::new(FundingMomentum::new(period))))
+            }
+            BarIndicatorId::FundingZScore => {
+                Ok(Self::FundingZScore(Box::new(FundingZScore::new(period))))
+            }
+            BarIndicatorId::OiChangeRate => {
+                Ok(Self::OiChangeRate(Box::new(OiChangeRate::new())))
+            }
             // CLUSTERS category (6 indicators)
             BarIndicatorId::ClQueueImb => Ok(Self::ClQueueImb(Box::default())),
             BarIndicatorId::MarketMicro => Ok(Self::MarketMicro(Box::new(MarketMicrostructure::new(period)))),
@@ -2048,6 +2114,16 @@ impl IndicatorInstance {
             BarIndicatorId::FootprintPoc => {
                 let price_bucket = config.additional_params.get("price_bucket").copied().unwrap_or(0.01);
                 Ok(Self::FootprintPoc(Box::new(FootprintPoc::new(price_bucket))))
+            }
+            BarIndicatorId::AbsorptionDetector => {
+                let window = config.periods.first().copied().unwrap_or(50);
+                Ok(Self::AbsorptionDetector(Box::new(AbsorptionDetector::new(window))))
+            }
+            BarIndicatorId::TradeClusterDetector => {
+                let price_bucket = config.additional_params.get("price_bucket").copied().unwrap_or(0.01);
+                let threshold = config.additional_params.get("cluster_threshold").copied().unwrap_or(3.0) as usize;
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(5000.0) as i64;
+                Ok(Self::TradeClusterDetector(Box::new(TradeClusterDetector::new(price_bucket, threshold, window_ms))))
             }
             // ENTROPY category (2 indicators)
             BarIndicatorId::Sampen => {
@@ -2494,6 +2570,15 @@ impl IndicatorInstance {
                 let window = config.periods.first().copied().unwrap_or(100);
                 Ok(Self::UptickDowntickVolume(Box::new(UptickDowntickVolume::new(window))))
             }
+            BarIndicatorId::AggressorImbalance => {
+                let window = config.periods.first().copied().unwrap_or(50);
+                Ok(Self::AggressorImbalance(Box::new(AggressorImbalance::new(window))))
+            }
+            BarIndicatorId::LargeTradeFilter => {
+                let window = config.periods.first().copied().unwrap_or(50);
+                let multiplier = config.additional_params.get("multiplier").copied().unwrap_or(3.0);
+                Ok(Self::LargeTradeFilter(Box::new(LargeTradeFilter::new(window, multiplier))))
+            }
             BarIndicatorId::Cmf => {
                 let p = config.periods.first().copied().unwrap_or(20);
                 let inner = Box::new(Self::Cmf(Box::new(ChaikinMoneyFlow::new(p))));
@@ -2863,8 +2948,13 @@ impl IndicatorInstance {
                 Ok(Self::Roof(Box::new(RoofingFilter::new(hp_alpha, lp_alpha))))
             }
             BarIndicatorId::Decyc => {
-                let alpha = config.additional_params.get("alpha").copied().unwrap_or(0.1);
-                Ok(Self::Decyc(Box::new(Decycler::new(alpha))))
+                // Support both "period" (bars) and legacy "alpha" parameters
+                if let Some(&p) = config.additional_params.get("period") {
+                    Ok(Self::Decyc(Box::new(Decycler::new(p))))
+                } else {
+                    let alpha = config.additional_params.get("alpha").copied().unwrap_or(0.1);
+                    Ok(Self::Decyc(Box::new(Decycler::from_alpha(alpha))))
+                }
             }
             BarIndicatorId::Ehlersfa => {
                 let p = config.periods.first().copied().unwrap_or(20);
@@ -4348,6 +4438,21 @@ impl IndicatorInstance {
             Self::BookPressure(x) => x.value(),
             Self::SpreadDistribution(x) => x.value(),
             Self::OrderBookVelocity(x) => x.value(),
+            Self::WallDetector(x) => x.value(),
+            Self::BookDepthChange(x) => x.value(),
+            // Delta indicators — bar pipeline is a no-op; use update_delta instead
+            Self::IcebergDetector(x) => x.value(),
+            Self::LevelReplenishRate(x) => x.value(),
+            Self::BookChurnRate(x) => x.value(),
+            // Funding/OI indicators — bar pipeline is a no-op; use update_funding/update_oi instead
+            Self::FundingMomentum(x) => x.value(),
+            Self::FundingZScore(x) => x.value(),
+            Self::OiChangeRate(x) => x.value(),
+            // Tick indicators — bar pipeline is a no-op; use update_tick instead
+            Self::AbsorptionDetector(x) => x.value(),
+            Self::TradeClusterDetector(x) => x.value(),
+            Self::AggressorImbalance(x) => x.value(),
+            Self::LargeTradeFilter(x) => x.value(),
             Self::BookSlope(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -5993,6 +6098,18 @@ impl IndicatorInstance {
             Self::BookPressure(ind) => ind.value(),
             Self::SpreadDistribution(ind) => ind.value(),
             Self::OrderBookVelocity(ind) => ind.value(),
+            Self::WallDetector(ind) => ind.value(),
+            Self::BookDepthChange(ind) => ind.value(),
+            Self::IcebergDetector(ind) => ind.value(),
+            Self::LevelReplenishRate(ind) => ind.value(),
+            Self::BookChurnRate(ind) => ind.value(),
+            Self::FundingMomentum(ind) => ind.value(),
+            Self::FundingZScore(ind) => ind.value(),
+            Self::OiChangeRate(ind) => ind.value(),
+            Self::AbsorptionDetector(ind) => ind.value(),
+            Self::TradeClusterDetector(ind) => ind.value(),
+            Self::AggressorImbalance(ind) => ind.value(),
+            Self::LargeTradeFilter(ind) => ind.value(),
             Self::Bop(ind) => ind.value(),
             Self::ButterworthFilter(ind) => ind.value(),
             Self::CandleAnatomy(ind) => ind.value(),
@@ -6458,6 +6575,18 @@ impl IndicatorInstance {
             Self::BookPressure(ind) => ind.is_ready(),
             Self::SpreadDistribution(ind) => ind.is_ready(),
             Self::OrderBookVelocity(ind) => ind.is_ready(),
+            Self::WallDetector(ind) => ind.is_ready(),
+            Self::BookDepthChange(ind) => ind.is_ready(),
+            Self::IcebergDetector(ind) => ind.is_ready(),
+            Self::LevelReplenishRate(ind) => ind.is_ready(),
+            Self::BookChurnRate(ind) => ind.is_ready(),
+            Self::FundingMomentum(ind) => ind.is_ready(),
+            Self::FundingZScore(ind) => ind.is_ready(),
+            Self::OiChangeRate(ind) => ind.is_ready(),
+            Self::AbsorptionDetector(ind) => ind.is_ready(),
+            Self::TradeClusterDetector(ind) => ind.is_ready(),
+            Self::AggressorImbalance(ind) => ind.is_ready(),
+            Self::LargeTradeFilter(ind) => ind.is_ready(),
             Self::Bop(ind) => ind.is_ready(),
             Self::BosEventDetector(ind) => ind.is_ready(),
             Self::BpCusum(ind) => ind.is_ready(),
@@ -6902,6 +7031,18 @@ impl IndicatorInstance {
             Self::BookPressure(ind) => ind.reset(),
             Self::SpreadDistribution(ind) => ind.reset(),
             Self::OrderBookVelocity(ind) => ind.reset(),
+            Self::WallDetector(ind) => ind.reset(),
+            Self::BookDepthChange(ind) => ind.reset(),
+            Self::IcebergDetector(ind) => ind.reset(),
+            Self::LevelReplenishRate(ind) => ind.reset(),
+            Self::BookChurnRate(ind) => ind.reset(),
+            Self::FundingMomentum(ind) => ind.reset(),
+            Self::FundingZScore(ind) => ind.reset(),
+            Self::OiChangeRate(ind) => ind.reset(),
+            Self::AbsorptionDetector(ind) => ind.reset(),
+            Self::TradeClusterDetector(ind) => ind.reset(),
+            Self::AggressorImbalance(ind) => ind.reset(),
+            Self::LargeTradeFilter(ind) => ind.reset(),
             Self::Bop(ind) => ind.reset(),
             Self::BosEventDetector(ind) => ind.reset(),
             Self::BpCusum(ind) => ind.reset(),
@@ -7296,6 +7437,38 @@ impl IndicatorInstance {
             Self::BookPressure(x) => x.update_orderbook(book),
             Self::SpreadDistribution(x) => x.update_orderbook(book),
             Self::OrderBookVelocity(x) => x.update_orderbook(book),
+            Self::WallDetector(x) => x.update_orderbook(book),
+            Self::BookDepthChange(x) => x.update_orderbook(book),
+            _ => self.value(),
+        }
+    }
+
+    /// Process an incremental orderbook delta.
+    /// Only delta-aware indicators consume this; all others return their current value unchanged.
+    pub fn update_delta(&mut self, delta: &OrderbookDelta) -> IndicatorValue {
+        match self {
+            Self::IcebergDetector(x) => x.update_delta(delta),
+            Self::LevelReplenishRate(x) => x.update_delta(delta),
+            Self::BookChurnRate(x) => x.update_delta(delta),
+            _ => self.value(),
+        }
+    }
+
+    /// Process a funding rate snapshot.
+    /// Only funding-aware indicators consume this; all others return their current value unchanged.
+    pub fn update_funding(&mut self, fr: &FundingRate) -> IndicatorValue {
+        match self {
+            Self::FundingMomentum(x) => x.update_funding(fr),
+            Self::FundingZScore(x) => x.update_funding(fr),
+            _ => self.value(),
+        }
+    }
+
+    /// Process an open interest snapshot.
+    /// Only OI-aware indicators consume this; all others return their current value unchanged.
+    pub fn update_oi(&mut self, oi: &OpenInterest) -> IndicatorValue {
+        match self {
+            Self::OiChangeRate(x) => x.update_oi(oi),
             _ => self.value(),
         }
     }
@@ -7311,6 +7484,10 @@ impl IndicatorInstance {
             Self::Vpin(x) => x.update_tick(tick),
             Self::TradeFlowImbalance(x) => x.update_tick(tick),
             Self::UptickDowntickVolume(x) => x.update_tick(tick),
+            Self::AbsorptionDetector(x) => x.update_tick(tick),
+            Self::TradeClusterDetector(x) => x.update_tick(tick),
+            Self::AggressorImbalance(x) => x.update_tick(tick),
+            Self::LargeTradeFilter(x) => x.update_tick(tick),
             _ => self.value(),
         }
     }

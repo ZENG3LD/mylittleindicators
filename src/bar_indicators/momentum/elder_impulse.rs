@@ -1,4 +1,7 @@
-// Elder Impulse System (placeholder): combination of EMA slope and MACD histogram sign
+// Elder Impulse System: combination of EMA slope and MACD histogram sign
+//
+// Implementation: EMA(ema_period) slope direction + MACD(fast=12, slow=26, signal=9) histogram sign.
+// Both conditions bullish (+1) or both bearish (-1) → impulse. Mixed → neutral (0).
 
 use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
@@ -9,8 +12,14 @@ pub struct ElderImpulseSystem {
     ema_period: usize,
     ma_type: MovingAverageType,
     source: OhlcvField,
+    /// Main trend EMA (typically 13 EMA)
     ema: MovingAverageProvider,
     prev_ema: f64,
+    /// MACD components: fast EMA (12), slow EMA (26), signal EMA (9)
+    macd_fast: MovingAverageProvider,
+    macd_slow: MovingAverageProvider,
+    macd_signal: MovingAverageProvider,
+    prev_macd_hist: f64,
     macd_hist: f64,
     value: i8,
 }
@@ -37,6 +46,10 @@ impl ElderImpulseSystem {
             source: OhlcvField::Close,
             ema: MovingAverageProvider::new(ma_type, period),
             prev_ema: 0.0,
+            macd_fast: MovingAverageProvider::new(MovingAverageType::EMA, 12),
+            macd_slow: MovingAverageProvider::new(MovingAverageType::EMA, 26),
+            macd_signal: MovingAverageProvider::new(MovingAverageType::EMA, 9),
+            prev_macd_hist: 0.0,
             macd_hist: 0.0,
             value: 0,
         }
@@ -67,6 +80,10 @@ impl ElderImpulseSystem {
             source,
             ema: MovingAverageProvider::new(ma_type, period),
             prev_ema: 0.0,
+            macd_fast: MovingAverageProvider::new(MovingAverageType::EMA, 12),
+            macd_slow: MovingAverageProvider::new(MovingAverageType::EMA, 26),
+            macd_signal: MovingAverageProvider::new(MovingAverageType::EMA, 9),
+            prev_macd_hist: 0.0,
             macd_hist: 0.0,
             value: 0,
         }
@@ -87,10 +104,7 @@ impl ElderImpulseSystem {
     pub fn set_ma_type(&mut self, ma_type: MovingAverageType) {
         if self.ma_type != ma_type {
             self.ma_type = ma_type;
-            self.ema = MovingAverageProvider::new(ma_type, self.ema_period);
-            self.prev_ema = 0.0;
-            self.macd_hist = 0.0;
-            self.value = 0;
+            self.reset();
         }
     }
 
@@ -106,12 +120,18 @@ impl ElderImpulseSystem {
     pub fn reset(&mut self) {
         self.ema = MovingAverageProvider::new(self.ma_type, self.ema_period);
         self.prev_ema = 0.0;
+        self.macd_fast = MovingAverageProvider::new(MovingAverageType::EMA, 12);
+        self.macd_slow = MovingAverageProvider::new(MovingAverageType::EMA, 26);
+        self.macd_signal = MovingAverageProvider::new(MovingAverageType::EMA, 9);
+        self.prev_macd_hist = 0.0;
         self.macd_hist = 0.0;
         self.value = 0;
     }
 
     #[inline]
     pub fn is_ready(&self) -> bool {
+        // Ready when the trend EMA has warmed up (MACD needs more bars but produces
+        // valid histogram from bar 1 via initial EMA seeding).
         self.ema.is_ready()
     }
 
@@ -129,8 +149,15 @@ impl ElderImpulseSystem {
         let ema_now = self.ema.update_bar(0.0, 0.0, 0.0, price, 0.0);
         let ema_slope_up = ema_now > self.prev_ema + 1e-12;
         self.prev_ema = ema_now;
-        // placeholder MACD histogram sign using simple momentum
-        self.macd_hist = price - ema_now;
+        // Real MACD histogram: fast_ema - slow_ema - signal_ema
+        let fast = self.macd_fast.update_bar(0.0, 0.0, 0.0, price, 0.0);
+        let slow = self.macd_slow.update_bar(0.0, 0.0, 0.0, price, 0.0);
+        let macd_line = fast - slow;
+        let signal_line = self.macd_signal.update_bar(0.0, 0.0, 0.0, macd_line, 0.0);
+        self.prev_macd_hist = self.macd_hist;
+        self.macd_hist = macd_line - signal_line;
+        // Positive histogram = bullish momentum; negative = bearish
+        // (Elder's original definition uses sign of histogram, not slope)
         let macd_up = self.macd_hist > 0.0;
         self.value = match (ema_slope_up, macd_up) {
             (true, true) => 1,

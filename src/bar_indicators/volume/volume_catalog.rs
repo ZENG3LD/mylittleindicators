@@ -546,6 +546,48 @@ pub fn signature_uptick_downtick_volume() -> IndicatorSignature {
         .build()
 }
 
+/// Aggressor Imbalance — rolling buy/sell tick frequency ratio
+pub fn signature_aggressor_imbalance() -> IndicatorSignature {
+    IndicatorSignature::builder("AGGRESSOR_IMBALANCE", CATEGORY)
+        .name("Aggressor Imbalance")
+        .description("Rolling buy-count vs sell-count ratio from tick stream [-1, 1]")
+        .add_constraint(ParamConstraint::period(5, 5000, 50))
+        .metadata("outputs", "imbalance in [-1, 1] (+1=all buys, -1=all sells)")
+        .metadata("uses_ticks", "true")
+        .machine_id(BarIndicatorId::AggressorImbalance)
+        .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .output_kind(IndicatorValueKind::Single)
+        .requires_l2()
+        .alias("AggressorImbalance")
+        .alias("aggressor_imbalance")
+        .alias("AGGRESSORIMBALANCE")
+        .build()
+}
+
+/// Large Trade Filter — flags ticks above N× rolling median size
+pub fn signature_large_trade_filter() -> IndicatorSignature {
+    IndicatorSignature::builder("LARGE_TRADE_FILTER", CATEGORY)
+        .name("Large Trade Filter")
+        .description("Flags ticks whose size exceeds multiplier × rolling median size")
+        .add_constraint(ParamConstraint::period(5, 5000, 50))
+        .add_constraint(
+            ParamConstraint::new("multiplier", ParamType::F64)
+                .with_min(ParamValue::F64(1.1))
+                .with_max(ParamValue::F64(50.0))
+                .with_default(ParamValue::F64(3.0))
+        )
+        .metadata("outputs", "signal (+1=large buy, -1=large sell, 0=normal), size_ratio")
+        .metadata("uses_ticks", "true")
+        .machine_id(BarIndicatorId::LargeTradeFilter)
+        .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Double)
+        .requires_l2()
+        .alias("LargeTradeFilter")
+        .alias("large_trade_filter")
+        .alias("LARGETRADEFILTER")
+        .build()
+}
+
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -568,6 +610,8 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("VPIN", signature_vpin as fn() -> IndicatorSignature),
     ("TRADE_FLOW_IMBALANCE", signature_trade_flow_imbalance as fn() -> IndicatorSignature),
     ("UPTICK_DOWNTICK_VOLUME", signature_uptick_downtick_volume as fn() -> IndicatorSignature),
+    ("AGGRESSOR_IMBALANCE", signature_aggressor_imbalance as fn() -> IndicatorSignature),
+    ("LARGE_TRADE_FILTER", signature_large_trade_filter as fn() -> IndicatorSignature),
     ("VPROFILE", signature_volume_profile as fn() -> IndicatorSignature),
     ("VPT", signature_vpt as fn() -> IndicatorSignature),
     ("VROC", signature_vroc as fn() -> IndicatorSignature),
@@ -637,6 +681,6 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 20);
+        assert_eq!(count(), 22);
     }
 }

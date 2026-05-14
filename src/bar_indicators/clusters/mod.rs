@@ -7,6 +7,8 @@ pub mod queue_imbalance;
 pub mod footprint_chart;
 pub mod footprint_imbalance;
 pub mod footprint_poc;
+pub mod absorption_detector;
+pub mod trade_cluster_detector;
 pub mod clusters_catalog;
 
 pub use tick_volume_analyzer::TickVolumeAnalyzer;
@@ -20,3 +22,5 @@ pub use queue_imbalance::QueueImbalance;
 pub use footprint_chart::FootprintChart;
 pub use footprint_imbalance::FootprintImbalance;
 pub use footprint_poc::FootprintPoc;
+pub use absorption_detector::AbsorptionDetector;
+pub use trade_cluster_detector::TradeClusterDetector;

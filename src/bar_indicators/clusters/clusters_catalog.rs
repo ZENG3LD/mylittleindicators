@@ -218,6 +218,59 @@ pub fn signature_footprint_poc() -> IndicatorSignature {
         .build()
 }
 
+/// Absorption Detector — high volume at minimal price movement
+pub fn signature_absorption_detector() -> IndicatorSignature {
+    IndicatorSignature::builder("ABSORPTION_DETECTOR", CATEGORY)
+        .name("Absorption Detector")
+        .description("Detects buy/sell absorption: large volume with minimal price movement")
+        .add_constraint(ParamConstraint::period(5, 1000, 50))
+        .metadata("outputs", "absorption_score, signal (+1=buy abs, -1=sell abs, 0=none)")
+        .metadata("uses_ticks", "true")
+        .machine_id(BarIndicatorId::AbsorptionDetector)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Double)
+        .requires_l2()
+        .alias("AbsorptionDetector")
+        .alias("absorption_detector")
+        .alias("ABSORPTIONDETECTOR")
+        .build()
+}
+
+/// Trade Cluster Detector — iceberg / repeated trades at same price level
+pub fn signature_trade_cluster_detector() -> IndicatorSignature {
+    IndicatorSignature::builder("TRADE_CLUSTER_DETECTOR", CATEGORY)
+        .name("Trade Cluster Detector")
+        .description("Detects iceberg orders: N+ trades at the same price bucket within a time window")
+        .add_constraint(
+            ParamConstraint::new("price_bucket", ParamType::F64)
+                .with_min(ParamValue::F64(1e-9))
+                .with_max(ParamValue::F64(1000.0))
+                .with_default(ParamValue::F64(0.01))
+        )
+        .add_constraint(
+            ParamConstraint::new("cluster_threshold", ParamType::F64)
+                .with_min(ParamValue::F64(2.0))
+                .with_max(ParamValue::F64(100.0))
+                .with_default(ParamValue::F64(3.0))
+        )
+        .add_constraint(
+            ParamConstraint::new("window_ms", ParamType::F64)
+                .with_min(ParamValue::F64(100.0))
+                .with_max(ParamValue::F64(300_000.0))
+                .with_default(ParamValue::F64(5000.0))
+        )
+        .metadata("outputs", "signal (+1/-1/0), cluster_price, cluster_size")
+        .metadata("uses_ticks", "true")
+        .machine_id(BarIndicatorId::TradeClusterDetector)
+        .role_kind(IndicatorRoleKind::Pattern)
+        .output_kind(IndicatorValueKind::Triple)
+        .requires_l2()
+        .alias("TradeClusterDetector")
+        .alias("trade_cluster_detector")
+        .alias("TRADECLUSTERDETECTOR")
+        .build()
+}
+
 /// Volume Weighted Price Levels - объемно-взвешенные ценовые уровни
 pub fn signature_volume_weighted_price_levels() -> IndicatorSignature {
     IndicatorSignature::builder("VWAP_LEVELS", CATEGORY)
@@ -264,6 +317,8 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("FOOTPRINT_CHART", signature_footprint_chart as fn() -> IndicatorSignature),
     ("FOOTPRINT_IMB", signature_footprint_imbalance as fn() -> IndicatorSignature),
     ("FOOTPRINT_POC", signature_footprint_poc as fn() -> IndicatorSignature),
+    ("ABSORPTION_DETECTOR", signature_absorption_detector as fn() -> IndicatorSignature),
+    ("TRADE_CLUSTER_DETECTOR", signature_trade_cluster_detector as fn() -> IndicatorSignature),
 ];
 
 /// Expanded catalog with all aliases auto-generated from signatures
@@ -346,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 9); // 9 cluster indicators
+        assert_eq!(count(), 11); // 11 cluster indicators
     }
 
     #[test]

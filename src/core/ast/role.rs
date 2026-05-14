@@ -321,6 +321,14 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::BookPressure => RoleKind::OscillatorUnbounded,
         BarIndicatorId::SpreadDistribution => RoleKind::OscillatorBounded,
         BarIndicatorId::OrderBookVelocity => RoleKind::Other,
+        // ── Book delta indicators ─────────────────────────────────────────────
+        BarIndicatorId::IcebergDetector => RoleKind::PatternDetector,
+        BarIndicatorId::LevelReplenishRate => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::BookChurnRate => RoleKind::OscillatorUnbounded,
+        // ── Funding / OI indicators ───────────────────────────────────────────
+        BarIndicatorId::FundingMomentum => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::FundingZScore => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::OiChangeRate => RoleKind::OscillatorUnbounded,
 
         // ── Everything else ───────────────────────────────────────────────────
         _ => RoleKind::Other,

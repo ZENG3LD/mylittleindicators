@@ -1,4 +1,13 @@
-// Polarized Fractal Efficiency (PFE) - placeholder implementation
+// Polarized Fractal Efficiency (PFE) — measures trend directness.
+//
+// Formula (Davis/Kaufman variant):
+//   efficiency = |close[N-1] - close[0]| / sum(|close[i] - close[i-1]|, i=1..N-1)
+//   PFE = 100 * efficiency * sign(close[N-1] - close[0])
+//
+// Output in [-100, 100]:
+//   +100 = perfectly efficient uptrend (straight line up)
+//   -100 = perfectly efficient downtrend (straight line down)
+//   near 0 = choppy / sideways
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 

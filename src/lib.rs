@@ -39,8 +39,16 @@ pub use catalog::{
     param_value::ParamValue,
 };
 
-pub use core::types::{Bar, Tick, CalendarService, TimeService, OrderBook, OrderBookLevel};
+pub use core::types::{
+    Bar, Tick, CalendarService, TimeService,
+    OrderBook, OrderBookLevel, OrderbookDelta,
+    FundingRate, MarkPrice, OpenInterest,
+};
 pub use bar_indicators::TickConsumer;
+pub use bar_indicators::orderbook_delta_consumer::OrderbookDeltaConsumer;
+pub use bar_indicators::funding_rate_consumer::FundingRateConsumer;
+pub use bar_indicators::mark_price_consumer::MarkPriceConsumer;
+pub use bar_indicators::open_interest_consumer::OpenInterestConsumer;
 
 // Signal taxonomy re-exports (runtime layer)
 pub use core::signal::{

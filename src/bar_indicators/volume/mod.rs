@@ -18,6 +18,11 @@ pub mod vpin;
 pub mod vzo;
 pub mod trade_flow_imbalance;
 pub mod uptick_downtick_volume;
+pub mod aggressor_imbalance;
+pub mod large_trade_filter;
+pub mod funding_momentum;
+pub mod funding_z_score;
+pub mod oi_change_rate;
 
 pub use volume_delta::*;
 pub use volume_profile::*;

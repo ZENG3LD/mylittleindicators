@@ -1,4 +1,13 @@
-// Rauch–Tung–Striebel smoother proxy: simple backward smoothing over kalman output (placeholder)
+// Rauch–Tung–Striebel (RTS) Smoother — streaming forward-filter proxy.
+//
+// True RTS requires a full backward pass over a stored sequence: it first runs the
+// Kalman filter forward storing all (x̂, P) pairs, then sweeps backward computing
+// smoothed estimates. This requires O(N) memory and is inherently non-causal (batch).
+//
+// Streaming constraint: in a bar-by-bar indicator there is no backward pass.
+// This implementation provides the causal Kalman forward filter output, which is
+// the best achievable real-time approximation of RTS. When the full sequence is
+// available offline, apply true RTS backward sweep on top of the stored states.
 
 use crate::bar_indicators::kalman::basic_kalman_filter::BasicKalmanFilter;
 use crate::bar_indicators::indicator_value::IndicatorValue;

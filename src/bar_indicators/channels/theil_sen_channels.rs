@@ -1,4 +1,14 @@
-// Theil–Sen Regression Channels (robust slope via median of slopes) - placeholder O(N^2) simplified
+// Theil–Sen Regression Channels — robust linear regression via median-of-slopes.
+//
+// Algorithm (O(N²) — intentional for correctness at window ≤ 256):
+//   1. For all pairs (i, j) with i < j: slope_ij = (price[j] - price[i]) / (j - i)
+//   2. slope = median of all slopes  (robust to outliers)
+//   3. intercept = median of (price[i] - slope*i)  for all i
+//   4. midline = intercept + slope*(N-1)  (end-of-window regression value)
+//   5. spread = 1.4826 * MAD(residuals)  (robust σ estimate)
+//   6. upper = midline + k*spread, lower = midline - k*spread
+//
+// Output: Channel3 { upper, middle, lower }
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 #[derive(Debug, Clone)]
