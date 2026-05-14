@@ -526,6 +526,11 @@ pub enum BarIndicatorId {
     HighLowRangeRatio,  // HIGH_LOW_RANGE_RATIO
     PriceChange24hZScore,  // PRICE_CHANGE_24H_ZSCORE
 
+    // Liquidation indicators (3 — consume Liquidation events)
+    LiquidationRate,  // LIQUIDATION_RATE
+    LiquidationVolumeImbalance,  // LIQUIDATION_VOLUME_IMBALANCE
+    LiquidationCascade,  // LIQUIDATION_CASCADE
+
     // Ohlcv Average (15 indicators) - REMOVED
     // All OHLCV variants replaced by MovingAverageWithField
     // Use: MovingAverageWithField::new(MovingAverageType, period, OhlcvField)
@@ -559,6 +564,6 @@ impl BarIndicatorId {
 }
 
 
-// Original variants: 484
+// Original variants: 487
 // Added long aliases: 155
 // Total: 637

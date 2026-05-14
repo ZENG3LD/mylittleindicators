@@ -335,6 +335,11 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::HighLowRangeRatio => RoleKind::OscillatorUnbounded,
         BarIndicatorId::PriceChange24hZScore => RoleKind::OscillatorBounded,
 
+        // ── Liquidation indicators ─────────────────────────────────────────────
+        BarIndicatorId::LiquidationRate => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::LiquidationVolumeImbalance => RoleKind::PatternDetector,
+        BarIndicatorId::LiquidationCascade => RoleKind::PatternDetector,
+
         // ── Everything else ───────────────────────────────────────────────────
         _ => RoleKind::Other,
     }

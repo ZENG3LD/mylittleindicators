@@ -345,11 +345,16 @@ use crate::core::types::Ticker;
 use crate::bar_indicators::order_book_consumer::OrderBookConsumer;
 use crate::bar_indicators::orderbook_delta_consumer::OrderbookDeltaConsumer;
 use crate::bar_indicators::funding_rate_consumer::FundingRateConsumer;
+use crate::bar_indicators::liquidation_consumer::LiquidationConsumer;
+use crate::bar_indicators::liquidations::LiquidationCascade;
+use crate::bar_indicators::liquidations::LiquidationRate;
+use crate::bar_indicators::liquidations::LiquidationVolumeImbalance;
 use crate::bar_indicators::mark_price_consumer::MarkPriceConsumer;
 use crate::bar_indicators::open_interest_consumer::OpenInterestConsumer;
 use crate::bar_indicators::tick_consumer::TickConsumer;
 use crate::bar_indicators::ticker_consumer::TickerConsumer;
 use crate::bar_indicators::hybrid_tick_book_consumer::HybridTickBookConsumer;
+use crate::core::types::Liquidation;
 use crate::core::types::Tick;
 use crate::bar_indicators::clusters::{
     market_microstructure::MarketMicrostructure,
@@ -923,6 +928,10 @@ pub enum IndicatorInstance {
     Volume24hMomentum(Box<Volume24hMomentum>),
     HighLowRangeRatio(Box<HighLowRangeRatio>),
     PriceChange24hZScore(Box<PriceChange24hZScore>),
+    // LIQUIDATION category (3 indicators — consume Liquidation events)
+    LiquidationRate(Box<LiquidationRate>),
+    LiquidationVolumeImbalance(Box<LiquidationVolumeImbalance>),
+    LiquidationCascade(Box<LiquidationCascade>),
     // ENTROPY category (2 indicators)
     Sampen(Box<SampleEntropy>),
     Xmil(Box<CrossMutualInformationLags>),
@@ -1564,7 +1573,8 @@ impl IndicatorInstance {
             HiddenLiquidityDetector | TradeBookAbsorption | SweepImpactAnalyzer |
             FundingMomentum | FundingZScore | OiChangeRate | FundingPriceDivergence |
             MarkPriceVsLast | IndexPriceMomentum |
-            Volume24hMomentum | HighLowRangeRatio | PriceChange24hZScore
+            Volume24hMomentum | HighLowRangeRatio | PriceChange24hZScore |
+            LiquidationRate | LiquidationVolumeImbalance | LiquidationCascade
 
             // Note: Most other indicators are PriceOnly and will use config.source
         )
@@ -2158,6 +2168,28 @@ impl IndicatorInstance {
             }
             BarIndicatorId::PriceChange24hZScore => {
                 Ok(Self::PriceChange24hZScore(Box::new(PriceChange24hZScore::new(period))))
+            }
+            // LIQUIDATION category (3 indicators)
+            BarIndicatorId::LiquidationRate => {
+                let window_ms = config.additional_params.get("window_ms")
+                    .copied()
+                    .unwrap_or(60_000.0) as i64;
+                Ok(Self::LiquidationRate(Box::new(LiquidationRate::new(window_ms))))
+            }
+            BarIndicatorId::LiquidationVolumeImbalance => {
+                let window_ms = config.additional_params.get("window_ms")
+                    .copied()
+                    .unwrap_or(60_000.0) as i64;
+                Ok(Self::LiquidationVolumeImbalance(Box::new(LiquidationVolumeImbalance::new(window_ms))))
+            }
+            BarIndicatorId::LiquidationCascade => {
+                let window_ms = config.additional_params.get("window_ms")
+                    .copied()
+                    .unwrap_or(10_000.0) as i64;
+                let threshold = config.additional_params.get("threshold_count")
+                    .copied()
+                    .unwrap_or(5.0) as usize;
+                Ok(Self::LiquidationCascade(Box::new(LiquidationCascade::new(window_ms, threshold))))
             }
             // CLUSTERS category (6 indicators)
             BarIndicatorId::ClQueueImb => Ok(Self::ClQueueImb(Box::default())),
@@ -4522,6 +4554,10 @@ impl IndicatorInstance {
             Self::Volume24hMomentum(x) => x.value(),
             Self::HighLowRangeRatio(x) => x.value(),
             Self::PriceChange24hZScore(x) => x.value(),
+            // Liquidation indicators — bar pipeline is a no-op; use update_liquidation instead
+            Self::LiquidationRate(x) => x.value(),
+            Self::LiquidationVolumeImbalance(x) => x.value(),
+            Self::LiquidationCascade(x) => x.value(),
             // Tick indicators — bar pipeline is a no-op; use update_tick instead
             Self::AbsorptionDetector(x) => x.value(),
             Self::TradeClusterDetector(x) => x.value(),
@@ -6190,6 +6226,10 @@ impl IndicatorInstance {
             Self::Volume24hMomentum(ind) => ind.value(),
             Self::HighLowRangeRatio(ind) => ind.value(),
             Self::PriceChange24hZScore(ind) => ind.value(),
+            // Liquidation indicators
+            Self::LiquidationRate(ind) => ind.value(),
+            Self::LiquidationVolumeImbalance(ind) => ind.value(),
+            Self::LiquidationCascade(ind) => ind.value(),
             Self::AbsorptionDetector(ind) => ind.value(),
             Self::TradeClusterDetector(ind) => ind.value(),
             Self::AggressorImbalance(ind) => ind.value(),
@@ -6676,6 +6716,9 @@ impl IndicatorInstance {
             Self::Volume24hMomentum(ind) => ind.is_ready(),
             Self::HighLowRangeRatio(ind) => ind.is_ready(),
             Self::PriceChange24hZScore(ind) => ind.is_ready(),
+            Self::LiquidationRate(ind) => ind.is_ready(),
+            Self::LiquidationVolumeImbalance(ind) => ind.is_ready(),
+            Self::LiquidationCascade(ind) => ind.is_ready(),
             Self::AbsorptionDetector(ind) => ind.is_ready(),
             Self::TradeClusterDetector(ind) => ind.is_ready(),
             Self::AggressorImbalance(ind) => ind.is_ready(),
@@ -7526,6 +7569,9 @@ impl IndicatorInstance {
             Self::XorGate(ind) => ind.reset(),
             Self::Za(ind) => ind.reset(),
             Self::ZlSma(ind) => ind.reset(),
+            Self::LiquidationRate(ind) => ind.reset(),
+            Self::LiquidationVolumeImbalance(ind) => ind.reset(),
+            Self::LiquidationCascade(ind) => ind.reset(),
         }
     }
 
@@ -7635,6 +7681,17 @@ impl IndicatorInstance {
             Self::TradeBookAbsorption(x) => x.update_book_only(book),
             Self::SweepImpactAnalyzer(x) => x.update_book_only(book),
             _ => {}
+        }
+    }
+
+    /// Process a public liquidation event.
+    /// Only liquidation-aware indicators consume this; all others return their current value unchanged.
+    pub fn update_liquidation(&mut self, liq: &Liquidation) -> IndicatorValue {
+        match self {
+            Self::LiquidationRate(x) => x.update_liquidation(liq),
+            Self::LiquidationVolumeImbalance(x) => x.update_liquidation(liq),
+            Self::LiquidationCascade(x) => x.update_liquidation(liq),
+            _ => self.value(),
         }
     }
 }

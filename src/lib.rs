@@ -43,7 +43,11 @@ pub use core::types::{
     Bar, Tick, CalendarService, TimeService,
     OrderBook, OrderBookLevel, OrderbookDelta,
     FundingRate, MarkPrice, OpenInterest, Ticker,
+    Liquidation, LiquidationSide,
+    PublicTrade,
 };
+pub use bar_indicators::LiquidationConsumer;
+pub use bar_indicators::liquidations::{LiquidationCascade, LiquidationRate, LiquidationVolumeImbalance};
 pub use bar_indicators::TickConsumer;
 pub use bar_indicators::TickerConsumer;
 pub use bar_indicators::orderbook_delta_consumer::OrderbookDeltaConsumer;
