@@ -4,7 +4,7 @@
 ///
 /// Published when a futures or options contract settles at expiry.
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SettlementEvent {
     /// Final settlement price of the contract.
     pub settlement_price: f64,

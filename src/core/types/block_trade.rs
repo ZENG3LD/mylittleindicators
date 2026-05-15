@@ -5,7 +5,7 @@
 /// Large trades reported separately from the regular order book (OTC desk or
 /// block trade facility).
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BlockTrade {
     /// Exchange-assigned block trade identifier.
     pub block_id: String,

@@ -7,6 +7,9 @@
 //! Здесь нет runtime-логики (детекторов, engine, рендера), нет defaults,
 //! нет StrategySpec. Только индикаторы и пограничные типы событий.
 
+// Multi-stream data loading for backtest pipeline.
+pub mod data_loader;
+
 // Bar indicators
 pub mod bar_indicators;
 

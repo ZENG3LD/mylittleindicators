@@ -5,7 +5,7 @@
 /// Represents one or more consecutive trades at the same price, same side,
 /// merged by the exchange into a single event.
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AggTrade {
     /// Exchange-assigned aggregate trade id.
     pub aggregate_id: i64,

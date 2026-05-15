@@ -1,7 +1,7 @@
 //! Open interest — total number of outstanding derivative contracts.
 
 /// Open interest snapshot for a futures/perpetual market.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OpenInterest {
     /// Trading pair symbol.
     pub symbol: String,

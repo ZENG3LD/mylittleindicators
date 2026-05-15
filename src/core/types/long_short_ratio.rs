@@ -3,7 +3,7 @@
 /// Long/short ratio snapshot from exchange data feeds.
 ///
 /// `symbol` omitted — mli is symbol-agnostic; callers route per-symbol.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LongShortRatio {
     /// Ratio type: `"top_account"` | `"top_position"` | `"global_account"` | `"taker"`
     pub ratio_type: String,

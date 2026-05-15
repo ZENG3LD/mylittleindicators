@@ -1,7 +1,7 @@
 //! Mark price — exchange-computed fair price used for PnL and liquidations.
 
 /// Mark price snapshot for a perpetual futures market.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MarkPrice {
     /// Trading pair symbol.
     pub symbol: String,

@@ -1,7 +1,7 @@
 //! Funding rate — perpetual futures funding rate snapshot.
 
 /// Perpetual futures funding rate snapshot.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FundingRate {
     /// Trading pair symbol.
     pub symbol: String,

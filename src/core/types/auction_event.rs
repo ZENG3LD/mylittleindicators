@@ -4,7 +4,7 @@
 ///
 /// Published during exchange opening, indicative, and closing auction phases.
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AuctionEvent {
     /// Exchange-assigned auction identifier.
     pub auction_id: String,

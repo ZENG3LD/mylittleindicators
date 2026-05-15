@@ -5,7 +5,7 @@
 /// Covers the standard first- and second-order sensitivities plus
 /// implied volatility variants.
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OptionGreeks {
     /// Delta — sensitivity to underlying price change (−1 to +1).
     pub delta: f64,

@@ -5,7 +5,7 @@
 /// Basis = futures_price − spot_index_price.
 /// Positive = contango (futures above spot), negative = backwardation.
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Basis {
     /// Futures price minus spot index price.
     pub basis: f64,

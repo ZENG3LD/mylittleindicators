@@ -4,7 +4,7 @@
 //! Matches the structure from digdigdig3 (price + size, optional order_count).
 
 /// One price level in the order book.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OrderBookLevel {
     pub price: f64,
     pub size: f64,
@@ -25,7 +25,7 @@ impl From<(f64, f64)> for OrderBookLevel {
 }
 
 /// L2 orderbook snapshot.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OrderBook {
     /// Bid levels, ordered best-to-worst (highest price first).
     pub bids: Vec<OrderBookLevel>,

@@ -4,7 +4,7 @@
 ///
 /// Typically the spot price underlying a perpetual or futures contract.
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct IndexPrice {
     /// Index price value.
     pub price: f64,

@@ -5,7 +5,7 @@
 /// Published by the exchange after each funding period closes, confirming
 /// the rate that was applied.
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FundingSettlement {
     /// Actual settled funding rate (e.g., 0.0001 = 0.01%).
     pub settled_rate: f64,

@@ -4,7 +4,7 @@
 ///
 /// `symbol` is kept here because warnings are inherently contextual to a specific
 /// instrument — callers cannot route without knowing the target.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MarketWarning {
     /// Symbol this warning applies to (e.g., `"BTCUSDT"`).
     pub symbol: String,

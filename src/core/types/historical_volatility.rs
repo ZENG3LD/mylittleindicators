@@ -4,7 +4,7 @@
 ///
 /// Exchange-published realized/historical volatility metric.
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HistoricalVolatility {
     /// Annualized volatility value (e.g., 0.85 = 85%).
     pub volatility: f64,

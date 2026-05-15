@@ -1,7 +1,7 @@
 //! Level-3 orderbook event — individual order-level add/modify/delete messages.
 
 /// Side of an L3 orderbook entry.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum OrderBookSide {
     /// Buy side (bids).
     Bid,
@@ -10,7 +10,7 @@ pub enum OrderBookSide {
 }
 
 /// Action applied to an individual L3 order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum L3Action {
     /// New order placed at this price level.
     Add,
@@ -24,7 +24,7 @@ pub enum L3Action {
 ///
 /// Carries add, modify, or delete for a single named order in the book.
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OrderbookL3Event {
     /// Which side of the book this order belongs to.
     pub side: OrderBookSide,

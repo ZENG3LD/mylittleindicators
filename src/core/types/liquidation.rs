@@ -8,7 +8,7 @@
 ///
 /// `Long`  — a long position was forced-closed (exchange sold into the market).
 /// `Short` — a short position was forced-closed (exchange bought from the market).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum LiquidationSide {
     /// Long position liquidated (forced sell).
     Long,
@@ -19,7 +19,7 @@ pub enum LiquidationSide {
 /// Single liquidation event from a public market feed.
 ///
 /// Omits `symbol` — indicators in mli are symbol-agnostic.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Liquidation {
     /// Side of the liquidated position.
     pub side: LiquidationSide,

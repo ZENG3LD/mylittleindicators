@@ -9,7 +9,7 @@
 use crate::core::types::OrderBookLevel;
 
 /// Incremental L2 orderbook update.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OrderbookDelta {
     /// Bid side changes. Level with `size == 0.0` means removal.
     pub bids: Vec<OrderBookLevel>,

@@ -4,7 +4,7 @@
 ///
 /// This is the universal bar type used by all indicators.
 /// Contains time, open, high, low, close, and volume.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Bar {
     pub time: i64,
     pub open: f64,
@@ -80,7 +80,7 @@ impl Bar {
 ///
 /// Used for order flow analysis, market microstructure,
 /// and tick-based indicators.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Tick {
     pub time: i64,
     pub price: f64,

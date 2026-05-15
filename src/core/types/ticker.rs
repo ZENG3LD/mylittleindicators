@@ -4,7 +4,7 @@
 //! consumers of both crates can convert without allocation.
 
 /// 24-hour market statistics snapshot (ticker stream).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Ticker {
     /// Trading symbol.
     pub symbol: String,

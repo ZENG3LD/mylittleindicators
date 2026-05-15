@@ -4,7 +4,7 @@
 ///
 /// Represents a weighted basket price (e.g., Binance composite index).
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompositeIndex {
     /// Weighted basket price.
     pub price: f64,

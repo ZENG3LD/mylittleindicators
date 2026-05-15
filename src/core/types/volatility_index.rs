@@ -4,7 +4,7 @@
 ///
 /// Exchange-published forward-looking implied volatility index.
 /// `symbol` omitted — mli is symbol-agnostic.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct VolatilityIndex {
     /// Index value (annualized implied volatility, e.g., 0.85 = 85%).
     pub value: f64,
