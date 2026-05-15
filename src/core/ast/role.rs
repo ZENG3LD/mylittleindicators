@@ -330,6 +330,13 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::FundingZScore => RoleKind::OscillatorUnbounded,
         BarIndicatorId::OiChangeRate => RoleKind::OscillatorUnbounded,
 
+        // ── Open Interest indicators ──────────────────────────────────────────
+        BarIndicatorId::OiZScore => RoleKind::OscillatorBounded,
+        BarIndicatorId::OiMomentum => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::OiPercentile => RoleKind::OscillatorBounded,
+        BarIndicatorId::LongSqueezeDetector => RoleKind::PatternDetector,
+        BarIndicatorId::OiPriceCorrelation => RoleKind::OscillatorBounded,
+
         // ── Ticker / 24h stats indicators ─────────────────────────────────────
         BarIndicatorId::Volume24hMomentum => RoleKind::OscillatorUnbounded,
         BarIndicatorId::HighLowRangeRatio => RoleKind::OscillatorUnbounded,
@@ -339,6 +346,10 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::LiquidationRate => RoleKind::OscillatorUnbounded,
         BarIndicatorId::LiquidationVolumeImbalance => RoleKind::PatternDetector,
         BarIndicatorId::LiquidationCascade => RoleKind::PatternDetector,
+        BarIndicatorId::LiquidationVolumeVelocity => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::StopHuntDetector => RoleKind::PatternDetector,
+        BarIndicatorId::LiquidationClusterDetector => RoleKind::PatternDetector,
+        BarIndicatorId::LiquidationCooldown => RoleKind::OscillatorUnbounded,
 
         // ── Sentiment indicators ──────────────────────────────────────────────
         BarIndicatorId::LongShortRatioMomentum => RoleKind::OscillatorBounded,
@@ -366,9 +377,17 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::GammaSqueezeDetector => RoleKind::PatternDetector,
         BarIndicatorId::IvSkew => RoleKind::OscillatorUnbounded,
 
+        // ── Greeks advanced indicators ────────────────────────────────────────
+        BarIndicatorId::CharmTracker => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::VegaExposureFlow => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::ThetaDecayTracker => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::PinRiskDetector => RoleKind::PatternDetector,
+
         // ── Stress indicators ─────────────────────────────────────────────────
         BarIndicatorId::FundDepletionRate => RoleKind::OscillatorUnbounded,
         BarIndicatorId::FundStressDetector => RoleKind::PatternDetector,
+        BarIndicatorId::InsuranceFundMomentum => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::SettlementApproachSignal => RoleKind::OscillatorBounded,
         BarIndicatorId::SettlementPriceMomentum => RoleKind::OscillatorUnbounded,
         BarIndicatorId::SettlementVsMarkSpread => RoleKind::OscillatorUnbounded,
 
@@ -378,20 +397,86 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::L3OrderRate => RoleKind::OscillatorUnbounded,
         BarIndicatorId::L3LargeOrderTracker => RoleKind::PatternDetector,
         BarIndicatorId::L3CancelRatio => RoleKind::OscillatorBounded,
+        BarIndicatorId::BlockTradeSizeAnomaly => RoleKind::OscillatorBounded,
+        BarIndicatorId::QuoteStuffingDetector => RoleKind::PatternDetector,
 
         // ── Risk indicators ───────────────────────────────────────────────────
         BarIndicatorId::LeverageReductionWarning => RoleKind::PatternDetector,
         BarIndicatorId::MmrTracker => RoleKind::OscillatorBounded,
+        BarIndicatorId::RiskLimitProximity => RoleKind::OscillatorBounded,
 
         // ── Funding indicators ────────────────────────────────────────────────
         BarIndicatorId::FundingDrift => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::FundingTimeDecay => RoleKind::OscillatorBounded,
         BarIndicatorId::PredictedFundingExtreme => RoleKind::PatternDetector,
         BarIndicatorId::SettledFundingMomentum => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::FundingSettlementImpact => RoleKind::OscillatorUnbounded,
+
+        // ── Funding advanced indicators ───────────────────────────────────────
+        BarIndicatorId::AnnualizedFundingRate => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::FundingDirectionShift => RoleKind::PatternDetector,
+        BarIndicatorId::FundingExtremeAlert => RoleKind::PatternDetector,
+
+        // ── MarkPrice advanced indicators ─────────────────────────────────────
+        BarIndicatorId::MarkPriceMomentum => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::MarkPriceVolatility => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::MarkPriceGapDetector => RoleKind::PatternDetector,
 
         // ── Misc indicators ───────────────────────────────────────────────────
+        BarIndicatorId::AuctionLiquidityScore => RoleKind::OscillatorUnbounded,
         BarIndicatorId::AuctionPriceDeviation => RoleKind::OscillatorUnbounded,
         BarIndicatorId::AuctionImbalance => RoleKind::OscillatorUnbounded,
         BarIndicatorId::WarningRate => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::WarningFrequencyFilter => RoleKind::PatternDetector,
+
+        // ── Ticker advanced indicators ────────────────────────────────────────
+        BarIndicatorId::TickerSpreadRatio => RoleKind::OscillatorBounded,
+        BarIndicatorId::Volume24hZScore => RoleKind::OscillatorBounded,
+
+        // ── Microstructure extra indicators ──────────────────────────────────
+        BarIndicatorId::L3SpooferScore => RoleKind::OscillatorBounded,
+        BarIndicatorId::QuoteLifecycleTracker => RoleKind::OscillatorUnbounded,
+
+        // ── Cross-stream composite indicators ─────────────────────────────────
+        BarIndicatorId::FundingOiPressure => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::IvHvSpread => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::SqueezeProbability => RoleKind::OscillatorBounded,
+        BarIndicatorId::FundingSentimentAlignment => RoleKind::PatternDetector,
+        BarIndicatorId::VolRegimeEntry => RoleKind::PatternDetector,
+        BarIndicatorId::BlockTradeVolumeRatio => RoleKind::OscillatorBounded,
+        BarIndicatorId::CapitulationDetector => RoleKind::PatternDetector,
+        BarIndicatorId::IndexTrackingError => RoleKind::OscillatorUnbounded,
+
+        // ── Book Advanced indicators ──────────────────────────────────────────
+        BarIndicatorId::BidAskAsymmetry => RoleKind::OscillatorBounded,
+        BarIndicatorId::BidAskBounceRate => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::MidPriceVelocity => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::BestLevelVolatility => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::LayerConcentration => RoleKind::OscillatorBounded,
+        BarIndicatorId::PriceLevelDensity => RoleKind::OscillatorUnbounded,
+
+        // ── Tick Advanced indicators ──────────────────────────────────────────
+        BarIndicatorId::VwapDeviation => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::TradeRunDetector => RoleKind::PatternDetector,
+        BarIndicatorId::SizeWeightedDirectionalMomentum => RoleKind::OscillatorBounded,
+        BarIndicatorId::TickFrequencyAnomaly => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::AggressorBurstDetector => RoleKind::PatternDetector,
+        BarIndicatorId::LargeTickMomentum => RoleKind::OscillatorBounded,
+        BarIndicatorId::ValueAreaTracker => RoleKind::PivotIndicator,
+        BarIndicatorId::VolumeImbalanceZone => RoleKind::PatternDetector,
+
+        // ── Category C composite + adaptive + cross-asset indicators ─────────
+        BarIndicatorId::MarketStressComposite => RoleKind::OscillatorBounded,
+        BarIndicatorId::RiskOffDetector => RoleKind::PatternDetector,
+        BarIndicatorId::SentimentComposite => RoleKind::OscillatorBounded,
+        BarIndicatorId::CompoundSqueezeProbability => RoleKind::OscillatorBounded,
+        BarIndicatorId::TpoSessionBalance => RoleKind::PivotIndicator,
+        BarIndicatorId::CompositeWeightDrift => RoleKind::OscillatorBounded,
+        BarIndicatorId::AdaptiveWindowSelector => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::AdaptiveThreshold => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::PairsCointegrationProxy => RoleKind::OscillatorBounded,
+        BarIndicatorId::CrossAssetBeta => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::RelativeStrengthCross => RoleKind::OscillatorUnbounded,
 
         // ── Everything else ───────────────────────────────────────────────────
         _ => RoleKind::Other,

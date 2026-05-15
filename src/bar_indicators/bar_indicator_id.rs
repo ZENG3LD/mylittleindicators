@@ -428,6 +428,16 @@ pub enum BarIndicatorId {
     RangeAtr,  // RANGE_ATR
     SpreadAnalyzer,  // SPREAD_ANALYZER
 
+    // Tick Advanced (8 indicators)
+    VwapDeviation,                   // VWAP_DEVIATION
+    TradeRunDetector,                // TRADE_RUN_DETECTOR
+    SizeWeightedDirectionalMomentum, // SIZE_WEIGHTED_DIRECTIONAL_MOMENTUM
+    TickFrequencyAnomaly,            // TICK_FREQUENCY_ANOMALY
+    AggressorBurstDetector,          // AGGRESSOR_BURST_DETECTOR
+    LargeTickMomentum,               // LARGE_TICK_MOMENTUM
+    ValueAreaTracker,                // VALUE_AREA_TRACKER
+    VolumeImbalanceZone,             // VOLUME_IMBALANCE_ZONE
+
     // Clusters (11 indicators)
     ClQueueImb,  // CL_QUEUE_IMB
     MarketMicro,  // MARKET_MICRO
@@ -511,25 +521,49 @@ pub enum BarIndicatorId {
     TradeBookAbsorption,  // TRADE_BOOK_ABSORPTION
     SweepImpactAnalyzer,  // SWEEP_IMPACT_ANALYZER
 
+    // Book Advanced (6 — consume OrderBook L2 snapshots)
+    BidAskAsymmetry,      // BID_ASK_ASYMMETRY
+    BidAskBounceRate,     // BID_ASK_BOUNCE_RATE
+    MidPriceVelocity,     // MID_PRICE_VELOCITY
+    BestLevelVolatility,  // BEST_LEVEL_VOLATILITY
+    LayerConcentration,   // LAYER_CONCENTRATION
+    PriceLevelDensity,    // PRICE_LEVEL_DENSITY
+
     // Funding / OI indicators (3 — consume FundingRate / OpenInterest)
     FundingMomentum,  // FUNDING_MOMENTUM
     FundingZScore,  // FUNDING_ZSCORE
     OiChangeRate,  // OI_CHANGE_RATE
     FundingPriceDivergence,  // FUNDING_PRICE_DIVERGENCE
 
+    // Open Interest indicators (5 — consume OpenInterest / OpenInterest+MarkPrice)
+    OiZScore,              // OI_Z_SCORE
+    OiMomentum,            // OI_MOMENTUM
+    OiPercentile,          // OI_PERCENTILE
+    LongSqueezeDetector,   // LONG_SQUEEZE_DETECTOR
+    OiPriceCorrelation,    // OI_PRICE_CORRELATION
+
     // MarkPrice indicators (2 — consume MarkPrice)
     MarkPriceVsLast,  // MARK_PRICE_VS_LAST
     IndexPriceMomentum,  // INDEX_PRICE_MOMENTUM
+
+    // MarkPrice advanced (3 — consume MarkPrice)
+    MarkPriceMomentum,           // MARK_PRICE_MOMENTUM
+    MarkPriceVolatility,         // MARK_PRICE_VOLATILITY
+    MarkPriceGapDetector,        // MARK_PRICE_GAP_DETECTOR
 
     // Ticker indicators (3 — consume Ticker / 24h stats)
     Volume24hMomentum,  // VOLUME_24H_MOMENTUM
     HighLowRangeRatio,  // HIGH_LOW_RANGE_RATIO
     PriceChange24hZScore,  // PRICE_CHANGE_24H_ZSCORE
 
-    // Liquidation indicators (3 — consume Liquidation events)
+    // Liquidation indicators (7 — consume Liquidation events)
     LiquidationRate,  // LIQUIDATION_RATE
     LiquidationVolumeImbalance,  // LIQUIDATION_VOLUME_IMBALANCE
     LiquidationCascade,  // LIQUIDATION_CASCADE
+    LiquidationVolumeVelocity,  // LIQUIDATION_VOLUME_VELOCITY
+    StopHuntDetector,  // STOP_HUNT_DETECTOR
+    LiquidationClusterDetector,  // LIQUIDATION_CLUSTER_DETECTOR
+    LiquidationCooldown,  // LIQUIDATION_COOLDOWN
 
     // Ohlcv Average (15 indicators) - REMOVED
     // All OHLCV variants replaced by MovingAverageWithField
@@ -561,32 +595,81 @@ pub enum BarIndicatorId {
     GammaSqueezeDetector,        // GAMMA_SQUEEZE_DETECTOR
     IvSkew,                      // IV_SKEW
 
-    // Stress indicators (4 — consume InsuranceFund / SettlementEvent / MarkPrice)
+    // Greeks advanced (4 — consume OptionGreeks)
+    CharmTracker,                // CHARM_TRACKER
+    VegaExposureFlow,            // VEGA_EXPOSURE_FLOW
+    ThetaDecayTracker,           // THETA_DECAY_TRACKER
+    PinRiskDetector,             // PIN_RISK_DETECTOR
+
+    // Stress indicators (6 — consume InsuranceFund / SettlementEvent / MarkPrice)
     FundDepletionRate,           // FUND_DEPLETION_RATE
     FundStressDetector,          // FUND_STRESS_DETECTOR
+    InsuranceFundMomentum,       // INSURANCE_FUND_MOMENTUM
+    SettlementApproachSignal,    // SETTLEMENT_APPROACH_SIGNAL
     SettlementPriceMomentum,     // SETTLEMENT_PRICE_MOMENTUM
     SettlementVsMarkSpread,      // SETTLEMENT_VS_MARK_SPREAD
 
-    // Microstructure indicators (5 — consume BlockTrade / OrderbookL3)
+    // Microstructure indicators (9 — consume BlockTrade / OrderbookL3 / OrderbookDelta)
     BlockTradeFlow,              // BLOCK_TRADE_FLOW
     BlockTradeImpact,            // BLOCK_TRADE_IMPACT
     L3OrderRate,                 // L3_ORDER_RATE
     L3LargeOrderTracker,         // L3_LARGE_ORDER_TRACKER
     L3CancelRatio,               // L3_CANCEL_RATIO
+    BlockTradeSizeAnomaly,       // BLOCK_TRADE_SIZE_ANOMALY
+    QuoteStuffingDetector,       // QUOTE_STUFFING_DETECTOR
+    L3SpooferScore,              // L3_SPOOFER_SCORE
+    QuoteLifecycleTracker,       // QUOTE_LIFECYCLE_TRACKER
 
-    // Risk indicators (2 — consume RiskLimit)
+    // Risk indicators (3 — consume RiskLimit)
     LeverageReductionWarning,    // LEVERAGE_REDUCTION_WARNING
     MmrTracker,                  // MMR_TRACKER
+    RiskLimitProximity,          // RISK_LIMIT_PROXIMITY
 
-    // Funding indicators (3 — consume PredictedFunding / FundingRate / FundingSettlement)
+    // Funding indicators (5 — consume PredictedFunding / FundingRate / FundingSettlement / MarkPrice)
     FundingDrift,                // FUNDING_DRIFT
+    FundingTimeDecay,            // FUNDING_TIME_DECAY
     PredictedFundingExtreme,     // PREDICTED_FUNDING_EXTREME
     SettledFundingMomentum,      // SETTLED_FUNDING_MOMENTUM
+    FundingSettlementImpact,     // FUNDING_SETTLEMENT_IMPACT
 
-    // Misc indicators (3 — consume AuctionEvent / MarketWarning)
+    // Funding advanced (3 — consume FundingRate)
+    AnnualizedFundingRate,       // ANNUALIZED_FUNDING_RATE
+    FundingDirectionShift,       // FUNDING_DIRECTION_SHIFT
+    FundingExtremeAlert,         // FUNDING_EXTREME_ALERT
+
+    // Misc indicators (5 — consume AuctionEvent / MarketWarning)
+    AuctionLiquidityScore,       // AUCTION_LIQUIDITY_SCORE
     AuctionPriceDeviation,       // AUCTION_PRICE_DEVIATION
     AuctionImbalance,            // AUCTION_IMBALANCE
     WarningRate,                 // WARNING_RATE
+    WarningFrequencyFilter,      // WARNING_FREQUENCY_FILTER
+
+    // Ticker advanced indicators (2 — consume Ticker)
+    TickerSpreadRatio,           // TICKER_SPREAD_RATIO
+    Volume24hZScore,             // VOLUME_24H_Z_SCORE
+
+    // Cross-stream composite indicators (8 — consume 2-3 streams simultaneously)
+    FundingOiPressure,           // FUNDING_OI_PRESSURE (FundingRate + OI)
+    IvHvSpread,                  // IV_HV_SPREAD (VolatilityIndex + HistoricalVolatility)
+    SqueezeProbability,          // SQUEEZE_PROBABILITY (OI + MarkPrice + Liquidation)
+    FundingSentimentAlignment,   // FUNDING_SENTIMENT_ALIGNMENT (FundingRate + LongShortRatio)
+    VolRegimeEntry,              // VOL_REGIME_ENTRY (VolatilityIndex + MarkPrice)
+    BlockTradeVolumeRatio,       // BLOCK_TRADE_VOLUME_RATIO (BlockTrade + AggTrade)
+    CapitulationDetector,        // CAPITULATION_DETECTOR (Liquidation + AggTrade + MarkPrice)
+    IndexTrackingError,          // INDEX_TRACKING_ERROR (IndexPrice + CompositeIndex)
+
+    // Category C composite + adaptive + cross-asset indicators (11)
+    MarketStressComposite,       // MARKET_STRESS_COMPOSITE (VolIdx + Liq + Funding + InsuranceFund)
+    RiskOffDetector,             // RISK_OFF_DETECTOR (VolIdx + Liq + Funding + InsuranceFund)
+    SentimentComposite,          // SENTIMENT_COMPOSITE (LongShortRatio + AggTrade + Funding)
+    CompoundSqueezeProbability,  // COMPOUND_SQUEEZE_PROBABILITY (OI + Liq + MarkPrice + Funding)
+    TpoSessionBalance,           // TPO_SESSION_BALANCE (Tick)
+    CompositeWeightDrift,        // COMPOSITE_WEIGHT_DRIFT (CompositeIndex)
+    AdaptiveWindowSelector,      // ADAPTIVE_WINDOW_SELECTOR (Tick)
+    AdaptiveThreshold,           // ADAPTIVE_THRESHOLD (Tick)
+    PairsCointegrationProxy,     // PAIRS_COINTEGRATION_PROXY (Tick + secondary price)
+    CrossAssetBeta,              // CROSS_ASSET_BETA (Tick + secondary price)
+    RelativeStrengthCross,       // RELATIVE_STRENGTH_CROSS (Tick + secondary price)
 
 }
 

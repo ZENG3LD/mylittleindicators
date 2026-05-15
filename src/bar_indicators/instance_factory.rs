@@ -327,9 +327,19 @@ use crate::bar_indicators::book::book_churn_rate::BookChurnRate;
 use crate::bar_indicators::book::hidden_liquidity_detector::HiddenLiquidityDetector;
 use crate::bar_indicators::book::trade_book_absorption::TradeBookAbsorption as TradeBookAbsorptionIndicator;
 use crate::bar_indicators::book::sweep_impact_analyzer::SweepImpactAnalyzer;
+// Book Advanced
+use crate::bar_indicators::book_advanced::bid_ask_asymmetry::BidAskAsymmetry;
+use crate::bar_indicators::book_advanced::bid_ask_bounce_rate::BidAskBounceRate;
+use crate::bar_indicators::book_advanced::mid_price_velocity::MidPriceVelocity as BookMidPriceVelocity;
+use crate::bar_indicators::book_advanced::best_level_volatility::BestLevelVolatility;
+use crate::bar_indicators::book_advanced::layer_concentration::LayerConcentration;
+use crate::bar_indicators::book_advanced::price_level_density::PriceLevelDensity;
 use crate::bar_indicators::volume::funding_momentum::FundingMomentum;
 use crate::bar_indicators::volume::funding_z_score::FundingZScore;
 use crate::bar_indicators::volume::oi_change_rate::OiChangeRate;
+use crate::bar_indicators::open_interest::{
+    LongSqueezeDetector, OiMomentum, OiPercentile, OiPriceCorrelation, OiZScore,
+};
 use crate::bar_indicators::volume::mark_price_vs_last::MarkPriceVsLast;
 use crate::bar_indicators::volume::index_price_momentum::IndexPriceMomentum;
 use crate::bar_indicators::volume::funding_price_divergence::FundingPriceMomentumDivergence;
@@ -347,8 +357,12 @@ use crate::bar_indicators::orderbook_delta_consumer::OrderbookDeltaConsumer;
 use crate::bar_indicators::funding_rate_consumer::FundingRateConsumer;
 use crate::bar_indicators::liquidation_consumer::LiquidationConsumer;
 use crate::bar_indicators::liquidations::LiquidationCascade;
+use crate::bar_indicators::liquidations::LiquidationClusterDetector;
+use crate::bar_indicators::liquidations::LiquidationCooldown;
 use crate::bar_indicators::liquidations::LiquidationRate;
 use crate::bar_indicators::liquidations::LiquidationVolumeImbalance;
+use crate::bar_indicators::liquidations::LiquidationVolumeVelocity;
+use crate::bar_indicators::liquidations::StopHuntDetector;
 use crate::bar_indicators::mark_price_consumer::MarkPriceConsumer;
 use crate::bar_indicators::open_interest_consumer::OpenInterestConsumer;
 use crate::bar_indicators::tick_consumer::TickConsumer;
@@ -391,6 +405,11 @@ use crate::bar_indicators::clusters::{
 };
 use crate::bar_indicators::volume::aggressor_imbalance::AggressorImbalance;
 use crate::bar_indicators::volume::large_trade_filter::LargeTradeFilter;
+use crate::bar_indicators::tick_advanced::{
+    VwapDeviation, TradeRunDetector, SizeWeightedDirectionalMomentum,
+    TickFrequencyAnomaly, AggressorBurstDetector, LargeTickMomentum,
+    ValueAreaTracker, VolumeImbalanceZone,
+};
 use crate::bar_indicators::book::wall_detector::WallDetector as BookWallDetector;
 use crate::bar_indicators::book::book_depth_change::BookDepthChange as BookDepthChangeIndicator;
 use crate::bar_indicators::entropy::cross_mutual_information_lags::CrossMutualInformationLags;
@@ -628,15 +647,35 @@ use crate::bar_indicators::VolatilityIndexConsumer as _VolatilityIndexConsumerTr
 // GREEKS INDICATORS (3)
 // ========================================
 use crate::bar_indicators::greeks::{DeltaExposureFlow, GammaSqueezeDetector, IvSkew};
+
+// ========================================
+// FUNDING ADVANCED INDICATORS (3)
+// ========================================
+use crate::bar_indicators::funding_advanced::{
+    AnnualizedFundingRate, FundingDirectionShift, FundingExtremeAlert,
+};
+
+// ========================================
+// MARK PRICE ADVANCED INDICATORS (3)
+// ========================================
+use crate::bar_indicators::mark_price_advanced::{
+    MarkPriceGapDetector, MarkPriceMomentum, MarkPriceVolatility,
+};
+
+// ========================================
+// GREEKS ADVANCED INDICATORS (4)
+// ========================================
+use crate::bar_indicators::greeks::{CharmTracker, VegaExposureFlow, ThetaDecayTracker, PinRiskDetector};
 use crate::bar_indicators::OptionGreeksConsumer as _OptionGreeksConsumerTrait;
 use crate::bar_indicators::statistical_scoring::FvgDurationIntensityScore;
 use crate::bar_indicators::statistical_scoring::FvgReversionProbability;
 
 // ========================================
-// STRESS INDICATORS (4)
+// STRESS INDICATORS (6)
 // ========================================
 use crate::bar_indicators::stress::{
-    FundDepletionRate, FundStressDetector, SettlementPriceMomentum, SettlementVsMarkSpread,
+    FundDepletionRate, FundStressDetector, InsuranceFundMomentum, SettlementApproachSignal,
+    SettlementPriceMomentum, SettlementVsMarkSpread,
 };
 use crate::bar_indicators::InsuranceFundConsumer as _InsuranceFundConsumerTrait;
 use crate::bar_indicators::SettlementEventConsumer as _SettlementEventConsumerTrait;
@@ -645,23 +684,56 @@ use crate::bar_indicators::SettlementEventConsumer as _SettlementEventConsumerTr
 // MICROSTRUCTURE INDICATORS (5)
 // ========================================
 use crate::bar_indicators::microstructure::{
-    BlockTradeFlow, BlockTradeImpact, L3CancelRatio, L3LargeOrderTracker, L3OrderRate,
+    BlockTradeFlow, BlockTradeImpact, BlockTradeSizeAnomaly, L3CancelRatio, L3LargeOrderTracker,
+    L3OrderRate, L3SpooferScore, QuoteLifecycleTracker, QuoteStuffingDetector,
 };
 use crate::bar_indicators::BlockTradeConsumer as _BlockTradeConsumerTrait;
 use crate::bar_indicators::OrderbookL3Consumer as _OrderbookL3ConsumerTrait;
 
 // ========================================
-// RISK / FUNDING / MISC INDICATORS (8)
+// RISK / FUNDING / MISC INDICATORS (11)
 // ========================================
 use crate::bar_indicators::risk_funding::{
-    AuctionImbalance, AuctionPriceDeviation, FundingDrift, LeverageReductionWarning,
-    MmrTracker, PredictedFundingExtreme, SettledFundingMomentum, WarningRate,
+    AuctionImbalance, AuctionLiquidityScore, AuctionPriceDeviation, FundingDrift,
+    FundingSettlementImpact, FundingTimeDecay, LeverageReductionWarning, MmrTracker,
+    PredictedFundingExtreme, RiskLimitProximity, SettledFundingMomentum, WarningFrequencyFilter,
+    WarningRate,
 };
 use crate::bar_indicators::RiskLimitConsumer as _RiskLimitConsumerTrait;
 use crate::bar_indicators::PredictedFundingConsumer as _PredictedFundingConsumerTrait;
 use crate::bar_indicators::FundingSettlementConsumer as _FundingSettlementConsumerTrait;
 use crate::bar_indicators::AuctionEventConsumer as _AuctionEventConsumerTrait;
 use crate::bar_indicators::MarketWarningConsumer as _MarketWarningConsumerTrait;
+
+// ========================================
+// CROSS-STREAM COMPOSITE INDICATORS (19)
+// ========================================
+use crate::bar_indicators::composites::{
+    AdaptiveThreshold,
+    AdaptiveWindowSelector,
+    BlockTradeVolumeRatio,
+    CapitulationDetector,
+    CompoundSqueezeProbability,
+    CrossAssetBeta,
+    FundingOiPressure,
+    FundingSentimentAlignment,
+    IndexTrackingError,
+    IvHvSpread,
+    MarketStressComposite,
+    PairsCointegrationProxy,
+    RelativeStrengthCross,
+    RiskOffDetector,
+    SentimentComposite,
+    SqueezeProbability,
+    VolRegimeEntry,
+};
+use crate::bar_indicators::tick_advanced::TpoSessionBalance;
+use crate::bar_indicators::index_basis::CompositeWeightDrift;
+
+// ========================================
+// TICKER ADVANCED INDICATORS (2)
+// ========================================
+use crate::bar_indicators::ticker_advanced::{TickerSpreadRatio, Volume24hZScore};
 
 /// Configuration for an individual component within a composite indicator
 ///
@@ -991,6 +1063,15 @@ pub enum IndicatorInstance {
     TradeClusterDetector(Box<TradeClusterDetector>),
     AggressorImbalance(Box<AggressorImbalance>),
     LargeTradeFilter(Box<LargeTradeFilter>),
+    // Tick Advanced (8 indicators)
+    TickAdvVwapDeviation(Box<VwapDeviation>),
+    TickAdvTradeRunDetector(Box<TradeRunDetector>),
+    TickAdvSizeWeightedMomentum(Box<SizeWeightedDirectionalMomentum>),
+    TickAdvFrequencyAnomaly(Box<TickFrequencyAnomaly>),
+    TickAdvAggressorBurst(Box<AggressorBurstDetector>),
+    TickAdvLargeTickMomentum(Box<LargeTickMomentum>),
+    TickAdvValueAreaTracker(Box<ValueAreaTracker>),
+    TickAdvVolumeImbalanceZone(Box<VolumeImbalanceZone>),
     WallDetector(Box<BookWallDetector>),
     BookDepthChange(Box<BookDepthChangeIndicator>),
     // BOOK DELTA category (3 indicators)
@@ -1001,11 +1082,24 @@ pub enum IndicatorInstance {
     HiddenLiquidityDetector(Box<HiddenLiquidityDetector>),
     TradeBookAbsorption(Box<TradeBookAbsorptionIndicator>),
     SweepImpactAnalyzer(Box<SweepImpactAnalyzer>),
+    // BOOK ADVANCED category (6 indicators)
+    BookBidAskAsymmetry(Box<BidAskAsymmetry>),
+    BookBidAskBounceRate(Box<BidAskBounceRate>),
+    BookMidPriceVelocity(Box<BookMidPriceVelocity>),
+    BookBestLevelVolatility(Box<BestLevelVolatility>),
+    BookLayerConcentration(Box<LayerConcentration>),
+    BookPriceLevelDensity(Box<PriceLevelDensity>),
     // FUNDING / OI category (3 indicators)
     FundingMomentum(Box<FundingMomentum>),
     FundingZScore(Box<FundingZScore>),
     OiChangeRate(Box<OiChangeRate>),
     FundingPriceDivergence(Box<FundingPriceMomentumDivergence>),
+    // OPEN INTEREST category (5 indicators)
+    OiZScore(Box<OiZScore>),
+    OiMomentum(Box<OiMomentum>),
+    OiPercentile(Box<OiPercentile>),
+    LongSqueezeDetector(Box<LongSqueezeDetector>),
+    OiPriceCorrelation(Box<OiPriceCorrelation>),
     // MARK PRICE category (2 indicators)
     MarkPriceVsLast(Box<MarkPriceVsLast>),
     IndexPriceMomentum(Box<IndexPriceMomentum>),
@@ -1013,10 +1107,14 @@ pub enum IndicatorInstance {
     Volume24hMomentum(Box<Volume24hMomentum>),
     HighLowRangeRatio(Box<HighLowRangeRatio>),
     PriceChange24hZScore(Box<PriceChange24hZScore>),
-    // LIQUIDATION category (3 indicators — consume Liquidation events)
+    // LIQUIDATION category (7 indicators — consume Liquidation events)
     LiquidationRate(Box<LiquidationRate>),
     LiquidationVolumeImbalance(Box<LiquidationVolumeImbalance>),
     LiquidationCascade(Box<LiquidationCascade>),
+    LiquidationVolumeVelocity(Box<LiquidationVolumeVelocity>),
+    StopHuntDetector(Box<StopHuntDetector>),
+    LiquidationClusterDetector(Box<LiquidationClusterDetector>),
+    LiquidationCooldown(Box<LiquidationCooldown>),
     // ENTROPY category (2 indicators)
     Sampen(Box<SampleEntropy>),
     Xmil(Box<CrossMutualInformationLags>),
@@ -1610,19 +1708,23 @@ pub enum IndicatorInstance {
     GrkIvSkew(Box<IvSkew>),
 
     // ========================================
-    // STRESS INDICATORS (4)
+    // STRESS INDICATORS (6)
     // ========================================
     /// Rolling slope of insurance fund balance. Output: `Single`.
     StressFundDepletionRate(Box<FundDepletionRate>),
     /// Insurance fund stress detector. Output: `Signal`.
     StressFundStressDetector(Box<FundStressDetector>),
+    /// EMA slope of insurance fund balance. Output: `Single(slope)`.
+    StressInsuranceFundMomentum(Box<InsuranceFundMomentum>),
+    /// Approach signal scoring proximity to next settlement. Output: `Single` ∈ [0,1].
+    StressSettlementApproachSignal(Box<SettlementApproachSignal>),
     /// Rolling slope of settlement price. Output: `Single`.
     StressSettlementPriceMomentum(Box<SettlementPriceMomentum>),
     /// Spread between settlement price and mark price. Output: `Triple`.
     StressSettlementVsMarkSpread(Box<SettlementVsMarkSpread>),
 
     // ========================================
-    // MICROSTRUCTURE INDICATORS (5)
+    // MICROSTRUCTURE INDICATORS (7)
     // ========================================
     /// Rolling net block trade flow (buy - sell). Output: `Single`.
     MicroBlockTradeFlow(Box<BlockTradeFlow>),
@@ -1634,34 +1736,142 @@ pub enum IndicatorInstance {
     MicroL3LargeOrderTracker(Box<L3LargeOrderTracker>),
     /// Rolling cancel-to-add ratio from L3 book. Output: `Single`.
     MicroL3CancelRatio(Box<L3CancelRatio>),
+    /// Z-score of current block trade size vs rolling history. Output: `Single(z_score)`.
+    MicroBlockTradeSizeAnomaly(Box<BlockTradeSizeAnomaly>),
+    /// Rolling L2 delta event rate / quote-stuffing signal. Output: `Double(rate, signal)`.
+    MicroQuoteStuffingDetector(Box<QuoteStuffingDetector>),
 
     // ========================================
-    // RISK INDICATORS (2)
+    // RISK INDICATORS (3)
     // ========================================
     /// Leverage tightening/loosening detector. Output: `Signal`.
     RiskLeverageReductionWarning(Box<LeverageReductionWarning>),
     /// Maintenance margin ratio tracker. Output: `Single`.
     RiskMmrTracker(Box<MmrTracker>),
+    /// Exchange margin tier restrictiveness proxy (mmr+imr)/2. Output: `Single`.
+    RiskRiskLimitProximity(Box<RiskLimitProximity>),
 
     // ========================================
-    // FUNDING INDICATORS (3)
+    // FUNDING INDICATORS (5)
     // ========================================
     /// Drift between predicted and actual funding rate. Output: `Single`.
     FndFundingDrift(Box<FundingDrift>),
+    /// Pressure score approaching next funding time. Output: `Single` ∈ [0,1].
+    FndFundingTimeDecay(Box<FundingTimeDecay>),
     /// Extreme predicted funding rate detector. Output: `Signal`.
     FndPredictedFundingExtreme(Box<PredictedFundingExtreme>),
     /// Rolling slope of settled funding rates. Output: `Single`.
     FndSettledFundingMomentum(Box<SettledFundingMomentum>),
+    /// Mark price change around funding settlements. Output: `Single(impact_pct)`.
+    FndFundingSettlementImpact(Box<FundingSettlementImpact>),
 
     // ========================================
-    // MISC INDICATORS (3)
+    // MISC INDICATORS (5)
     // ========================================
+    /// Liquidity score: current auction qty / rolling mean qty. Output: `Single(score)`.
+    MiscAuctionLiquidityScore(Box<AuctionLiquidityScore>),
     /// Percentage deviation of indicative auction price from last close. Output: `Single`.
     MiscAuctionPriceDeviation(Box<AuctionPriceDeviation>),
     /// Rolling imbalance of auction indicative quantities. Output: `Single`.
     MiscAuctionImbalance(Box<AuctionImbalance>),
     /// Rolling market warning event rate (events/min). Output: `Single`.
     MiscWarningRate(Box<WarningRate>),
+    /// Debounce filter for market warning events. Output: `Signal(+1=emitted,0=filtered)`.
+    MiscWarningFrequencyFilter(Box<WarningFrequencyFilter>),
+
+    // ========================================
+    // MICROSTRUCTURE EXTRA INDICATORS (2)
+    // ========================================
+    /// Composite spoofing score (cancel ratio + large order freq). Output: `Single`.
+    MicroL3SpooferScore(Box<L3SpooferScore>),
+    /// Rolling average lifetime of L3 quotes (Add→Delete). Output: `Single(avg_ms)`.
+    MicroQuoteLifecycleTracker(Box<QuoteLifecycleTracker>),
+
+    // ========================================
+    // TICKER ADVANCED INDICATORS (2)
+    // ========================================
+    /// Normalized bid-ask spread: (ask-bid)/last_price. Output: `Single`.
+    TkrSpreadRatio(Box<TickerSpreadRatio>),
+    /// Z-score of current 24h volume vs rolling history. Output: `Single(z)`.
+    TkrVolume24hZScore(Box<Volume24hZScore>),
+
+    // ========================================
+    // FUNDING ADVANCED INDICATORS (3)
+    // ========================================
+    /// Annualized funding rate. Output: `Single(annualized_pct)`.
+    FndAdvAnnualizedFundingRate(Box<AnnualizedFundingRate>),
+    /// Funding rate direction shift detector. Output: `Signal`.
+    FndAdvFundingDirectionShift(Box<FundingDirectionShift>),
+    /// Extreme funding rate alert. Output: `Double(signal, magnitude_sigma)`.
+    FndAdvFundingExtremeAlert(Box<FundingExtremeAlert>),
+
+    // ========================================
+    // MARK PRICE ADVANCED INDICATORS (3)
+    // ========================================
+    /// Rolling linear slope of mark price. Output: `Single(slope)`.
+    MpAdvMarkPriceMomentum(Box<MarkPriceMomentum>),
+    /// Rolling std of mark price. Output: `Single(std)`.
+    MpAdvMarkPriceVolatility(Box<MarkPriceVolatility>),
+    /// Abnormal mark price jump detector. Output: `Triple(signal, jump_size, sigma_ratio)`.
+    MpAdvMarkPriceGapDetector(Box<MarkPriceGapDetector>),
+
+    // ========================================
+    // GREEKS ADVANCED INDICATORS (4)
+    // ========================================
+    /// Charm approximation ∂Δ/∂t from consecutive snapshots. Output: `Single(charm)`.
+    GrkCharmTracker(Box<CharmTracker>),
+    /// Rolling slope of option vega. Output: `Single(slope)`.
+    GrkVegaExposureFlow(Box<VegaExposureFlow>),
+    /// Cumulative theta decay tracker. Output: `Single(cumulative_theta)`.
+    GrkThetaDecayTracker(Box<ThetaDecayTracker>),
+    /// Pin risk detector. Output: `Signal(+1 = high risk, 0 = none)`.
+    GrkPinRiskDetector(Box<PinRiskDetector>),
+
+    // ========================================
+    // CROSS-STREAM COMPOSITE INDICATORS (8)
+    // ========================================
+    /// Funding rate × OI delta pressure. Output: `Triple(funding, oi_delta, pressure)`.
+    CmpFundingOiPressure(Box<FundingOiPressure>),
+    /// IV minus HV spread (volatility risk premium). Output: `Triple(iv, hv, spread)`.
+    CmpIvHvSpread(Box<IvHvSpread>),
+    /// Composite squeeze probability [0,1] + direction. Output: `Double(probability, direction)`.
+    CmpSqueezeProbability(Box<SqueezeProbability>),
+    /// Funding/sentiment alignment signal. Output: `Signal(+1/-1/0)`.
+    CmpFundingSentimentAlignment(Box<FundingSentimentAlignment>),
+    /// Volatility regime entry/exit signal. Output: `Signal(+1/-1/0)`.
+    CmpVolRegimeEntry(Box<VolRegimeEntry>),
+    /// Block trade volume / aggregate trade volume ratio. Output: `Single(ratio)`.
+    CmpBlockTradeVolumeRatio(Box<BlockTradeVolumeRatio>),
+    /// Capitulation event detector. Output: `Signal(+1/-1/0)`.
+    CmpCapitulationDetector(Box<CapitulationDetector>),
+    /// Rolling std of index - composite price divergence. Output: `Single(tracking_error)`.
+    CmpIndexTrackingError(Box<IndexTrackingError>),
+
+    // ========================================
+    // CATEGORY C: COMPOSITE + ADAPTIVE + CROSS-ASSET (11)
+    // ========================================
+    /// Quad-stream market stress score [0,1]. Output: `Single(stress)`.
+    CmpMarketStressComposite(Box<MarketStressComposite>),
+    /// Risk-off signal when 2+ stress components exceed threshold. Output: `Signal(+1/0)`.
+    CmpRiskOffDetector(Box<RiskOffDetector>),
+    /// Sentiment composite from L/S ratio + trade flow + funding. Output: `Single(composite)`.
+    CmpSentimentComposite(Box<SentimentComposite>),
+    /// 4-factor squeeze probability (OI + Liq + MarkPrice + Funding). Output: `Double(prob, dir)`.
+    CmpCompoundSqueezeProbability(Box<CompoundSqueezeProbability>),
+    /// TPO session balance point from tick stream. Output: `Triple(balance_price, max_tpo, buckets)`.
+    TickAdvTpoSessionBalance(Box<TpoSessionBalance>),
+    /// Rolling max weight drift across composite index components. Output: `Single(max_drift_pct)`.
+    IdxCompositeWeightDrift(Box<CompositeWeightDrift>),
+    /// Volatility-adaptive window size selector. Output: `Single(window_size)`.
+    CmpAdaptiveWindowSelector(Box<AdaptiveWindowSelector>),
+    /// Dynamic threshold = mean + N×std. Output: `Triple(mean, std, threshold)`.
+    CmpAdaptiveThreshold(Box<AdaptiveThreshold>),
+    /// Spread z-score cointegration proxy (primary tick + secondary price). Output: `Single(zscore)`.
+    CmpPairsCointegrationProxy(Box<PairsCointegrationProxy>),
+    /// Rolling cross-asset beta (primary tick + secondary price). Output: `Single(beta)`.
+    CmpCrossAssetBeta(Box<CrossAssetBeta>),
+    /// Relative strength cross (primary tick + secondary price). Output: `Single(rs)`.
+    CmpRelativeStrengthCross(Box<RelativeStrengthCross>),
 }
 
 impl IndicatorInstance {
@@ -1762,10 +1972,15 @@ impl IndicatorInstance {
             OrderBookVelocity | WallDetector | BookDepthChange |
             IcebergDetector | LevelReplenishRate | BookChurnRate |
             HiddenLiquidityDetector | TradeBookAbsorption | SweepImpactAnalyzer |
+            BidAskAsymmetry | BidAskBounceRate | MidPriceVelocity | BestLevelVolatility |
+            LayerConcentration | PriceLevelDensity |
             FundingMomentum | FundingZScore | OiChangeRate | FundingPriceDivergence |
+            OiZScore | OiMomentum | OiPercentile | LongSqueezeDetector | OiPriceCorrelation |
             MarkPriceVsLast | IndexPriceMomentum |
             Volume24hMomentum | HighLowRangeRatio | PriceChange24hZScore |
             LiquidationRate | LiquidationVolumeImbalance | LiquidationCascade |
+            LiquidationVolumeVelocity | StopHuntDetector | LiquidationClusterDetector |
+            LiquidationCooldown |
 
             // Sentiment indicators — consume stream events, not OHLCV source
             LongShortRatioMomentum | LongShortExtremeDetector | RatioVsPriceDivergence |
@@ -1781,16 +1996,48 @@ impl IndicatorInstance {
             // Greeks indicators — consume OptionGreeks stream events
             DeltaExposureFlow | GammaSqueezeDetector | IvSkew |
 
+            // Greeks advanced — consume OptionGreeks stream events
+            CharmTracker | VegaExposureFlow | ThetaDecayTracker | PinRiskDetector |
+
+            // Funding advanced — consume FundingRate stream events
+            AnnualizedFundingRate | FundingDirectionShift | FundingExtremeAlert |
+
+            // MarkPrice advanced — consume MarkPrice stream events
+            MarkPriceMomentum | MarkPriceVolatility | MarkPriceGapDetector |
+
             // Stress indicators — consume InsuranceFund, SettlementEvent, MarkPrice stream events
-            FundDepletionRate | FundStressDetector | SettlementPriceMomentum | SettlementVsMarkSpread |
+            FundDepletionRate | FundStressDetector | InsuranceFundMomentum |
+            SettlementApproachSignal | SettlementPriceMomentum | SettlementVsMarkSpread |
 
             // Microstructure indicators — consume BlockTrade, OrderbookL3 stream events
             BlockTradeFlow | BlockTradeImpact | L3OrderRate | L3LargeOrderTracker | L3CancelRatio |
 
             // Risk/Funding/Misc indicators — consume stream events, not OHLCV source
-            LeverageReductionWarning | MmrTracker |
-            FundingDrift | PredictedFundingExtreme | SettledFundingMomentum |
-            AuctionPriceDeviation | AuctionImbalance | WarningRate
+            LeverageReductionWarning | MmrTracker | RiskLimitProximity |
+            FundingDrift | FundingTimeDecay | PredictedFundingExtreme | SettledFundingMomentum |
+            FundingSettlementImpact |
+            AuctionLiquidityScore | AuctionPriceDeviation | AuctionImbalance | WarningRate |
+            WarningFrequencyFilter |
+            TickerSpreadRatio | Volume24hZScore |
+            L3SpooferScore | QuoteLifecycleTracker |
+
+            // Tick Advanced indicators — consume raw ticks, not OHLCV source
+            VwapDeviation | TradeRunDetector | SizeWeightedDirectionalMomentum |
+            TickFrequencyAnomaly | AggressorBurstDetector | LargeTickMomentum |
+            ValueAreaTracker | VolumeImbalanceZone |
+
+            // Microstructure new — consume block trade / delta stream events
+            BlockTradeSizeAnomaly | QuoteStuffingDetector |
+
+            // Cross-stream composite indicators — consume stream events, not OHLCV source
+            FundingOiPressure | IvHvSpread | SqueezeProbability |
+            FundingSentimentAlignment | VolRegimeEntry | BlockTradeVolumeRatio |
+            CapitulationDetector | IndexTrackingError |
+            // Category C indicators
+            MarketStressComposite | RiskOffDetector | SentimentComposite |
+            CompoundSqueezeProbability | TpoSessionBalance | CompositeWeightDrift |
+            AdaptiveWindowSelector | AdaptiveThreshold |
+            PairsCointegrationProxy | CrossAssetBeta | RelativeStrengthCross
 
             // Note: Most other indicators are PriceOnly and will use config.source
         )
@@ -2354,6 +2601,29 @@ impl IndicatorInstance {
                 let window = config.periods.first().copied().unwrap_or(50);
                 Ok(Self::SweepImpactAnalyzer(Box::new(SweepImpactAnalyzer::new(window))))
             }
+            // BOOK ADVANCED category (6 indicators)
+            BarIndicatorId::BidAskAsymmetry => {
+                let top_n = config.additional_params.get("top_n").copied().unwrap_or(5.0) as usize;
+                Ok(Self::BookBidAskAsymmetry(Box::new(BidAskAsymmetry::new(top_n.max(1)))))
+            }
+            BarIndicatorId::BidAskBounceRate => {
+                let win = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::BookBidAskBounceRate(Box::new(BidAskBounceRate::new(win))))
+            }
+            BarIndicatorId::MidPriceVelocity => {
+                Ok(Self::BookMidPriceVelocity(Box::new(BookMidPriceVelocity::new(period))))
+            }
+            BarIndicatorId::BestLevelVolatility => {
+                Ok(Self::BookBestLevelVolatility(Box::new(BestLevelVolatility::new(period))))
+            }
+            BarIndicatorId::LayerConcentration => {
+                let top_n = config.additional_params.get("top_n").copied().unwrap_or(10.0) as usize;
+                Ok(Self::BookLayerConcentration(Box::new(LayerConcentration::new(top_n.max(2)))))
+            }
+            BarIndicatorId::PriceLevelDensity => {
+                let top_n = config.additional_params.get("top_n").copied().unwrap_or(10.0) as usize;
+                Ok(Self::BookPriceLevelDensity(Box::new(PriceLevelDensity::new(top_n.max(2)))))
+            }
             // FUNDING / OI category (3 indicators)
             BarIndicatorId::FundingMomentum => {
                 Ok(Self::FundingMomentum(Box::new(FundingMomentum::new(period))))
@@ -2367,6 +2637,22 @@ impl IndicatorInstance {
             BarIndicatorId::FundingPriceDivergence => {
                 let price_period = config.periods.get(1).copied().unwrap_or(period);
                 Ok(Self::FundingPriceDivergence(Box::new(FundingPriceMomentumDivergence::new(period, price_period))))
+            }
+            // OPEN INTEREST category (5 indicators)
+            BarIndicatorId::OiZScore => {
+                Ok(Self::OiZScore(Box::new(OiZScore::new(period))))
+            }
+            BarIndicatorId::OiMomentum => {
+                Ok(Self::OiMomentum(Box::new(OiMomentum::new(period))))
+            }
+            BarIndicatorId::OiPercentile => {
+                Ok(Self::OiPercentile(Box::new(OiPercentile::new(period))))
+            }
+            BarIndicatorId::LongSqueezeDetector => {
+                Ok(Self::LongSqueezeDetector(Box::new(LongSqueezeDetector::new())))
+            }
+            BarIndicatorId::OiPriceCorrelation => {
+                Ok(Self::OiPriceCorrelation(Box::new(OiPriceCorrelation::new(period))))
             }
             // MARK PRICE category (2 indicators)
             BarIndicatorId::MarkPriceVsLast => {
@@ -2406,6 +2692,36 @@ impl IndicatorInstance {
                     .copied()
                     .unwrap_or(5.0) as usize;
                 Ok(Self::LiquidationCascade(Box::new(LiquidationCascade::new(window_ms, threshold))))
+            }
+            BarIndicatorId::LiquidationVolumeVelocity => {
+                let window_ms = config.additional_params.get("window_ms")
+                    .copied()
+                    .unwrap_or(60_000.0) as i64;
+                Ok(Self::LiquidationVolumeVelocity(Box::new(LiquidationVolumeVelocity::new(window_ms))))
+            }
+            BarIndicatorId::StopHuntDetector => {
+                let spike_threshold = config.additional_params.get("spike_threshold_usd")
+                    .copied()
+                    .unwrap_or(500_000.0);
+                let reversal_window_ms = config.additional_params.get("reversal_window_ms")
+                    .copied()
+                    .unwrap_or(10_000.0) as i64;
+                Ok(Self::StopHuntDetector(Box::new(StopHuntDetector::new(spike_threshold, reversal_window_ms))))
+            }
+            BarIndicatorId::LiquidationClusterDetector => {
+                let price_bucket = config.additional_params.get("price_bucket")
+                    .copied()
+                    .unwrap_or(100.0);
+                let window_ms = config.additional_params.get("window_ms")
+                    .copied()
+                    .unwrap_or(60_000.0) as i64;
+                let min_cluster_count = config.additional_params.get("min_cluster_count")
+                    .copied()
+                    .unwrap_or(3.0) as usize;
+                Ok(Self::LiquidationClusterDetector(Box::new(LiquidationClusterDetector::new(price_bucket, window_ms, min_cluster_count))))
+            }
+            BarIndicatorId::LiquidationCooldown => {
+                Ok(Self::LiquidationCooldown(Box::new(LiquidationCooldown::new())))
             }
             // CLUSTERS category (6 indicators)
             BarIndicatorId::ClQueueImb => Ok(Self::ClQueueImb(Box::default())),
@@ -2896,6 +3212,46 @@ impl IndicatorInstance {
                 let window = config.periods.first().copied().unwrap_or(50);
                 let multiplier = config.additional_params.get("multiplier").copied().unwrap_or(3.0);
                 Ok(Self::LargeTradeFilter(Box::new(LargeTradeFilter::new(window, multiplier))))
+            }
+            // ── Tick Advanced ────────────────────────────────────────────────
+            BarIndicatorId::VwapDeviation => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                Ok(Self::TickAdvVwapDeviation(Box::new(VwapDeviation::new(window_ms))))
+            }
+            BarIndicatorId::TradeRunDetector => {
+                let min_run = config.additional_params.get("min_run_length").copied().unwrap_or(3.0) as usize;
+                Ok(Self::TickAdvTradeRunDetector(Box::new(TradeRunDetector::new(min_run))))
+            }
+            BarIndicatorId::SizeWeightedDirectionalMomentum => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                Ok(Self::TickAdvSizeWeightedMomentum(Box::new(SizeWeightedDirectionalMomentum::new(window_ms))))
+            }
+            BarIndicatorId::TickFrequencyAnomaly => {
+                let short_ms = config.additional_params.get("short_window_ms").copied().unwrap_or(5_000.0) as i64;
+                let long_ms = config.additional_params.get("long_window_ms").copied().unwrap_or(60_000.0) as i64;
+                Ok(Self::TickAdvFrequencyAnomaly(Box::new(TickFrequencyAnomaly::new(short_ms, long_ms))))
+            }
+            BarIndicatorId::AggressorBurstDetector => {
+                let window_ms = config.additional_params.get("burst_window_ms").copied().unwrap_or(5_000.0) as i64;
+                let min_count = config.additional_params.get("min_count").copied().unwrap_or(5.0) as usize;
+                let threshold = config.additional_params.get("directional_threshold").copied().unwrap_or(0.8);
+                Ok(Self::TickAdvAggressorBurst(Box::new(AggressorBurstDetector::new(window_ms, min_count, threshold))))
+            }
+            BarIndicatorId::LargeTickMomentum => {
+                let threshold = config.additional_params.get("size_threshold").copied().unwrap_or(1.0);
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                Ok(Self::TickAdvLargeTickMomentum(Box::new(LargeTickMomentum::new(threshold, window_ms))))
+            }
+            BarIndicatorId::ValueAreaTracker => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(300_000.0) as i64;
+                let price_bucket = config.additional_params.get("price_bucket").copied().unwrap_or(1.0);
+                let value_area_pct = config.additional_params.get("value_area_pct").copied().unwrap_or(0.7);
+                Ok(Self::TickAdvValueAreaTracker(Box::new(ValueAreaTracker::new(window_ms, price_bucket, value_area_pct))))
+            }
+            BarIndicatorId::VolumeImbalanceZone => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                let delta_threshold = config.additional_params.get("delta_threshold").copied().unwrap_or(0.6);
+                Ok(Self::TickAdvVolumeImbalanceZone(Box::new(VolumeImbalanceZone::new(window_ms, delta_threshold))))
             }
             BarIndicatorId::Cmf => {
                 let p = config.periods.first().copied().unwrap_or(20);
@@ -4657,11 +5013,66 @@ impl IndicatorInstance {
             BarIndicatorId::IvSkew => {
                 Ok(Self::GrkIvSkew(Box::new(IvSkew::new())))
             }
+            BarIndicatorId::CharmTracker => {
+                Ok(Self::GrkCharmTracker(Box::new(CharmTracker::new())))
+            }
+            BarIndicatorId::VegaExposureFlow => {
+                let p = config.periods.first().copied().unwrap_or(14);
+                Ok(Self::GrkVegaExposureFlow(Box::new(VegaExposureFlow::new(p))))
+            }
+            BarIndicatorId::ThetaDecayTracker => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::GrkThetaDecayTracker(Box::new(ThetaDecayTracker::new(p))))
+            }
+            BarIndicatorId::PinRiskDetector => {
+                let delta_target = config.additional_params.get("delta_target").copied().unwrap_or(0.5);
+                let delta_tolerance = config.additional_params.get("delta_tolerance").copied().unwrap_or(0.05);
+                let theta_threshold = config.additional_params.get("theta_threshold").copied().unwrap_or(0.5);
+                Ok(Self::GrkPinRiskDetector(Box::new(PinRiskDetector::new(delta_target, delta_tolerance, theta_threshold))))
+            }
+
+            // ── Funding advanced indicators ────────────────────────────────────
+            BarIndicatorId::AnnualizedFundingRate => {
+                let fpd = config.additional_params.get("funding_periods_per_day").copied().unwrap_or(3.0);
+                Ok(Self::FndAdvAnnualizedFundingRate(Box::new(AnnualizedFundingRate::new(fpd))))
+            }
+            BarIndicatorId::FundingDirectionShift => {
+                Ok(Self::FndAdvFundingDirectionShift(Box::new(FundingDirectionShift::new())))
+            }
+            BarIndicatorId::FundingExtremeAlert => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                let sigma = config.additional_params.get("sigma_threshold").copied().unwrap_or(2.0);
+                Ok(Self::FndAdvFundingExtremeAlert(Box::new(FundingExtremeAlert::new(p, sigma))))
+            }
+
+            // ── MarkPrice advanced indicators ──────────────────────────────────
+            BarIndicatorId::MarkPriceMomentum => {
+                let p = config.periods.first().copied().unwrap_or(14);
+                Ok(Self::MpAdvMarkPriceMomentum(Box::new(MarkPriceMomentum::new(p))))
+            }
+            BarIndicatorId::MarkPriceVolatility => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::MpAdvMarkPriceVolatility(Box::new(MarkPriceVolatility::new(p))))
+            }
+            BarIndicatorId::MarkPriceGapDetector => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                let sigma = config.additional_params.get("sigma_threshold").copied().unwrap_or(3.0);
+                Ok(Self::MpAdvMarkPriceGapDetector(Box::new(MarkPriceGapDetector::new(p, sigma))))
+            }
 
             // ── Stress indicators ─────────────────────────────────────────────
             BarIndicatorId::FundDepletionRate => {
                 let p = config.periods.first().copied().unwrap_or(14);
                 Ok(Self::StressFundDepletionRate(Box::new(FundDepletionRate::new(p))))
+            }
+            BarIndicatorId::InsuranceFundMomentum => {
+                let p = config.periods.first().copied().unwrap_or(14);
+                Ok(Self::StressInsuranceFundMomentum(Box::new(InsuranceFundMomentum::new(p))))
+            }
+            BarIndicatorId::SettlementApproachSignal => {
+                let max_window_ms = config.additional_params.get("max_window_ms").copied().unwrap_or((8 * 3600 * 1000) as f64) as i64;
+                let max_window_ticks = config.periods.first().copied().unwrap_or(480);
+                Ok(Self::StressSettlementApproachSignal(Box::new(SettlementApproachSignal::new(max_window_ms, max_window_ticks))))
             }
             BarIndicatorId::FundStressDetector => {
                 let p = config.periods.first().copied().unwrap_or(14);
@@ -4698,6 +5109,15 @@ impl IndicatorInstance {
                 let win = config.periods.first().copied().unwrap_or(100);
                 Ok(Self::MicroL3CancelRatio(Box::new(L3CancelRatio::new(win))))
             }
+            BarIndicatorId::BlockTradeSizeAnomaly => {
+                let window = config.periods.first().copied().unwrap_or(50).max(2);
+                Ok(Self::MicroBlockTradeSizeAnomaly(Box::new(BlockTradeSizeAnomaly::new(window))))
+            }
+            BarIndicatorId::QuoteStuffingDetector => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(1_000.0) as i64;
+                let rate_threshold = config.additional_params.get("rate_threshold").copied().unwrap_or(100.0);
+                Ok(Self::MicroQuoteStuffingDetector(Box::new(QuoteStuffingDetector::new(window_ms, rate_threshold))))
+            }
 
             // ── Risk indicators ───────────────────────────────────────────────
             BarIndicatorId::LeverageReductionWarning => {
@@ -4706,10 +5126,18 @@ impl IndicatorInstance {
             BarIndicatorId::MmrTracker => {
                 Ok(Self::RiskMmrTracker(Box::new(MmrTracker::new())))
             }
+            BarIndicatorId::RiskLimitProximity => {
+                Ok(Self::RiskRiskLimitProximity(Box::new(RiskLimitProximity::new())))
+            }
 
             // ── Funding indicators ────────────────────────────────────────────
             BarIndicatorId::FundingDrift => {
                 Ok(Self::FndFundingDrift(Box::new(FundingDrift::new())))
+            }
+            BarIndicatorId::FundingTimeDecay => {
+                let max_window_ms = config.additional_params.get("max_window_ms").copied().unwrap_or((8 * 3600 * 1000) as f64) as i64;
+                let max_window_ticks = config.periods.first().copied().unwrap_or(480);
+                Ok(Self::FndFundingTimeDecay(Box::new(FundingTimeDecay::new(max_window_ms, max_window_ticks))))
             }
             BarIndicatorId::PredictedFundingExtreme => {
                 let threshold = config.additional_params.get("threshold").copied().unwrap_or(0.001);
@@ -4719,8 +5147,16 @@ impl IndicatorInstance {
                 let p = config.periods.first().copied().unwrap_or(8);
                 Ok(Self::FndSettledFundingMomentum(Box::new(SettledFundingMomentum::new(p))))
             }
+            BarIndicatorId::FundingSettlementImpact => {
+                let buf = config.periods.first().copied().unwrap_or(64);
+                Ok(Self::FndFundingSettlementImpact(Box::new(FundingSettlementImpact::new(buf))))
+            }
 
             // ── Misc indicators ───────────────────────────────────────────────
+            BarIndicatorId::AuctionLiquidityScore => {
+                let win = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::MiscAuctionLiquidityScore(Box::new(AuctionLiquidityScore::new(win))))
+            }
             BarIndicatorId::AuctionPriceDeviation => {
                 Ok(Self::MiscAuctionPriceDeviation(Box::new(AuctionPriceDeviation::new())))
             }
@@ -4731,6 +5167,121 @@ impl IndicatorInstance {
             BarIndicatorId::WarningRate => {
                 let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(300_000.0) as i64;
                 Ok(Self::MiscWarningRate(Box::new(WarningRate::new(window_ms))))
+            }
+            BarIndicatorId::WarningFrequencyFilter => {
+                let min_interval_ms = config.additional_params.get("min_interval_ms").copied().unwrap_or(60_000.0) as i64;
+                Ok(Self::MiscWarningFrequencyFilter(Box::new(WarningFrequencyFilter::new(min_interval_ms))))
+            }
+
+            // ── Microstructure extra indicators ───────────────────────────────
+            BarIndicatorId::L3SpooferScore => {
+                let window = config.periods.first().copied().unwrap_or(100);
+                let large_size_multiplier = config.additional_params.get("large_size_multiplier").copied().unwrap_or(3.0);
+                Ok(Self::MicroL3SpooferScore(Box::new(L3SpooferScore::new(window, large_size_multiplier))))
+            }
+            BarIndicatorId::QuoteLifecycleTracker => {
+                let window = config.periods.first().copied().unwrap_or(50);
+                Ok(Self::MicroQuoteLifecycleTracker(Box::new(QuoteLifecycleTracker::new(window))))
+            }
+
+            // ── Ticker advanced indicators ────────────────────────────────────
+            BarIndicatorId::TickerSpreadRatio => {
+                Ok(Self::TkrSpreadRatio(Box::new(TickerSpreadRatio::new())))
+            }
+            BarIndicatorId::Volume24hZScore => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::TkrVolume24hZScore(Box::new(Volume24hZScore::new(p))))
+            }
+
+            // ── Cross-stream composite indicators ──────────────────────────────
+            BarIndicatorId::FundingOiPressure => {
+                Ok(Self::CmpFundingOiPressure(Box::new(FundingOiPressure::new())))
+            }
+            BarIndicatorId::IvHvSpread => {
+                Ok(Self::CmpIvHvSpread(Box::new(IvHvSpread::new())))
+            }
+            BarIndicatorId::SqueezeProbability => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                let max_liq = config.additional_params.get("max_expected_liq").copied().unwrap_or(10.0);
+                Ok(Self::CmpSqueezeProbability(Box::new(SqueezeProbability::new(window_ms, max_liq))))
+            }
+            BarIndicatorId::FundingSentimentAlignment => {
+                Ok(Self::CmpFundingSentimentAlignment(Box::new(FundingSentimentAlignment::new())))
+            }
+            BarIndicatorId::VolRegimeEntry => {
+                let history = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::CmpVolRegimeEntry(Box::new(VolRegimeEntry::new(history))))
+            }
+            BarIndicatorId::BlockTradeVolumeRatio => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                Ok(Self::CmpBlockTradeVolumeRatio(Box::new(BlockTradeVolumeRatio::new(window_ms))))
+            }
+            BarIndicatorId::CapitulationDetector => {
+                let liq_count = config.periods.first().copied().unwrap_or(5);
+                let vol_thresh = config.additional_params.get("volume_spike_threshold").copied().unwrap_or(1_000_000.0);
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                Ok(Self::CmpCapitulationDetector(Box::new(CapitulationDetector::new(liq_count, vol_thresh, window_ms))))
+            }
+            BarIndicatorId::IndexTrackingError => {
+                let win = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::CmpIndexTrackingError(Box::new(IndexTrackingError::new(win))))
+            }
+
+            // ── Category C indicators ──────────────────────────────────────────
+            BarIndicatorId::MarketStressComposite => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                let max_liq = config.additional_params.get("max_expected_liq").copied().unwrap_or(10.0);
+                let vol_cap = config.periods.first().copied().unwrap_or(100);
+                let slope_thresh = config.additional_params.get("depletion_slope_threshold").copied().unwrap_or(-1e-6);
+                Ok(Self::CmpMarketStressComposite(Box::new(MarketStressComposite::new(window_ms, max_liq, vol_cap, slope_thresh))))
+            }
+            BarIndicatorId::RiskOffDetector => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                let vol_thresh = config.additional_params.get("vol_threshold").copied().unwrap_or(0.5);
+                let liq_thresh = config.periods.first().copied().unwrap_or(3);
+                let fund_thresh = config.additional_params.get("funding_threshold").copied().unwrap_or(0.05);
+                Ok(Self::CmpRiskOffDetector(Box::new(RiskOffDetector::new(window_ms, vol_thresh, liq_thresh, fund_thresh))))
+            }
+            BarIndicatorId::SentimentComposite => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                Ok(Self::CmpSentimentComposite(Box::new(SentimentComposite::new(window_ms))))
+            }
+            BarIndicatorId::CompoundSqueezeProbability => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                let max_liq = config.additional_params.get("max_expected_liq").copied().unwrap_or(10.0);
+                Ok(Self::CmpCompoundSqueezeProbability(Box::new(CompoundSqueezeProbability::new(window_ms, max_liq))))
+            }
+            BarIndicatorId::TpoSessionBalance => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(3_600_000.0) as i64;
+                let bucket = config.additional_params.get("price_bucket").copied().unwrap_or(1.0);
+                Ok(Self::TickAdvTpoSessionBalance(Box::new(TpoSessionBalance::new(window_ms, bucket))))
+            }
+            BarIndicatorId::CompositeWeightDrift => {
+                let win = config.periods.first().copied().unwrap_or(10);
+                Ok(Self::IdxCompositeWeightDrift(Box::new(CompositeWeightDrift::new(win))))
+            }
+            BarIndicatorId::AdaptiveWindowSelector => {
+                let short = config.periods.first().copied().unwrap_or(10);
+                let long = config.periods.get(1).copied().unwrap_or(100);
+                let thresh = config.additional_params.get("volatility_threshold").copied().unwrap_or(10.0);
+                Ok(Self::CmpAdaptiveWindowSelector(Box::new(AdaptiveWindowSelector::new(short, long, thresh))))
+            }
+            BarIndicatorId::AdaptiveThreshold => {
+                let win = config.periods.first().copied().unwrap_or(50);
+                let mult = config.additional_params.get("multiplier").copied().unwrap_or(2.0);
+                Ok(Self::CmpAdaptiveThreshold(Box::new(AdaptiveThreshold::new(win, mult))))
+            }
+            BarIndicatorId::PairsCointegrationProxy => {
+                let win = config.periods.first().copied().unwrap_or(50);
+                Ok(Self::CmpPairsCointegrationProxy(Box::new(PairsCointegrationProxy::new(win))))
+            }
+            BarIndicatorId::CrossAssetBeta => {
+                let win = config.periods.first().copied().unwrap_or(50);
+                Ok(Self::CmpCrossAssetBeta(Box::new(CrossAssetBeta::new(win))))
+            }
+            BarIndicatorId::RelativeStrengthCross => {
+                let win = config.periods.first().copied().unwrap_or(50);
+                Ok(Self::CmpRelativeStrengthCross(Box::new(RelativeStrengthCross::new(win))))
             }
         }
     }
@@ -4913,6 +5464,11 @@ impl IndicatorInstance {
             Self::OrderBookVelocity(x) => x.value(),
             Self::WallDetector(x) => x.value(),
             Self::BookDepthChange(x) => x.value(),
+            Self::BookBidAskAsymmetry(x) => x.value(),
+            Self::BookMidPriceVelocity(x) => x.value(),
+            Self::BookBestLevelVolatility(x) => x.value(),
+            Self::BookLayerConcentration(x) => x.value(),
+            Self::BookPriceLevelDensity(x) => x.value(),
             // Delta indicators — bar pipeline is a no-op; use update_delta instead
             Self::IcebergDetector(x) => x.value(),
             Self::LevelReplenishRate(x) => x.value(),
@@ -4921,6 +5477,12 @@ impl IndicatorInstance {
             Self::FundingMomentum(x) => x.value(),
             Self::FundingZScore(x) => x.value(),
             Self::OiChangeRate(x) => x.value(),
+            // Open Interest indicators — bar pipeline is a no-op; use update_oi/update_mark instead
+            Self::OiZScore(x) => x.value(),
+            Self::OiMomentum(x) => x.value(),
+            Self::OiPercentile(x) => x.value(),
+            Self::LongSqueezeDetector(x) => x.indicator_value(),
+            Self::OiPriceCorrelation(x) => x.indicator_value(),
             // Ticker indicators — bar pipeline is a no-op; use update_ticker instead
             Self::Volume24hMomentum(x) => x.value(),
             Self::HighLowRangeRatio(x) => x.value(),
@@ -4929,11 +5491,23 @@ impl IndicatorInstance {
             Self::LiquidationRate(x) => x.value(),
             Self::LiquidationVolumeImbalance(x) => x.value(),
             Self::LiquidationCascade(x) => x.value(),
+            Self::LiquidationVolumeVelocity(x) => x.value(),
+            Self::StopHuntDetector(x) => x.indicator_value(),
+            Self::LiquidationClusterDetector(x) => x.value(),
+            Self::LiquidationCooldown(x) => x.value(),
             // Tick indicators — bar pipeline is a no-op; use update_tick instead
             Self::AbsorptionDetector(x) => x.value(),
             Self::TradeClusterDetector(x) => x.value(),
             Self::AggressorImbalance(x) => x.value(),
             Self::LargeTradeFilter(x) => x.value(),
+            Self::TickAdvVwapDeviation(x) => x.value(),
+            Self::TickAdvTradeRunDetector(x) => x.value(),
+            Self::TickAdvSizeWeightedMomentum(x) => x.value(),
+            Self::TickAdvFrequencyAnomaly(x) => x.value(),
+            Self::TickAdvAggressorBurst(x) => x.value(),
+            Self::TickAdvLargeTickMomentum(x) => x.value(),
+            Self::TickAdvValueAreaTracker(x) => x.value(),
+            Self::TickAdvVolumeImbalanceZone(x) => x.value(),
             Self::BookSlope(x) => {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
@@ -6550,6 +7124,8 @@ impl IndicatorInstance {
             // ── Stress indicators (passthrough — stream-driven) ───────────────
             Self::StressFundDepletionRate(_x) => _x.value(),
             Self::StressFundStressDetector(_x) => _x.value(),
+            Self::StressInsuranceFundMomentum(_x) => _x.value(),
+            Self::StressSettlementApproachSignal(x) => x.update_bar_with_ts(timestamp.unwrap_or(0)),
             Self::StressSettlementPriceMomentum(_x) => _x.value(),
             Self::StressSettlementVsMarkSpread(_x) => _x.indicator_value(),
             // ── Microstructure indicators (passthrough — stream-driven) ──────
@@ -6558,17 +7134,64 @@ impl IndicatorInstance {
             Self::MicroL3OrderRate(_x) => _x.value(),
             Self::MicroL3LargeOrderTracker(_x) => _x.value(),
             Self::MicroL3CancelRatio(_x) => _x.value(),
+            Self::MicroBlockTradeSizeAnomaly(_x) => _x.value(),
+            Self::MicroQuoteStuffingDetector(_x) => _x.value(),
             // ── Risk indicators (passthrough — stream-driven) ─────────────────
             Self::RiskLeverageReductionWarning(x) => x.update_bar(open, high, low, close, volume),
             Self::RiskMmrTracker(x) => x.update_bar(open, high, low, close, volume),
+            Self::RiskRiskLimitProximity(x) => x.update_bar(open, high, low, close, volume),
             // ── Funding indicators (passthrough — stream-driven) ──────────────
             Self::FndFundingDrift(x) => x.update_bar(open, high, low, close, volume),
+            Self::FndFundingTimeDecay(x) => x.update_bar_with_ts(timestamp.unwrap_or(0)),
             Self::FndPredictedFundingExtreme(x) => x.update_bar(open, high, low, close, volume),
             Self::FndSettledFundingMomentum(x) => x.update_bar(open, high, low, close, volume),
+            Self::FndFundingSettlementImpact(x) => x.value(),
             // ── Misc indicators ───────────────────────────────────────────────
+            Self::MiscAuctionLiquidityScore(_x) => _x.value(),
             Self::MiscAuctionPriceDeviation(x) => x.update_bar(open, high, low, close, volume),
             Self::MiscAuctionImbalance(x) => x.update_bar(open, high, low, close, volume),
             Self::MiscWarningRate(x) => x.update_bar(open, high, low, close, volume),
+            Self::MiscWarningFrequencyFilter(x) => x.update_bar(open, high, low, close, volume),
+            // ── Microstructure extra — no-op on bar; use stream update methods
+            Self::MicroL3SpooferScore(x) => x.value(),
+            Self::MicroQuoteLifecycleTracker(x) => x.value(),
+            // ── Ticker advanced — no-op on bar; use update_ticker
+            Self::TkrSpreadRatio(x) => x.value(),
+            Self::TkrVolume24hZScore(x) => x.value(),
+            // ── Funding advanced — bar pipeline is a no-op; use update_funding instead
+            Self::FndAdvAnnualizedFundingRate(x) => x.value(),
+            Self::FndAdvFundingDirectionShift(x) => x.value(),
+            Self::FndAdvFundingExtremeAlert(x) => x.value(),
+            // ── MarkPrice advanced — bar pipeline is a no-op; use update_mark instead
+            Self::MpAdvMarkPriceMomentum(x) => x.value(),
+            Self::MpAdvMarkPriceVolatility(x) => x.value(),
+            Self::MpAdvMarkPriceGapDetector(x) => x.value(),
+            // ── Greeks advanced — bar pipeline is a no-op; use update_option_greeks instead
+            Self::GrkCharmTracker(x) => x.value(),
+            Self::GrkVegaExposureFlow(x) => x.value(),
+            Self::GrkThetaDecayTracker(x) => x.value(),
+            Self::GrkPinRiskDetector(x) => x.value(),
+            // ── Cross-stream composites — bar pipeline is a no-op; use stream update methods
+            Self::CmpFundingOiPressure(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpIvHvSpread(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpSqueezeProbability(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpFundingSentimentAlignment(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpVolRegimeEntry(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpBlockTradeVolumeRatio(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpCapitulationDetector(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpIndexTrackingError(x) => x.update_bar(open, high, low, close, volume),
+            // ── Category C indicators ─────────────────────────────────────────
+            Self::CmpMarketStressComposite(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpRiskOffDetector(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpSentimentComposite(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpCompoundSqueezeProbability(x) => x.update_bar(open, high, low, close, volume),
+            Self::TickAdvTpoSessionBalance(x) => x.update_bar(open, high, low, close, volume),
+            Self::IdxCompositeWeightDrift(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpAdaptiveWindowSelector(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpAdaptiveThreshold(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpPairsCointegrationProxy(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpCrossAssetBeta(x) => x.update_bar(open, high, low, close, volume),
+            Self::CmpRelativeStrengthCross(x) => x.update_bar(open, high, low, close, volume),
             // Catch-all for remaining legacy indicators
             _ => IndicatorValue::Single(0.0),
         }
@@ -6625,6 +7248,12 @@ impl IndicatorInstance {
             Self::OrderBookVelocity(ind) => ind.value(),
             Self::WallDetector(ind) => ind.value(),
             Self::BookDepthChange(ind) => ind.value(),
+            Self::BookBidAskAsymmetry(ind) => ind.value(),
+            Self::BookBidAskBounceRate(ind) => ind.value(),
+            Self::BookMidPriceVelocity(ind) => ind.value(),
+            Self::BookBestLevelVolatility(ind) => ind.value(),
+            Self::BookLayerConcentration(ind) => ind.value(),
+            Self::BookPriceLevelDensity(ind) => ind.value(),
             Self::IcebergDetector(ind) => ind.value(),
             Self::LevelReplenishRate(ind) => ind.value(),
             Self::BookChurnRate(ind) => ind.value(),
@@ -6635,6 +7264,11 @@ impl IndicatorInstance {
             Self::FundingZScore(ind) => ind.value(),
             Self::OiChangeRate(ind) => ind.value(),
             Self::FundingPriceDivergence(ind) => ind.value(),
+            Self::OiZScore(ind) => ind.value(),
+            Self::OiMomentum(ind) => ind.value(),
+            Self::OiPercentile(ind) => ind.value(),
+            Self::LongSqueezeDetector(ind) => ind.indicator_value(),
+            Self::OiPriceCorrelation(ind) => ind.indicator_value(),
             Self::MarkPriceVsLast(ind) => ind.value(),
             Self::IndexPriceMomentum(ind) => ind.value(),
             // Ticker indicators — bar pipeline is a no-op; use update_ticker instead
@@ -6645,10 +7279,22 @@ impl IndicatorInstance {
             Self::LiquidationRate(ind) => ind.value(),
             Self::LiquidationVolumeImbalance(ind) => ind.value(),
             Self::LiquidationCascade(ind) => ind.value(),
+            Self::LiquidationVolumeVelocity(ind) => ind.value(),
+            Self::StopHuntDetector(ind) => ind.indicator_value(),
+            Self::LiquidationClusterDetector(ind) => ind.value(),
+            Self::LiquidationCooldown(ind) => ind.value(),
             Self::AbsorptionDetector(ind) => ind.value(),
             Self::TradeClusterDetector(ind) => ind.value(),
             Self::AggressorImbalance(ind) => ind.value(),
             Self::LargeTradeFilter(ind) => ind.value(),
+            Self::TickAdvVwapDeviation(ind) => ind.value(),
+            Self::TickAdvTradeRunDetector(ind) => ind.value(),
+            Self::TickAdvSizeWeightedMomentum(ind) => ind.value(),
+            Self::TickAdvFrequencyAnomaly(ind) => ind.value(),
+            Self::TickAdvAggressorBurst(ind) => ind.value(),
+            Self::TickAdvLargeTickMomentum(ind) => ind.value(),
+            Self::TickAdvValueAreaTracker(ind) => ind.value(),
+            Self::TickAdvVolumeImbalanceZone(ind) => ind.value(),
             Self::Bop(ind) => ind.value(),
             Self::ButterworthFilter(ind) => ind.value(),
             Self::CandleAnatomy(ind) => ind.value(),
@@ -7076,6 +7722,8 @@ impl IndicatorInstance {
             // ── Stress ────────────────────────────────────────────────────────
             Self::StressFundDepletionRate(ind) => ind.value(),
             Self::StressFundStressDetector(ind) => ind.value(),
+            Self::StressInsuranceFundMomentum(ind) => ind.value(),
+            Self::StressSettlementApproachSignal(ind) => ind.value(),
             Self::StressSettlementPriceMomentum(ind) => ind.value(),
             Self::StressSettlementVsMarkSpread(ind) => ind.indicator_value(),
             // ── Microstructure ────────────────────────────────────────────────
@@ -7084,17 +7732,62 @@ impl IndicatorInstance {
             Self::MicroL3OrderRate(ind) => ind.value(),
             Self::MicroL3LargeOrderTracker(ind) => ind.value(),
             Self::MicroL3CancelRatio(ind) => ind.value(),
+            Self::MicroBlockTradeSizeAnomaly(ind) => ind.value(),
+            Self::MicroQuoteStuffingDetector(ind) => ind.value(),
             // ── Risk ──────────────────────────────────────────────────────────
             Self::RiskLeverageReductionWarning(ind) => ind.value(),
             Self::RiskMmrTracker(ind) => ind.value(),
+            Self::RiskRiskLimitProximity(ind) => ind.value(),
             // ── Funding ───────────────────────────────────────────────────────
             Self::FndFundingDrift(ind) => ind.indicator_value(),
+            Self::FndFundingTimeDecay(ind) => ind.value(),
             Self::FndPredictedFundingExtreme(ind) => ind.value(),
             Self::FndSettledFundingMomentum(ind) => ind.value(),
+            Self::FndFundingSettlementImpact(ind) => FundingSettlementImpact::value(ind),
             // ── Misc ──────────────────────────────────────────────────────────
+            Self::MiscAuctionLiquidityScore(ind) => ind.value(),
             Self::MiscAuctionPriceDeviation(ind) => ind.value(),
             Self::MiscAuctionImbalance(ind) => ind.value(),
             Self::MiscWarningRate(ind) => ind.value(),
+            Self::MiscWarningFrequencyFilter(ind) => ind.value(),
+            Self::MicroL3SpooferScore(ind) => ind.value(),
+            Self::MicroQuoteLifecycleTracker(ind) => ind.value(),
+            Self::TkrSpreadRatio(ind) => ind.value(),
+            Self::TkrVolume24hZScore(ind) => ind.value(),
+            // ── Funding advanced ──────────────────────────────────────────────
+            Self::FndAdvAnnualizedFundingRate(ind) => ind.value(),
+            Self::FndAdvFundingDirectionShift(ind) => ind.value(),
+            Self::FndAdvFundingExtremeAlert(ind) => ind.value(),
+            // ── MarkPrice advanced ────────────────────────────────────────────
+            Self::MpAdvMarkPriceMomentum(ind) => ind.value(),
+            Self::MpAdvMarkPriceVolatility(ind) => ind.value(),
+            Self::MpAdvMarkPriceGapDetector(ind) => ind.value(),
+            // ── Greeks advanced ───────────────────────────────────────────────
+            Self::GrkCharmTracker(ind) => ind.value(),
+            Self::GrkVegaExposureFlow(ind) => ind.value(),
+            Self::GrkThetaDecayTracker(ind) => ind.value(),
+            Self::GrkPinRiskDetector(ind) => ind.value(),
+            // ── Cross-stream composites ───────────────────────────────────────
+            Self::CmpFundingOiPressure(ind) => ind.indicator_value(),
+            Self::CmpIvHvSpread(ind) => ind.indicator_value(),
+            Self::CmpSqueezeProbability(ind) => ind.indicator_value(),
+            Self::CmpFundingSentimentAlignment(ind) => ind.indicator_value(),
+            Self::CmpVolRegimeEntry(ind) => ind.indicator_value(),
+            Self::CmpBlockTradeVolumeRatio(ind) => ind.indicator_value(),
+            Self::CmpCapitulationDetector(ind) => ind.indicator_value(),
+            Self::CmpIndexTrackingError(ind) => ind.indicator_value(),
+            // Category C
+            Self::CmpMarketStressComposite(ind) => ind.indicator_value(),
+            Self::CmpRiskOffDetector(ind) => ind.indicator_value(),
+            Self::CmpSentimentComposite(ind) => ind.indicator_value(),
+            Self::CmpCompoundSqueezeProbability(ind) => ind.indicator_value(),
+            Self::TickAdvTpoSessionBalance(ind) => ind.indicator_value(),
+            Self::IdxCompositeWeightDrift(ind) => ind.indicator_value(),
+            Self::CmpAdaptiveWindowSelector(ind) => ind.indicator_value(),
+            Self::CmpAdaptiveThreshold(ind) => ind.indicator_value(),
+            Self::CmpPairsCointegrationProxy(ind) => ind.indicator_value(),
+            Self::CmpCrossAssetBeta(ind) => ind.indicator_value(),
+            Self::CmpRelativeStrengthCross(ind) => ind.indicator_value(),
         }
     }
 
@@ -7160,6 +7853,12 @@ impl IndicatorInstance {
             Self::OrderBookVelocity(ind) => ind.is_ready(),
             Self::WallDetector(ind) => ind.is_ready(),
             Self::BookDepthChange(ind) => ind.is_ready(),
+            Self::BookBidAskAsymmetry(ind) => ind.is_ready(),
+            Self::BookBidAskBounceRate(ind) => ind.is_ready(),
+            Self::BookMidPriceVelocity(ind) => ind.is_ready(),
+            Self::BookBestLevelVolatility(ind) => ind.is_ready(),
+            Self::BookLayerConcentration(ind) => ind.is_ready(),
+            Self::BookPriceLevelDensity(ind) => ind.is_ready(),
             Self::IcebergDetector(ind) => ind.is_ready(),
             Self::LevelReplenishRate(ind) => ind.is_ready(),
             Self::BookChurnRate(ind) => ind.is_ready(),
@@ -7170,6 +7869,11 @@ impl IndicatorInstance {
             Self::FundingZScore(ind) => ind.is_ready(),
             Self::OiChangeRate(ind) => ind.is_ready(),
             Self::FundingPriceDivergence(ind) => ind.is_ready(),
+            Self::OiZScore(ind) => ind.is_ready(),
+            Self::OiMomentum(ind) => ind.is_ready(),
+            Self::OiPercentile(ind) => ind.is_ready(),
+            Self::LongSqueezeDetector(ind) => ind.indicator_is_ready(),
+            Self::OiPriceCorrelation(ind) => ind.indicator_is_ready(),
             Self::MarkPriceVsLast(ind) => ind.is_ready(),
             Self::IndexPriceMomentum(ind) => ind.is_ready(),
             Self::Volume24hMomentum(ind) => ind.is_ready(),
@@ -7178,6 +7882,10 @@ impl IndicatorInstance {
             Self::LiquidationRate(ind) => ind.is_ready(),
             Self::LiquidationVolumeImbalance(ind) => ind.is_ready(),
             Self::LiquidationCascade(ind) => ind.is_ready(),
+            Self::LiquidationVolumeVelocity(ind) => ind.is_ready(),
+            Self::StopHuntDetector(ind) => ind.indicator_is_ready(),
+            Self::LiquidationClusterDetector(ind) => ind.is_ready(),
+            Self::LiquidationCooldown(ind) => ind.is_ready(),
             Self::AbsorptionDetector(ind) => ind.is_ready(),
             Self::TradeClusterDetector(ind) => ind.is_ready(),
             Self::AggressorImbalance(ind) => ind.is_ready(),
@@ -7588,6 +8296,8 @@ impl IndicatorInstance {
             // ── Stress ────────────────────────────────────────────────────────
             Self::StressFundDepletionRate(ind) => ind.is_ready(),
             Self::StressFundStressDetector(ind) => ind.is_ready(),
+            Self::StressInsuranceFundMomentum(ind) => ind.is_ready(),
+            Self::StressSettlementApproachSignal(ind) => ind.is_ready(),
             Self::StressSettlementPriceMomentum(ind) => ind.is_ready(),
             Self::StressSettlementVsMarkSpread(ind) => ind.indicator_is_ready(),
             // ── Microstructure ────────────────────────────────────────────────
@@ -7596,17 +8306,71 @@ impl IndicatorInstance {
             Self::MicroL3OrderRate(ind) => ind.is_ready(),
             Self::MicroL3LargeOrderTracker(ind) => ind.is_ready(),
             Self::MicroL3CancelRatio(ind) => ind.is_ready(),
+            Self::MicroBlockTradeSizeAnomaly(ind) => ind.is_ready(),
+            Self::MicroQuoteStuffingDetector(ind) => ind.is_ready(),
             // ── Risk ──────────────────────────────────────────────────────────
             Self::RiskLeverageReductionWarning(ind) => ind.is_ready(),
             Self::RiskMmrTracker(ind) => ind.is_ready(),
+            Self::RiskRiskLimitProximity(ind) => ind.is_ready(),
             // ── Funding ───────────────────────────────────────────────────────
             Self::FndFundingDrift(ind) => ind.indicator_is_ready(),
+            Self::FndFundingTimeDecay(ind) => ind.is_ready(),
             Self::FndPredictedFundingExtreme(ind) => ind.is_ready(),
             Self::FndSettledFundingMomentum(ind) => ind.is_ready(),
+            Self::FndFundingSettlementImpact(ind) => FundingSettlementImpact::is_ready(ind),
             // ── Misc ──────────────────────────────────────────────────────────
+            Self::MiscAuctionLiquidityScore(ind) => ind.is_ready(),
             Self::MiscAuctionPriceDeviation(ind) => ind.is_ready(),
             Self::MiscAuctionImbalance(ind) => ind.is_ready(),
             Self::MiscWarningRate(ind) => ind.is_ready(),
+            Self::MiscWarningFrequencyFilter(ind) => ind.is_ready(),
+            Self::MicroL3SpooferScore(ind) => ind.is_ready(),
+            Self::MicroQuoteLifecycleTracker(ind) => ind.is_ready(),
+            Self::TkrSpreadRatio(ind) => ind.is_ready(),
+            Self::TkrVolume24hZScore(ind) => ind.is_ready(),
+            // ── Tick Advanced ─────────────────────────────────────────────────
+            Self::TickAdvVwapDeviation(ind) => ind.is_ready(),
+            Self::TickAdvTradeRunDetector(ind) => ind.is_ready(),
+            Self::TickAdvSizeWeightedMomentum(ind) => ind.is_ready(),
+            Self::TickAdvFrequencyAnomaly(ind) => ind.is_ready(),
+            Self::TickAdvAggressorBurst(ind) => ind.is_ready(),
+            Self::TickAdvLargeTickMomentum(ind) => ind.is_ready(),
+            Self::TickAdvValueAreaTracker(ind) => ind.is_ready(),
+            Self::TickAdvVolumeImbalanceZone(ind) => ind.is_ready(),
+            // ── Funding advanced ──────────────────────────────────────────────
+            Self::FndAdvAnnualizedFundingRate(ind) => ind.is_ready(),
+            Self::FndAdvFundingDirectionShift(ind) => ind.is_ready(),
+            Self::FndAdvFundingExtremeAlert(ind) => ind.is_ready(),
+            // ── MarkPrice advanced ────────────────────────────────────────────
+            Self::MpAdvMarkPriceMomentum(ind) => ind.is_ready(),
+            Self::MpAdvMarkPriceVolatility(ind) => ind.is_ready(),
+            Self::MpAdvMarkPriceGapDetector(ind) => ind.is_ready(),
+            // ── Greeks advanced ───────────────────────────────────────────────
+            Self::GrkCharmTracker(ind) => ind.is_ready(),
+            Self::GrkVegaExposureFlow(ind) => ind.is_ready(),
+            Self::GrkThetaDecayTracker(ind) => ind.is_ready(),
+            Self::GrkPinRiskDetector(ind) => ind.is_ready(),
+            // ── Cross-stream composites ───────────────────────────────────────
+            Self::CmpFundingOiPressure(ind) => ind.indicator_is_ready(),
+            Self::CmpIvHvSpread(ind) => ind.indicator_is_ready(),
+            Self::CmpSqueezeProbability(ind) => ind.indicator_is_ready(),
+            Self::CmpFundingSentimentAlignment(ind) => ind.indicator_is_ready(),
+            Self::CmpVolRegimeEntry(ind) => ind.indicator_is_ready(),
+            Self::CmpBlockTradeVolumeRatio(ind) => ind.indicator_is_ready(),
+            Self::CmpCapitulationDetector(ind) => ind.indicator_is_ready(),
+            Self::CmpIndexTrackingError(ind) => ind.indicator_is_ready(),
+            // Category C
+            Self::CmpMarketStressComposite(ind) => ind.indicator_is_ready(),
+            Self::CmpRiskOffDetector(ind) => ind.indicator_is_ready(),
+            Self::CmpSentimentComposite(ind) => ind.indicator_is_ready(),
+            Self::CmpCompoundSqueezeProbability(ind) => ind.indicator_is_ready(),
+            Self::TickAdvTpoSessionBalance(ind) => ind.indicator_is_ready(),
+            Self::IdxCompositeWeightDrift(ind) => ind.indicator_is_ready(),
+            Self::CmpAdaptiveWindowSelector(ind) => ind.indicator_is_ready(),
+            Self::CmpAdaptiveThreshold(ind) => ind.indicator_is_ready(),
+            Self::CmpPairsCointegrationProxy(ind) => ind.indicator_is_ready(),
+            Self::CmpCrossAssetBeta(ind) => ind.indicator_is_ready(),
+            Self::CmpRelativeStrengthCross(ind) => ind.indicator_is_ready(),
         }
     }
 
@@ -7672,6 +8436,12 @@ impl IndicatorInstance {
             Self::OrderBookVelocity(ind) => ind.reset(),
             Self::WallDetector(ind) => ind.reset(),
             Self::BookDepthChange(ind) => ind.reset(),
+            Self::BookBidAskAsymmetry(ind) => ind.reset(),
+            Self::BookBidAskBounceRate(ind) => ind.reset(),
+            Self::BookMidPriceVelocity(ind) => ind.reset(),
+            Self::BookBestLevelVolatility(ind) => ind.reset(),
+            Self::BookLayerConcentration(ind) => ind.reset(),
+            Self::BookPriceLevelDensity(ind) => ind.reset(),
             Self::IcebergDetector(ind) => ind.reset(),
             Self::LevelReplenishRate(ind) => ind.reset(),
             Self::BookChurnRate(ind) => ind.reset(),
@@ -7682,6 +8452,11 @@ impl IndicatorInstance {
             Self::FundingZScore(ind) => ind.reset(),
             Self::OiChangeRate(ind) => ind.reset(),
             Self::FundingPriceDivergence(ind) => ind.reset(),
+            Self::OiZScore(ind) => ind.reset(),
+            Self::OiMomentum(ind) => ind.reset(),
+            Self::OiPercentile(ind) => ind.reset(),
+            Self::LongSqueezeDetector(ind) => ind.indicator_reset(),
+            Self::OiPriceCorrelation(ind) => ind.indicator_reset(),
             Self::MarkPriceVsLast(ind) => ind.reset(),
             Self::IndexPriceMomentum(ind) => ind.reset(),
             Self::Volume24hMomentum(ind) => ind.reset(),
@@ -8075,6 +8850,10 @@ impl IndicatorInstance {
             Self::LiquidationRate(ind) => ind.reset(),
             Self::LiquidationVolumeImbalance(ind) => ind.reset(),
             Self::LiquidationCascade(ind) => ind.reset(),
+            Self::LiquidationVolumeVelocity(ind) => ind.reset(),
+            Self::StopHuntDetector(ind) => ind.indicator_reset(),
+            Self::LiquidationClusterDetector(ind) => ind.reset(),
+            Self::LiquidationCooldown(ind) => ind.reset(),
             // ── Sentiment indicators ──────────────────────────────────────────
             Self::SentLongShortRatioMomentum(ind) => ind.reset(),
             Self::SentLongShortExtremeDetector(ind) => ind.reset(),
@@ -8100,6 +8879,8 @@ impl IndicatorInstance {
             // ── Stress ────────────────────────────────────────────────────────
             Self::StressFundDepletionRate(ind) => ind.reset(),
             Self::StressFundStressDetector(ind) => ind.reset(),
+            Self::StressInsuranceFundMomentum(ind) => ind.reset(),
+            Self::StressSettlementApproachSignal(ind) => ind.reset(),
             Self::StressSettlementPriceMomentum(ind) => ind.reset(),
             Self::StressSettlementVsMarkSpread(ind) => ind.indicator_reset(),
             // ── Microstructure ────────────────────────────────────────────────
@@ -8108,17 +8889,71 @@ impl IndicatorInstance {
             Self::MicroL3OrderRate(ind) => ind.reset(),
             Self::MicroL3LargeOrderTracker(ind) => ind.reset(),
             Self::MicroL3CancelRatio(ind) => ind.reset(),
+            Self::MicroBlockTradeSizeAnomaly(ind) => ind.reset(),
+            Self::MicroQuoteStuffingDetector(ind) => ind.reset(),
             // ── Risk ──────────────────────────────────────────────────────────
             Self::RiskLeverageReductionWarning(ind) => ind.reset(),
             Self::RiskMmrTracker(ind) => ind.reset(),
+            Self::RiskRiskLimitProximity(ind) => ind.reset(),
             // ── Funding ───────────────────────────────────────────────────────
             Self::FndFundingDrift(ind) => ind.indicator_reset(),
+            Self::FndFundingTimeDecay(ind) => ind.reset(),
             Self::FndPredictedFundingExtreme(ind) => ind.reset(),
             Self::FndSettledFundingMomentum(ind) => ind.reset(),
+            Self::FndFundingSettlementImpact(ind) => ind.do_reset(),
             // ── Misc ──────────────────────────────────────────────────────────
+            Self::MiscAuctionLiquidityScore(ind) => ind.reset(),
             Self::MiscAuctionPriceDeviation(ind) => ind.reset(),
             Self::MiscAuctionImbalance(ind) => ind.reset(),
             Self::MiscWarningRate(ind) => ind.reset(),
+            Self::MiscWarningFrequencyFilter(ind) => ind.reset(),
+            Self::MicroL3SpooferScore(ind) => ind.reset(),
+            Self::MicroQuoteLifecycleTracker(ind) => ind.reset(),
+            Self::TkrSpreadRatio(ind) => ind.reset(),
+            Self::TkrVolume24hZScore(ind) => ind.reset(),
+            // ── Tick Advanced ─────────────────────────────────────────────────
+            Self::TickAdvVwapDeviation(ind) => ind.reset(),
+            Self::TickAdvTradeRunDetector(ind) => ind.reset(),
+            Self::TickAdvSizeWeightedMomentum(ind) => ind.reset(),
+            Self::TickAdvFrequencyAnomaly(ind) => ind.reset(),
+            Self::TickAdvAggressorBurst(ind) => ind.reset(),
+            Self::TickAdvLargeTickMomentum(ind) => ind.reset(),
+            Self::TickAdvValueAreaTracker(ind) => ind.reset(),
+            Self::TickAdvVolumeImbalanceZone(ind) => ind.reset(),
+            // ── Funding advanced ──────────────────────────────────────────────
+            Self::FndAdvAnnualizedFundingRate(ind) => ind.reset(),
+            Self::FndAdvFundingDirectionShift(ind) => ind.reset(),
+            Self::FndAdvFundingExtremeAlert(ind) => ind.reset(),
+            // ── MarkPrice advanced ────────────────────────────────────────────
+            Self::MpAdvMarkPriceMomentum(ind) => ind.reset(),
+            Self::MpAdvMarkPriceVolatility(ind) => ind.reset(),
+            Self::MpAdvMarkPriceGapDetector(ind) => ind.reset(),
+            // ── Greeks advanced ───────────────────────────────────────────────
+            Self::GrkCharmTracker(ind) => ind.reset(),
+            Self::GrkVegaExposureFlow(ind) => ind.reset(),
+            Self::GrkThetaDecayTracker(ind) => ind.reset(),
+            Self::GrkPinRiskDetector(ind) => ind.reset(),
+            // ── Cross-stream composites ───────────────────────────────────────
+            Self::CmpFundingOiPressure(ind) => ind.indicator_reset(),
+            Self::CmpIvHvSpread(ind) => ind.indicator_reset(),
+            Self::CmpSqueezeProbability(ind) => ind.indicator_reset(),
+            Self::CmpFundingSentimentAlignment(ind) => ind.indicator_reset(),
+            Self::CmpVolRegimeEntry(ind) => ind.indicator_reset(),
+            Self::CmpBlockTradeVolumeRatio(ind) => ind.indicator_reset(),
+            Self::CmpCapitulationDetector(ind) => ind.indicator_reset(),
+            Self::CmpIndexTrackingError(ind) => ind.indicator_reset(),
+            // Category C
+            Self::CmpMarketStressComposite(ind) => ind.indicator_reset(),
+            Self::CmpRiskOffDetector(ind) => ind.indicator_reset(),
+            Self::CmpSentimentComposite(ind) => ind.indicator_reset(),
+            Self::CmpCompoundSqueezeProbability(ind) => ind.indicator_reset(),
+            Self::TickAdvTpoSessionBalance(ind) => ind.indicator_reset(),
+            Self::IdxCompositeWeightDrift(ind) => ind.indicator_reset(),
+            Self::CmpAdaptiveWindowSelector(ind) => ind.indicator_reset(),
+            Self::CmpAdaptiveThreshold(ind) => ind.indicator_reset(),
+            Self::CmpPairsCointegrationProxy(ind) => ind.indicator_reset(),
+            Self::CmpCrossAssetBeta(ind) => ind.indicator_reset(),
+            Self::CmpRelativeStrengthCross(ind) => ind.indicator_reset(),
         }
     }
 
@@ -8134,6 +8969,12 @@ impl IndicatorInstance {
             Self::OrderBookVelocity(x) => x.update_orderbook(book),
             Self::WallDetector(x) => x.update_orderbook(book),
             Self::BookDepthChange(x) => x.update_orderbook(book),
+            Self::BookBidAskAsymmetry(x) => x.update_orderbook(book),
+            Self::BookBidAskBounceRate(x) => x.update_orderbook(book),
+            Self::BookMidPriceVelocity(x) => x.update_orderbook(book),
+            Self::BookBestLevelVolatility(x) => x.update_orderbook(book),
+            Self::BookLayerConcentration(x) => x.update_orderbook(book),
+            Self::BookPriceLevelDensity(x) => x.update_orderbook(book),
             _ => self.value(),
         }
     }
@@ -8145,6 +8986,7 @@ impl IndicatorInstance {
             Self::IcebergDetector(x) => x.update_delta(delta),
             Self::LevelReplenishRate(x) => x.update_delta(delta),
             Self::BookChurnRate(x) => x.update_delta(delta),
+            Self::MicroQuoteStuffingDetector(x) => x.update_delta(delta),
             _ => self.value(),
         }
     }
@@ -8157,6 +8999,15 @@ impl IndicatorInstance {
             Self::FundingZScore(x) => x.update_funding(fr),
             Self::FundingPriceDivergence(x) => x.update_funding(fr),
             Self::FndFundingDrift(x) => x.update_funding(fr),
+            Self::FndAdvAnnualizedFundingRate(x) => x.update_funding(fr),
+            Self::FndAdvFundingDirectionShift(x) => x.update_funding(fr),
+            Self::FndAdvFundingExtremeAlert(x) => x.update_funding(fr),
+            Self::CmpFundingOiPressure(x) => x.update_funding(fr),
+            Self::CmpFundingSentimentAlignment(x) => x.update_funding(fr),
+            Self::CmpMarketStressComposite(x) => x.update_funding(fr),
+            Self::CmpRiskOffDetector(x) => x.update_funding(fr),
+            Self::CmpSentimentComposite(x) => x.update_funding(fr),
+            Self::CmpCompoundSqueezeProbability(x) => x.update_funding(fr),
             _ => self.value(),
         }
     }
@@ -8166,6 +9017,14 @@ impl IndicatorInstance {
     pub fn update_oi(&mut self, oi: &OpenInterest) -> IndicatorValue {
         match self {
             Self::OiChangeRate(x) => x.update_oi(oi),
+            Self::OiZScore(x) => x.update_oi(oi),
+            Self::OiMomentum(x) => x.update_oi(oi),
+            Self::OiPercentile(x) => x.update_oi(oi),
+            Self::LongSqueezeDetector(x) => x.update_oi(oi),
+            Self::OiPriceCorrelation(x) => x.update_oi(oi),
+            Self::CmpFundingOiPressure(x) => x.update_oi(oi),
+            Self::CmpSqueezeProbability(x) => x.update_oi(oi),
+            Self::CmpCompoundSqueezeProbability(x) => x.update_oi(oi),
             _ => self.value(),
         }
     }
@@ -8177,6 +9036,17 @@ impl IndicatorInstance {
             Self::MarkPriceVsLast(x) => x.update_mark(mp),
             Self::IndexPriceMomentum(x) => x.update_mark(mp),
             Self::StressSettlementVsMarkSpread(x) => x.update_mark(mp),
+            Self::LongSqueezeDetector(x) => x.update_mark(mp),
+            Self::OiPriceCorrelation(x) => x.update_mark(mp),
+            Self::StopHuntDetector(x) => x.update_mark(mp),
+            Self::MpAdvMarkPriceMomentum(x) => x.update_mark(mp),
+            Self::MpAdvMarkPriceVolatility(x) => x.update_mark(mp),
+            Self::MpAdvMarkPriceGapDetector(x) => x.update_mark(mp),
+            Self::CmpSqueezeProbability(x) => x.update_mark(mp),
+            Self::CmpVolRegimeEntry(x) => x.update_mark(mp),
+            Self::CmpCapitulationDetector(x) => x.update_mark(mp),
+            Self::CmpCompoundSqueezeProbability(x) => x.update_mark(mp),
+            Self::FndFundingSettlementImpact(x) => x.update_mark(mp),
             _ => self.value(),
         }
     }
@@ -8188,6 +9058,8 @@ impl IndicatorInstance {
             Self::Volume24hMomentum(x) => x.update_ticker(ticker),
             Self::HighLowRangeRatio(x) => x.update_ticker(ticker),
             Self::PriceChange24hZScore(x) => x.update_ticker(ticker),
+            Self::TkrSpreadRatio(x) => x.update_ticker(ticker),
+            Self::TkrVolume24hZScore(x) => x.update_ticker(ticker),
             _ => self.value(),
         }
     }
@@ -8207,6 +9079,20 @@ impl IndicatorInstance {
             Self::TradeClusterDetector(x) => x.update_tick(tick),
             Self::AggressorImbalance(x) => x.update_tick(tick),
             Self::LargeTradeFilter(x) => x.update_tick(tick),
+            Self::TickAdvVwapDeviation(x) => x.update_tick(tick),
+            Self::TickAdvTradeRunDetector(x) => x.update_tick(tick),
+            Self::TickAdvSizeWeightedMomentum(x) => x.update_tick(tick),
+            Self::TickAdvFrequencyAnomaly(x) => x.update_tick(tick),
+            Self::TickAdvAggressorBurst(x) => x.update_tick(tick),
+            Self::TickAdvLargeTickMomentum(x) => x.update_tick(tick),
+            Self::TickAdvValueAreaTracker(x) => x.update_tick(tick),
+            Self::TickAdvVolumeImbalanceZone(x) => x.update_tick(tick),
+            Self::TickAdvTpoSessionBalance(x) => x.update_tick(tick),
+            Self::CmpAdaptiveWindowSelector(x) => x.update_tick(tick),
+            Self::CmpAdaptiveThreshold(x) => x.update_tick(tick),
+            Self::CmpPairsCointegrationProxy(x) => x.update_tick(tick),
+            Self::CmpCrossAssetBeta(x) => x.update_tick(tick),
+            Self::CmpRelativeStrengthCross(x) => x.update_tick(tick),
             _ => self.value(),
         }
     }
@@ -8240,6 +9126,15 @@ impl IndicatorInstance {
             Self::LiquidationRate(x) => x.update_liquidation(liq),
             Self::LiquidationVolumeImbalance(x) => x.update_liquidation(liq),
             Self::LiquidationCascade(x) => x.update_liquidation(liq),
+            Self::LiquidationVolumeVelocity(x) => x.update_liquidation(liq),
+            Self::StopHuntDetector(x) => x.update_liquidation(liq),
+            Self::LiquidationClusterDetector(x) => x.update_liquidation(liq),
+            Self::LiquidationCooldown(x) => x.update_liquidation(liq),
+            Self::CmpSqueezeProbability(x) => x.update_liquidation(liq),
+            Self::CmpCapitulationDetector(x) => x.update_liquidation(liq),
+            Self::CmpMarketStressComposite(x) => x.update_liquidation(liq),
+            Self::CmpRiskOffDetector(x) => x.update_liquidation(liq),
+            Self::CmpCompoundSqueezeProbability(x) => x.update_liquidation(liq),
             _ => self.value(),
         }
     }
@@ -8250,6 +9145,8 @@ impl IndicatorInstance {
             Self::SentLongShortRatioMomentum(x) => x.update_long_short_ratio(lsr),
             Self::SentLongShortExtremeDetector(x) => x.update_long_short_ratio(lsr),
             Self::SentRatioVsPriceDivergence(x) => x.update_long_short_ratio(lsr),
+            Self::CmpFundingSentimentAlignment(x) => x.update_long_short_ratio(lsr),
+            Self::CmpSentimentComposite(x) => x.update_long_short_ratio(lsr),
             _ => self.value(),
         }
     }
@@ -8259,6 +9156,9 @@ impl IndicatorInstance {
         match self {
             Self::SentAggTradeFlowImbalance(x) => x.update_agg_trade(t),
             Self::SentAggTradeSizeDistribution(x) => x.update_agg_trade(t),
+            Self::CmpBlockTradeVolumeRatio(x) => x.update_agg_trade(t),
+            Self::CmpCapitulationDetector(x) => x.update_agg_trade(t),
+            Self::CmpSentimentComposite(x) => x.update_agg_trade(t),
             _ => self.value(),
         }
     }
@@ -8268,6 +9168,8 @@ impl IndicatorInstance {
         match self {
             Self::IdxComponentDrift(x) => x.update_composite_index(ci),
             Self::IdxCorrelationBreakdown(x) => x.update_composite_index(ci),
+            Self::CmpIndexTrackingError(x) => x.update_composite_index(ci),
+            Self::IdxCompositeWeightDrift(x) => x.update_composite_index(ci),
             _ => self.value(),
         }
     }
@@ -8276,6 +9178,7 @@ impl IndicatorInstance {
     pub fn update_index_price(&mut self, ip: &IndexPrice) -> IndicatorValue {
         match self {
             Self::IdxPriceVsIndexSpread(x) => x.update_index_price(ip),
+            Self::CmpIndexTrackingError(x) => x.update_index_price(ip),
             _ => self.value(),
         }
     }
@@ -8285,6 +9188,7 @@ impl IndicatorInstance {
         match self {
             Self::VolAdvHvMomentum(x) => x.update_historical_volatility(hv),
             Self::VolAdvHvSpike(x) => x.update_historical_volatility(hv),
+            Self::CmpIvHvSpread(x) => x.update_historical_volatility(hv),
             _ => self.value(),
         }
     }
@@ -8294,6 +9198,9 @@ impl IndicatorInstance {
         match self {
             Self::StressFundDepletionRate(x) => x.update_insurance_fund(ins),
             Self::StressFundStressDetector(x) => x.update_insurance_fund(ins),
+            Self::StressInsuranceFundMomentum(x) => x.update_insurance_fund(ins),
+            Self::CmpMarketStressComposite(x) => x.update_insurance_fund(ins),
+            Self::CmpRiskOffDetector(x) => x.update_insurance_fund(ins),
             _ => self.value(),
         }
     }
@@ -8314,6 +9221,10 @@ impl IndicatorInstance {
             Self::GrkDeltaExposureFlow(x) => x.update_option_greeks(g),
             Self::GrkGammaSqueezeDetector(x) => x.update_option_greeks(g),
             Self::GrkIvSkew(x) => x.update_option_greeks(g),
+            Self::GrkCharmTracker(x) => x.update_option_greeks(g),
+            Self::GrkVegaExposureFlow(x) => x.update_option_greeks(g),
+            Self::GrkThetaDecayTracker(x) => x.update_option_greeks(g),
+            Self::GrkPinRiskDetector(x) => x.update_option_greeks(g),
             _ => self.value(),
         }
     }
@@ -8323,6 +9234,10 @@ impl IndicatorInstance {
         match self {
             Self::VolAdvVolIdxSpike(x) => x.update_volatility_index(vi),
             Self::VolAdvVolIdxMomentum(x) => x.update_volatility_index(vi),
+            Self::CmpIvHvSpread(x) => x.update_volatility_index(vi),
+            Self::CmpVolRegimeEntry(x) => x.update_volatility_index(vi),
+            Self::CmpMarketStressComposite(x) => x.update_volatility_index(vi),
+            Self::CmpRiskOffDetector(x) => x.update_volatility_index(vi),
             _ => self.value(),
         }
     }
@@ -8332,6 +9247,8 @@ impl IndicatorInstance {
         match self {
             Self::MicroBlockTradeFlow(x) => x.update_block_trade(bt),
             Self::MicroBlockTradeImpact(x) => x.update_block_trade(bt),
+            Self::MicroBlockTradeSizeAnomaly(x) => x.update_block_trade(bt),
+            Self::CmpBlockTradeVolumeRatio(x) => x.update_block_trade(bt),
             _ => self.value(),
         }
     }
@@ -8339,6 +9256,7 @@ impl IndicatorInstance {
     /// Process an auction event snapshot.
     pub fn update_auction(&mut self, a: &AuctionEvent) -> IndicatorValue {
         match self {
+            Self::MiscAuctionLiquidityScore(x) => x.update_auction(a),
             Self::MiscAuctionPriceDeviation(x) => x.update_auction(a),
             Self::MiscAuctionImbalance(x) => x.update_auction(a),
             _ => self.value(),
@@ -8349,6 +9267,7 @@ impl IndicatorInstance {
     pub fn update_market_warning(&mut self, w: &MarketWarning) -> IndicatorValue {
         match self {
             Self::MiscWarningRate(x) => x.update_market_warning(w),
+            Self::MiscWarningFrequencyFilter(x) => x.update_market_warning(w),
             _ => self.value(),
         }
     }
@@ -8359,6 +9278,8 @@ impl IndicatorInstance {
             Self::MicroL3OrderRate(x) => x.update_orderbook_l3(l3),
             Self::MicroL3LargeOrderTracker(x) => x.update_orderbook_l3(l3),
             Self::MicroL3CancelRatio(x) => x.update_orderbook_l3(l3),
+            Self::MicroL3SpooferScore(x) => x.update_orderbook_l3(l3),
+            Self::MicroQuoteLifecycleTracker(x) => x.update_orderbook_l3(l3),
             _ => self.value(),
         }
     }
@@ -8366,6 +9287,7 @@ impl IndicatorInstance {
     /// Process a contract settlement event.
     pub fn update_settlement(&mut self, s: &SettlementEvent) -> IndicatorValue {
         match self {
+            Self::StressSettlementApproachSignal(x) => x.update_settlement(s),
             Self::StressSettlementPriceMomentum(x) => x.update_settlement(s),
             Self::StressSettlementVsMarkSpread(x) => x.update_settlement(s),
             _ => self.value(),
@@ -8377,6 +9299,7 @@ impl IndicatorInstance {
         match self {
             Self::RiskLeverageReductionWarning(x) => x.update_risk_limit(r),
             Self::RiskMmrTracker(x) => x.update_risk_limit(r),
+            Self::RiskRiskLimitProximity(x) => x.update_risk_limit(r),
             _ => self.value(),
         }
     }
@@ -8385,6 +9308,7 @@ impl IndicatorInstance {
     pub fn update_predicted_funding(&mut self, pf: &PredictedFunding) -> IndicatorValue {
         match self {
             Self::FndFundingDrift(x) => x.update_predicted_funding(pf),
+            Self::FndFundingTimeDecay(x) => x.update_predicted_funding(pf),
             Self::FndPredictedFundingExtreme(x) => x.update_predicted_funding(pf),
             _ => self.value(),
         }
@@ -8394,6 +9318,20 @@ impl IndicatorInstance {
     pub fn update_funding_settlement(&mut self, fs: &FundingSettlement) -> IndicatorValue {
         match self {
             Self::FndSettledFundingMomentum(x) => x.update_funding_settlement(fs),
+            Self::FndFundingSettlementImpact(x) => x.update_funding_settlement(fs),
+            _ => self.value(),
+        }
+    }
+
+    /// Update secondary symbol price for cross-asset indicators.
+    ///
+    /// Dispatches to `PairsCointegrationProxy`, `CrossAssetBeta`, and `RelativeStrengthCross`.
+    /// All other indicators return their current value unchanged.
+    pub fn update_secondary_price(&mut self, price: f64, timestamp: i64) -> IndicatorValue {
+        match self {
+            Self::CmpPairsCointegrationProxy(x) => x.update_secondary_price(price, timestamp),
+            Self::CmpCrossAssetBeta(x) => x.update_secondary_price(price, timestamp),
+            Self::CmpRelativeStrengthCross(x) => x.update_secondary_price(price, timestamp),
             _ => self.value(),
         }
     }
