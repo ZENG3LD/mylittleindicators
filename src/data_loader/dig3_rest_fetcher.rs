@@ -24,7 +24,7 @@
 use std::sync::Arc;
 
 use digdigdig3::{
-    AccountType, Positions,
+    AccountType,
     l3::open::crypto::cex::binance::BinanceConnector,
 };
 
@@ -71,20 +71,28 @@ impl RestFetcher for Dig3RestFetcher {
 
 impl Dig3RestFetcher {
     /// Fetch funding rate history via `GET /fapi/v1/fundingRate`.
+    ///
+    /// Uses `get_funding_rate_history` which accepts startTime/endTime/limit
+    /// and returns full historical series. Replaces previous single-current
+    /// `get_funding_rate` call.
     fn fetch_funding(&self, symbol: &str, from_ts: i64, to_ts: i64) -> Result<Vec<TimedEvent>, String> {
         let connector = Arc::clone(&self.connector);
         let symbol = symbol.to_string();
 
         let rates = block_on(async move {
             connector
-                .get_funding_rate(&symbol, AccountType::FuturesCross)
+                .get_funding_rate_history(
+                    &symbol,
+                    Some(from_ts),
+                    Some(to_ts),
+                    Some(1000),  // max
+                )
                 .await
         })
         .map_err(|e| format!("Dig3RestFetcher::fetch_funding: {e}"))?;
 
-        // get_funding_rate returns a single FundingRate (current).
-        // Filter to the requested window by timestamp.
-        let events = std::iter::once(rates)
+        let events = rates
+            .into_iter()
             .filter(|r| r.timestamp >= from_ts && r.timestamp <= to_ts)
             .map(TimedEvent::Funding)
             .collect();
