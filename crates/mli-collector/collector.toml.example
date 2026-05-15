@@ -1,0 +1,14 @@
+storage_dir = "./collector_data"
+exchange = "binance"
+symbols = ["BTCUSDT", "ETHUSDT"]
+
+[[streams]]
+kind = "Funding"
+
+[[streams]]
+kind = "OpenInterest"
+
+[[streams]]
+kind = "Liquidation"
+# Override symbols for this stream only:
+# symbols = ["BTCUSDT"]
