@@ -535,6 +535,58 @@ pub enum BarIndicatorId {
     // All OHLCV variants replaced by MovingAverageWithField
     // Use: MovingAverageWithField::new(MovingAverageType, period, OhlcvField)
 
+    // Sentiment indicators (5 — consume LongShortRatio / AggTrade streams)
+    LongShortRatioMomentum,     // LONG_SHORT_RATIO_MOMENTUM
+    LongShortExtremeDetector,   // LONG_SHORT_EXTREME_DETECTOR
+    RatioVsPriceDivergence,     // RATIO_VS_PRICE_DIVERGENCE
+    AggTradeFlowImbalance,      // AGG_TRADE_FLOW_IMBALANCE
+    AggTradeSizeDistribution,   // AGG_TRADE_SIZE_DISTRIBUTION
+
+    // Index/Basis indicators (6 — consume IndexPrice, CompositeIndex, Basis)
+    PriceVsIndexSpread,          // PRICE_VS_INDEX_SPREAD
+    IndexComponentDrift,         // INDEX_COMPONENT_DRIFT
+    IndexCorrelationBreakdown,   // INDEX_CORRELATION_BREAKDOWN
+    BasisMomentum,               // BASIS_MOMENTUM
+    BasisExtreme,                // BASIS_EXTREME
+    BasisZScore,                 // BASIS_Z_SCORE
+
+    // Volatility advanced indicators (4 — consume HistoricalVolatility, VolatilityIndex)
+    HvMomentum,                  // HV_MOMENTUM
+    HvSpike,                     // HV_SPIKE
+    VolIdxSpike,                 // VOL_IDX_SPIKE
+    VolIdxMomentum,              // VOL_IDX_MOMENTUM
+
+    // Greeks indicators (3 — consume OptionGreeks)
+    DeltaExposureFlow,           // DELTA_EXPOSURE_FLOW
+    GammaSqueezeDetector,        // GAMMA_SQUEEZE_DETECTOR
+    IvSkew,                      // IV_SKEW
+
+    // Stress indicators (4 — consume InsuranceFund / SettlementEvent / MarkPrice)
+    FundDepletionRate,           // FUND_DEPLETION_RATE
+    FundStressDetector,          // FUND_STRESS_DETECTOR
+    SettlementPriceMomentum,     // SETTLEMENT_PRICE_MOMENTUM
+    SettlementVsMarkSpread,      // SETTLEMENT_VS_MARK_SPREAD
+
+    // Microstructure indicators (5 — consume BlockTrade / OrderbookL3)
+    BlockTradeFlow,              // BLOCK_TRADE_FLOW
+    BlockTradeImpact,            // BLOCK_TRADE_IMPACT
+    L3OrderRate,                 // L3_ORDER_RATE
+    L3LargeOrderTracker,         // L3_LARGE_ORDER_TRACKER
+    L3CancelRatio,               // L3_CANCEL_RATIO
+
+    // Risk indicators (2 — consume RiskLimit)
+    LeverageReductionWarning,    // LEVERAGE_REDUCTION_WARNING
+    MmrTracker,                  // MMR_TRACKER
+
+    // Funding indicators (3 — consume PredictedFunding / FundingRate / FundingSettlement)
+    FundingDrift,                // FUNDING_DRIFT
+    PredictedFundingExtreme,     // PREDICTED_FUNDING_EXTREME
+    SettledFundingMomentum,      // SETTLED_FUNDING_MOMENTUM
+
+    // Misc indicators (3 — consume AuctionEvent / MarketWarning)
+    AuctionPriceDeviation,       // AUCTION_PRICE_DEVIATION
+    AuctionImbalance,            // AUCTION_IMBALANCE
+    WarningRate,                 // WARNING_RATE
 
 }
 

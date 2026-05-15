@@ -340,6 +340,59 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::LiquidationVolumeImbalance => RoleKind::PatternDetector,
         BarIndicatorId::LiquidationCascade => RoleKind::PatternDetector,
 
+        // ── Sentiment indicators ──────────────────────────────────────────────
+        BarIndicatorId::LongShortRatioMomentum => RoleKind::OscillatorBounded,
+        BarIndicatorId::LongShortExtremeDetector => RoleKind::PatternDetector,
+        BarIndicatorId::RatioVsPriceDivergence => RoleKind::PatternDetector,
+        BarIndicatorId::AggTradeFlowImbalance => RoleKind::OscillatorBounded,
+        BarIndicatorId::AggTradeSizeDistribution => RoleKind::OscillatorUnbounded,
+
+        // ── Index/Basis indicators ────────────────────────────────────────────
+        BarIndicatorId::PriceVsIndexSpread => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::IndexComponentDrift => RoleKind::OscillatorBounded,
+        BarIndicatorId::IndexCorrelationBreakdown => RoleKind::OscillatorBounded,
+        BarIndicatorId::BasisMomentum => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::BasisExtreme => RoleKind::PatternDetector,
+        BarIndicatorId::BasisZScore => RoleKind::OscillatorBounded,
+
+        // ── Volatility advanced indicators ────────────────────────────────────
+        BarIndicatorId::HvMomentum => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::HvSpike => RoleKind::PatternDetector,
+        BarIndicatorId::VolIdxSpike => RoleKind::PatternDetector,
+        BarIndicatorId::VolIdxMomentum => RoleKind::OscillatorUnbounded,
+
+        // ── Greeks indicators ─────────────────────────────────────────────────
+        BarIndicatorId::DeltaExposureFlow => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::GammaSqueezeDetector => RoleKind::PatternDetector,
+        BarIndicatorId::IvSkew => RoleKind::OscillatorUnbounded,
+
+        // ── Stress indicators ─────────────────────────────────────────────────
+        BarIndicatorId::FundDepletionRate => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::FundStressDetector => RoleKind::PatternDetector,
+        BarIndicatorId::SettlementPriceMomentum => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::SettlementVsMarkSpread => RoleKind::OscillatorUnbounded,
+
+        // ── Microstructure indicators ─────────────────────────────────────────
+        BarIndicatorId::BlockTradeFlow => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::BlockTradeImpact => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::L3OrderRate => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::L3LargeOrderTracker => RoleKind::PatternDetector,
+        BarIndicatorId::L3CancelRatio => RoleKind::OscillatorBounded,
+
+        // ── Risk indicators ───────────────────────────────────────────────────
+        BarIndicatorId::LeverageReductionWarning => RoleKind::PatternDetector,
+        BarIndicatorId::MmrTracker => RoleKind::OscillatorBounded,
+
+        // ── Funding indicators ────────────────────────────────────────────────
+        BarIndicatorId::FundingDrift => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::PredictedFundingExtreme => RoleKind::PatternDetector,
+        BarIndicatorId::SettledFundingMomentum => RoleKind::OscillatorUnbounded,
+
+        // ── Misc indicators ───────────────────────────────────────────────────
+        BarIndicatorId::AuctionPriceDeviation => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::AuctionImbalance => RoleKind::OscillatorUnbounded,
+        BarIndicatorId::WarningRate => RoleKind::OscillatorUnbounded,
+
         // ── Everything else ───────────────────────────────────────────────────
         _ => RoleKind::Other,
     }

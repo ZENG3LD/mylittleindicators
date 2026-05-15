@@ -595,8 +595,73 @@ use crate::bar_indicators::volume::poc_detector::PocDetector;
 // ========================================
 // FVG FAMILY (3 indicators)
 use crate::bar_indicators::statistical_scoring::FvgIntensityAltScore;
+
+// ========================================
+// SENTIMENT INDICATORS (5)
+// ========================================
+use crate::bar_indicators::sentiment::{
+    AggTradeFlowImbalance, AggTradeSizeDistribution, LongShortExtremeDetector,
+    LongShortRatioMomentum, RatioVsPriceDivergence,
+};
+use crate::bar_indicators::agg_trade_consumer::AggTradeConsumer as _AggTradeConsumerTrait;
+use crate::bar_indicators::long_short_ratio_consumer::LongShortRatioConsumer as _LongShortRatioConsumerTrait;
+
+// ========================================
+// INDEX/BASIS INDICATORS (6)
+// ========================================
+use crate::bar_indicators::index_basis::{
+    BasisExtreme, BasisMomentum, BasisZScore, IndexComponentDrift, IndexCorrelationBreakdown,
+    PriceVsIndexSpread,
+};
+use crate::bar_indicators::BasisConsumer as _BasisConsumerTrait;
+use crate::bar_indicators::CompositeIndexConsumer as _CompositeIndexConsumerTrait;
+use crate::bar_indicators::IndexPriceConsumer as _IndexPriceConsumerTrait;
+
+// ========================================
+// VOLATILITY ADVANCED INDICATORS (4)
+// ========================================
+use crate::bar_indicators::volatility_advanced::{HvMomentum, HvSpike, VolIdxMomentum, VolIdxSpike};
+use crate::bar_indicators::HistoricalVolatilityConsumer as _HistoricalVolatilityConsumerTrait;
+use crate::bar_indicators::VolatilityIndexConsumer as _VolatilityIndexConsumerTrait;
+
+// ========================================
+// GREEKS INDICATORS (3)
+// ========================================
+use crate::bar_indicators::greeks::{DeltaExposureFlow, GammaSqueezeDetector, IvSkew};
+use crate::bar_indicators::OptionGreeksConsumer as _OptionGreeksConsumerTrait;
 use crate::bar_indicators::statistical_scoring::FvgDurationIntensityScore;
 use crate::bar_indicators::statistical_scoring::FvgReversionProbability;
+
+// ========================================
+// STRESS INDICATORS (4)
+// ========================================
+use crate::bar_indicators::stress::{
+    FundDepletionRate, FundStressDetector, SettlementPriceMomentum, SettlementVsMarkSpread,
+};
+use crate::bar_indicators::InsuranceFundConsumer as _InsuranceFundConsumerTrait;
+use crate::bar_indicators::SettlementEventConsumer as _SettlementEventConsumerTrait;
+
+// ========================================
+// MICROSTRUCTURE INDICATORS (5)
+// ========================================
+use crate::bar_indicators::microstructure::{
+    BlockTradeFlow, BlockTradeImpact, L3CancelRatio, L3LargeOrderTracker, L3OrderRate,
+};
+use crate::bar_indicators::BlockTradeConsumer as _BlockTradeConsumerTrait;
+use crate::bar_indicators::OrderbookL3Consumer as _OrderbookL3ConsumerTrait;
+
+// ========================================
+// RISK / FUNDING / MISC INDICATORS (8)
+// ========================================
+use crate::bar_indicators::risk_funding::{
+    AuctionImbalance, AuctionPriceDeviation, FundingDrift, LeverageReductionWarning,
+    MmrTracker, PredictedFundingExtreme, SettledFundingMomentum, WarningRate,
+};
+use crate::bar_indicators::RiskLimitConsumer as _RiskLimitConsumerTrait;
+use crate::bar_indicators::PredictedFundingConsumer as _PredictedFundingConsumerTrait;
+use crate::bar_indicators::FundingSettlementConsumer as _FundingSettlementConsumerTrait;
+use crate::bar_indicators::AuctionEventConsumer as _AuctionEventConsumerTrait;
+use crate::bar_indicators::MarketWarningConsumer as _MarketWarningConsumerTrait;
 
 /// Configuration for an individual component within a composite indicator
 ///
@@ -1491,6 +1556,112 @@ pub enum IndicatorInstance {
     Cvd(Box<CumulativeVolumeDelta>),
     /// Rolling Volume Profile — POC, VAH, VAL. Output: `Triple`.
     RollingVolumeProfile(Box<RollingVolumeProfile>),
+
+    // ========================================
+    // SENTIMENT INDICATORS (5)
+    // ========================================
+    /// Rolling slope of long_ratio. Output: `Single`.
+    SentLongShortRatioMomentum(Box<LongShortRatioMomentum>),
+    /// Extreme positioning detector. Output: `Signal`.
+    SentLongShortExtremeDetector(Box<LongShortExtremeDetector>),
+    /// Long/short ratio vs price divergence. Output: `Double`.
+    SentRatioVsPriceDivergence(Box<RatioVsPriceDivergence>),
+    /// Rolling buy/sell flow imbalance. Output: `Single`.
+    SentAggTradeFlowImbalance(Box<AggTradeFlowImbalance>),
+    /// Rolling trade size distribution (median, p95, current). Output: `Triple`.
+    SentAggTradeSizeDistribution(Box<AggTradeSizeDistribution>),
+
+    // ========================================
+    // INDEX/BASIS INDICATORS (6)
+    // ========================================
+    /// Price vs index spread. Output: `Triple(price, index, spread)`.
+    IdxPriceVsIndexSpread(Box<PriceVsIndexSpread>),
+    /// Maximum relative component weight drift. Output: `Single`.
+    IdxComponentDrift(Box<IndexComponentDrift>),
+    /// Minimum pairwise correlation of component weights. Output: `Single`.
+    IdxCorrelationBreakdown(Box<IndexCorrelationBreakdown>),
+    /// Rolling slope of basis. Output: `Single`.
+    IdxBasisMomentum(Box<BasisMomentum>),
+    /// Basis at extreme percentile. Output: `Signal`.
+    IdxBasisExtreme(Box<BasisExtreme>),
+    /// Z-score of basis. Output: `Single`.
+    IdxBasisZScore(Box<BasisZScore>),
+
+    // ========================================
+    // VOLATILITY ADVANCED INDICATORS (4)
+    // ========================================
+    /// Rolling slope of historical volatility. Output: `Single`.
+    VolAdvHvMomentum(Box<HvMomentum>),
+    /// HV spike detector (HV > N × mean). Output: `Signal`.
+    VolAdvHvSpike(Box<HvSpike>),
+    /// Volatility index spike (above p95). Output: `Signal`.
+    VolAdvVolIdxSpike(Box<VolIdxSpike>),
+    /// Rolling slope of volatility index. Output: `Single`.
+    VolAdvVolIdxMomentum(Box<VolIdxMomentum>),
+
+    // ========================================
+    // GREEKS INDICATORS (3)
+    // ========================================
+    /// Rolling slope of option delta. Output: `Single`.
+    GrkDeltaExposureFlow(Box<DeltaExposureFlow>),
+    /// Gamma squeeze detector. Output: `Signal`.
+    GrkGammaSqueezeDetector(Box<GammaSqueezeDetector>),
+    /// Implied volatility skew (bid_iv - ask_iv). Output: `Single`.
+    GrkIvSkew(Box<IvSkew>),
+
+    // ========================================
+    // STRESS INDICATORS (4)
+    // ========================================
+    /// Rolling slope of insurance fund balance. Output: `Single`.
+    StressFundDepletionRate(Box<FundDepletionRate>),
+    /// Insurance fund stress detector. Output: `Signal`.
+    StressFundStressDetector(Box<FundStressDetector>),
+    /// Rolling slope of settlement price. Output: `Single`.
+    StressSettlementPriceMomentum(Box<SettlementPriceMomentum>),
+    /// Spread between settlement price and mark price. Output: `Triple`.
+    StressSettlementVsMarkSpread(Box<SettlementVsMarkSpread>),
+
+    // ========================================
+    // MICROSTRUCTURE INDICATORS (5)
+    // ========================================
+    /// Rolling net block trade flow (buy - sell). Output: `Single`.
+    MicroBlockTradeFlow(Box<BlockTradeFlow>),
+    /// Rolling block trade event rate (events/min). Output: `Single`.
+    MicroBlockTradeImpact(Box<BlockTradeImpact>),
+    /// Rolling L3 orderbook event rate (events/sec). Output: `Single`.
+    MicroL3OrderRate(Box<L3OrderRate>),
+    /// Large order detector from L3 book. Output: `Triple`.
+    MicroL3LargeOrderTracker(Box<L3LargeOrderTracker>),
+    /// Rolling cancel-to-add ratio from L3 book. Output: `Single`.
+    MicroL3CancelRatio(Box<L3CancelRatio>),
+
+    // ========================================
+    // RISK INDICATORS (2)
+    // ========================================
+    /// Leverage tightening/loosening detector. Output: `Signal`.
+    RiskLeverageReductionWarning(Box<LeverageReductionWarning>),
+    /// Maintenance margin ratio tracker. Output: `Single`.
+    RiskMmrTracker(Box<MmrTracker>),
+
+    // ========================================
+    // FUNDING INDICATORS (3)
+    // ========================================
+    /// Drift between predicted and actual funding rate. Output: `Single`.
+    FndFundingDrift(Box<FundingDrift>),
+    /// Extreme predicted funding rate detector. Output: `Signal`.
+    FndPredictedFundingExtreme(Box<PredictedFundingExtreme>),
+    /// Rolling slope of settled funding rates. Output: `Single`.
+    FndSettledFundingMomentum(Box<SettledFundingMomentum>),
+
+    // ========================================
+    // MISC INDICATORS (3)
+    // ========================================
+    /// Percentage deviation of indicative auction price from last close. Output: `Single`.
+    MiscAuctionPriceDeviation(Box<AuctionPriceDeviation>),
+    /// Rolling imbalance of auction indicative quantities. Output: `Single`.
+    MiscAuctionImbalance(Box<AuctionImbalance>),
+    /// Rolling market warning event rate (events/min). Output: `Single`.
+    MiscWarningRate(Box<WarningRate>),
 }
 
 impl IndicatorInstance {
@@ -1594,7 +1765,32 @@ impl IndicatorInstance {
             FundingMomentum | FundingZScore | OiChangeRate | FundingPriceDivergence |
             MarkPriceVsLast | IndexPriceMomentum |
             Volume24hMomentum | HighLowRangeRatio | PriceChange24hZScore |
-            LiquidationRate | LiquidationVolumeImbalance | LiquidationCascade
+            LiquidationRate | LiquidationVolumeImbalance | LiquidationCascade |
+
+            // Sentiment indicators — consume stream events, not OHLCV source
+            LongShortRatioMomentum | LongShortExtremeDetector | RatioVsPriceDivergence |
+            AggTradeFlowImbalance | AggTradeSizeDistribution |
+
+            // Index/Basis indicators — consume IndexPrice, CompositeIndex, Basis stream events
+            PriceVsIndexSpread | IndexComponentDrift | IndexCorrelationBreakdown |
+            BasisMomentum | BasisExtreme | BasisZScore |
+
+            // Volatility advanced — consume HistoricalVolatility, VolatilityIndex stream events
+            HvMomentum | HvSpike | VolIdxSpike | VolIdxMomentum |
+
+            // Greeks indicators — consume OptionGreeks stream events
+            DeltaExposureFlow | GammaSqueezeDetector | IvSkew |
+
+            // Stress indicators — consume InsuranceFund, SettlementEvent, MarkPrice stream events
+            FundDepletionRate | FundStressDetector | SettlementPriceMomentum | SettlementVsMarkSpread |
+
+            // Microstructure indicators — consume BlockTrade, OrderbookL3 stream events
+            BlockTradeFlow | BlockTradeImpact | L3OrderRate | L3LargeOrderTracker | L3CancelRatio |
+
+            // Risk/Funding/Misc indicators — consume stream events, not OHLCV source
+            LeverageReductionWarning | MmrTracker |
+            FundingDrift | PredictedFundingExtreme | SettledFundingMomentum |
+            AuctionPriceDeviation | AuctionImbalance | WarningRate
 
             // Note: Most other indicators are PriceOnly and will use config.source
         )
@@ -4381,6 +4577,161 @@ impl IndicatorInstance {
                 )))
             }
             BarIndicatorId::DayWeekMonth => Ok(Self::DayWeekMonth(Box::default())),
+
+            // ── Sentiment indicators ──────────────────────────────────────────
+            BarIndicatorId::LongShortRatioMomentum => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::SentLongShortRatioMomentum(Box::new(LongShortRatioMomentum::new(p))))
+            }
+            BarIndicatorId::LongShortExtremeDetector => {
+                let upper = config.additional_params.get("upper_threshold").copied().unwrap_or(0.8);
+                let lower = config.additional_params.get("lower_threshold").copied().unwrap_or(0.2);
+                Ok(Self::SentLongShortExtremeDetector(Box::new(LongShortExtremeDetector::new(upper, lower))))
+            }
+            BarIndicatorId::RatioVsPriceDivergence => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::SentRatioVsPriceDivergence(Box::new(RatioVsPriceDivergence::new(p))))
+            }
+            BarIndicatorId::AggTradeFlowImbalance => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                Ok(Self::SentAggTradeFlowImbalance(Box::new(AggTradeFlowImbalance::new(window_ms))))
+            }
+            BarIndicatorId::AggTradeSizeDistribution => {
+                let window_size = config.periods.first().copied().unwrap_or(100);
+                Ok(Self::SentAggTradeSizeDistribution(Box::new(AggTradeSizeDistribution::new(window_size))))
+            }
+
+            // ── Index/Basis indicators ────────────────────────────────────────
+            BarIndicatorId::PriceVsIndexSpread => {
+                Ok(Self::IdxPriceVsIndexSpread(Box::new(PriceVsIndexSpread::new())))
+            }
+            BarIndicatorId::IndexComponentDrift => {
+                Ok(Self::IdxComponentDrift(Box::new(IndexComponentDrift::new())))
+            }
+            BarIndicatorId::IndexCorrelationBreakdown => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::IdxCorrelationBreakdown(Box::new(IndexCorrelationBreakdown::new(p))))
+            }
+            BarIndicatorId::BasisMomentum => {
+                let p = config.periods.first().copied().unwrap_or(14);
+                Ok(Self::IdxBasisMomentum(Box::new(BasisMomentum::new(p))))
+            }
+            BarIndicatorId::BasisExtreme => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::IdxBasisExtreme(Box::new(BasisExtreme::new(p))))
+            }
+            BarIndicatorId::BasisZScore => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::IdxBasisZScore(Box::new(BasisZScore::new(p))))
+            }
+
+            // ── Volatility advanced indicators ────────────────────────────────
+            BarIndicatorId::HvMomentum => {
+                let p = config.periods.first().copied().unwrap_or(14);
+                Ok(Self::VolAdvHvMomentum(Box::new(HvMomentum::new(p))))
+            }
+            BarIndicatorId::HvSpike => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                let mult = config.additional_params.get("multiplier").copied().unwrap_or(2.0);
+                Ok(Self::VolAdvHvSpike(Box::new(HvSpike::new(p, mult))))
+            }
+            BarIndicatorId::VolIdxSpike => {
+                let p = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::VolAdvVolIdxSpike(Box::new(VolIdxSpike::new(p))))
+            }
+            BarIndicatorId::VolIdxMomentum => {
+                let p = config.periods.first().copied().unwrap_or(14);
+                Ok(Self::VolAdvVolIdxMomentum(Box::new(VolIdxMomentum::new(p))))
+            }
+
+            // ── Greeks indicators ─────────────────────────────────────────────
+            BarIndicatorId::DeltaExposureFlow => {
+                let p = config.periods.first().copied().unwrap_or(14);
+                Ok(Self::GrkDeltaExposureFlow(Box::new(DeltaExposureFlow::new(p))))
+            }
+            BarIndicatorId::GammaSqueezeDetector => {
+                let gamma_thresh = config.additional_params.get("gamma_threshold").copied().unwrap_or(0.01);
+                let price_thresh = config.additional_params.get("price_move_threshold").copied().unwrap_or(1.0);
+                Ok(Self::GrkGammaSqueezeDetector(Box::new(GammaSqueezeDetector::new(gamma_thresh, price_thresh))))
+            }
+            BarIndicatorId::IvSkew => {
+                Ok(Self::GrkIvSkew(Box::new(IvSkew::new())))
+            }
+
+            // ── Stress indicators ─────────────────────────────────────────────
+            BarIndicatorId::FundDepletionRate => {
+                let p = config.periods.first().copied().unwrap_or(14);
+                Ok(Self::StressFundDepletionRate(Box::new(FundDepletionRate::new(p))))
+            }
+            BarIndicatorId::FundStressDetector => {
+                let p = config.periods.first().copied().unwrap_or(14);
+                let thresh = config.additional_params.get("threshold").copied().unwrap_or(1000.0);
+                Ok(Self::StressFundStressDetector(Box::new(FundStressDetector::new(p, thresh))))
+            }
+            BarIndicatorId::SettlementPriceMomentum => {
+                let p = config.periods.first().copied().unwrap_or(14);
+                Ok(Self::StressSettlementPriceMomentum(Box::new(SettlementPriceMomentum::new(p))))
+            }
+            BarIndicatorId::SettlementVsMarkSpread => {
+                Ok(Self::StressSettlementVsMarkSpread(Box::new(SettlementVsMarkSpread::new())))
+            }
+
+            // ── Microstructure indicators ─────────────────────────────────────
+            BarIndicatorId::BlockTradeFlow => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                Ok(Self::MicroBlockTradeFlow(Box::new(BlockTradeFlow::new(window_ms))))
+            }
+            BarIndicatorId::BlockTradeImpact => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(60_000.0) as i64;
+                Ok(Self::MicroBlockTradeImpact(Box::new(BlockTradeImpact::new(window_ms))))
+            }
+            BarIndicatorId::L3OrderRate => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(10_000.0) as i64;
+                Ok(Self::MicroL3OrderRate(Box::new(L3OrderRate::new(window_ms))))
+            }
+            BarIndicatorId::L3LargeOrderTracker => {
+                let win = config.periods.first().copied().unwrap_or(50);
+                let mult = config.additional_params.get("threshold_multiplier").copied().unwrap_or(5.0);
+                Ok(Self::MicroL3LargeOrderTracker(Box::new(L3LargeOrderTracker::new(win, mult))))
+            }
+            BarIndicatorId::L3CancelRatio => {
+                let win = config.periods.first().copied().unwrap_or(100);
+                Ok(Self::MicroL3CancelRatio(Box::new(L3CancelRatio::new(win))))
+            }
+
+            // ── Risk indicators ───────────────────────────────────────────────
+            BarIndicatorId::LeverageReductionWarning => {
+                Ok(Self::RiskLeverageReductionWarning(Box::new(LeverageReductionWarning::new())))
+            }
+            BarIndicatorId::MmrTracker => {
+                Ok(Self::RiskMmrTracker(Box::new(MmrTracker::new())))
+            }
+
+            // ── Funding indicators ────────────────────────────────────────────
+            BarIndicatorId::FundingDrift => {
+                Ok(Self::FndFundingDrift(Box::new(FundingDrift::new())))
+            }
+            BarIndicatorId::PredictedFundingExtreme => {
+                let threshold = config.additional_params.get("threshold").copied().unwrap_or(0.001);
+                Ok(Self::FndPredictedFundingExtreme(Box::new(PredictedFundingExtreme::new(threshold))))
+            }
+            BarIndicatorId::SettledFundingMomentum => {
+                let p = config.periods.first().copied().unwrap_or(8);
+                Ok(Self::FndSettledFundingMomentum(Box::new(SettledFundingMomentum::new(p))))
+            }
+
+            // ── Misc indicators ───────────────────────────────────────────────
+            BarIndicatorId::AuctionPriceDeviation => {
+                Ok(Self::MiscAuctionPriceDeviation(Box::new(AuctionPriceDeviation::new())))
+            }
+            BarIndicatorId::AuctionImbalance => {
+                let win = config.periods.first().copied().unwrap_or(20);
+                Ok(Self::MiscAuctionImbalance(Box::new(AuctionImbalance::new(win))))
+            }
+            BarIndicatorId::WarningRate => {
+                let window_ms = config.additional_params.get("window_ms").copied().unwrap_or(300_000.0) as i64;
+                Ok(Self::MiscWarningRate(Box::new(WarningRate::new(window_ms))))
+            }
         }
     }
 
@@ -6174,6 +6525,50 @@ impl IndicatorInstance {
                 x.update_bar(open, high, low, close, volume);
                 x.value()
             }
+            // ── Sentiment indicators (passthrough) ──────────────────────────
+            Self::SentLongShortRatioMomentum(x) => x.update_bar(open, high, low, close, volume),
+            Self::SentLongShortExtremeDetector(x) => x.update_bar(open, high, low, close, volume),
+            Self::SentRatioVsPriceDivergence(x) => x.update_bar(open, high, low, close, volume),
+            Self::SentAggTradeFlowImbalance(x) => x.update_bar(open, high, low, close, volume),
+            Self::SentAggTradeSizeDistribution(x) => x.update_bar(open, high, low, close, volume),
+            // ── Index/Basis indicators (passthrough or price update) ──────────
+            Self::IdxPriceVsIndexSpread(x) => x.update_bar(open, high, low, close, volume),
+            Self::IdxComponentDrift(_x) => _x.value(),
+            Self::IdxCorrelationBreakdown(_x) => _x.value(),
+            Self::IdxBasisMomentum(_x) => _x.value(),
+            Self::IdxBasisExtreme(_x) => _x.value(),
+            Self::IdxBasisZScore(_x) => _x.value(),
+            // ── Volatility advanced indicators (passthrough) ──────────────────
+            Self::VolAdvHvMomentum(_x) => _x.value(),
+            Self::VolAdvHvSpike(_x) => _x.value(),
+            Self::VolAdvVolIdxSpike(_x) => _x.value(),
+            Self::VolAdvVolIdxMomentum(_x) => _x.value(),
+            // ── Greeks indicators (bar update for price-aware ones) ───────────
+            Self::GrkDeltaExposureFlow(_x) => _x.value(),
+            Self::GrkGammaSqueezeDetector(x) => x.update_bar(open, high, low, close, volume),
+            Self::GrkIvSkew(_x) => _x.value(),
+            // ── Stress indicators (passthrough — stream-driven) ───────────────
+            Self::StressFundDepletionRate(_x) => _x.value(),
+            Self::StressFundStressDetector(_x) => _x.value(),
+            Self::StressSettlementPriceMomentum(_x) => _x.value(),
+            Self::StressSettlementVsMarkSpread(_x) => _x.indicator_value(),
+            // ── Microstructure indicators (passthrough — stream-driven) ──────
+            Self::MicroBlockTradeFlow(_x) => _x.value(),
+            Self::MicroBlockTradeImpact(_x) => _x.value(),
+            Self::MicroL3OrderRate(_x) => _x.value(),
+            Self::MicroL3LargeOrderTracker(_x) => _x.value(),
+            Self::MicroL3CancelRatio(_x) => _x.value(),
+            // ── Risk indicators (passthrough — stream-driven) ─────────────────
+            Self::RiskLeverageReductionWarning(x) => x.update_bar(open, high, low, close, volume),
+            Self::RiskMmrTracker(x) => x.update_bar(open, high, low, close, volume),
+            // ── Funding indicators (passthrough — stream-driven) ──────────────
+            Self::FndFundingDrift(x) => x.update_bar(open, high, low, close, volume),
+            Self::FndPredictedFundingExtreme(x) => x.update_bar(open, high, low, close, volume),
+            Self::FndSettledFundingMomentum(x) => x.update_bar(open, high, low, close, volume),
+            // ── Misc indicators ───────────────────────────────────────────────
+            Self::MiscAuctionPriceDeviation(x) => x.update_bar(open, high, low, close, volume),
+            Self::MiscAuctionImbalance(x) => x.update_bar(open, high, low, close, volume),
+            Self::MiscWarningRate(x) => x.update_bar(open, high, low, close, volume),
             // Catch-all for remaining legacy indicators
             _ => IndicatorValue::Single(0.0),
         }
@@ -6656,6 +7051,50 @@ impl IndicatorInstance {
             Self::StatisticalWickDetector(ind) => ind.value(),
             Self::WoodiePivots(ind) => ind.value(),
             Self::Xmil(ind) => ind.value(),
+            // ── Sentiment indicators ──────────────────────────────────────────
+            Self::SentLongShortRatioMomentum(ind) => ind.value(),
+            Self::SentLongShortExtremeDetector(ind) => ind.value(),
+            Self::SentRatioVsPriceDivergence(ind) => ind.value(),
+            Self::SentAggTradeFlowImbalance(ind) => ind.value(),
+            Self::SentAggTradeSizeDistribution(ind) => ind.value(),
+            // ── Index/Basis ───────────────────────────────────────────────────
+            Self::IdxPriceVsIndexSpread(ind) => ind.value(),
+            Self::IdxComponentDrift(ind) => ind.value(),
+            Self::IdxCorrelationBreakdown(ind) => ind.value(),
+            Self::IdxBasisMomentum(ind) => ind.value(),
+            Self::IdxBasisExtreme(ind) => ind.value(),
+            Self::IdxBasisZScore(ind) => ind.value(),
+            // ── Volatility advanced ───────────────────────────────────────────
+            Self::VolAdvHvMomentum(ind) => ind.value(),
+            Self::VolAdvHvSpike(ind) => ind.value(),
+            Self::VolAdvVolIdxSpike(ind) => ind.value(),
+            Self::VolAdvVolIdxMomentum(ind) => ind.value(),
+            // ── Greeks ────────────────────────────────────────────────────────
+            Self::GrkDeltaExposureFlow(ind) => ind.value(),
+            Self::GrkGammaSqueezeDetector(ind) => ind.value(),
+            Self::GrkIvSkew(ind) => ind.value(),
+            // ── Stress ────────────────────────────────────────────────────────
+            Self::StressFundDepletionRate(ind) => ind.value(),
+            Self::StressFundStressDetector(ind) => ind.value(),
+            Self::StressSettlementPriceMomentum(ind) => ind.value(),
+            Self::StressSettlementVsMarkSpread(ind) => ind.indicator_value(),
+            // ── Microstructure ────────────────────────────────────────────────
+            Self::MicroBlockTradeFlow(ind) => ind.value(),
+            Self::MicroBlockTradeImpact(ind) => ind.value(),
+            Self::MicroL3OrderRate(ind) => ind.value(),
+            Self::MicroL3LargeOrderTracker(ind) => ind.value(),
+            Self::MicroL3CancelRatio(ind) => ind.value(),
+            // ── Risk ──────────────────────────────────────────────────────────
+            Self::RiskLeverageReductionWarning(ind) => ind.value(),
+            Self::RiskMmrTracker(ind) => ind.value(),
+            // ── Funding ───────────────────────────────────────────────────────
+            Self::FndFundingDrift(ind) => ind.indicator_value(),
+            Self::FndPredictedFundingExtreme(ind) => ind.value(),
+            Self::FndSettledFundingMomentum(ind) => ind.value(),
+            // ── Misc ──────────────────────────────────────────────────────────
+            Self::MiscAuctionPriceDeviation(ind) => ind.value(),
+            Self::MiscAuctionImbalance(ind) => ind.value(),
+            Self::MiscWarningRate(ind) => ind.value(),
         }
     }
 
@@ -7124,6 +7563,50 @@ impl IndicatorInstance {
             Self::XorGate(ind) => ind.is_ready(),
             Self::Za(ind) => ind.is_ready(),
             Self::ZlSma(ind) => ind.is_ready(),
+            // ── Sentiment indicators ──────────────────────────────────────────
+            Self::SentLongShortRatioMomentum(ind) => ind.is_ready(),
+            Self::SentLongShortExtremeDetector(ind) => ind.is_ready(),
+            Self::SentRatioVsPriceDivergence(ind) => ind.is_ready(),
+            Self::SentAggTradeFlowImbalance(ind) => ind.is_ready(),
+            Self::SentAggTradeSizeDistribution(ind) => ind.is_ready(),
+            // ── Index/Basis ───────────────────────────────────────────────────
+            Self::IdxPriceVsIndexSpread(ind) => ind.is_ready(),
+            Self::IdxComponentDrift(ind) => ind.is_ready(),
+            Self::IdxCorrelationBreakdown(ind) => ind.is_ready(),
+            Self::IdxBasisMomentum(ind) => ind.is_ready(),
+            Self::IdxBasisExtreme(ind) => ind.is_ready(),
+            Self::IdxBasisZScore(ind) => ind.is_ready(),
+            // ── Volatility advanced ───────────────────────────────────────────
+            Self::VolAdvHvMomentum(ind) => ind.is_ready(),
+            Self::VolAdvHvSpike(ind) => ind.is_ready(),
+            Self::VolAdvVolIdxSpike(ind) => ind.is_ready(),
+            Self::VolAdvVolIdxMomentum(ind) => ind.is_ready(),
+            // ── Greeks ────────────────────────────────────────────────────────
+            Self::GrkDeltaExposureFlow(ind) => ind.is_ready(),
+            Self::GrkGammaSqueezeDetector(ind) => ind.is_ready(),
+            Self::GrkIvSkew(ind) => ind.is_ready(),
+            // ── Stress ────────────────────────────────────────────────────────
+            Self::StressFundDepletionRate(ind) => ind.is_ready(),
+            Self::StressFundStressDetector(ind) => ind.is_ready(),
+            Self::StressSettlementPriceMomentum(ind) => ind.is_ready(),
+            Self::StressSettlementVsMarkSpread(ind) => ind.indicator_is_ready(),
+            // ── Microstructure ────────────────────────────────────────────────
+            Self::MicroBlockTradeFlow(ind) => ind.is_ready(),
+            Self::MicroBlockTradeImpact(ind) => ind.is_ready(),
+            Self::MicroL3OrderRate(ind) => ind.is_ready(),
+            Self::MicroL3LargeOrderTracker(ind) => ind.is_ready(),
+            Self::MicroL3CancelRatio(ind) => ind.is_ready(),
+            // ── Risk ──────────────────────────────────────────────────────────
+            Self::RiskLeverageReductionWarning(ind) => ind.is_ready(),
+            Self::RiskMmrTracker(ind) => ind.is_ready(),
+            // ── Funding ───────────────────────────────────────────────────────
+            Self::FndFundingDrift(ind) => ind.indicator_is_ready(),
+            Self::FndPredictedFundingExtreme(ind) => ind.is_ready(),
+            Self::FndSettledFundingMomentum(ind) => ind.is_ready(),
+            // ── Misc ──────────────────────────────────────────────────────────
+            Self::MiscAuctionPriceDeviation(ind) => ind.is_ready(),
+            Self::MiscAuctionImbalance(ind) => ind.is_ready(),
+            Self::MiscWarningRate(ind) => ind.is_ready(),
         }
     }
 
@@ -7592,6 +8075,50 @@ impl IndicatorInstance {
             Self::LiquidationRate(ind) => ind.reset(),
             Self::LiquidationVolumeImbalance(ind) => ind.reset(),
             Self::LiquidationCascade(ind) => ind.reset(),
+            // ── Sentiment indicators ──────────────────────────────────────────
+            Self::SentLongShortRatioMomentum(ind) => ind.reset(),
+            Self::SentLongShortExtremeDetector(ind) => ind.reset(),
+            Self::SentRatioVsPriceDivergence(ind) => ind.reset(),
+            Self::SentAggTradeFlowImbalance(ind) => ind.reset(),
+            Self::SentAggTradeSizeDistribution(ind) => ind.reset(),
+            // ── Index/Basis ───────────────────────────────────────────────────
+            Self::IdxPriceVsIndexSpread(ind) => ind.reset(),
+            Self::IdxComponentDrift(ind) => ind.reset(),
+            Self::IdxCorrelationBreakdown(ind) => ind.reset(),
+            Self::IdxBasisMomentum(ind) => ind.reset(),
+            Self::IdxBasisExtreme(ind) => ind.reset(),
+            Self::IdxBasisZScore(ind) => ind.reset(),
+            // ── Volatility advanced ───────────────────────────────────────────
+            Self::VolAdvHvMomentum(ind) => ind.reset(),
+            Self::VolAdvHvSpike(ind) => ind.reset(),
+            Self::VolAdvVolIdxSpike(ind) => ind.reset(),
+            Self::VolAdvVolIdxMomentum(ind) => ind.reset(),
+            // ── Greeks ────────────────────────────────────────────────────────
+            Self::GrkDeltaExposureFlow(ind) => ind.reset(),
+            Self::GrkGammaSqueezeDetector(ind) => ind.reset(),
+            Self::GrkIvSkew(ind) => ind.reset(),
+            // ── Stress ────────────────────────────────────────────────────────
+            Self::StressFundDepletionRate(ind) => ind.reset(),
+            Self::StressFundStressDetector(ind) => ind.reset(),
+            Self::StressSettlementPriceMomentum(ind) => ind.reset(),
+            Self::StressSettlementVsMarkSpread(ind) => ind.indicator_reset(),
+            // ── Microstructure ────────────────────────────────────────────────
+            Self::MicroBlockTradeFlow(ind) => ind.reset(),
+            Self::MicroBlockTradeImpact(ind) => ind.reset(),
+            Self::MicroL3OrderRate(ind) => ind.reset(),
+            Self::MicroL3LargeOrderTracker(ind) => ind.reset(),
+            Self::MicroL3CancelRatio(ind) => ind.reset(),
+            // ── Risk ──────────────────────────────────────────────────────────
+            Self::RiskLeverageReductionWarning(ind) => ind.reset(),
+            Self::RiskMmrTracker(ind) => ind.reset(),
+            // ── Funding ───────────────────────────────────────────────────────
+            Self::FndFundingDrift(ind) => ind.indicator_reset(),
+            Self::FndPredictedFundingExtreme(ind) => ind.reset(),
+            Self::FndSettledFundingMomentum(ind) => ind.reset(),
+            // ── Misc ──────────────────────────────────────────────────────────
+            Self::MiscAuctionPriceDeviation(ind) => ind.reset(),
+            Self::MiscAuctionImbalance(ind) => ind.reset(),
+            Self::MiscWarningRate(ind) => ind.reset(),
         }
     }
 
@@ -7629,6 +8156,7 @@ impl IndicatorInstance {
             Self::FundingMomentum(x) => x.update_funding(fr),
             Self::FundingZScore(x) => x.update_funding(fr),
             Self::FundingPriceDivergence(x) => x.update_funding(fr),
+            Self::FndFundingDrift(x) => x.update_funding(fr),
             _ => self.value(),
         }
     }
@@ -7648,6 +8176,7 @@ impl IndicatorInstance {
         match self {
             Self::MarkPriceVsLast(x) => x.update_mark(mp),
             Self::IndexPriceMomentum(x) => x.update_mark(mp),
+            Self::StressSettlementVsMarkSpread(x) => x.update_mark(mp),
             _ => self.value(),
         }
     }
@@ -7716,106 +8245,159 @@ impl IndicatorInstance {
     }
 
     /// Process a long/short ratio snapshot.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_long_short_ratio(&mut self, _lsr: &LongShortRatio) -> IndicatorValue {
-        self.value()
+    pub fn update_long_short_ratio(&mut self, lsr: &LongShortRatio) -> IndicatorValue {
+        match self {
+            Self::SentLongShortRatioMomentum(x) => x.update_long_short_ratio(lsr),
+            Self::SentLongShortExtremeDetector(x) => x.update_long_short_ratio(lsr),
+            Self::SentRatioVsPriceDivergence(x) => x.update_long_short_ratio(lsr),
+            _ => self.value(),
+        }
     }
 
     /// Process an aggregated trade event.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_agg_trade(&mut self, _t: &AggTrade) -> IndicatorValue {
-        self.value()
+    pub fn update_agg_trade(&mut self, t: &AggTrade) -> IndicatorValue {
+        match self {
+            Self::SentAggTradeFlowImbalance(x) => x.update_agg_trade(t),
+            Self::SentAggTradeSizeDistribution(x) => x.update_agg_trade(t),
+            _ => self.value(),
+        }
     }
 
     /// Process a composite index snapshot.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_composite_index(&mut self, _ci: &CompositeIndex) -> IndicatorValue {
-        self.value()
+    pub fn update_composite_index(&mut self, ci: &CompositeIndex) -> IndicatorValue {
+        match self {
+            Self::IdxComponentDrift(x) => x.update_composite_index(ci),
+            Self::IdxCorrelationBreakdown(x) => x.update_composite_index(ci),
+            _ => self.value(),
+        }
     }
 
     /// Process an index price snapshot.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_index_price(&mut self, _ip: &IndexPrice) -> IndicatorValue {
-        self.value()
+    pub fn update_index_price(&mut self, ip: &IndexPrice) -> IndicatorValue {
+        match self {
+            Self::IdxPriceVsIndexSpread(x) => x.update_index_price(ip),
+            _ => self.value(),
+        }
     }
 
     /// Process a historical volatility snapshot.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_historical_volatility(&mut self, _hv: &HistoricalVolatility) -> IndicatorValue {
-        self.value()
+    pub fn update_historical_volatility(&mut self, hv: &HistoricalVolatility) -> IndicatorValue {
+        match self {
+            Self::VolAdvHvMomentum(x) => x.update_historical_volatility(hv),
+            Self::VolAdvHvSpike(x) => x.update_historical_volatility(hv),
+            _ => self.value(),
+        }
     }
 
     /// Process an insurance fund balance snapshot.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_insurance_fund(&mut self, _ins: &InsuranceFund) -> IndicatorValue {
-        self.value()
+    pub fn update_insurance_fund(&mut self, ins: &InsuranceFund) -> IndicatorValue {
+        match self {
+            Self::StressFundDepletionRate(x) => x.update_insurance_fund(ins),
+            Self::StressFundStressDetector(x) => x.update_insurance_fund(ins),
+            _ => self.value(),
+        }
     }
 
     /// Process a futures basis snapshot.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_basis(&mut self, _b: &Basis) -> IndicatorValue {
-        self.value()
+    pub fn update_basis(&mut self, b: &Basis) -> IndicatorValue {
+        match self {
+            Self::IdxBasisMomentum(x) => x.update_basis(b),
+            Self::IdxBasisExtreme(x) => x.update_basis(b),
+            Self::IdxBasisZScore(x) => x.update_basis(b),
+            _ => self.value(),
+        }
     }
 
     /// Process an option Greeks snapshot.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_option_greeks(&mut self, _g: &OptionGreeks) -> IndicatorValue {
-        self.value()
+    pub fn update_option_greeks(&mut self, g: &OptionGreeks) -> IndicatorValue {
+        match self {
+            Self::GrkDeltaExposureFlow(x) => x.update_option_greeks(g),
+            Self::GrkGammaSqueezeDetector(x) => x.update_option_greeks(g),
+            Self::GrkIvSkew(x) => x.update_option_greeks(g),
+            _ => self.value(),
+        }
     }
 
     /// Process a volatility index snapshot.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_volatility_index(&mut self, _vi: &VolatilityIndex) -> IndicatorValue {
-        self.value()
+    pub fn update_volatility_index(&mut self, vi: &VolatilityIndex) -> IndicatorValue {
+        match self {
+            Self::VolAdvVolIdxSpike(x) => x.update_volatility_index(vi),
+            Self::VolAdvVolIdxMomentum(x) => x.update_volatility_index(vi),
+            _ => self.value(),
+        }
     }
 
     /// Process a block trade event.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_block_trade(&mut self, _bt: &BlockTrade) -> IndicatorValue {
-        self.value()
+    pub fn update_block_trade(&mut self, bt: &BlockTrade) -> IndicatorValue {
+        match self {
+            Self::MicroBlockTradeFlow(x) => x.update_block_trade(bt),
+            Self::MicroBlockTradeImpact(x) => x.update_block_trade(bt),
+            _ => self.value(),
+        }
     }
 
     /// Process an auction event snapshot.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_auction(&mut self, _a: &AuctionEvent) -> IndicatorValue {
-        self.value()
+    pub fn update_auction(&mut self, a: &AuctionEvent) -> IndicatorValue {
+        match self {
+            Self::MiscAuctionPriceDeviation(x) => x.update_auction(a),
+            Self::MiscAuctionImbalance(x) => x.update_auction(a),
+            _ => self.value(),
+        }
     }
 
     /// Process a market warning event.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_market_warning(&mut self, _w: &MarketWarning) -> IndicatorValue {
-        self.value()
+    pub fn update_market_warning(&mut self, w: &MarketWarning) -> IndicatorValue {
+        match self {
+            Self::MiscWarningRate(x) => x.update_market_warning(w),
+            _ => self.value(),
+        }
     }
 
     /// Process an L3 orderbook event.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_orderbook_l3(&mut self, _l3: &OrderbookL3Event) -> IndicatorValue {
-        self.value()
+    pub fn update_orderbook_l3(&mut self, l3: &OrderbookL3Event) -> IndicatorValue {
+        match self {
+            Self::MicroL3OrderRate(x) => x.update_orderbook_l3(l3),
+            Self::MicroL3LargeOrderTracker(x) => x.update_orderbook_l3(l3),
+            Self::MicroL3CancelRatio(x) => x.update_orderbook_l3(l3),
+            _ => self.value(),
+        }
     }
 
     /// Process a contract settlement event.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_settlement(&mut self, _s: &SettlementEvent) -> IndicatorValue {
-        self.value()
+    pub fn update_settlement(&mut self, s: &SettlementEvent) -> IndicatorValue {
+        match self {
+            Self::StressSettlementPriceMomentum(x) => x.update_settlement(s),
+            Self::StressSettlementVsMarkSpread(x) => x.update_settlement(s),
+            _ => self.value(),
+        }
     }
 
     /// Process a risk limit tier snapshot.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_risk_limit(&mut self, _r: &RiskLimit) -> IndicatorValue {
-        self.value()
+    pub fn update_risk_limit(&mut self, r: &RiskLimit) -> IndicatorValue {
+        match self {
+            Self::RiskLeverageReductionWarning(x) => x.update_risk_limit(r),
+            Self::RiskMmrTracker(x) => x.update_risk_limit(r),
+            _ => self.value(),
+        }
     }
 
     /// Process a predicted funding rate snapshot.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_predicted_funding(&mut self, _pf: &PredictedFunding) -> IndicatorValue {
-        self.value()
+    pub fn update_predicted_funding(&mut self, pf: &PredictedFunding) -> IndicatorValue {
+        match self {
+            Self::FndFundingDrift(x) => x.update_predicted_funding(pf),
+            Self::FndPredictedFundingExtreme(x) => x.update_predicted_funding(pf),
+            _ => self.value(),
+        }
     }
 
     /// Process a funding settlement event.
-    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
-    pub fn update_funding_settlement(&mut self, _fs: &FundingSettlement) -> IndicatorValue {
-        self.value()
+    pub fn update_funding_settlement(&mut self, fs: &FundingSettlement) -> IndicatorValue {
+        match self {
+            Self::FndSettledFundingMomentum(x) => x.update_funding_settlement(fs),
+            _ => self.value(),
+        }
     }
+
 }
 
 #[cfg(test)]

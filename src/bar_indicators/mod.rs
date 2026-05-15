@@ -59,6 +59,13 @@ pub mod settlement_event_consumer;
 pub mod volatility_index_consumer;
 
 pub mod liquidations;
+pub mod sentiment;
+pub mod index_basis;
+pub mod volatility_advanced;
+pub mod greeks;
+pub mod stress;
+pub mod microstructure;
+pub mod risk_funding;
 
 pub use indicator_value::{IndicatorValue, IndicatorValueKind};
 pub use ohlcv_field::OhlcvField;
