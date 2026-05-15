@@ -77,6 +77,7 @@ mod tests {
             bids: vec![OrderBookLevel::new(bid_p, bid_s)],
             asks: vec![OrderBookLevel::new(ask_p, ask_s)],
             timestamp: 0,
+            ..Default::default()
         }
     }
 
@@ -121,7 +122,7 @@ mod tests {
     #[test]
     fn empty_book_stays_zero() {
         let mut mp = Microprice::new();
-        let book = OrderBook { bids: vec![], asks: vec![], timestamp: 0 };
+        let book = OrderBook { bids: vec![], asks: vec![], timestamp: 0, ..Default::default() };
         let v = mp.update_orderbook(&book);
         assert_eq!(v.main(), 0.0);
         assert!(!mp.is_ready());

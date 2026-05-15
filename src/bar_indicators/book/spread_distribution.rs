@@ -89,6 +89,7 @@ mod tests {
             bids: vec![OrderBookLevel::new(bid, 10.0)],
             asks: vec![OrderBookLevel::new(ask, 10.0)],
             timestamp: 0,
+            ..Default::default()
         }
     }
 
@@ -145,7 +146,7 @@ mod tests {
     #[test]
     fn zero_spread_skipped() {
         let mut sd = SpreadDistribution::new(5);
-        let bad_book = OrderBook { bids: vec![], asks: vec![], timestamp: 0 };
+        let bad_book = OrderBook { bids: vec![], asks: vec![], timestamp: 0, ..Default::default() };
         sd.update_orderbook(&bad_book);
         assert!(!sd.is_ready());
     }

@@ -16,11 +16,6 @@ impl EventWriter {
         }
     }
 
-    /// Returns the root data directory path.
-    pub fn storage_root(&self) -> &std::path::Path {
-        &self.storage.data_dir
-    }
-
     /// Append a single event to the appropriate binary stream file.
     pub fn write(&self, symbol: &str, event: &TimedEvent) -> std::io::Result<()> {
         self.storage.append(symbol, event)

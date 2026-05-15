@@ -17,7 +17,7 @@ use std::collections::VecDeque;
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::liquidation_consumer::LiquidationConsumer;
-use crate::core::types::{Liquidation, LiquidationSide};
+use crate::core::types::{Liquidation, TradeSide};
 
 /// Rolling liquidation volume imbalance.
 #[derive(Clone)]
@@ -25,7 +25,7 @@ pub struct LiquidationVolumeImbalance {
     /// Rolling window length in milliseconds.
     window_ms: i64,
     /// Buffered events: (timestamp, quote_value, side).
-    events: VecDeque<(i64, f64, LiquidationSide)>,
+    events: VecDeque<(i64, f64, TradeSide)>,
     /// Cached imbalance.
     last_imbalance: f64,
     /// Cached long volume.
@@ -62,9 +62,11 @@ impl LiquidationVolumeImbalance {
         let mut long_vol = 0.0_f64;
         let mut short_vol = 0.0_f64;
         for &(_, val, side) in &self.events {
+            // TradeSide::Buy = long was liquidated (forced sell)
+            // TradeSide::Sell = short was liquidated (forced buy)
             match side {
-                LiquidationSide::Long => long_vol += val,
-                LiquidationSide::Short => short_vol += val,
+                TradeSide::Buy => long_vol += val,
+                TradeSide::Sell => short_vol += val,
             }
         }
         let total = long_vol + short_vol;
@@ -107,8 +109,8 @@ impl LiquidationConsumer for LiquidationVolumeImbalance {
 mod tests {
     use super::*;
 
-    fn liq(ts: i64, side: LiquidationSide, price: f64, qty: f64) -> Liquidation {
-        Liquidation { side, price, quantity: qty, timestamp: ts, value: None }
+    fn liq(ts: i64, side: TradeSide, price: f64, qty: f64) -> Liquidation {
+        Liquidation { symbol: String::new(), side, price, quantity: qty, timestamp: ts, value: None }
     }
 
     #[test]
@@ -121,8 +123,8 @@ mod tests {
     #[test]
     fn pure_long_liquidations_give_neg_one() {
         let mut lvi = LiquidationVolumeImbalance::new(60_000);
-        lvi.update_liquidation(&liq(0, LiquidationSide::Long, 30_000.0, 1.0));
-        lvi.update_liquidation(&liq(1_000, LiquidationSide::Long, 30_000.0, 1.0));
+        lvi.update_liquidation(&liq(0, TradeSide::Buy, 30_000.0, 1.0));
+        lvi.update_liquidation(&liq(1_000, TradeSide::Buy, 30_000.0, 1.0));
         if let IndicatorValue::Triple(imb, _lv, _sv) = lvi.value() {
             assert!((imb - (-1.0)).abs() < 1e-9, "imb={imb}");
         }
@@ -131,8 +133,8 @@ mod tests {
     #[test]
     fn pure_short_liquidations_give_pos_one() {
         let mut lvi = LiquidationVolumeImbalance::new(60_000);
-        lvi.update_liquidation(&liq(0, LiquidationSide::Short, 30_000.0, 1.0));
-        lvi.update_liquidation(&liq(1_000, LiquidationSide::Short, 30_000.0, 1.0));
+        lvi.update_liquidation(&liq(0, TradeSide::Sell, 30_000.0, 1.0));
+        lvi.update_liquidation(&liq(1_000, TradeSide::Sell, 30_000.0, 1.0));
         if let IndicatorValue::Triple(imb, _lv, _sv) = lvi.value() {
             assert!((imb - 1.0).abs() < 1e-9, "imb={imb}");
         }
@@ -141,8 +143,8 @@ mod tests {
     #[test]
     fn equal_volumes_give_zero_imbalance() {
         let mut lvi = LiquidationVolumeImbalance::new(60_000);
-        lvi.update_liquidation(&liq(0, LiquidationSide::Long, 30_000.0, 1.0));
-        lvi.update_liquidation(&liq(1_000, LiquidationSide::Short, 30_000.0, 1.0));
+        lvi.update_liquidation(&liq(0, TradeSide::Buy, 30_000.0, 1.0));
+        lvi.update_liquidation(&liq(1_000, TradeSide::Sell, 30_000.0, 1.0));
         if let IndicatorValue::Triple(imb, lv, sv) = lvi.value() {
             assert!((imb).abs() < 1e-9, "imb={imb}");
             assert!((lv - 30_000.0).abs() < 1e-6);
@@ -154,9 +156,9 @@ mod tests {
     fn old_events_evicted() {
         let mut lvi = LiquidationVolumeImbalance::new(10_000);
         // long liq at t=0 (will be evicted)
-        lvi.update_liquidation(&liq(0, LiquidationSide::Long, 30_000.0, 1.0));
+        lvi.update_liquidation(&liq(0, TradeSide::Buy, 30_000.0, 1.0));
         // short liq at t=15_000 (outside window for t=0)
-        lvi.update_liquidation(&liq(15_000, LiquidationSide::Short, 30_000.0, 1.0));
+        lvi.update_liquidation(&liq(15_000, TradeSide::Sell, 30_000.0, 1.0));
         // only short remains → imbalance = +1
         if let IndicatorValue::Triple(imb, _lv, _sv) = lvi.value() {
             assert!((imb - 1.0).abs() < 1e-9, "imb={imb}");
@@ -166,7 +168,7 @@ mod tests {
     #[test]
     fn reset_clears_state() {
         let mut lvi = LiquidationVolumeImbalance::new(60_000);
-        lvi.update_liquidation(&liq(0, LiquidationSide::Long, 30_000.0, 1.0));
+        lvi.update_liquidation(&liq(0, TradeSide::Buy, 30_000.0, 1.0));
         lvi.reset();
         assert!(!lvi.is_ready());
         assert_eq!(lvi.value(), IndicatorValue::Triple(0.0, 0.0, 0.0));

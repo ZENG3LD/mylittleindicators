@@ -46,12 +46,12 @@ pub use core::types::{
     Bar, Tick, CalendarService, TimeService,
     OrderBook, OrderBookLevel, OrderbookDelta,
     FundingRate, MarkPrice, OpenInterest, Ticker,
-    Liquidation, LiquidationSide,
+    Liquidation, TradeSide,
     PublicTrade,
-    // New stream event types
+    // Stream event types
     AggTrade, AuctionEvent, Basis, BlockTrade, CompositeIndex,
     FundingSettlement, HistoricalVolatility, IndexPrice, InsuranceFund,
-    LongShortRatio, MarketWarning, OptionGreeks,
+    Kline, LongShortRatio, MarketWarning, OptionGreeks,
     L3Action, OrderBookSide, OrderbookL3Event,
     PredictedFunding, RiskLimit, SettlementEvent, VolatilityIndex,
 };

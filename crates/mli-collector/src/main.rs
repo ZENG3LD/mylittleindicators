@@ -1,8 +1,5 @@
 //! mli-collector daemon: subscribe to live streams + write to local binary storage.
 //!
-//! Foundation: structure + config loading + storage writer.
-//! Integration with digdigdig3 WS subscriber is a separate step (feature flag).
-//!
 //! Usage:
 //!   cargo run -p mli-collector -- collector.toml
 //!   (default config path: "collector.toml" in cwd)
@@ -39,18 +36,17 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let writer = Arc::new(EventWriter::new(config.storage_dir.clone()));
-
     let subscriber = Subscriber::new(Arc::clone(&writer));
 
-    // digdigdig3 integration not yet implemented — logs a warning and returns.
-    subscriber.start(&config).await?;
-
-    tracing::warn!(
-        "Storage writer ready at {:?}. Daemon idle — awaiting Ctrl-C.",
-        config.storage_dir
-    );
+    let config_clone = config.clone();
+    let handle = tokio::spawn(async move {
+        if let Err(e) = subscriber.start(&config_clone).await {
+            tracing::error!("Subscriber error: {e}");
+        }
+    });
 
     tokio::signal::ctrl_c().await?;
-    tracing::info!("Shutting down");
+    tracing::info!("Shutdown signal received");
+    handle.abort();
     Ok(())
 }

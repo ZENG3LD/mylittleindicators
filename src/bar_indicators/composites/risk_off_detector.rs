@@ -216,14 +216,14 @@ impl InsuranceFundConsumer for RiskOffDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::types::LiquidationSide;
+    use crate::core::types::TradeSide;
 
     fn make_vi(value: f64, ts: i64) -> VolatilityIndex {
         VolatilityIndex { value, timestamp: ts }
     }
 
     fn make_liq(ts: i64) -> Liquidation {
-        Liquidation { side: LiquidationSide::Long, price: 30000.0, quantity: 0.1, timestamp: ts, value: None }
+        Liquidation { symbol: String::new(), side: TradeSide::Buy, price: 30000.0, quantity: 0.1, timestamp: ts, value: None }
     }
 
     fn make_fr(rate: f64) -> FundingRate {

@@ -16,7 +16,7 @@ use crate::bar_indicators::agg_trade_consumer::AggTradeConsumer;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::liquidation_consumer::LiquidationConsumer;
 use crate::bar_indicators::mark_price_consumer::MarkPriceConsumer;
-use crate::core::types::{AggTrade, Liquidation, LiquidationSide, MarkPrice};
+use crate::core::types::{AggTrade, Liquidation, TradeSide, MarkPrice};
 
 /// Capitulation event detector.
 ///
@@ -162,8 +162,8 @@ impl LiquidationConsumer for CapitulationDetector {
     fn update_liquidation(&mut self, liq: &Liquidation) -> IndicatorValue {
         self.evict_liq(liq.timestamp);
         match liq.side {
-            LiquidationSide::Long => self.liq_long_events.push_back(liq.timestamp),
-            LiquidationSide::Short => self.liq_short_events.push_back(liq.timestamp),
+            TradeSide::Buy => self.liq_long_events.push_back(liq.timestamp),
+            TradeSide::Sell => self.liq_short_events.push_back(liq.timestamp),
         }
         self.recompute();
         self.indicator_value()
@@ -230,7 +230,7 @@ mod tests {
     use super::*;
 
     fn make_liq_long(ts: i64) -> Liquidation {
-        Liquidation { side: LiquidationSide::Long, price: 30000.0, quantity: 0.1, timestamp: ts, value: None }
+        Liquidation { symbol: String::new(), side: TradeSide::Buy, price: 30000.0, quantity: 0.1, timestamp: ts, value: None }
     }
 
     fn make_agg(ts: i64, price: f64, qty: f64) -> AggTrade {

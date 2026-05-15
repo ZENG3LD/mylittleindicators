@@ -97,6 +97,7 @@ mod tests {
             bids: vec![OrderBookLevel::new(100.0, bid_size)],
             asks: vec![OrderBookLevel::new(101.0, ask_size)],
             timestamp: 0,
+            ..Default::default()
         }
     }
 

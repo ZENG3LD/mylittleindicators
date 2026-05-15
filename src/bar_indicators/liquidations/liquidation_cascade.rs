@@ -89,10 +89,10 @@ impl LiquidationConsumer for LiquidationCascade {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::types::LiquidationSide;
+    use crate::core::types::TradeSide;
 
     fn liq(ts: i64) -> Liquidation {
-        Liquidation { side: LiquidationSide::Long, price: 30_000.0, quantity: 0.1, timestamp: ts, value: None }
+        Liquidation { symbol: String::new(), side: TradeSide::Buy, price: 30_000.0, quantity: 0.1, timestamp: ts, value: None }
     }
 
     #[test]

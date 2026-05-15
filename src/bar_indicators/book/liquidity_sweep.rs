@@ -104,6 +104,7 @@ mod tests {
             bids: bids.iter().map(|&(p, s)| OrderBookLevel::new(p, s)).collect(),
             asks: asks.iter().map(|&(p, s)| OrderBookLevel::new(p, s)).collect(),
             timestamp: 0,
+            ..Default::default()
         }
     }
 

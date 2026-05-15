@@ -132,6 +132,7 @@ mod tests {
 
     fn make_lsr(long_ratio: f64) -> LongShortRatio {
         LongShortRatio {
+            symbol: String::new(),
             ratio_type: "global_account".to_string(),
             long_ratio,
             short_ratio: 1.0 - long_ratio,

@@ -90,6 +90,7 @@ mod tests {
             first_update_id: None,
             last_update_id: None,
             prev_update_id: None,
+            ..Default::default()
         }
     }
 

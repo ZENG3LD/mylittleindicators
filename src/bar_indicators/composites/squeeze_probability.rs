@@ -208,7 +208,7 @@ impl LiquidationConsumer for SqueezeProbability {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::types::LiquidationSide;
+    use crate::core::types::TradeSide;
 
     fn make_oi(open_interest: f64, ts: i64) -> OpenInterest {
         OpenInterest { symbol: "BTCUSDT".to_string(), open_interest, open_interest_value: None, timestamp: ts }
@@ -219,7 +219,7 @@ mod tests {
     }
 
     fn make_liq(ts: i64) -> Liquidation {
-        Liquidation { side: LiquidationSide::Long, price: 30000.0, quantity: 0.1, timestamp: ts, value: None }
+        Liquidation { symbol: String::new(), side: TradeSide::Buy, price: 30000.0, quantity: 0.1, timestamp: ts, value: None }
     }
 
     #[test]

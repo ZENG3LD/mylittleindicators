@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 mylittleindicators = { path = "../.." }
+digdigdig3 = { path = "../../../digdigdig3" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
@@ -20,10 +21,4 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "signa
 tracing = "0.1"
 tracing-subscriber = "0.3"
 anyhow = "1"
-
-# digdigdig3 = { path = "../../../digdigdig3" }  — future integration; see feature flag below
-
-[features]
-default = []
-# Placeholder for future digdigdig3 WS subscriber integration.
-digdigdig3-integration = []
+futures-util = "0.3"

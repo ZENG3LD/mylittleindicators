@@ -35,7 +35,7 @@ use std::collections::VecDeque;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::liquidation_consumer::LiquidationConsumer;
 use crate::bar_indicators::mark_price_consumer::MarkPriceConsumer;
-use crate::core::types::{Liquidation, LiquidationSide, MarkPrice};
+use crate::core::types::{Liquidation, TradeSide, MarkPrice};
 
 /// Stop hunt detector: liq spike + immediate price reversal.
 #[derive(Clone)]
@@ -45,7 +45,7 @@ pub struct StopHuntDetector {
     /// Rolling window used for both liq accumulation and price reversal check (ms).
     reversal_window_ms: i64,
     /// Recent liquidations: `(timestamp_ms, quote_value, side)`.
-    liq_buf: VecDeque<(i64, f64, LiquidationSide)>,
+    liq_buf: VecDeque<(i64, f64, TradeSide)>,
     /// Recent mark prices: `(timestamp_ms, price)`.
     price_buf: VecDeque<(i64, f64)>,
     /// Cached last signal.
@@ -96,8 +96,8 @@ impl StopHuntDetector {
         let mut short_vol = 0.0_f64;
         for &(_, val, side) in &self.liq_buf {
             match side {
-                LiquidationSide::Long => long_vol += val,
-                LiquidationSide::Short => short_vol += val,
+                TradeSide::Buy => long_vol += val,
+                TradeSide::Sell => short_vol += val,
             }
         }
 
@@ -179,8 +179,8 @@ impl MarkPriceConsumer for StopHuntDetector {
 mod tests {
     use super::*;
 
-    fn liq(ts: i64, side: LiquidationSide, price: f64, qty: f64) -> Liquidation {
-        Liquidation { side, price, quantity: qty, timestamp: ts, value: None }
+    fn liq(ts: i64, side: TradeSide, price: f64, qty: f64) -> Liquidation {
+        Liquidation { symbol: String::new(), side, price, quantity: qty, timestamp: ts, value: None }
     }
 
     fn mp(ts: i64, price: f64) -> MarkPrice {
@@ -204,7 +204,7 @@ mod tests {
     fn bullish_stop_hunt_detected() {
         // Long liquidation spike ($210k) + price goes up → bullish stop hunt.
         let mut shd = StopHuntDetector::new(100_000.0, 30_000);
-        shd.update_liquidation(&liq(1_000, LiquidationSide::Long, 30_000.0, 7.0));
+        shd.update_liquidation(&liq(1_000, TradeSide::Buy, 30_000.0, 7.0));
         shd.update_mark(&mp(2_000, 29_800.0));
         let signal = shd.update_mark(&mp(3_000, 30_200.0));
         assert_eq!(signal, IndicatorValue::Signal(1), "expected bullish stop hunt");
@@ -214,7 +214,7 @@ mod tests {
     fn bearish_stop_hunt_detected() {
         // Short liquidation spike ($210k) + price goes down → bearish stop hunt.
         let mut shd = StopHuntDetector::new(100_000.0, 30_000);
-        shd.update_liquidation(&liq(1_000, LiquidationSide::Short, 30_000.0, 7.0));
+        shd.update_liquidation(&liq(1_000, TradeSide::Sell, 30_000.0, 7.0));
         shd.update_mark(&mp(2_000, 30_200.0));
         let signal = shd.update_mark(&mp(3_000, 29_800.0));
         assert_eq!(signal, IndicatorValue::Signal(-1), "expected bearish stop hunt");
@@ -224,7 +224,7 @@ mod tests {
     fn below_threshold_no_signal() {
         // Only $10k liq — below $100k threshold.
         let mut shd = StopHuntDetector::new(100_000.0, 30_000);
-        shd.update_liquidation(&liq(1_000, LiquidationSide::Long, 10_000.0, 1.0));
+        shd.update_liquidation(&liq(1_000, TradeSide::Buy, 10_000.0, 1.0));
         shd.update_mark(&mp(2_000, 29_800.0));
         let signal = shd.update_mark(&mp(3_000, 30_200.0));
         assert_eq!(signal, IndicatorValue::Signal(0));
@@ -234,7 +234,7 @@ mod tests {
     fn spike_but_no_reversal_no_signal() {
         // Large long liq but price goes DOWN — not a stop hunt.
         let mut shd = StopHuntDetector::new(100_000.0, 30_000);
-        shd.update_liquidation(&liq(1_000, LiquidationSide::Long, 30_000.0, 7.0));
+        shd.update_liquidation(&liq(1_000, TradeSide::Buy, 30_000.0, 7.0));
         shd.update_mark(&mp(2_000, 30_200.0));
         let signal = shd.update_mark(&mp(3_000, 29_800.0));
         assert_eq!(signal, IndicatorValue::Signal(0));
@@ -245,7 +245,7 @@ mod tests {
         // 5-second window. Liq at t=0, prices at t=20_000 and t=21_000.
         // Liq is outside window → no spike → no signal.
         let mut shd = StopHuntDetector::new(100_000.0, 5_000);
-        shd.update_liquidation(&liq(0, LiquidationSide::Long, 30_000.0, 7.0));
+        shd.update_liquidation(&liq(0, TradeSide::Buy, 30_000.0, 7.0));
         shd.update_mark(&mp(20_000, 29_800.0));
         let signal = shd.update_mark(&mp(21_000, 30_200.0));
         assert_eq!(signal, IndicatorValue::Signal(0), "old liq should be evicted");
@@ -254,7 +254,7 @@ mod tests {
     #[test]
     fn reset_clears_state() {
         let mut shd = StopHuntDetector::new(100_000.0, 30_000);
-        shd.update_liquidation(&liq(1_000, LiquidationSide::Long, 30_000.0, 7.0));
+        shd.update_liquidation(&liq(1_000, TradeSide::Buy, 30_000.0, 7.0));
         shd.update_mark(&mp(2_000, 29_800.0));
         shd.update_mark(&mp(3_000, 30_200.0));
         shd.indicator_reset();
