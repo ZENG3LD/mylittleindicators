@@ -356,6 +356,26 @@ use crate::bar_indicators::ticker_consumer::TickerConsumer;
 use crate::bar_indicators::hybrid_tick_book_consumer::HybridTickBookConsumer;
 use crate::core::types::Liquidation;
 use crate::core::types::Tick;
+
+// New stream event type imports
+use crate::core::types::AggTrade;
+use crate::core::types::AuctionEvent;
+use crate::core::types::Basis;
+use crate::core::types::BlockTrade;
+use crate::core::types::CompositeIndex;
+use crate::core::types::FundingSettlement;
+use crate::core::types::HistoricalVolatility;
+use crate::core::types::IndexPrice;
+use crate::core::types::InsuranceFund;
+use crate::core::types::LongShortRatio;
+use crate::core::types::MarketWarning;
+use crate::core::types::OptionGreeks;
+use crate::core::types::OrderbookL3Event;
+use crate::core::types::PredictedFunding;
+use crate::core::types::RiskLimit;
+use crate::core::types::SettlementEvent;
+use crate::core::types::VolatilityIndex;
+
 use crate::bar_indicators::clusters::{
     market_microstructure::MarketMicrostructure,
     order_book_slope::OrderBookSlope,
@@ -7693,6 +7713,108 @@ impl IndicatorInstance {
             Self::LiquidationCascade(x) => x.update_liquidation(liq),
             _ => self.value(),
         }
+    }
+
+    /// Process a long/short ratio snapshot.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_long_short_ratio(&mut self, _lsr: &LongShortRatio) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process an aggregated trade event.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_agg_trade(&mut self, _t: &AggTrade) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process a composite index snapshot.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_composite_index(&mut self, _ci: &CompositeIndex) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process an index price snapshot.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_index_price(&mut self, _ip: &IndexPrice) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process a historical volatility snapshot.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_historical_volatility(&mut self, _hv: &HistoricalVolatility) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process an insurance fund balance snapshot.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_insurance_fund(&mut self, _ins: &InsuranceFund) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process a futures basis snapshot.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_basis(&mut self, _b: &Basis) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process an option Greeks snapshot.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_option_greeks(&mut self, _g: &OptionGreeks) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process a volatility index snapshot.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_volatility_index(&mut self, _vi: &VolatilityIndex) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process a block trade event.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_block_trade(&mut self, _bt: &BlockTrade) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process an auction event snapshot.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_auction(&mut self, _a: &AuctionEvent) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process a market warning event.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_market_warning(&mut self, _w: &MarketWarning) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process an L3 orderbook event.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_orderbook_l3(&mut self, _l3: &OrderbookL3Event) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process a contract settlement event.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_settlement(&mut self, _s: &SettlementEvent) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process a risk limit tier snapshot.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_risk_limit(&mut self, _r: &RiskLimit) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process a predicted funding rate snapshot.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_predicted_funding(&mut self, _pf: &PredictedFunding) -> IndicatorValue {
+        self.value()
+    }
+
+    /// Process a funding settlement event.
+    /// No concrete indicators yet — returns current value unchanged until Stage C adds them.
+    pub fn update_funding_settlement(&mut self, _fs: &FundingSettlement) -> IndicatorValue {
+        self.value()
     }
 }
 
