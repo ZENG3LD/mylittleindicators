@@ -11,6 +11,10 @@ path = "src/lib.rs"
 name = "mli-collector"
 path = "src/main.rs"
 
+[[bin]]
+name = "mli-collector-smoke"
+path = "src/bin/smoke.rs"
+
 [dependencies]
 mylittleindicators = { path = "../.." }
 digdigdig3 = "=0.2.0"

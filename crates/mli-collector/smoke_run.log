@@ -1,0 +1,76 @@
+[2m2026-05-16T15:06:32.751506Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m mli-collector-smoke: duration=300s storage=./smoke_data
+[2m2026-05-16T15:06:32.751975Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Binance (2 account types)...
+[2m2026-05-16T15:06:32.752475Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Binance: connected
+[2m2026-05-16T15:06:32.752510Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Bybit (2 account types)...
+[2m2026-05-16T15:06:32.752636Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Bybit: connected
+[2m2026-05-16T15:06:32.752655Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting OKX (2 account types)...
+[2m2026-05-16T15:06:32.752758Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   OKX: connected
+[2m2026-05-16T15:06:32.752767Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting KuCoin (2 account types)...
+[2m2026-05-16T15:06:32.752881Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   KuCoin: connected
+[2m2026-05-16T15:06:32.752891Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Bitget (2 account types)...
+[2m2026-05-16T15:06:32.753160Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Bitget: connected
+[2m2026-05-16T15:06:32.753173Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting GateIO (2 account types)...
+[2m2026-05-16T15:06:32.753229Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   GateIO: connected
+[2m2026-05-16T15:06:32.753239Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting HTX (2 account types)...
+[2m2026-05-16T15:06:32.753279Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   HTX: connected
+[2m2026-05-16T15:06:32.753286Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Deribit (1 account types)...
+[2m2026-05-16T15:06:32.753358Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Deribit: connected
+[2m2026-05-16T15:06:32.753368Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting HyperLiquid (1 account types)...
+[2m2026-05-16T15:06:32.753495Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   HyperLiquid: connected
+[2m2026-05-16T15:06:32.753505Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting BingX (2 account types)...
+[2m2026-05-16T15:06:32.753607Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   BingX: connected
+[2m2026-05-16T15:06:32.753614Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Kraken (1 account types)...
+[2m2026-05-16T15:06:32.753637Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Kraken: connected
+[2m2026-05-16T15:06:32.753641Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting MEXC (2 account types)...
+[2m2026-05-16T15:06:32.753700Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   MEXC: connected
+[2m2026-05-16T15:06:32.753707Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Coinbase (1 account types)...
+[2m2026-05-16T15:06:32.753737Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Coinbase: connected
+[2m2026-05-16T15:06:32.753743Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting CryptoCom (1 account types)...
+[2m2026-05-16T15:06:32.753791Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   CryptoCom: connected
+[2m2026-05-16T15:06:32.753796Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Bitfinex (1 account types)...
+[2m2026-05-16T15:06:32.753812Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Bitfinex: connected
+[2m2026-05-16T15:06:32.753817Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Bitstamp (1 account types)...
+[2m2026-05-16T15:06:32.753854Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Bitstamp: connected
+[2m2026-05-16T15:06:32.753858Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Gemini (1 account types)...
+[2m2026-05-16T15:06:32.753875Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Gemini: connected
+[2m2026-05-16T15:06:32.753879Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Upbit (1 account types)...
+[2m2026-05-16T15:06:32.753897Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Upbit: connected
+[2m2026-05-16T15:06:32.753902Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Dydx (1 account types)...
+[2m2026-05-16T15:06:32.753927Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Dydx: connected
+[2m2026-05-16T15:06:32.753931Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Connecting Lighter (1 account types)...
+[2m2026-05-16T15:06:32.753973Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m   Lighter: connected
+[KRAKEN WS] Connecting...
+[KRAKEN WS] Connecting to wss://ws.kraken.com/v2
+[KRAKEN WS] Connection successful, response status: 101
+[2m2026-05-16T15:09:51.141140Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Subscriptions: 289 active, 379 skipped, 173 failed
+[2m2026-05-16T15:10:21.141724Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m [smoke] elapsed=228s  events=2  writes=2  parse_failures=0
+[2m2026-05-16T15:10:47.300837Z[0m [33m WARN[0m [2mmli_collector_smoke[0m[2m:[0m ws error Gemini/Spot: Connection error: WebSocket protocol error: Connection reset without closing handshake
+[2m2026-05-16T15:10:51.142140Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m [smoke] elapsed=258s  events=2  writes=2  parse_failures=0
+[2m2026-05-16T15:11:21.142146Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m [smoke] elapsed=288s  events=2  writes=2  parse_failures=0
+[2m2026-05-16T15:11:51.141901Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m [smoke] elapsed=318s  events=3  writes=3  parse_failures=0
+[2m2026-05-16T15:12:21.142284Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m [smoke] elapsed=348s  events=3  writes=3  parse_failures=0
+[2m2026-05-16T15:12:51.141681Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m [smoke] elapsed=378s  events=3  writes=3  parse_failures=0
+[2m2026-05-16T15:13:21.142322Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m [smoke] elapsed=408s  events=3  writes=3  parse_failures=0
+[2m2026-05-16T15:13:51.142734Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m [smoke] elapsed=438s  events=4  writes=4  parse_failures=0
+[2m2026-05-16T15:14:21.141929Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m [smoke] elapsed=468s  events=4  writes=4  parse_failures=0
+[2m2026-05-16T15:14:51.141698Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m [smoke] elapsed=498s  events=5  writes=5  parse_failures=0
+[2m2026-05-16T15:14:51.141723Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Duration elapsed, shutting down
+
+=== mli-collector smoke summary ===
+Duration: 8m 18s
+Exchanges: 20 connected, 0 failed
+  Connected: binance, bingx, bitfinex, bitget, bitstamp, bybit, coinbase, crypto_com, deribit, dydx, gateio, gemini, htx, hyperliquid, kraken, kucoin, lighter, mexc, okx, upbit
+
+Subscriptions: 289 active, 379 skipped, 173 failed
+
+Events received: 5 total
+  By stream_type:
+    liquidation: 5
+  By exchange:
+    okx: 5
+
+Storage writes: 5 (0 storage write failures)
+Parse failures: 0 (0.00%)
+===================================
+
+[2m2026-05-16T15:14:51.146707Z[0m [32m INFO[0m [2mmli_collector_smoke[0m[2m:[0m Smoke report saved to ./smoke_data\smoke_report.json
