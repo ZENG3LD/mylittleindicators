@@ -138,6 +138,41 @@ impl StreamTypeStr {
             "risklimit" | "risk_limit" => Some(StreamType::RiskLimit),
             "predictedfunding" | "predicted_funding" => Some(StreamType::PredictedFunding),
             "fundingsettlement" | "funding_settlement" => Some(StreamType::FundingSettlement),
+            // Kline variants — require interval suffix, e.g. "kline:1m", "kline:5m".
+            // Plain "kline" defaults to "1m".
+            s if s == "kline" => Some(StreamType::Kline { interval: "1m".into() }),
+            s if s.starts_with("kline:") => {
+                let interval = s.trim_start_matches("kline:").to_string();
+                Some(StreamType::Kline { interval })
+            }
+            s if s.starts_with("kline_") => {
+                let interval = s.trim_start_matches("kline_").to_string();
+                Some(StreamType::Kline { interval })
+            }
+            // Mark price kline, e.g. "markpricekline:1m".
+            s if s == "markpricekline" || s == "mark_price_kline" => {
+                Some(StreamType::MarkPriceKline { interval: "1m".into() })
+            }
+            s if s.starts_with("markpricekline:") || s.starts_with("mark_price_kline:") => {
+                let interval = s.splitn(2, ':').nth(1).unwrap_or("1m").to_string();
+                Some(StreamType::MarkPriceKline { interval })
+            }
+            // Index price kline, e.g. "indexpricekline:1m".
+            s if s == "indexpricekline" || s == "index_price_kline" => {
+                Some(StreamType::IndexPriceKline { interval: "1m".into() })
+            }
+            s if s.starts_with("indexpricekline:") || s.starts_with("index_price_kline:") => {
+                let interval = s.splitn(2, ':').nth(1).unwrap_or("1m").to_string();
+                Some(StreamType::IndexPriceKline { interval })
+            }
+            // Premium index kline, e.g. "premiumindexkline:1m".
+            s if s == "premiumindexkline" || s == "premium_index_kline" => {
+                Some(StreamType::PremiumIndexKline { interval: "1m".into() })
+            }
+            s if s.starts_with("premiumindexkline:") || s.starts_with("premium_index_kline:") => {
+                let interval = s.splitn(2, ':').nth(1).unwrap_or("1m").to_string();
+                Some(StreamType::PremiumIndexKline { interval })
+            }
             _ => None,
         }
     }
