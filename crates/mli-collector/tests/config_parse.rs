@@ -16,27 +16,52 @@ fn tempdir(tag: &str) -> std::path::PathBuf {
 }
 
 #[test]
-fn config_from_toml() {
+fn config_from_toml_multi_exchange() {
     let toml = r#"
 storage_dir = "/tmp/collector_data"
-exchange = "binance"
-symbols = ["BTCUSDT", "ETHUSDT"]
 
-[[streams]]
-kind = "Funding"
+[[exchanges]]
+id = "binance"
+account_types = ["FuturesCross"]
 
-[[streams]]
-kind = "OpenInterest"
-symbols = ["BTCUSDT"]
+[[exchanges.subscriptions]]
+symbol = "BTCUSDT"
+account_type = "FuturesCross"
+stream_type = "FundingRate"
+
+[[exchanges.subscriptions]]
+symbol = "BTCUSDT"
+account_type = "FuturesCross"
+stream_type = "Liquidation"
+
+[[exchanges]]
+id = "bybit"
+account_types = ["FuturesCross"]
+
+[[exchanges.subscriptions]]
+symbol = "BTCUSDT"
+account_type = "FuturesCross"
+stream_type = "Liquidation"
 "#;
     let config: CollectorConfig = toml::from_str(toml).expect("toml parse failed");
-    assert_eq!(config.exchange, "binance");
-    assert_eq!(config.symbols.len(), 2);
-    assert_eq!(config.streams.len(), 2);
-    assert_eq!(config.streams[0].kind, StreamKind::Funding);
-    assert!(config.streams[0].symbols.is_empty());
-    assert_eq!(config.streams[1].kind, StreamKind::OpenInterest);
-    assert_eq!(config.streams[1].symbols, vec!["BTCUSDT"]);
+    assert_eq!(config.exchanges.len(), 2);
+
+    let binance = &config.exchanges[0];
+    assert_eq!(binance.id.0, "binance");
+    assert_eq!(binance.account_types.len(), 1);
+    assert_eq!(binance.subscriptions.len(), 2);
+    assert_eq!(binance.subscriptions[0].symbol, "BTCUSDT");
+    assert_eq!(binance.subscriptions[0].stream_type.0.to_lowercase(), "fundingrate");
+
+    let bybit = &config.exchanges[1];
+    assert_eq!(bybit.id.0, "bybit");
+    assert_eq!(bybit.subscriptions.len(), 1);
+
+    // Parse helpers
+    use digdigdig3::{AccountType, ExchangeId};
+    assert_eq!(binance.exchange_id(), Some(ExchangeId::Binance));
+    assert_eq!(binance.parsed_account_types(), vec![AccountType::FuturesCross]);
+    assert_eq!(bybit.exchange_id(), Some(ExchangeId::Bybit));
 }
 
 #[test]

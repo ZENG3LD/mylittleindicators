@@ -1,8 +1,11 @@
 //! Per-stream data source selector.
 
-use super::StreamKind;
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+use digdigdig3::{AccountType, ExchangeId};
+
+use super::StreamKind;
 
 /// Where to load each stream from.
 #[derive(Debug, Clone)]
@@ -24,15 +27,18 @@ pub enum DataSource {
     /// pre-existing test data or one-off imports.
     Json { storage_root: PathBuf },
 
-    /// Direct REST fetch from exchange (no local storage).
+    /// Direct REST fetch from exchange via `ExchangeHub`.
     ///
     /// Supported for streams where public REST history is available
-    /// (klines, funding history, OI history, liquidations <7d, aggTrades).
+    /// (klines, funding history, OI history, liquidations, long/short ratio).
     ///
     /// Requires a `RestFetcher` implementor passed via
     /// `EnrichedDataLoader::with_rest_fetcher(...)`.
     /// Without one, loading returns `ErrorKind::Unsupported`.
-    Rest { exchange: String },
+    Rest {
+        exchange: ExchangeId,
+        account_type: AccountType,
+    },
 
     /// Per-stream source selection.
     ///
@@ -50,6 +56,7 @@ pub enum DataSource {
 mod tests {
     use super::DataSource;
     use crate::data_loader::StreamKind;
+    use digdigdig3::{AccountType, ExchangeId};
     use std::collections::HashMap;
     use std::path::PathBuf;
 
@@ -80,12 +87,16 @@ mod tests {
     }
 
     #[test]
-    fn rest_variant_stores_exchange() {
+    fn rest_variant_stores_exchange_and_account_type() {
         let ds = DataSource::Rest {
-            exchange: "binance".into(),
+            exchange: ExchangeId::Binance,
+            account_type: AccountType::FuturesCross,
         };
         match ds {
-            DataSource::Rest { exchange } => assert_eq!(exchange, "binance"),
+            DataSource::Rest { exchange, account_type } => {
+                assert_eq!(exchange, ExchangeId::Binance);
+                assert_eq!(account_type, AccountType::FuturesCross);
+            }
             _ => panic!("expected Rest"),
         }
     }

@@ -11,10 +11,11 @@ mod writer;
 use std::sync::Arc;
 
 use config::CollectorConfig;
+use digdigdig3::connector_manager::ExchangeHub;
 use subscriber::Subscriber;
 use writer::EventWriter;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
@@ -27,16 +28,11 @@ async fn main() -> anyhow::Result<()> {
         toml::from_str(&s)?
     };
 
-    tracing::info!(
-        "Loaded config from {}: {} symbols, {} streams, exchange={}",
-        config_path,
-        config.symbols.len(),
-        config.streams.len(),
-        config.exchange,
-    );
+    tracing::info!("Loaded config from {}: {} exchange(s)", config_path, config.exchanges.len());
 
+    let hub = Arc::new(ExchangeHub::new());
     let writer = Arc::new(EventWriter::new(config.storage_dir.clone()));
-    let subscriber = Subscriber::new(Arc::clone(&writer));
+    let subscriber = Subscriber::new(Arc::clone(&hub), Arc::clone(&writer));
 
     let config_clone = config.clone();
     let handle = tokio::spawn(async move {
@@ -47,6 +43,14 @@ async fn main() -> anyhow::Result<()> {
 
     tokio::signal::ctrl_c().await?;
     tracing::info!("Shutdown signal received");
+
+    // Disconnect all exchanges gracefully.
+    for ex_cfg in &config.exchanges {
+        if let Some(id) = ex_cfg.exchange_id() {
+            hub.shutdown(id);
+        }
+    }
+
     handle.abort();
     Ok(())
 }

@@ -30,7 +30,7 @@ impl EnrichedDataLoader {
     ///
     /// `bars` must be provided by the caller (e.g. loaded via REST beforehand).
     /// Additional `streams` are loaded from the configured `DataSource`.
-    pub fn load(
+    pub async fn load(
         &self,
         symbol: &str,
         bars: Vec<Bar>,
@@ -52,7 +52,7 @@ impl EnrichedDataLoader {
                 continue;
             }
             let mut stream_events =
-                self.load_stream_events(&self.source, symbol, kind, from_ts, to_ts)?;
+                self.load_stream_events(&self.source, symbol, kind, from_ts, to_ts).await?;
             events.append(&mut stream_events);
         }
 
@@ -62,7 +62,7 @@ impl EnrichedDataLoader {
         Ok(EnrichedHistory::new(bars, events))
     }
 
-    fn load_stream_events(
+    async fn load_stream_events(
         &self,
         source: &DataSource,
         symbol: &str,
@@ -77,10 +77,11 @@ impl EnrichedDataLoader {
             DataSource::Json { storage_root } => {
                 self.read_json(storage_root, symbol, kind, from_ts, to_ts)
             }
-            DataSource::Rest { exchange: _ } => {
+            DataSource::Rest { exchange, account_type } => {
                 if let Some(fetcher) = &self.rest_fetcher {
                     fetcher
-                        .fetch(symbol, kind, from_ts, to_ts)
+                        .fetch(*exchange, *account_type, symbol, kind, from_ts, to_ts)
+                        .await
                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
                 } else {
                     Err(std::io::Error::new(
@@ -91,7 +92,7 @@ impl EnrichedDataLoader {
             }
             DataSource::Mixed { per_stream } => {
                 if let Some(sub) = per_stream.get(&kind) {
-                    self.load_stream_events(sub, symbol, kind, from_ts, to_ts)
+                    Box::pin(self.load_stream_events(sub, symbol, kind, from_ts, to_ts)).await
                 } else {
                     Err(std::io::Error::new(
                         std::io::ErrorKind::NotFound,
@@ -132,6 +133,8 @@ mod tests {
     use super::{EnrichedDataLoader, RestFetcher};
     use crate::core::types::{Bar, FundingRate, OpenInterest};
     use crate::data_loader::{DataSource, StorageRoot, StreamKind, TimedEvent};
+    use async_trait::async_trait;
+    use digdigdig3::{AccountType, ExchangeId};
     use std::collections::HashMap;
     use std::path::PathBuf;
     use std::sync::Arc;
@@ -167,20 +170,20 @@ mod tests {
 
     // ---- Binary (formerly Local) ----
 
-    #[test]
-    fn binary_bars_only_load() {
+    #[tokio::test]
+    async fn binary_bars_only_load() {
         let dir = tempdir("binary_bars_only");
         let loader = EnrichedDataLoader::new(DataSource::Binary {
             storage_root: dir.clone(),
         });
         let bars: Vec<Bar> = (0..5).map(|i| make_bar(i * 1_000)).collect();
-        let history = loader.load("BTCUSDT", bars, &[]).unwrap();
+        let history = loader.load("BTCUSDT", bars, &[]).await.unwrap();
         assert_eq!(history.bar_count(), 5);
         assert_eq!(history.event_count(), 5);
     }
 
-    #[test]
-    fn binary_multi_stream_sorted_order() {
+    #[tokio::test]
+    async fn binary_multi_stream_sorted_order() {
         let dir = tempdir("binary_multi_stream");
         let storage = StorageRoot::new(&dir);
 
@@ -195,6 +198,7 @@ mod tests {
         let bars: Vec<Bar> = (0..5).map(|i| make_bar(i * 2_000)).collect();
         let history = loader
             .load("BTCUSDT", bars, &[StreamKind::Funding])
+            .await
             .unwrap();
 
         assert_eq!(history.bar_count(), 5);
@@ -208,8 +212,8 @@ mod tests {
 
     // ---- Json ----
 
-    #[test]
-    fn json_read_filters_by_timestamp() {
+    #[tokio::test]
+    async fn json_read_filters_by_timestamp() {
         let dir = tempdir("json_filter");
         let symbol_dir = dir.join("BTCUSDT");
         std::fs::create_dir_all(&symbol_dir).unwrap();
@@ -228,6 +232,7 @@ mod tests {
         let bars: Vec<Bar> = vec![make_bar(2000), make_bar(4000)];
         let history = loader
             .load("BTCUSDT", bars, &[StreamKind::Funding])
+            .await
             .unwrap();
 
         // from_ts=2000, to_ts=4000 → events at 2000, 3000, 4000 pass filter.
@@ -239,8 +244,8 @@ mod tests {
         assert_eq!(funding_count, 3, "expected 3 funding events in [2000,4000]");
     }
 
-    #[test]
-    fn json_missing_file_returns_empty() {
+    #[tokio::test]
+    async fn json_missing_file_returns_empty() {
         let dir = tempdir("json_missing");
         let loader = EnrichedDataLoader::new(DataSource::Json {
             storage_root: dir.clone(),
@@ -248,6 +253,7 @@ mod tests {
         let bars = vec![make_bar(1000)];
         let history = loader
             .load("BTCUSDT", bars, &[StreamKind::Funding])
+            .await
             .unwrap();
         // Only the bar event, no funding.
         assert_eq!(history.event_count(), 1);
@@ -255,14 +261,16 @@ mod tests {
 
     // ---- Rest without fetcher ----
 
-    #[test]
-    fn rest_without_fetcher_returns_unsupported() {
+    #[tokio::test]
+    async fn rest_without_fetcher_returns_unsupported() {
         let loader = EnrichedDataLoader::new(DataSource::Rest {
-            exchange: "binance".into(),
+            exchange: ExchangeId::Binance,
+            account_type: AccountType::FuturesCross,
         });
         let bars = vec![make_bar(1000)];
         let err = loader
             .load("BTCUSDT", bars, &[StreamKind::Funding])
+            .await
             .unwrap_err();
         assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
     }
@@ -271,9 +279,12 @@ mod tests {
 
     struct StaticFetcher(Vec<TimedEvent>);
 
+    #[async_trait]
     impl RestFetcher for StaticFetcher {
-        fn fetch(
+        async fn fetch(
             &self,
+            _exchange: ExchangeId,
+            _account_type: AccountType,
             _symbol: &str,
             _kind: StreamKind,
             from_ts: i64,
@@ -291,20 +302,22 @@ mod tests {
         }
     }
 
-    #[test]
-    fn rest_with_fetcher_returns_events() {
+    #[tokio::test]
+    async fn rest_with_fetcher_returns_events() {
         let fetcher_events: Vec<TimedEvent> =
             [500i64, 1500, 2500].iter().map(|&ts| make_funding_event(ts)).collect();
         let fetcher = Arc::new(StaticFetcher(fetcher_events));
 
         let loader = EnrichedDataLoader::new(DataSource::Rest {
-            exchange: "binance".into(),
+            exchange: ExchangeId::Binance,
+            account_type: AccountType::FuturesCross,
         })
         .with_rest_fetcher(fetcher);
 
         let bars = vec![make_bar(1000), make_bar(2000)];
         let history = loader
             .load("BTCUSDT", bars, &[StreamKind::Funding])
+            .await
             .unwrap();
 
         // from_ts=1000, to_ts=2000 → fetcher returns 1500, 2500 filtered to 1500.
@@ -318,8 +331,8 @@ mod tests {
 
     // ---- Mixed ----
 
-    #[test]
-    fn mixed_per_stream_routing() {
+    #[tokio::test]
+    async fn mixed_per_stream_routing() {
         // Binary for Funding, Json for OpenInterest.
         let binary_dir = tempdir("mixed_binary");
         let json_dir = tempdir("mixed_json");
@@ -351,6 +364,7 @@ mod tests {
         let bars = vec![make_bar(1000), make_bar(2000), make_bar(3000)];
         let history = loader
             .load("BTCUSDT", bars, &[StreamKind::Funding, StreamKind::OpenInterest])
+            .await
             .unwrap();
 
         let funding_count = history
@@ -368,13 +382,14 @@ mod tests {
         assert_eq!(oi_count, 2);
     }
 
-    #[test]
-    fn mixed_missing_stream_returns_not_found() {
+    #[tokio::test]
+    async fn mixed_missing_stream_returns_not_found() {
         let per_stream: HashMap<StreamKind, Box<DataSource>> = HashMap::new();
         let loader = EnrichedDataLoader::new(DataSource::Mixed { per_stream });
         let bars = vec![make_bar(1000)];
         let err = loader
             .load("BTCUSDT", bars, &[StreamKind::Funding])
+            .await
             .unwrap_err();
         assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
     }

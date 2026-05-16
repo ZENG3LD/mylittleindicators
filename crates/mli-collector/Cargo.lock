@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "digdigdig3"
-version = "0.1.32"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -1094,6 +1094,7 @@ name = "mylittleindicators"
 version = "0.1.0"
 dependencies = [
  "arrayvec",
+ "async-trait",
  "digdigdig3",
  "once_cell",
  "proc-macro2",

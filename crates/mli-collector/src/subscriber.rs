@@ -1,94 +1,186 @@
-//! WebSocket subscriber backed by digdigdig3.
+//! WS subscriber using digdigdig3 `ExchangeHub`.
 //!
-//! Creates a `BinanceWebSocket`, subscribes to all configured streams, then
-//! drives an event loop that converts `StreamEvent` → `TimedEvent` and writes
-//! each event to `EventWriter`.
+//! For each exchange in the config:
+//! 1. `hub.connect_full(id, account_types, false)` — wires REST + WS.
+//! 2. For each subscription, `hub.ws(id, account_type)` → `ws.subscribe(req)`.
+//! 3. All WS event streams are merged via `futures_util::stream::select_all`.
+//! 4. Events are converted to `TimedEvent` and written via `EventWriter`.
 //!
 //! # Stream mapping
 //!
-//! | `StreamKind`       | dig3 `StreamType`        | Notes                         |
-//! |--------------------|--------------------------|-------------------------------|
-//! | Tick               | Trade                    | needs `dig3_trade_to_mli_tick` |
-//! | OrderBook          | Orderbook                |                               |
-//! | OrderbookDelta     | OrderbookDelta           |                               |
-//! | Funding            | FundingRate              |                               |
-//! | MarkPrice          | MarkPrice                |                               |
-//! | OpenInterest       | OpenInterest             |                               |
-//! | Liquidation        | Liquidation              |                               |
-//! | Ticker             | Ticker                   |                               |
-//! | AggTrade           | AggTrade                 |                               |
-//! | LongShortRatio     | LongShortRatio           |                               |
-//! | Bar                | —                        | REST-only; not mapped here    |
-//! | *rest*             | —                        | no dig3 WS source             |
+//! | `StreamType` (dig3)      | `TimedEvent` (mli)        |
+//! |--------------------------|---------------------------|
+//! | Trade                    | Tick                      |
+//! | OrderbookSnapshot        | OrderBook                 |
+//! | OrderbookDelta           | OrderbookDelta            |
+//! | FundingRate              | Funding                   |
+//! | MarkPrice                | MarkPrice                 |
+//! | OpenInterestUpdate       | OpenInterest              |
+//! | Liquidation              | Liquidation               |
+//! | Ticker                   | Ticker                    |
+//! | AggTrade                 | AggTrade                  |
+//! | LongShortRatio           | LongShortRatio            |
+//! | CompositeIndex           | CompositeIndex            |
+//! | IndexPrice               | IndexPrice                |
+//! | HistoricalVolatility     | HistoricalVolatility      |
+//! | InsuranceFund            | InsuranceFund             |
+//! | Basis                    | Basis                     |
+//! | VolatilityIndex          | VolatilityIndex           |
+//! | BlockTrade               | BlockTrade                |
+//! | AuctionEvent             | Auction                   |
+//! | MarketWarning            | MarketWarning             |
+//! | OrderbookL3              | OrderbookL3               |
+//! | SettlementEvent          | Settlement                |
+//! | RiskLimit                | RiskLimit                 |
+//! | PredictedFunding         | PredictedFunding          |
+//! | FundingSettlement        | FundingSettlement         |
+//! | OptionGreeks             | OptionGreeks              |
+//! | Kline                    | Bar                       |
+//! | MarkPriceKline etc.      | (dropped)                 |
+//! | private events           | (dropped)                 |
 
 use std::sync::Arc;
 
-use futures_util::StreamExt;
-
+use anyhow::Result;
 use digdigdig3::{
-    AccountType,
-    StreamEvent, StreamType, SubscriptionRequest, Symbol,
-    WebSocketConnector,
+    AccountType, StreamEvent, Symbol, SubscriptionRequest,
+    connector_manager::ExchangeHub,
+    core::types::TradeSide,
 };
-use digdigdig3::l3::open::crypto::cex::binance::BinanceWebSocket;
-
+use futures_util::{stream::SelectAll, StreamExt};
 use mylittleindicators::{
-    core::types::{Tick, TradeSide},
+    core::types::Tick,
     data_loader::TimedEvent,
 };
 
-use crate::config::{CollectorConfig, StreamConfig};
+use crate::config::CollectorConfig;
 use crate::writer::EventWriter;
-use mylittleindicators::data_loader::StreamKind;
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// STREAM KIND → STREAM TYPE MAPPING
-// ═══════════════════════════════════════════════════════════════════════════════
+/// Subscriber wires live WS stream data into binary storage via `ExchangeHub`.
+pub struct Subscriber {
+    hub: Arc<ExchangeHub>,
+    writer: Arc<EventWriter>,
+}
 
-/// Map a collector `StreamKind` to the dig3 `StreamType` used for WS subscription.
-///
-/// Returns `None` when the stream kind has no WS analogue (e.g. `Bar` is REST-only).
-fn mli_to_dig3_stream(kind: StreamKind) -> Option<StreamType> {
-    match kind {
-        StreamKind::Bar => None, // REST-only (klines)
-        StreamKind::Tick => Some(StreamType::Trade),
-        StreamKind::OrderBook => Some(StreamType::Orderbook),
-        StreamKind::OrderbookDelta => Some(StreamType::OrderbookDelta),
-        StreamKind::Funding => Some(StreamType::FundingRate),
-        StreamKind::MarkPrice => Some(StreamType::MarkPrice),
-        StreamKind::OpenInterest => Some(StreamType::OpenInterest),
-        StreamKind::Liquidation => Some(StreamType::Liquidation),
-        StreamKind::Ticker => Some(StreamType::Ticker),
-        StreamKind::AggTrade => Some(StreamType::AggTrade),
-        StreamKind::LongShortRatio => Some(StreamType::LongShortRatio),
-        // No dig3 WS sources for the following:
-        StreamKind::OptionGreeks => Some(StreamType::OptionGreeks),
-        StreamKind::VolatilityIndex => Some(StreamType::VolatilityIndex),
-        StreamKind::HistoricalVolatility => Some(StreamType::HistoricalVolatility),
-        StreamKind::Basis => Some(StreamType::Basis),
-        StreamKind::IndexPrice => Some(StreamType::IndexPrice),
-        StreamKind::CompositeIndex => Some(StreamType::CompositeIndex),
-        StreamKind::InsuranceFund => Some(StreamType::InsuranceFund),
-        StreamKind::Settlement => Some(StreamType::SettlementEvent),
-        StreamKind::BlockTrade => Some(StreamType::BlockTrade),
-        StreamKind::OrderbookL3 => Some(StreamType::OrderbookL3),
-        StreamKind::RiskLimit => Some(StreamType::RiskLimit),
-        StreamKind::PredictedFunding => Some(StreamType::PredictedFunding),
-        StreamKind::FundingSettlement => Some(StreamType::FundingSettlement),
-        StreamKind::Auction => Some(StreamType::AuctionEvent),
-        StreamKind::MarketWarning => Some(StreamType::MarketWarning),
+impl Subscriber {
+    pub fn new(hub: Arc<ExchangeHub>, writer: Arc<EventWriter>) -> Self {
+        Self { hub, writer }
+    }
+
+    /// Connect all exchanges and start the event loop.
+    ///
+    /// Merges event streams from all subscribed WS connectors using
+    /// `futures_util::stream::select_all` and drives the loop until aborted.
+    pub async fn start(&self, config: &CollectorConfig) -> Result<()> {
+        // ── Phase 1: connect + subscribe ─────────────────────────────────────
+        for ex_cfg in &config.exchanges {
+            let Some(id) = ex_cfg.exchange_id() else {
+                tracing::warn!("Unknown exchange id {:?}, skipping", ex_cfg.id.0);
+                continue;
+            };
+
+            let account_types: Vec<AccountType> = ex_cfg.parsed_account_types();
+            if account_types.is_empty() {
+                tracing::warn!("Exchange {:?}: no valid account_types, skipping", id);
+                continue;
+            }
+
+            // Connect REST + WS (WS failures are best-effort in connect_full).
+            if let Err(e) = self.hub.connect_full(id, &account_types, false).await {
+                tracing::error!("connect_full {:?} failed: {e}", id);
+                continue;
+            }
+
+            // Subscribe each (symbol, account_type, stream_type) triple.
+            for sub in &ex_cfg.subscriptions {
+                let Some(account_type) = sub.parsed_account_type() else {
+                    tracing::warn!("Unknown account_type {:?} in subscription, skipping", sub.account_type.0);
+                    continue;
+                };
+                let Some(stream_type) = sub.parsed_stream_type() else {
+                    tracing::warn!("Unknown stream_type {:?} in subscription, skipping", sub.stream_type.0);
+                    continue;
+                };
+
+                let ws = match self.hub.ws(id, account_type) {
+                    Some(ws) => ws,
+                    None => {
+                        tracing::warn!(
+                            "{:?}/{:?}: no WS connector available (exchange may not support this account_type)",
+                            id, account_type,
+                        );
+                        continue;
+                    }
+                };
+
+                // Connect the WS if not yet connected.
+                if let Err(e) = ws.connect(account_type).await {
+                    tracing::warn!("{:?}/{:?} ws.connect failed: {e}", id, account_type);
+                    continue;
+                }
+
+                let symbol = Symbol::with_raw("", "", sub.symbol.clone());
+                let req = SubscriptionRequest {
+                    symbol,
+                    stream_type,
+                    account_type,
+                    depth: None,
+                    update_speed_ms: None,
+                };
+
+                if let Err(e) = ws.subscribe(req).await {
+                    tracing::warn!("{:?}/{:?}/{}: subscribe failed: {e}", id, account_type, sub.symbol);
+                }
+            }
+        }
+
+        // ── Phase 2: collect event streams ───────────────────────────────────
+        let mut streams: SelectAll<
+            std::pin::Pin<Box<dyn futures_util::Stream<Item = digdigdig3::core::types::WebSocketResult<StreamEvent>> + Send>>,
+        > = SelectAll::new();
+
+        for ex_cfg in &config.exchanges {
+            let Some(id) = ex_cfg.exchange_id() else { continue; };
+            for at in ex_cfg.parsed_account_types() {
+                if let Some(ws) = self.hub.ws(id, at) {
+                    streams.push(ws.event_stream());
+                }
+            }
+        }
+
+        if streams.is_empty() {
+            tracing::warn!("No WS event streams available; subscriber idle");
+            return Ok(());
+        }
+
+        tracing::info!("mli-collector: event loop started ({} WS streams)", streams.len());
+
+        // ── Phase 3: event loop ───────────────────────────────────────────────
+        while let Some(result) = streams.next().await {
+            match result {
+                Ok(event) => {
+                    if let Some((symbol, timed)) = stream_event_to_timed(event) {
+                        if let Err(e) = self.writer.write(&symbol, &timed) {
+                            tracing::warn!("write error for {symbol}: {e}");
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("WS error: {e}");
+                }
+            }
+        }
+
+        tracing::warn!("All WS event streams ended");
+        Ok(())
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// STREAM EVENT → TIMED EVENT CONVERSION
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// StreamEvent → TimedEvent conversion
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// Convert a dig3 `PublicTrade` to a mli `Tick`.
-///
-/// `Tick` is mli-specific (lightweight, copy-friendly).  `PublicTrade` is the
-/// dig3 canonical trade type.  Fields map 1:1 except `is_buy` which is derived
-/// from `TradeSide`.
 fn dig3_trade_to_mli_tick(t: digdigdig3::core::types::PublicTrade) -> Tick {
     Tick {
         time: t.timestamp,
@@ -113,12 +205,10 @@ fn stream_event_to_timed(ev: StreamEvent) -> Option<(String, TimedEvent)> {
 
         // ── orderbook snapshot ────────────────────────────────────────────────
         StreamEvent::OrderbookSnapshot(b) => {
-            // OrderBook is re-exported from dig3 in mli, so types are identical.
+            // OrderBook has no symbol field; symbol context comes from subscription.
+            // Use empty string — writer will filter via StorageRoot which uses symbol
+            // directory paths (empty string → root, harmless).
             Some(("".to_string(), TimedEvent::OrderBook(b)))
-            // symbol embedded in OrderBook? It has no symbol field — we rely on
-            // the subscription to associate symbol. Use empty string and caller
-            // must provide context. For now the event loop patches the symbol
-            // from subscription metadata (see note in event loop).
         }
 
         StreamEvent::OrderbookDelta(d) => {
@@ -131,9 +221,8 @@ fn stream_event_to_timed(ev: StreamEvent) -> Option<(String, TimedEvent)> {
             Some((symbol, TimedEvent::Ticker(t)))
         }
 
-        // ── kline ─────────────────────────────────────────────────────────────
+        // ── kline → Bar ───────────────────────────────────────────────────────
         StreamEvent::Kline(k) => {
-            // Map Kline → Bar using close_time as time (or open_time if no close).
             use mylittleindicators::core::types::Bar;
             let time = k.close_time.unwrap_or(k.open_time);
             let bar = Bar::new(time, k.open, k.high, k.low, k.close, k.volume);
@@ -249,7 +338,6 @@ fn stream_event_to_timed(ev: StreamEvent) -> Option<(String, TimedEvent)> {
         // ── auction event ─────────────────────────────────────────────────────
         StreamEvent::AuctionEvent { symbol, auction_id, indicative_price, indicative_qty, state, timestamp } => {
             use digdigdig3::core::types::AuctionEvent;
-            // AuctionEvent struct has f64 (required); StreamEvent has Option<f64>; default 0.0 when absent.
             let ae = AuctionEvent {
                 auction_id,
                 indicative_price: indicative_price.unwrap_or(0.0),
@@ -275,7 +363,15 @@ fn stream_event_to_timed(ev: StreamEvent) -> Option<(String, TimedEvent)> {
         }
 
         // ── risk limit ────────────────────────────────────────────────────────
-        StreamEvent::RiskLimit { symbol, tier, max_leverage, max_position_value, maintenance_margin_rate, initial_margin_rate, timestamp } => {
+        StreamEvent::RiskLimit {
+            symbol,
+            tier,
+            max_leverage,
+            max_position_value,
+            maintenance_margin_rate,
+            initial_margin_rate,
+            timestamp,
+        } => {
             use digdigdig3::core::types::RiskLimit;
             let rl = RiskLimit {
                 tier,
@@ -303,9 +399,19 @@ fn stream_event_to_timed(ev: StreamEvent) -> Option<(String, TimedEvent)> {
         }
 
         // ── option greeks ─────────────────────────────────────────────────────
-        StreamEvent::OptionGreeks { symbol, delta, gamma, vega, theta, rho, mark_iv, bid_iv, ask_iv, timestamp } => {
+        StreamEvent::OptionGreeks {
+            symbol,
+            delta,
+            gamma,
+            vega,
+            theta,
+            rho,
+            mark_iv,
+            bid_iv,
+            ask_iv,
+            timestamp,
+        } => {
             use digdigdig3::core::types::OptionGreeks;
-            // OptionGreeks struct has required f64 fields; StreamEvent has Option<f64>; default 0.0 when absent.
             let og = OptionGreeks {
                 delta: delta.unwrap_or(0.0),
                 gamma: gamma.unwrap_or(0.0),
@@ -322,8 +428,8 @@ fn stream_event_to_timed(ev: StreamEvent) -> Option<(String, TimedEvent)> {
 
         // ── orderbook L3 ──────────────────────────────────────────────────────
         StreamEvent::OrderbookL3 { symbol, side, order_id, price, quantity, action, timestamp } => {
-            use digdigdig3::core::types::{OrderbookL3Event, L3Action, OrderBookSide};
-            let l3_side = if side == digdigdig3::core::types::OrderSide::Buy {
+            use digdigdig3::core::types::{L3Action, OrderBookSide, OrderSide, OrderbookL3Event};
+            let l3_side = if side == OrderSide::Buy {
                 OrderBookSide::Bid
             } else {
                 OrderBookSide::Ask
@@ -337,172 +443,27 @@ fn stream_event_to_timed(ev: StreamEvent) -> Option<(String, TimedEvent)> {
             Some((symbol, TimedEvent::OrderbookL3(ev)))
         }
 
-        // ── mark price kline / index price kline / premium index kline ────────
+        // ── mark/index/premium price klines — no mli analogue ─────────────────
         StreamEvent::MarkPriceKline { .. }
         | StreamEvent::IndexPriceKline { .. }
         | StreamEvent::PremiumIndexKline { .. } => None,
 
-        // ── private events ────────────────────────────────────────────────────
+        // ── private events ─────────────────────────────────────────────────────
         StreamEvent::OrderUpdate(_)
         | StreamEvent::BalanceUpdate(_)
         | StreamEvent::PositionUpdate(_) => None,
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SUBSCRIBER
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Subscriber wires live WS stream data into the binary storage.
-pub struct Subscriber {
-    pub writer: Arc<EventWriter>,
-}
-
-impl Subscriber {
-    pub fn new(writer: Arc<EventWriter>) -> Self {
-        Self { writer }
-    }
-
-    /// Start subscribing to all configured streams and write events.
-    ///
-    /// Creates a `BinanceWebSocket`, subscribes to all `(symbol, stream_kind)` pairs
-    /// from `config`, then drives the event loop until the task is aborted.
-    pub async fn start(&self, config: &CollectorConfig) -> anyhow::Result<()> {
-        let account_type = AccountType::FuturesCross;
-
-        let mut ws = BinanceWebSocket::new(None, false, account_type).await?;
-        ws.connect(account_type).await?;
-
-        // Build list of (symbol, StreamType) subscriptions.
-        let mut subscriptions: Vec<(String, StreamType)> = Vec::new();
-        for stream_cfg in &config.streams {
-            let Some(dig3_type) = mli_to_dig3_stream(stream_cfg.kind) else {
-                tracing::warn!(
-                    "StreamKind::{:?} has no WS analogue — skipping",
-                    stream_cfg.kind
-                );
-                continue;
-            };
-            let symbols = effective_symbols(stream_cfg, config);
-            for symbol in symbols {
-                subscriptions.push((symbol.to_string(), dig3_type.clone()));
-            }
-        }
-
-        if subscriptions.is_empty() {
-            tracing::warn!("No WS-mappable streams configured; subscriber idle");
-            return Ok(());
-        }
-
-        // Subscribe each (symbol, type) pair.
-        for (sym, stream_type) in &subscriptions {
-            // Symbol::parse handles "BTC-USDT" / "BTC_USDT" formats.
-            // For raw exchange symbols like "BTCUSDT" we use with_raw with empty base/quote
-            // so the connector receives the raw string intact.
-            let symbol = Symbol::with_raw("", "", sym.clone());
-            let req = SubscriptionRequest::new(symbol, stream_type.clone());
-            if let Err(e) = ws.subscribe(req).await {
-                tracing::warn!("subscribe {sym}/{stream_type:?} failed: {e}");
-            }
-        }
-
-        tracing::info!(
-            "mli-collector: {} subscriptions active on {}",
-            subscriptions.len(),
-            config.exchange,
-        );
-
-        let mut stream = ws.event_stream();
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(event) => {
-                    if let Some((symbol, timed)) = stream_event_to_timed(event) {
-                        if let Err(e) = self.writer.write(&symbol, &timed) {
-                            tracing::warn!("write error for {symbol}: {e}");
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!("WS error: {e}");
-                }
-            }
-        }
-
-        tracing::warn!("WS event stream ended");
-        Ok(())
-    }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-
-/// Returns the effective symbol list for a stream config:
-/// stream-level override if non-empty, else top-level symbols.
-fn effective_symbols<'a>(stream: &'a StreamConfig, config: &'a CollectorConfig) -> &'a [String] {
-    if stream.symbols.is_empty() {
-        &config.symbols
-    } else {
-        &stream.symbols
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TESTS
-// ═══════════════════════════════════════════════════════════════════════════════
+// Tests
+// ─────────────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use digdigdig3::core::types::PublicTrade;
-
-    // ── StreamKind → StreamType mapping ──────────────────────────────────────
-
-    #[test]
-    fn tick_maps_to_trade() {
-        assert_eq!(mli_to_dig3_stream(StreamKind::Tick), Some(StreamType::Trade));
-    }
-
-    #[test]
-    fn orderbook_maps_correctly() {
-        assert_eq!(mli_to_dig3_stream(StreamKind::OrderBook), Some(StreamType::Orderbook));
-        assert_eq!(mli_to_dig3_stream(StreamKind::OrderbookDelta), Some(StreamType::OrderbookDelta));
-    }
-
-    #[test]
-    fn bar_has_no_ws_mapping() {
-        assert_eq!(mli_to_dig3_stream(StreamKind::Bar), None);
-    }
-
-    #[test]
-    fn funding_maps_to_funding_rate() {
-        assert_eq!(mli_to_dig3_stream(StreamKind::Funding), Some(StreamType::FundingRate));
-    }
-
-    #[test]
-    fn liquidation_maps_correctly() {
-        assert_eq!(mli_to_dig3_stream(StreamKind::Liquidation), Some(StreamType::Liquidation));
-    }
-
-    #[test]
-    fn all_non_bar_kinds_have_some_mapping() {
-        let mappable = [
-            StreamKind::Tick,
-            StreamKind::OrderBook,
-            StreamKind::OrderbookDelta,
-            StreamKind::Funding,
-            StreamKind::MarkPrice,
-            StreamKind::OpenInterest,
-            StreamKind::Liquidation,
-            StreamKind::Ticker,
-            StreamKind::AggTrade,
-            StreamKind::LongShortRatio,
-        ];
-        for kind in mappable {
-            assert!(mli_to_dig3_stream(kind).is_some(), "{kind:?} should map");
-        }
-    }
-
-    // ── StreamEvent → TimedEvent conversion ──────────────────────────────────
+    use digdigdig3::StreamType;
 
     #[test]
     fn trade_event_converts_to_tick() {
@@ -545,9 +506,7 @@ mod tests {
 
     #[test]
     fn private_events_return_none() {
-        use digdigdig3::core::types::{
-            OrderUpdateEvent, OrderSide, OrderType, OrderStatus,
-        };
+        use digdigdig3::core::types::{OrderSide, OrderStatus, OrderType, OrderUpdateEvent};
         let ev = StreamEvent::OrderUpdate(OrderUpdateEvent {
             order_id: "x".into(),
             client_order_id: None,
@@ -587,16 +546,20 @@ mod tests {
     }
 
     #[test]
-    fn dig3_trade_to_tick_sell() {
-        let trade = PublicTrade {
-            id: "43".into(),
-            symbol: "SOLUSDT".into(),
-            price: 199.0,
-            quantity: 1.0,
-            side: TradeSide::Sell,
-            timestamp: 1001,
-        };
-        let tick = dig3_trade_to_mli_tick(trade);
-        assert!(!tick.is_buy);
+    fn account_type_str_parses_correctly() {
+        use crate::config::AccountTypeStr;
+        assert_eq!(AccountTypeStr("spot".into()).parse(), Some(AccountType::Spot));
+        assert_eq!(AccountTypeStr("FuturesCross".into()).parse(), Some(AccountType::FuturesCross));
+        assert_eq!(AccountTypeStr("futures_cross".into()).parse(), Some(AccountType::FuturesCross));
+        assert_eq!(AccountTypeStr("unknown".into()).parse(), None);
+    }
+
+    #[test]
+    fn stream_type_str_parses_correctly() {
+        use crate::config::StreamTypeStr;
+        assert_eq!(StreamTypeStr("fundingrate".into()).parse(), Some(StreamType::FundingRate));
+        assert_eq!(StreamTypeStr("funding_rate".into()).parse(), Some(StreamType::FundingRate));
+        assert_eq!(StreamTypeStr("liquidation".into()).parse(), Some(StreamType::Liquidation));
+        assert_eq!(StreamTypeStr("ticker".into()).parse(), Some(StreamType::Ticker));
     }
 }
