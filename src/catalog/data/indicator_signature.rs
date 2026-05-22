@@ -9,6 +9,7 @@ use crate::catalog::{
 };
 use crate::bar_indicators::bar_indicator_id::BarIndicatorId;
 use crate::bar_indicators::indicator_value::IndicatorValueKind;
+use crate::data_loader::stream_kind::StreamKind;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -320,6 +321,25 @@ pub struct IndicatorSignature {
     /// `None` means unknown — codegen falls back to runtime materialisation
     /// via `IndicatorInstance::create` to discover the kind.
     pub output_kind: Option<IndicatorValueKind>,
+
+    /// Primary input stream this indicator consumes. Default `Bar` (OHLCV) for
+    /// backward compatibility with classic bar-based indicators. Set explicitly
+    /// for non-OHLCV indicators (book, funding, OI, liq, ticker, mark, etc.).
+    ///
+    /// Used by:
+    /// - live validator + collector to dispatch the right `update_*(...)` method
+    /// - codegen to filter indicators by data source compatibility
+    /// - mlq warmup to know which Station Stream subscription to consume
+    pub input_stream: StreamKind,
+
+    /// Auxiliary input streams for hybrid / composite indicators that consume
+    /// multiple already-synchronized vectors (e.g. tick + orderbook, bar +
+    /// funding + OI). Synchronization is NOT the indicator's responsibility —
+    /// the runtime feeds it pre-aligned data through a composite update method.
+    ///
+    /// Single-input indicators (90%+ of catalog) keep this as `&[]` — zero
+    /// allocation, zero cost. The hot path for bar indicators is untouched.
+    pub aux_streams: &'static [StreamKind],
 }
 
 impl IndicatorSignature {
@@ -476,6 +496,8 @@ pub struct IndicatorSignatureBuilder {
     validated: bool,
     requires_l2: bool,
     output_kind: Option<IndicatorValueKind>,
+    input_stream: StreamKind,
+    aux_streams: &'static [StreamKind],
 }
 
 impl IndicatorSignatureBuilder {
@@ -498,7 +520,23 @@ impl IndicatorSignatureBuilder {
             validated: false,
             requires_l2: false,
             output_kind: None,
+            input_stream: StreamKind::Bar,
+            aux_streams: &[],
         }
+    }
+
+    /// Set primary input stream this indicator consumes (default `Bar` OHLCV).
+    /// For non-OHLCV indicators (book, funding, OI, liq, ticker, mark, ...).
+    pub fn input_stream(mut self, stream: StreamKind) -> Self {
+        self.input_stream = stream;
+        self
+    }
+
+    /// Set auxiliary input streams (for hybrid/composite indicators).
+    /// Single-input indicators should leave this empty.
+    pub fn aux_streams(mut self, streams: &'static [StreamKind]) -> Self {
+        self.aux_streams = streams;
+        self
     }
 
     /// Set output kind (IndicatorValue variant discriminant) — used by codegen
@@ -610,6 +648,8 @@ impl IndicatorSignatureBuilder {
             validated: self.validated,
             requires_l2: self.requires_l2,
             output_kind: self.output_kind,
+            input_stream: self.input_stream,
+            aux_streams: self.aux_streams,
         }
     }
 }

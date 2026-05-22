@@ -296,6 +296,20 @@ impl MasterIndicatorCatalog {
             .unwrap_or(0)
     }
 
+    /// Iterate all signatures across every registered category.
+    ///
+    /// Yields one `IndicatorSignature` per catalog entry.  Useful for one-pass
+    /// collection (e.g. building `HashMap<BarIndicatorId, StreamKind>` in the
+    /// live validator / collector).
+    pub fn iter_signatures(&self) -> impl Iterator<Item = IndicatorSignature> + '_ {
+        self.catalogs.values().flat_map(|catalog| {
+            catalog
+                .get_all_ids()
+                .into_iter()
+                .filter_map(|id| catalog.get_signature(id))
+        })
+    }
+
     /// Get statistics about the catalog
     pub fn stats(&self) -> CatalogStats {
         CatalogStats {

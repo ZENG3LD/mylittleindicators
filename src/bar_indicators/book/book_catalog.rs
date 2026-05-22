@@ -7,6 +7,7 @@ use crate::catalog::{
     IndicatorSignature, IndicatorCategory, IndicatorRoleKind, ParamConstraint, ParamType, ParamValue,
 };
 use crate::bar_indicators::indicator_value::IndicatorValueKind;
+use crate::data_loader::stream_kind::StreamKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -30,6 +31,7 @@ pub fn signature_book_imbalance_ratio() -> IndicatorSignature {
         .metadata("interpretation", "Closer to 0 = ask pressure, closer to 1 = bid pressure")
         .machine_id(BarIndicatorId::BookImb)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "BOOK_IMB" is already the main ID, no need for alias
@@ -55,6 +57,7 @@ pub fn signature_microprice() -> IndicatorSignature {
         .metadata("interpretation", "Weighted toward side with smaller quote; pulls toward pressure side")
         .machine_id(BarIndicatorId::BookMicroprice)
         .role_kind(IndicatorRoleKind::Smoother)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         .alias("Microprice")
@@ -75,6 +78,7 @@ pub fn signature_order_book_slope() -> IndicatorSignature {
         .metadata("interpretation", "Higher values indicate steeper order book")
         .machine_id(BarIndicatorId::BookSlope)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "BOOK_SLOPE" is already the main ID, no need for alias
@@ -113,6 +117,7 @@ pub fn signature_order_flow_imbalance() -> IndicatorSignature {
         .metadata("interpretation", "Positive = buy pressure, negative = sell pressure")
         .machine_id(BarIndicatorId::Ofi)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "OFI" is already the main ID, no need for alias
@@ -137,6 +142,7 @@ pub fn signature_liquidity_sweep() -> IndicatorSignature {
         .metadata("interpretation", "+1 = buy sweep, -1 = sell sweep, 0 = no sweep")
         .machine_id(BarIndicatorId::LiquiditySweep)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Double)
         .requires_l2()
         .alias("LiquiditySweep")
@@ -170,6 +176,7 @@ pub fn signature_book_pressure() -> IndicatorSignature {
         .metadata("interpretation", "Positive = bid pressure growing faster; negative = ask growing faster")
         .machine_id(BarIndicatorId::BookPressure)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         .alias("BookPressure")
@@ -195,6 +202,7 @@ pub fn signature_spread_distribution() -> IndicatorSignature {
         .metadata("interpretation", "100 = tightest historical spread; 0 = widest")
         .machine_id(BarIndicatorId::SpreadDistribution)
         .role_kind(IndicatorRoleKind::OscillatorBounded)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Double)
         .requires_l2()
         .alias("SpreadDistribution")
@@ -221,6 +229,7 @@ pub fn signature_order_book_velocity() -> IndicatorSignature {
         .metadata("interpretation", "Higher = more active orderbook; lower = stable market")
         .machine_id(BarIndicatorId::OrderBookVelocity)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         .alias("OrderBookVelocity")
@@ -241,6 +250,7 @@ pub fn signature_queue_imbalance() -> IndicatorSignature {
         .metadata("interpretation", "Positive = buying pressure, negative = selling pressure")
         .machine_id(BarIndicatorId::QueueImb)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "QUEUE_IMB" is already the main ID, no need for alias
@@ -277,6 +287,7 @@ pub fn signature_wall_detector() -> IndicatorSignature {
         .metadata("requirements", "L2 orderbook snapshots")
         .machine_id(BarIndicatorId::WallDetector)
         .role_kind(IndicatorRoleKind::Level)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Triple)
         .requires_l2()
         .alias("WallDetector")
@@ -296,6 +307,7 @@ pub fn signature_book_depth_change() -> IndicatorSignature {
         .metadata("interpretation", "Positive bid_change = book deepening on bid side")
         .machine_id(BarIndicatorId::BookDepthChange)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Double)
         .requires_l2()
         .alias("BookDepthChange")
@@ -328,6 +340,7 @@ pub fn signature_hidden_liquidity_detector() -> IndicatorSignature {
         .metadata("interpretation", "+1 = buy aggressor hit hidden ask, -1 = sell hit hidden bid")
         .machine_id(BarIndicatorId::HiddenLiquidityDetector)
         .role_kind(IndicatorRoleKind::Pattern)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Triple)
         .requires_l2()
         .alias("HiddenLiquidityDetector")
@@ -347,6 +360,7 @@ pub fn signature_trade_book_absorption() -> IndicatorSignature {
         .metadata("interpretation", "+1 = buy absorbed at ask, -1 = sell absorbed at bid")
         .machine_id(BarIndicatorId::TradeBookAbsorption)
         .role_kind(IndicatorRoleKind::Pattern)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Triple)
         .requires_l2()
         .alias("TradeBookAbsorption")
@@ -366,6 +380,7 @@ pub fn signature_sweep_impact_analyzer() -> IndicatorSignature {
         .metadata("interpretation", "levels_swept ≥ 2 = real sweep; slippage = price distance from best to last level")
         .machine_id(BarIndicatorId::SweepImpactAnalyzer)
         .role_kind(IndicatorRoleKind::Pattern)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Triple)
         .requires_l2()
         .alias("SweepImpactAnalyzer")

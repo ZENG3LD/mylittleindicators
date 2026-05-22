@@ -8,6 +8,7 @@ use crate::catalog::{
     IndicatorSignature, IndicatorCategory, IndicatorRoleKind, ParamConstraint, ParamType, ParamValue,
 };
 use crate::bar_indicators::indicator_value::IndicatorValueKind;
+use crate::data_loader::stream_kind::StreamKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -30,6 +31,7 @@ pub fn signature_market_microstructure() -> IndicatorSignature {
         .metadata("metrics", "spread, depth, price_impact, discovery_speed, volatility_clustering")
         .machine_id(BarIndicatorId::MarketMicro)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "MARKET_MICRO" is already the main ID, no need for alias
@@ -53,6 +55,7 @@ pub fn signature_order_book_slope() -> IndicatorSignature {
         .metadata("proxy", "true")
         .machine_id(BarIndicatorId::OrderBookSlope)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "ORDER_BOOK_SLOPE" is already the main ID, no need for alias
@@ -80,6 +83,7 @@ pub fn signature_order_flow_imbalance() -> IndicatorSignature {
         .metadata("uses_volume", "true")
         .machine_id(BarIndicatorId::OrderFlowImb)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "ORDER_FLOW_IMB" is already the main ID, no need for alias
@@ -103,6 +107,7 @@ pub fn signature_queue_imbalance() -> IndicatorSignature {
         .metadata("proxy", "true")
         .machine_id(BarIndicatorId::ClQueueImb)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "CL_QUEUE_IMB" is already the main ID, no need for alias
@@ -128,6 +133,7 @@ pub fn signature_tick_volume_analyzer() -> IndicatorSignature {
         .metadata("uses_ticks", "true")
         .machine_id(BarIndicatorId::TickVolume)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "TICK_VOLUME" is already the main ID, no need for alias
@@ -157,6 +163,7 @@ pub fn signature_footprint_chart() -> IndicatorSignature {
         .metadata("uses_ticks", "true")
         .machine_id(BarIndicatorId::FootprintChart)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Triple)
         .requires_l2()
         .alias("FootprintChart")
@@ -187,6 +194,7 @@ pub fn signature_footprint_imbalance() -> IndicatorSignature {
         .metadata("uses_ticks", "true")
         .machine_id(BarIndicatorId::FootprintImbalance)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Triple)
         .requires_l2()
         .alias("FootprintImbalance")
@@ -210,6 +218,7 @@ pub fn signature_footprint_poc() -> IndicatorSignature {
         .metadata("uses_ticks", "true")
         .machine_id(BarIndicatorId::FootprintPoc)
         .role_kind(IndicatorRoleKind::Smoother)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         .alias("FootprintPoc")
@@ -228,6 +237,7 @@ pub fn signature_absorption_detector() -> IndicatorSignature {
         .metadata("uses_ticks", "true")
         .machine_id(BarIndicatorId::AbsorptionDetector)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Double)
         .requires_l2()
         .alias("AbsorptionDetector")
@@ -263,6 +273,7 @@ pub fn signature_trade_cluster_detector() -> IndicatorSignature {
         .metadata("uses_ticks", "true")
         .machine_id(BarIndicatorId::TradeClusterDetector)
         .role_kind(IndicatorRoleKind::Pattern)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Triple)
         .requires_l2()
         .alias("TradeClusterDetector")
@@ -287,6 +298,7 @@ pub fn signature_volume_weighted_price_levels() -> IndicatorSignature {
         .metadata("uses_volume", "true")
         .machine_id(BarIndicatorId::VwapLevels)
         .role_kind(IndicatorRoleKind::Volume)
+        .input_stream(StreamKind::OrderBook)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
         // Note: "VWAP_LEVELS" is already the main ID, no need for alias
