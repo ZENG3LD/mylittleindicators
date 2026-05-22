@@ -359,28 +359,26 @@ fn category_of(id: BarIndicatorId) -> &'static str {
 /// someone catalogues them).
 fn build_stream_kind_map(
     all_indicator_ids: &[BarIndicatorId],
-) -> (HashMap<BarIndicatorId, StreamKind>, usize, usize) {
+) -> (HashMap<BarIndicatorId, (StreamKind, &'static [StreamKind])>, usize, usize) {
     let catalog = MasterIndicatorCatalog::new();
 
-    // Collect catalog-sourced routing.
-    let mut map: HashMap<BarIndicatorId, StreamKind> = HashMap::new();
+    let mut map: HashMap<BarIndicatorId, (StreamKind, &'static [StreamKind])> = HashMap::new();
     let mut n_catalogued: usize = 0;
 
     for sig in catalog.iter_signatures() {
         if let Some(machine_id) = sig.machine_id {
-            map.insert(machine_id, sig.input_stream);
+            map.insert(machine_id, (sig.input_stream, sig.aux_streams));
             n_catalogued += 1;
         }
     }
 
-    // Fill fallback for any id not in catalog.
     let n_uncatalogued = all_indicator_ids
         .iter()
         .filter(|id| !map.contains_key(id))
         .count();
 
     for &id in all_indicator_ids {
-        map.entry(id).or_insert(StreamKind::Bar);
+        map.entry(id).or_insert((StreamKind::Bar, &[]));
     }
 
     (map, n_catalogued, n_uncatalogued)
@@ -411,6 +409,7 @@ struct IndicatorState {
     id: BarIndicatorId,
     category: &'static str,
     stream_kind: StreamKind,
+    aux_streams: &'static [StreamKind],
     matched_signature: bool,
     instance: Option<IndicatorInstance>,
     create_error: Option<String>,
@@ -421,6 +420,15 @@ struct IndicatorState {
     last_value: Option<IndicatorValue>,
     max_abs_value: f64,
     has_finite_nonzero: bool,
+}
+
+impl IndicatorState {
+    /// Returns true if the indicator should receive events from this stream
+    /// (matches primary input_stream OR any aux_streams). Composites and
+    /// hybrid indicators have non-empty aux_streams.
+    fn accepts(&self, kind: StreamKind) -> bool {
+        self.stream_kind == kind || self.aux_streams.contains(&kind)
+    }
 }
 
 /// Period fallback ladder for indicators that reject `vec![14]`.
@@ -441,7 +449,7 @@ const PERIOD_LADDER: &[&[usize]] = &[
 ];
 
 impl IndicatorState {
-    fn new(id: BarIndicatorId, stream_kind: StreamKind, matched_signature: bool) -> Self {
+    fn new(id: BarIndicatorId, stream_kind: StreamKind, aux_streams: &'static [StreamKind], matched_signature: bool) -> Self {
         let category = category_of(id);
         let (instance, create_error, periods_used) = Self::try_create_with_ladder(id);
         if let Some(p) = &periods_used {
@@ -451,6 +459,7 @@ impl IndicatorState {
             id,
             category,
             stream_kind,
+            aux_streams,
             matched_signature,
             instance,
             create_error,
@@ -1038,8 +1047,8 @@ fn extract_f64s(val: &IndicatorValue) -> Vec<f64> {
         IndicatorValue::Volatility { total, close_close, high_low } => {
             vec![*total, *close_close, *high_low]
         }
-        IndicatorValue::ValueFlag(v, _) => vec![*v],
-        IndicatorValue::DoubleFlag(_, _) => vec![],
+        IndicatorValue::ValueFlag(v, flag) => vec![*v, if *flag { 1.0 } else { 0.0 }],
+        IndicatorValue::DoubleFlag(a, b) => vec![if *a { 1.0 } else { 0.0 }, if *b { 1.0 } else { 0.0 }],
         IndicatorValue::FuzzyCandle { direction, size, body_size, upper_wick, lower_wick } => {
             vec![
                 *direction as f64,
@@ -1339,13 +1348,13 @@ async fn main() -> Result<()> {
     // Per-StreamKind breakdown
     let mut sk_counts: HashMap<String, usize> = HashMap::new();
     for &id in &all_indicator_ids {
-        let sk = stream_kind_map[&id];
+        let (sk, _aux) = stream_kind_map[&id];
         *sk_counts.entry(sk.as_str().to_string()).or_default() += 1;
     }
 
     let n_non_bar: usize = all_indicator_ids
         .iter()
-        .filter(|&&id| stream_kind_map[&id] != StreamKind::Bar)
+        .filter(|&&id| stream_kind_map[&id].0 != StreamKind::Bar)
         .count();
 
     tracing::info!(
@@ -1372,9 +1381,9 @@ async fn main() -> Result<()> {
     let mut states: Vec<IndicatorState> = all_indicator_ids
         .iter()
         .map(|&id| {
-            let sk = stream_kind_map[&id];
+            let (sk, aux) = stream_kind_map[&id];
             let matched_sig = catalogued_ids.contains(&id);
-            IndicatorState::new(id, sk, matched_sig)
+            IndicatorState::new(id, sk, aux, matched_sig)
         })
         .collect();
 
@@ -1547,7 +1556,7 @@ async fn main() -> Result<()> {
                             point.open, point.high, point.low, point.close, point.volume,
                         );
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::Bar {
+                            if s.accepts(StreamKind::Bar) {
                                 s.try_update_bar(o, h, l, c, v, ts);
                             }
                         }
@@ -1555,7 +1564,7 @@ async fn main() -> Result<()> {
                     Event::Trade { point, .. } => {
                         let tick = trade_point_to_tick(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::Tick {
+                            if s.accepts(StreamKind::Tick) {
                                 s.try_update_tick(&tick);
                             }
                         }
@@ -1563,7 +1572,7 @@ async fn main() -> Result<()> {
                     Event::AggTrade { point, .. } => {
                         let agg = agg_trade_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::AggTrade {
+                            if s.accepts(StreamKind::AggTrade) {
                                 s.try_update_agg_trade(&agg);
                             }
                         }
@@ -1571,7 +1580,7 @@ async fn main() -> Result<()> {
                     Event::Ticker { point, .. } => {
                         let ticker = ticker_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::Ticker {
+                            if s.accepts(StreamKind::Ticker) {
                                 s.try_update_ticker(&ticker);
                             }
                         }
@@ -1579,7 +1588,7 @@ async fn main() -> Result<()> {
                     Event::OrderbookSnapshot { point, .. } => {
                         let book = obs_to_orderbook(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::OrderBook {
+                            if s.accepts(StreamKind::OrderBook) {
                                 s.try_update_orderbook(&book);
                             }
                         }
@@ -1587,7 +1596,7 @@ async fn main() -> Result<()> {
                     Event::MarkPrice { point, .. } => {
                         let mp = mark_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::MarkPrice {
+                            if s.accepts(StreamKind::MarkPrice) {
                                 s.try_update_mark(&mp);
                             }
                         }
@@ -1595,7 +1604,7 @@ async fn main() -> Result<()> {
                     Event::FundingRate { point, .. } => {
                         let fr = funding_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::Funding {
+                            if s.accepts(StreamKind::Funding) {
                                 s.try_update_funding(&fr);
                             }
                         }
@@ -1603,7 +1612,7 @@ async fn main() -> Result<()> {
                     Event::OpenInterest { point, .. } => {
                         let oi = oi_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::OpenInterest {
+                            if s.accepts(StreamKind::OpenInterest) {
                                 s.try_update_oi(&oi);
                             }
                         }
@@ -1611,7 +1620,7 @@ async fn main() -> Result<()> {
                     Event::Liquidation { point, .. } => {
                         let liq = liq_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::Liquidation {
+                            if s.accepts(StreamKind::Liquidation) {
                                 s.try_update_liquidation(&liq);
                             }
                         }
@@ -1619,7 +1628,7 @@ async fn main() -> Result<()> {
                     Event::BlockTrade { point, .. } => {
                         let bt = block_trade_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::BlockTrade {
+                            if s.accepts(StreamKind::BlockTrade) {
                                 s.try_update_block_trade(&bt);
                             }
                         }
@@ -1627,7 +1636,7 @@ async fn main() -> Result<()> {
                     Event::IndexPrice { point, .. } => {
                         let ip = index_price_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::IndexPrice {
+                            if s.accepts(StreamKind::IndexPrice) {
                                 s.try_update_index_price(&ip);
                             }
                         }
@@ -1635,7 +1644,7 @@ async fn main() -> Result<()> {
                     Event::CompositeIndex { point, .. } => {
                         let ci = composite_index_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::CompositeIndex {
+                            if s.accepts(StreamKind::CompositeIndex) {
                                 s.try_update_composite_index(&ci);
                             }
                         }
@@ -1643,7 +1652,7 @@ async fn main() -> Result<()> {
                     Event::OptionGreeks { point, .. } => {
                         let g = option_greeks_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::OptionGreeks {
+                            if s.accepts(StreamKind::OptionGreeks) {
                                 s.try_update_option_greeks(&g);
                             }
                         }
@@ -1651,7 +1660,7 @@ async fn main() -> Result<()> {
                     Event::VolatilityIndex { point, .. } => {
                         let vi = volatility_index_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::VolatilityIndex {
+                            if s.accepts(StreamKind::VolatilityIndex) {
                                 s.try_update_volatility_index(&vi);
                             }
                         }
@@ -1659,7 +1668,7 @@ async fn main() -> Result<()> {
                     Event::HistoricalVolatility { point, .. } => {
                         let hv = historical_volatility_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::HistoricalVolatility {
+                            if s.accepts(StreamKind::HistoricalVolatility) {
                                 s.try_update_historical_volatility(&hv);
                             }
                         }
@@ -1667,7 +1676,7 @@ async fn main() -> Result<()> {
                     Event::Basis { point, .. } => {
                         let b = basis_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::Basis {
+                            if s.accepts(StreamKind::Basis) {
                                 s.try_update_basis(&b);
                             }
                         }
@@ -1675,7 +1684,7 @@ async fn main() -> Result<()> {
                     Event::InsuranceFund { point, .. } => {
                         let ins = insurance_fund_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::InsuranceFund {
+                            if s.accepts(StreamKind::InsuranceFund) {
                                 s.try_update_insurance_fund(&ins);
                             }
                         }
@@ -1683,7 +1692,7 @@ async fn main() -> Result<()> {
                     Event::OrderbookL3 { point, .. } => {
                         let l3 = orderbook_l3_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::OrderbookL3 {
+                            if s.accepts(StreamKind::OrderbookL3) {
                                 s.try_update_orderbook_l3(&l3);
                             }
                         }
@@ -1691,7 +1700,7 @@ async fn main() -> Result<()> {
                     Event::SettlementEvent { point, .. } => {
                         let se = settlement_event_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::Settlement {
+                            if s.accepts(StreamKind::Settlement) {
                                 s.try_update_settlement(&se);
                             }
                         }
@@ -1699,7 +1708,7 @@ async fn main() -> Result<()> {
                     Event::AuctionEvent { point, .. } => {
                         let a = auction_event_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::Auction {
+                            if s.accepts(StreamKind::Auction) {
                                 s.try_update_auction(&a);
                             }
                         }
@@ -1707,7 +1716,7 @@ async fn main() -> Result<()> {
                     Event::MarketWarning { point, .. } => {
                         let w = market_warning_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::MarketWarning {
+                            if s.accepts(StreamKind::MarketWarning) {
                                 s.try_update_market_warning(&w);
                             }
                         }
@@ -1715,7 +1724,7 @@ async fn main() -> Result<()> {
                     Event::RiskLimit { point, .. } => {
                         let r = risk_limit_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::RiskLimit {
+                            if s.accepts(StreamKind::RiskLimit) {
                                 s.try_update_risk_limit(&r);
                             }
                         }
@@ -1723,7 +1732,7 @@ async fn main() -> Result<()> {
                     Event::PredictedFunding { point, .. } => {
                         let pf = predicted_funding_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::PredictedFunding {
+                            if s.accepts(StreamKind::PredictedFunding) {
                                 s.try_update_predicted_funding(&pf);
                             }
                         }
@@ -1731,7 +1740,7 @@ async fn main() -> Result<()> {
                     Event::FundingSettlement { point, .. } => {
                         let fs = funding_settlement_point_to_core(point);
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::FundingSettlement {
+                            if s.accepts(StreamKind::FundingSettlement) {
                                 s.try_update_funding_settlement(&fs);
                             }
                         }
@@ -1743,7 +1752,7 @@ async fn main() -> Result<()> {
                             point.open, point.high, point.low, point.close, point.volume,
                         );
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::Bar {
+                            if s.accepts(StreamKind::Bar) {
                                 s.try_update_bar(o, h, l, c, v, ts);
                             }
                         }
@@ -1754,7 +1763,7 @@ async fn main() -> Result<()> {
                             point.open, point.high, point.low, point.close, point.volume,
                         );
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::Bar {
+                            if s.accepts(StreamKind::Bar) {
                                 s.try_update_bar(o, h, l, c, v, ts);
                             }
                         }
@@ -1765,7 +1774,7 @@ async fn main() -> Result<()> {
                             point.open, point.high, point.low, point.close, point.volume,
                         );
                         for s in &mut states {
-                            if s.stream_kind == StreamKind::Bar {
+                            if s.accepts(StreamKind::Bar) {
                                 s.try_update_bar(o, h, l, c, v, ts);
                             }
                         }

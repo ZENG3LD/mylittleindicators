@@ -8,6 +8,7 @@ use crate::catalog::{
 };
 use crate::bar_indicators::average::moving_average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValueKind;
+use crate::data_loader::stream_kind::StreamKind;
 use super::super::bar_indicator_id::BarIndicatorId;
 
 use once_cell::sync::Lazy;
@@ -516,6 +517,7 @@ pub fn signature_trade_flow_imbalance() -> IndicatorSignature {
         .metadata("range", "-1 to +1")
         .metadata("source", "tick_stream")
         .machine_id(BarIndicatorId::TradeFlowImbalance)
+        .input_stream(StreamKind::Tick)
         .role_kind(IndicatorRoleKind::OscillatorBounded)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -535,6 +537,7 @@ pub fn signature_uptick_downtick_volume() -> IndicatorSignature {
         .add_constraint(ParamConstraint::period(2, 10000, 100))
         .metadata("source", "tick_stream")
         .machine_id(BarIndicatorId::UptickDowntickVolume)
+        .input_stream(StreamKind::Tick)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Double)
         .validated()
@@ -555,6 +558,7 @@ pub fn signature_aggressor_imbalance() -> IndicatorSignature {
         .metadata("outputs", "imbalance in [-1, 1] (+1=all buys, -1=all sells)")
         .metadata("uses_ticks", "true")
         .machine_id(BarIndicatorId::AggressorImbalance)
+        .input_stream(StreamKind::Tick)
         .role_kind(IndicatorRoleKind::OscillatorBounded)
         .output_kind(IndicatorValueKind::Single)
         .requires_l2()
@@ -616,6 +620,7 @@ pub fn signature_large_trade_filter() -> IndicatorSignature {
         .metadata("outputs", "signal (+1=large buy, -1=large sell, 0=normal), size_ratio")
         .metadata("uses_ticks", "true")
         .machine_id(BarIndicatorId::LargeTradeFilter)
+        .input_stream(StreamKind::Tick)
         .role_kind(IndicatorRoleKind::Pattern)
         .output_kind(IndicatorValueKind::Double)
         .requires_l2()
