@@ -1,5 +1,6 @@
 //! Microstructure indicators — consume BlockTrade and OrderbookL3 stream events.
 
+pub mod microstructure_catalog;
 pub mod block_trade_flow;
 pub mod block_trade_impact;
 pub mod block_trade_size_anomaly;

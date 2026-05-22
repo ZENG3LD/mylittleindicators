@@ -1,5 +1,6 @@
 //! Risk, Funding, and Misc stream-event indicators.
 
+pub mod risk_funding_catalog;
 pub mod auction_imbalance;
 pub mod auction_liquidity_score;
 pub mod auction_price_deviation;

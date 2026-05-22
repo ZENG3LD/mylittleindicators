@@ -1,5 +1,6 @@
 //! Option Greeks indicators — consume OptionGreeks stream events.
 
+pub mod greeks_catalog;
 pub mod charm_tracker;
 pub mod delta_exposure_flow;
 pub mod gamma_squeeze_detector;

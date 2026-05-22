@@ -1,5 +1,6 @@
 //! Stress indicators — consume InsuranceFund and SettlementEvent stream events.
 
+pub mod stress_catalog;
 pub mod fund_depletion_rate;
 pub mod fund_stress_detector;
 pub mod insurance_fund_momentum;

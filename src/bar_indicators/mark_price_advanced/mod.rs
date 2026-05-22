@@ -3,6 +3,7 @@
 pub mod mark_price_gap_detector;
 pub mod mark_price_momentum;
 pub mod mark_price_volatility;
+pub mod mark_price_advanced_catalog;
 
 pub use mark_price_gap_detector::MarkPriceGapDetector;
 pub use mark_price_momentum::MarkPriceMomentum;

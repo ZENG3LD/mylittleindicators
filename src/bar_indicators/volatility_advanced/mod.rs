@@ -1,5 +1,6 @@
 //! Advanced volatility indicators — consume HistoricalVolatility and VolatilityIndex stream events.
 
+pub mod volatility_advanced_catalog;
 pub mod hv_momentum;
 pub mod hv_spike;
 pub mod vol_idx_momentum;

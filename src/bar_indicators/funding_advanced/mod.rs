@@ -3,6 +3,7 @@
 pub mod annualized_funding_rate;
 pub mod funding_direction_shift;
 pub mod funding_extreme_alert;
+pub mod funding_advanced_catalog;
 
 pub use annualized_funding_rate::AnnualizedFundingRate;
 pub use funding_direction_shift::FundingDirectionShift;

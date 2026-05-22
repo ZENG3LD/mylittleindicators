@@ -8,6 +8,7 @@ pub mod best_level_volatility;
 pub mod layer_concentration;
 pub mod mid_price_velocity;
 pub mod price_level_density;
+pub mod book_advanced_catalog;
 
 pub use bid_ask_asymmetry::BidAskAsymmetry;
 pub use bid_ask_bounce_rate::BidAskBounceRate;

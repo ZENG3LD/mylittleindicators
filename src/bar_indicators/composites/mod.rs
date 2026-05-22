@@ -4,6 +4,7 @@
 //! (funding rate, open interest, mark price, liquidations, etc.) to produce
 //! composite signals that no single-stream indicator can generate.
 
+pub mod composites_catalog;
 pub mod adaptive_threshold;
 pub mod adaptive_window_selector;
 pub mod block_trade_volume_ratio;

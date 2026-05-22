@@ -21,6 +21,7 @@ pub mod large_tick_momentum;
 pub mod tpo_session_balance;
 pub mod value_area_tracker;
 pub mod volume_imbalance_zone;
+pub mod tick_advanced_catalog;
 
 pub use vwap_deviation::VwapDeviation;
 pub use trade_run_detector::TradeRunDetector;

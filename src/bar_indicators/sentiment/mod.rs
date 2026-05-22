@@ -1,5 +1,6 @@
 //! Sentiment indicators — consume long/short ratio and aggregated trade streams.
 
+pub mod sentiment_catalog;
 pub mod agg_trade_flow_imbalance;
 pub mod agg_trade_size_distribution;
 pub mod long_short_extreme_detector;

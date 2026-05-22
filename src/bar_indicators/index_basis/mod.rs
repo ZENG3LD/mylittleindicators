@@ -1,5 +1,6 @@
 //! Index/Basis indicators — consume IndexPrice, CompositeIndex, and Basis stream events.
 
+pub mod index_basis_catalog;
 pub mod basis_extreme;
 pub mod basis_momentum;
 pub mod basis_z_score;

@@ -420,16 +420,30 @@ struct IndicatorState {
     has_finite_nonzero: bool,
 }
 
+/// Period fallback ladder for indicators that reject `vec![14]`.
+/// Many multi-period indicators (UltimateOscillator, MACD-likes, etc.) require
+/// a specific shape — try common ones before giving up.
+const PERIOD_LADDER: &[&[usize]] = &[
+    &[14],                 // most common single-period default
+    &[14, 28],             // dual MA / 2-period
+    &[12, 26],             // MACD-like fast/slow
+    &[5, 14, 28],          // triple-period (UltimateOscillator)
+    &[7, 14, 28],          // alt triple
+    &[12, 26, 9],          // MACD + signal
+    &[20],                 // BB / Donchian-like
+    &[10],
+    &[5],
+    &[3],
+    &[2],
+];
+
 impl IndicatorState {
     fn new(id: BarIndicatorId, stream_kind: StreamKind, matched_signature: bool) -> Self {
         let category = category_of(id);
-        let cfg = IndicatorConfig::new(id, format!("{id:?}"), vec![14]);
-        let result = panic::catch_unwind(AssertUnwindSafe(|| IndicatorInstance::create(&cfg)));
-        let (instance, create_error) = match result {
-            Ok(Ok(inst)) => (Some(inst), None),
-            Ok(Err(e)) => (None, Some(e)),
-            Err(_) => (None, Some("panic during create".to_string())),
-        };
+        let (instance, create_error, periods_used) = Self::try_create_with_ladder(id);
+        if let Some(p) = &periods_used {
+            tracing::debug!(?id, ?p, "indicator created with non-default periods");
+        }
         Self {
             id,
             category,
@@ -445,6 +459,29 @@ impl IndicatorState {
             max_abs_value: 0.0,
             has_finite_nonzero: false,
         }
+    }
+
+    /// Try IndicatorInstance::create with PERIOD_LADDER fallbacks until one
+    /// works. Returns (instance, error, periods_used_if_non_default).
+    fn try_create_with_ladder(
+        id: BarIndicatorId,
+    ) -> (Option<IndicatorInstance>, Option<String>, Option<Vec<usize>>) {
+        let mut last_err: Option<String> = None;
+        for (idx, periods) in PERIOD_LADDER.iter().enumerate() {
+            let p = periods.to_vec();
+            let cfg = IndicatorConfig::new(id, format!("{id:?}"), p.clone());
+            let result =
+                panic::catch_unwind(AssertUnwindSafe(|| IndicatorInstance::create(&cfg)));
+            match result {
+                Ok(Ok(inst)) => {
+                    let used = if idx == 0 { None } else { Some(p) };
+                    return (Some(inst), None, used);
+                }
+                Ok(Err(e)) => last_err = Some(e),
+                Err(_) => last_err = Some("panic during create".to_string()),
+            }
+        }
+        (None, last_err, None)
     }
 
     fn record_value(&mut self, val: IndicatorValue) {

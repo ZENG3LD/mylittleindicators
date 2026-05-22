@@ -3,6 +3,7 @@ pub mod oi_momentum;
 pub mod oi_percentile;
 pub mod long_squeeze_detector;
 pub mod oi_price_correlation;
+pub mod open_interest_catalog;
 
 pub use oi_z_score::OiZScore;
 pub use oi_momentum::OiMomentum;

@@ -113,6 +113,23 @@ pub enum IndicatorCategory {
     Statistics,         // 26 indicators (statistical tests, stationarity, etc.)
     StatisticalScoring, // 6 indicators (normalized scalar: probability, density, tanh-strength)
 
+    // Stream-specialized categories
+    FundingAdvanced,      // Advanced funding rate indicators
+    OpenInterest,         // Open interest indicators
+    MarkPriceAdvanced,    // Advanced mark price indicators
+    TickerAdvanced,       // Advanced ticker indicators
+    Liquidations,         // Liquidation event indicators
+    TickAdvanced,         // Advanced tick/trade flow indicators
+    BookAdvanced,         // Advanced order book indicators
+    Composites,           // Cross-stream composite indicators
+    Sentiment,            // Sentiment indicators (long/short ratio, agg trade)
+    IndexBasis,           // Index/Basis indicators
+    VolatilityAdvanced,   // Advanced volatility indicators (HV, Vol Index)
+    Greeks,               // Option Greeks indicators
+    Stress,               // Stress indicators (insurance fund, settlement)
+    Microstructure,       // Microstructure indicators (block trade, L3)
+    RiskFunding,          // Risk, funding, and auction indicators
+
     // Reserved for future expansion
     Custom,
     Composite,
@@ -148,6 +165,21 @@ impl IndicatorCategory {
             "position" => Self::Position,
             "statistics" | "stats" => Self::Statistics,
             "statistical_scoring" | "statisticalscoring" | "scoring" => Self::StatisticalScoring,
+            "funding_advanced" | "fundingadvanced" => Self::FundingAdvanced,
+            "open_interest" | "openinterest" => Self::OpenInterest,
+            "mark_price_advanced" | "markpriceadvanced" => Self::MarkPriceAdvanced,
+            "ticker_advanced" | "tickeradvanced" => Self::TickerAdvanced,
+            "liquidations" => Self::Liquidations,
+            "tick_advanced" | "tickadvanced" => Self::TickAdvanced,
+            "book_advanced" | "bookadvanced" => Self::BookAdvanced,
+            "composites" => Self::Composites,
+            "sentiment" => Self::Sentiment,
+            "index_basis" | "indexbasis" => Self::IndexBasis,
+            "volatility_advanced" | "volatilityadvanced" => Self::VolatilityAdvanced,
+            "greeks" => Self::Greeks,
+            "stress" => Self::Stress,
+            "microstructure" => Self::Microstructure,
+            "risk_funding" | "riskfunding" => Self::RiskFunding,
             "custom" => Self::Custom,
             "composite" => Self::Composite,
             "experimental" => Self::Experimental,
@@ -182,6 +214,21 @@ impl IndicatorCategory {
             Self::Position => "position",
             Self::Statistics => "statistics",
             Self::StatisticalScoring => "statistical_scoring",
+            Self::FundingAdvanced => "funding_advanced",
+            Self::OpenInterest => "open_interest",
+            Self::MarkPriceAdvanced => "mark_price_advanced",
+            Self::TickerAdvanced => "ticker_advanced",
+            Self::Liquidations => "liquidations",
+            Self::TickAdvanced => "tick_advanced",
+            Self::BookAdvanced => "book_advanced",
+            Self::Composites => "composites",
+            Self::Sentiment => "sentiment",
+            Self::IndexBasis => "index_basis",
+            Self::VolatilityAdvanced => "volatility_advanced",
+            Self::Greeks => "greeks",
+            Self::Stress => "stress",
+            Self::Microstructure => "microstructure",
+            Self::RiskFunding => "risk_funding",
             Self::Custom => "custom",
             Self::Composite => "composite",
             Self::Experimental => "experimental",

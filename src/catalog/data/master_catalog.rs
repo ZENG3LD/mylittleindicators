@@ -56,6 +56,21 @@ use crate::bar_indicators::trend_stop::trend_stop_catalog;
 use crate::bar_indicators::position::position_catalog;
 use crate::bar_indicators::statistics::statistics_catalog;
 use crate::bar_indicators::statistical_scoring::statistical_scoring_catalog;
+use crate::bar_indicators::funding_advanced::funding_advanced_catalog;
+use crate::bar_indicators::open_interest::open_interest_catalog;
+use crate::bar_indicators::mark_price_advanced::mark_price_advanced_catalog;
+use crate::bar_indicators::ticker_advanced::ticker_advanced_catalog;
+use crate::bar_indicators::liquidations::liquidations_catalog;
+use crate::bar_indicators::tick_advanced::tick_advanced_catalog;
+use crate::bar_indicators::book_advanced::book_advanced_catalog;
+use crate::bar_indicators::composites::composites_catalog;
+use crate::bar_indicators::sentiment::sentiment_catalog;
+use crate::bar_indicators::index_basis::index_basis_catalog;
+use crate::bar_indicators::volatility_advanced::volatility_advanced_catalog;
+use crate::bar_indicators::greeks::greeks_catalog;
+use crate::bar_indicators::stress::stress_catalog;
+use crate::bar_indicators::microstructure::microstructure_catalog;
+use crate::bar_indicators::risk_funding::risk_funding_catalog;
 // Note: zigzag_catalog not exported from zigzag module yet
 
 /// Error type for catalog operations
@@ -174,6 +189,21 @@ impl MasterIndicatorCatalog {
             (IndicatorCategory::Position, position_catalog::get_signature, position_catalog::all_indicator_ids()),
             (IndicatorCategory::Statistics, statistics_catalog::get_signature, statistics_catalog::all_indicator_ids()),
             (IndicatorCategory::StatisticalScoring, statistical_scoring_catalog::get_signature, statistical_scoring_catalog::all_indicator_ids()),
+            (IndicatorCategory::FundingAdvanced, funding_advanced_catalog::get_signature, funding_advanced_catalog::all_indicator_ids()),
+            (IndicatorCategory::OpenInterest, open_interest_catalog::get_signature, open_interest_catalog::all_indicator_ids()),
+            (IndicatorCategory::MarkPriceAdvanced, mark_price_advanced_catalog::get_signature, mark_price_advanced_catalog::all_indicator_ids()),
+            (IndicatorCategory::TickerAdvanced, ticker_advanced_catalog::get_signature, ticker_advanced_catalog::all_indicator_ids()),
+            (IndicatorCategory::Liquidations, liquidations_catalog::get_signature, liquidations_catalog::all_indicator_ids()),
+            (IndicatorCategory::TickAdvanced, tick_advanced_catalog::get_signature, tick_advanced_catalog::all_indicator_ids()),
+            (IndicatorCategory::BookAdvanced, book_advanced_catalog::get_signature, book_advanced_catalog::all_indicator_ids()),
+            (IndicatorCategory::Composites, composites_catalog::get_signature, composites_catalog::all_indicator_ids()),
+            (IndicatorCategory::Sentiment, sentiment_catalog::get_signature, sentiment_catalog::all_indicator_ids()),
+            (IndicatorCategory::IndexBasis, index_basis_catalog::get_signature, index_basis_catalog::all_indicator_ids()),
+            (IndicatorCategory::VolatilityAdvanced, volatility_advanced_catalog::get_signature, volatility_advanced_catalog::all_indicator_ids()),
+            (IndicatorCategory::Greeks, greeks_catalog::get_signature, greeks_catalog::all_indicator_ids()),
+            (IndicatorCategory::Stress, stress_catalog::get_signature, stress_catalog::all_indicator_ids()),
+            (IndicatorCategory::Microstructure, microstructure_catalog::get_signature, microstructure_catalog::all_indicator_ids()),
+            (IndicatorCategory::RiskFunding, risk_funding_catalog::get_signature, risk_funding_catalog::all_indicator_ids()),
             // Note: Zigzag catalog will be added when exported from zigzag module
         ];
 

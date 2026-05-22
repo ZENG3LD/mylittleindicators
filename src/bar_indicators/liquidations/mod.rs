@@ -5,6 +5,7 @@ pub mod liquidation_rate;
 pub mod liquidation_volume_imbalance;
 pub mod liquidation_volume_velocity;
 pub mod stop_hunt_detector;
+pub mod liquidations_catalog;
 
 pub use liquidation_cascade::LiquidationCascade;
 pub use liquidation_cluster_detector::LiquidationClusterDetector;
