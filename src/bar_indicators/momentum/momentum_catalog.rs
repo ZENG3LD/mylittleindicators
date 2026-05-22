@@ -1159,27 +1159,6 @@ pub fn signature_momentum_zscore() -> IndicatorSignature {
         .build()
 }
 
-/// Multi-Timeframe Momentum Divergence
-pub fn signature_multi_timeframe_momentum_divergence() -> IndicatorSignature {
-    IndicatorSignature::builder("MTF_MOM_DIV", CATEGORY)
-        .name("Multi-Timeframe Momentum Divergence")
-        .description("Momentum divergence across timeframes")
-        .add_constraint(ParamConstraint::period(2, 200, 14))
-        .machine_id(BarIndicatorId::MtfMomDiv)
-        .role_kind(IndicatorRoleKind::Other)
-        .output_kind(IndicatorValueKind::Signal)
-        // Note: "MTF_MOM_DIV" is already the main ID, no need for alias
-        .alias("MtfMomDiv")
-        .alias("mtf_mom_div")
-        .alias("MULTITIMEFRAMEMOMENTUMDIVERGENCE")
-        .alias("MultiTimeframeMomentumDivergence")
-        .alias("multitimeframemomentumdivergence")
-        .alias("multi_timeframe_momentum_divergence")
-        .alias("MULTI_TIMEFRAME_MOMENTUM_DIVERGENCE")
-        .alias("Multi_Timeframe_Momentum_Divergence")
-        .build()
-}
-
 /// Neural Momentum Network
 pub fn signature_neural_momentum_network() -> IndicatorSignature {
     IndicatorSignature::builder("NEURAL_MOM", CATEGORY)
@@ -2201,27 +2180,6 @@ pub fn signature_di_plus_minus() -> IndicatorSignature {
         .build()
 }
 
-/// ZigZag - identifies significant price swings
-pub fn signature_zigzag() -> IndicatorSignature {
-    IndicatorSignature::builder("ZIGZAG", CATEGORY)
-        .name("ZigZag")
-        .description("Identifies significant price swings")
-        .add_constraint(
-            ParamConstraint::new("deviation", ParamType::F64)
-                .with_min(ParamValue::F64(0.01))
-                .with_max(ParamValue::F64(1.0))
-                .with_default(ParamValue::F64(0.05))
-        )
-        .machine_id(BarIndicatorId::Zigzag)
-        .role_kind(IndicatorRoleKind::Other)
-        .output_kind(IndicatorValueKind::Single)
-        // Note: "ZIGZAG" is already the main ID, no need for alias
-        .alias("Zigzag")
-        .alias("zigzag")
-        .alias("ZigZag")
-        .build()
-}
-
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -2276,7 +2234,7 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("MACD_SIGNAL", signature_macd_signal as fn() -> IndicatorSignature),
     ("MARKET_CIPHER", signature_market_cipher as fn() -> IndicatorSignature),
     ("MOM_ZSCORE", signature_momentum_zscore as fn() -> IndicatorSignature),
-    ("MTF_MOM_DIV", signature_multi_timeframe_momentum_divergence as fn() -> IndicatorSignature),
+
     ("NEURAL_MOM", signature_neural_momentum_network as fn() -> IndicatorSignature),
     ("MO_OBV", signature_obv as fn() -> IndicatorSignature),
     ("PSAR", signature_parabolic_sar as fn() -> IndicatorSignature),
@@ -2317,7 +2275,6 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("VORTEX", signature_vortex_indicator as fn() -> IndicatorSignature),
     ("WILLIAMS_R", signature_williams_r as fn() -> IndicatorSignature),
     ("DI_PLUS_MINUS", signature_di_plus_minus as fn() -> IndicatorSignature),
-    ("ZIGZAG", signature_zigzag as fn() -> IndicatorSignature),
 ];
 
 /// Expanded catalog with all aliases auto-generated from signatures
@@ -2400,7 +2357,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 88); // CandlePatterns removed; SwingAge moved to statistical_scoring
+        assert_eq!(count(), 87); // MtfMomDiv + Zigzag removed (legacy wrappers)
     }
 
     #[test]

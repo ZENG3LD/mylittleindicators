@@ -273,8 +273,7 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::TradeFlowImbalance => RoleKind::OscillatorBounded,
 
         // ── Pivot Indicators ──────────────────────────────────────────────────
-        BarIndicatorId::Zigzag
-        | BarIndicatorId::Pivot
+        BarIndicatorId::Pivot
         | BarIndicatorId::Floorpivot
         | BarIndicatorId::Camarilla
         | BarIndicatorId::Demark

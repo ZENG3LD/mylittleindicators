@@ -1082,15 +1082,6 @@ fn register_momentum_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingM
             .build()
     );
 
-    // MTF Momentum Divergence
-    catalog.insert(BarIndicatorId::MtfMomDiv,
-        RenderingMetadata::builder("MTF_MOM_DIV")
-            .sub_pane()
-            .line_output("div", "MTF Mom Div", COLOR_PURPLE)
-            .precision(0)
-            .build()
-    );
-
     // Neural Momentum
     catalog.insert(BarIndicatorId::NeuralMom,
         RenderingMetadata::builder("NEURAL_MOM")
@@ -1345,14 +1336,6 @@ fn register_momentum_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingM
             .build()
     );
 
-    // Zigzag
-    catalog.insert(BarIndicatorId::Zigzag,
-        RenderingMetadata::builder("ZIGZAG")
-            .overlay()
-            .line_output("zigzag", "Zigzag", COLOR_PURPLE)
-            .precision(4)
-            .build()
-    );
 }
 
 // ============================================================================
@@ -4037,120 +4020,8 @@ fn register_cluster_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMe
 // DIVERGENCE INDICATORS
 // ============================================================================
 
-fn register_divergence_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMetadata>) {
-    // RSI Divergence
-    catalog.insert(BarIndicatorId::RsiDiv,
-        RenderingMetadata::builder("RSIDIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("divergence", "RSI Divergence", COLOR_PURPLE, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // MACD Divergence
-    catalog.insert(BarIndicatorId::MacdDiv,
-        RenderingMetadata::builder("MACDDIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("divergence", "MACD Divergence", COLOR_BLUE, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // OBV Divergence
-    catalog.insert(BarIndicatorId::ObvDiv,
-        RenderingMetadata::builder("OBVDIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("divergence", "OBV Divergence", COLOR_GREEN, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // Stochastic Divergence
-    catalog.insert(BarIndicatorId::StochDiv,
-        RenderingMetadata::builder("STOCHDIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("divergence", "Stoch Divergence", COLOR_ORANGE, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // General Divergence Scanner
-
-    // === MISSING DIVERGENCE INDICATORS ===
-
-    // CCI Divergence
-    catalog.insert(BarIndicatorId::CciDiv,
-        RenderingMetadata::builder("CCI_DIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("div", "CCI Divergence", COLOR_PURPLE, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // Hidden Divergence
-    catalog.insert(BarIndicatorId::HiddenDiv,
-        RenderingMetadata::builder("HIDDEN_DIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("div", "Hidden Div", COLOR_TEAL, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // MACD Histogram Divergence
-    catalog.insert(BarIndicatorId::MacdHistDiv,
-        RenderingMetadata::builder("MACD_HIST_DIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("div", "MACD Hist Div", COLOR_INDIGO, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // Volume Divergence
-    catalog.insert(BarIndicatorId::VolDiv,
-        RenderingMetadata::builder("VOL_DIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("div", "Vol Div", COLOR_TEAL, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // Williams Divergence
-    catalog.insert(BarIndicatorId::WilliamsDiv,
-        RenderingMetadata::builder("WILLIAMS_DIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("div", "Williams Div", COLOR_CYAN, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
-
-    // Zigzag Divergence
-    catalog.insert(BarIndicatorId::ZigzagDiv,
-        RenderingMetadata::builder("ZIGZAG_DIV")
-            .sub_pane()
-            .output(OutputSpec::histogram("div", "Zigzag Div", COLOR_PINK, ValueExtractor::Main))
-            .bounds(-1.0, 1.0)
-            .histogram_style(HistogramStyle::Centered)
-            .precision(0)
-            .build()
-    );
+fn register_divergence_indicators(_catalog: &mut HashMap<BarIndicatorId, RenderingMetadata>) {
+    // Divergence variants removed — handled by events::Divergence / events::SwingDetection
 }
 
 // ============================================================================
@@ -4975,25 +4846,6 @@ fn register_missing_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMe
                 .sub_pane()
                 .line_output("chaos", "Chaos", COLOR_PURPLE)
                 .precision(4)
-                .build()
-        );
-    }
-
-    // ========================================================================
-    // DIVERGENCE (all missing)
-    // ========================================================================
-
-    let divergence_ids = [
-        BarIndicatorId::CciDiv, BarIndicatorId::HiddenDiv, BarIndicatorId::MacdDiv, BarIndicatorId::MacdHistDiv, BarIndicatorId::ObvDiv, BarIndicatorId::RsiDiv, BarIndicatorId::StochDiv, BarIndicatorId::VolDiv, BarIndicatorId::WilliamsDiv, BarIndicatorId::ZigzagDiv
-    ];
-    for id in divergence_ids {
-        catalog.insert(id,
-            RenderingMetadata::builder(format!("{:?}", id))
-                .sub_pane()
-                .line_output("divergence", "Divergence", COLOR_PURPLE)
-                .bounds(-1.0, 1.0)
-                .zero_baseline()
-                .precision(0)
                 .build()
         );
     }

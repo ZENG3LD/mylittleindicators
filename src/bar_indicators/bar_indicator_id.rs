@@ -78,7 +78,7 @@ pub enum BarIndicatorId {
     MoFisher,  // MO_FISHER
     MoObv,  // MO_OBV
     MomZscore,  // MOM_ZSCORE
-    MtfMomDiv,  // MTF_MOM_DIV
+
     NeuralMom,  // NEURAL_MOM
     Pfe,  // PFE
     Pmo,  // PMO
@@ -117,7 +117,6 @@ pub enum BarIndicatorId {
     Vortex,  // VORTEX
     Vwrsi,  // VWRSI
     WilliamsR,  // WILLIAMS_R
-    Zigzag,  // ZIGZAG
 
     // Signal Processing (84 indicators)
     Autocorr,  // AUTOCORR
@@ -401,18 +400,6 @@ pub enum BarIndicatorId {
     Hurst,  // HURST
     HurstPct,  // HURST_PCT
     WilliamsMfi,  // WILLIAMS_MFI
-
-    // Divergence (10 indicators)
-    CciDiv,  // CCI_DIV
-    HiddenDiv,  // HIDDEN_DIV
-    MacdDiv,  // MACD_DIV
-    MacdHistDiv,  // MACD_HIST_DIV
-    ObvDiv,  // OBV_DIV
-    RsiDiv,  // RSI_DIV
-    StochDiv,  // STOCH_DIV
-    VolDiv,  // VOL_DIV
-    WilliamsDiv,  // WILLIAMS_DIV
-    ZigzagDiv,  // ZIGZAG_DIV
 
     // Regression (7 indicators)
     Arima,  // ARIMA

@@ -50,11 +50,11 @@ fn all_ids() -> Vec<BarIndicatorId> {
         BbPeriod, Bias, Bop, Cci, Cfo, Cmo, Cog, ConnorsRsi, Coppock, Demarker, Dm, Dpo, DpoPct,
         Dsp, Dss, EhlersCc, EhlersRocket, ElderImpulse, ElderRay, EmaSlope, Ewmac, EwmacRobust,
         Gapo, Gator, Highest, IftRsi, Imi, Kdj, Kst, Kvo, Lowest, Macd, MacdHist, MacdHistZ,
-        MacdSignal, MarketCipher, MoFisher, MoObv, MomZscore, MtfMomDiv, NeuralMom, Pfe, Pmo,
+        MacdSignal, MarketCipher, MoFisher, MoObv, MomZscore, NeuralMom, Pfe, Pmo,
         Ppo, PpoSignal, Pressure, Psar, Psl, Qqe, Qstick, Rmi, Roc, RocPct, Rsi, RsiPctBands,
         RsiPctRank, RsiZscore, Rsioma, Rsx, Rvgi, Rwi, Smi, Stc, Stoch, StochRsi, Stochkd,
         SweepRev, SwingAge, Tdi, Trix, Tsi, Uo, UoSmooth, Vhf, VhfMa, Vortex, Vwrsi,
-        WilliamsR, Zigzag,
+        WilliamsR,
         // Signal Processing
         Autocorr, Butter, Cheby, Cusum, Cyber, Decyc, Esine, Ess, Fft, Hampel, Hdc, Hilb, Hmom,
         Hyst, Logicand, Logicor, Logicxor, Logicsign, Lz, Mrf, Rc, Roof, Sbp, Sbprhl, Sbwf, Scf,
@@ -96,9 +96,7 @@ fn all_ids() -> Vec<BarIndicatorId> {
         // Chaos
         Ac, Alligator, Ao, ChaosOsc, Dfa, DfaPct, FractalDim, Fractals, Hurst, HurstPct,
         WilliamsMfi,
-        // Divergence
-        CciDiv, HiddenDiv, MacdDiv, MacdHistDiv, ObvDiv, RsiDiv, StochDiv, VolDiv, WilliamsDiv,
-        ZigzagDiv,
+        // Divergence (variants removed — use events::Divergence)
         // Regression
         Arima, Arimax, Egarch, Garch, PolyReg, Var,
         // Ratio
@@ -195,11 +193,11 @@ fn category_of(id: BarIndicatorId) -> &'static str {
         | Demarker | Dm | Dpo | DpoPct | Dsp | Dss | EhlersCc | EhlersRocket | ElderImpulse
         | ElderRay | EmaSlope | Ewmac | EwmacRobust | Gapo | Gator | Highest | IftRsi | Imi
         | Kdj | Kst | Kvo | Lowest | Macd | MacdHist | MacdHistZ | MacdSignal | MarketCipher
-        | MoFisher | MoObv | MomZscore | MtfMomDiv | NeuralMom | Pfe | Pmo | Ppo | PpoSignal
+        | MoFisher | MoObv | MomZscore | NeuralMom | Pfe | Pmo | Ppo | PpoSignal
         | Pressure | Psar | Psl | Qqe | Qstick | Rmi | Roc | RocPct | Rsi | RsiPctBands
         | RsiPctRank | RsiZscore | Rsioma | Rsx | Rvgi | Rwi | Smi | Stc | Stoch | StochRsi
         | Stochkd | SweepRev | SwingAge | Tdi | Trix | Tsi | Uo | UoSmooth | Vhf | VhfMa
-        | Vortex | Vwrsi | WilliamsR | Zigzag => "momentum",
+        | Vortex | Vwrsi | WilliamsR => "momentum",
 
         Autocorr | Butter | Cheby | Cusum | Cyber | Decyc | Esine | Ess | Fft | Hampel | Hdc
         | Hilb | Hmom | Hyst | Logicand | Logicor | Logicxor | Logicsign | Lz | Mrf | Rc | Roof
@@ -252,9 +250,6 @@ fn category_of(id: BarIndicatorId) -> &'static str {
 
         Ac | Alligator | Ao | ChaosOsc | Dfa | DfaPct | FractalDim | Fractals | Hurst
         | HurstPct | WilliamsMfi => "chaos",
-
-        CciDiv | HiddenDiv | MacdDiv | MacdHistDiv | ObvDiv | RsiDiv | StochDiv | VolDiv
-        | WilliamsDiv | ZigzagDiv => "divergence",
 
         Arima | Arimax | Egarch | Garch | PolyReg | Var => "regression",
 
@@ -480,9 +475,6 @@ impl IndicatorState {
         match id {
             // SwingDetection::Percent — factory uses additional_params["deviation"] * 100
             // → 0.005 * 100 = 0.5% (was 5%)
-            BarIndicatorId::Zigzag | BarIndicatorId::ZigzagDiv => {
-                vec![("deviation", 0.005)]
-            }
             // CusumFilter threshold (factory default ~0.01 = 1% cumulative return)
             // Lower to 0.003 (0.3%) — common per-bar BTC log-return scale.
             BarIndicatorId::Cusum | BarIndicatorId::StCusum => {

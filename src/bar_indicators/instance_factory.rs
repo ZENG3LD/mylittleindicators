@@ -2206,7 +2206,10 @@ impl IndicatorInstance {
                 let sigma = config.additional_params.get("sigma").copied().unwrap_or(6.0);
                 Ok(Self::Alma(Box::new(Alma::with_source(period, config.source, offset, sigma))))
             }
-            BarIndicatorId::T3 => Ok(Self::T3(Box::new(T3::with_source(period, 0.7, config.source)))),
+            BarIndicatorId::T3 => {
+                let vfactor = config.additional_params.get("vfactor").copied().unwrap_or(0.7);
+                Ok(Self::T3(Box::new(T3::with_source(period, vfactor, config.source))))
+            }
             BarIndicatorId::Mcginley => Ok(Self::McGinley(Box::new(McGinleyDynamic::with_source(period, config.source)))),
             BarIndicatorId::Ama => {
                 let fast = config.periods.get(1).copied().unwrap_or(2);
@@ -2449,7 +2452,10 @@ impl IndicatorInstance {
                 let pct = config.additional_params.get("pct").copied().unwrap_or(2.5);
                 Ok(Self::Envbw(Box::new(EnvelopeBandwidth::new(period, pct))))
             }
-            BarIndicatorId::Stddevchan => Ok(Self::StandardDeviationChannels(Box::new(StandardDeviationChannels::with_source(period, 2.0, crate::bar_indicators::channels::standard_deviation_channels::StandardDeviationMode::Simple, crate::bar_indicators::channels::standard_deviation_channels::RegressionSource::Close, config.source)))) ,
+            BarIndicatorId::Stddevchan => {
+                let mult = config.additional_params.get("std_dev").copied().unwrap_or(2.0);
+                Ok(Self::StandardDeviationChannels(Box::new(StandardDeviationChannels::with_source(period, mult, crate::bar_indicators::channels::standard_deviation_channels::StandardDeviationMode::Simple, crate::bar_indicators::channels::standard_deviation_channels::RegressionSource::Close, config.source))))
+            }
             BarIndicatorId::Stddevwidth => {
                 let mult = config.additional_params.get("std_dev").copied().unwrap_or(2.0);
                 Ok(Self::StdDevChannelWidth(Box::new(StdDevChannelWidth::new(period, mult))))
@@ -2488,10 +2494,24 @@ impl IndicatorInstance {
             // MedianChannels requires period > 2 (asserts inside). Clamp to at least 3.
             BarIndicatorId::Medchan => Ok(Self::Medchan(Box::new(MedianChannels::with_source(period.max(3), crate::bar_indicators::channels::median_channels::MedianMode::Simple, crate::bar_indicators::channels::median_channels::MedianSource::Close, 1.4826, config.source)))),
             BarIndicatorId::Medchanpos => Ok(Self::Medchanpos(Box::new(MedianChannelPosition::new(period)))),
-            BarIndicatorId::Qrchan => Ok(Self::QuantileRegressionChannels(Box::new(QuantileRegressionChannels::new(period, 2.0)))),
-            BarIndicatorId::Trimabands => Ok(Self::TrimaBands(Box::new(TrimaBands::with_source(period, 2.0, config.source)))),
-            BarIndicatorId::Dpobands => Ok(Self::DpoBands(Box::new(DpoBands::new(period, period.max(5), 2.0)))),
-            BarIndicatorId::Percentilech => Ok(Self::Percentilech(Box::new(PercentileChannels::with_source(period, PercentileBasis::Close, 0.25, 0.75, config.source)))),
+            BarIndicatorId::Qrchan => {
+                let bandwidth_mult = config.additional_params.get("bandwidth").copied().unwrap_or(2.0);
+                Ok(Self::QuantileRegressionChannels(Box::new(QuantileRegressionChannels::new(period, bandwidth_mult))))
+            }
+            BarIndicatorId::Trimabands => {
+                let mult = config.additional_params.get("multiplier").copied().unwrap_or(2.0);
+                Ok(Self::TrimaBands(Box::new(TrimaBands::with_source(period, mult, config.source))))
+            }
+            BarIndicatorId::Dpobands => {
+                let period2 = config.periods.get(1).copied().unwrap_or(period.max(5));
+                let mult = config.additional_params.get("multiplier").copied().unwrap_or(2.0);
+                Ok(Self::DpoBands(Box::new(DpoBands::new(period, period2, mult))))
+            }
+            BarIndicatorId::Percentilech => {
+                let lower_q = config.additional_params.get("lower_q").copied().unwrap_or(0.25);
+                let upper_q = config.additional_params.get("upper_q").copied().unwrap_or(0.75);
+                Ok(Self::Percentilech(Box::new(PercentileChannels::with_source(period, PercentileBasis::Close, lower_q, upper_q, config.source))))
+            }
             // Duplicate short form removed; detailed arm below
             // Duplicate short form removed; detailed arm below
             // DarvasBox variant not present in BarIndicatorId; skip wiring here.
@@ -2768,7 +2788,12 @@ impl IndicatorInstance {
             BarIndicatorId::Xmil => {
                 let bins = config.additional_params.get("bins").copied().unwrap_or(10.0) as usize;
                 let clip_abs = config.additional_params.get("clip_abs").copied().unwrap_or(3.0);
-                let lags = vec![1, 2, 3, 5, 10]; // Default lags
+                let lag_1 = config.additional_params.get("lag_1").copied().unwrap_or(1.0) as usize;
+                let lag_2 = config.additional_params.get("lag_2").copied().unwrap_or(2.0) as usize;
+                let lag_3 = config.additional_params.get("lag_3").copied().unwrap_or(3.0) as usize;
+                let lag_4 = config.additional_params.get("lag_4").copied().unwrap_or(5.0) as usize;
+                let lag_5 = config.additional_params.get("lag_5").copied().unwrap_or(10.0) as usize;
+                let lags = vec![lag_1, lag_2, lag_3, lag_4, lag_5];
                 Ok(Self::Xmil(Box::new(CrossMutualInformationLags::new(period, &lags, bins, clip_abs))))
             }
             BarIndicatorId::Cmo => {
@@ -2815,8 +2840,10 @@ impl IndicatorInstance {
                 Ok(Self::ParabolicSAR(Box::new(ParabolicSAR::with_params(af_start, af_inc, af_max))))
             }
             BarIndicatorId::Uo => {
-                // Ensure increasing default periods (7,14,28)
-                let inner = Box::new(Self::UltimateOscillator(Box::new(UltimateOscillator::with_periods(7, 14, 28))));
+                let p1 = config.periods.first().copied().unwrap_or(7);
+                let p2 = config.periods.get(1).copied().unwrap_or(14);
+                let p3 = config.periods.get(2).copied().unwrap_or(28);
+                let inner = Box::new(Self::UltimateOscillator(Box::new(UltimateOscillator::with_periods(p1, p2, p3))));
                 Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::UoSmooth => {
@@ -3642,7 +3669,12 @@ impl IndicatorInstance {
                 let alpha = config.additional_params.get("alpha").copied().unwrap_or(0.07);
                 Ok(Self::Eit(Box::new(EhlersInstantaneousTrendline::with_source(alpha, config.source))))
             }
-            BarIndicatorId::Mama => Ok(Self::MesaAdaptiveMA(Box::new(MesaAdaptiveMA::with_source(8.0, 50.0, MovingAverageType::EMA, config.source)))),
+            BarIndicatorId::Mama => {
+                let fast_limit = config.additional_params.get("fast_limit").copied().unwrap_or(8.0);
+                let slow_limit = config.additional_params.get("slow_limit").copied().unwrap_or(50.0);
+                let ma_type = config.ma_types.get("ma_type").copied().unwrap_or(MovingAverageType::EMA);
+                Ok(Self::MesaAdaptiveMA(Box::new(MesaAdaptiveMA::with_source(fast_limit, slow_limit, ma_type, config.source))))
+            }
             BarIndicatorId::Ess => {
                 let period = config.additional_params.get("period").copied().unwrap_or(10.0);
                 Ok(Self::Ess(Box::new(EhlersSuperSmoother::with_source(period, config.source))))
@@ -3654,7 +3686,9 @@ impl IndicatorInstance {
                 Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Vwrsi => {
-                let inner = Box::new(Self::VolumeWeightedRsi(Box::new(VolumeWeightedRsi::with_source(14, 20, config.source))));
+                let p1 = config.periods.first().copied().unwrap_or(14);
+                let p2 = config.periods.get(1).copied().unwrap_or(20);
+                let inner = Box::new(Self::VolumeWeightedRsi(Box::new(VolumeWeightedRsi::with_source(p1, p2, config.source))));
                 Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Rsioma => {
@@ -4335,7 +4369,13 @@ impl IndicatorInstance {
                 Ok(Self::RSquared(Box::new(RSquared::new(window))))
             }
             BarIndicatorId::VrZAgg => {
-                let configs_vec: Vec<(usize, usize)> = vec![(2, 10), (5, 10), (10, 20)]; // Default configs
+                let p1s = config.additional_params.get("pair_1_short").copied().unwrap_or(2.0) as usize;
+                let p1l = config.additional_params.get("pair_1_long").copied().unwrap_or(10.0) as usize;
+                let p2s = config.additional_params.get("pair_2_short").copied().unwrap_or(5.0) as usize;
+                let p2l = config.additional_params.get("pair_2_long").copied().unwrap_or(10.0) as usize;
+                let p3s = config.additional_params.get("pair_3_short").copied().unwrap_or(10.0) as usize;
+                let p3l = config.additional_params.get("pair_3_long").copied().unwrap_or(20.0) as usize;
+                let configs_vec: Vec<(usize, usize)> = vec![(p1s, p1l), (p2s, p2l), (p3s, p3l)];
                 let z_window = config.periods.first().copied().unwrap_or(100);
                 Ok(Self::VrZAgg(Box::new(VarianceRatioZAggregate::new(&configs_vec, z_window))))
             }
@@ -4627,127 +4667,6 @@ impl IndicatorInstance {
             }
 
             // ========================================
-            // BATCH 5 ADDITIONS (13 divergence indicators)
-            // ========================================
-            // DIVERGENCE
-            // Legacy Div arms redirected to OscillatorWithDivergence wrapper.
-            BarIndicatorId::RsiDiv => {
-                let period = config.periods.first().copied().unwrap_or(14).max(1);
-                let lookback = config.periods.get(1).copied().unwrap_or(14).max(5);
-                let mut div_config = config.clone();
-                div_config.flags.insert("with_divergence".to_string(), true);
-                div_config.flags.insert("divergence_regular".to_string(), true);
-                div_config.flags.insert("divergence_hidden".to_string(), true);
-                div_config.additional_params.insert("swing_lookback".to_string(), lookback as f64);
-                let inner = Box::new(Self::Rsi(Box::new(
-                    Rsi::with_source(period, MovingAverageType::RMA, config.source),
-                )));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, &div_config))
-            }
-            BarIndicatorId::CciDiv => {
-                let period = config.periods.first().copied().unwrap_or(14).max(1);
-                let lookback = config.periods.get(1).copied().unwrap_or(14).max(5);
-                let mut div_config = config.clone();
-                div_config.flags.insert("with_divergence".to_string(), true);
-                div_config.flags.insert("divergence_regular".to_string(), true);
-                div_config.flags.insert("divergence_hidden".to_string(), true);
-                div_config.additional_params.insert("swing_lookback".to_string(), lookback as f64);
-                let scalar = config.additional_params.get("scalar").copied().unwrap_or(0.015);
-                let inner = Box::new(Self::Cci(Box::new(Cci::new(period, scalar, None))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, &div_config))
-            }
-            BarIndicatorId::MacdDiv => {
-                let fast = config.periods.first().copied().unwrap_or(12).max(1);
-                let slow = config.periods.get(1).copied().unwrap_or(26).max(2);
-                let lookback = config.periods.get(2).copied().unwrap_or(14).max(5);
-                let signal = config.periods.get(3).copied().unwrap_or(9);
-                let mut div_config = config.clone();
-                div_config.flags.insert("with_divergence".to_string(), true);
-                div_config.flags.insert("divergence_regular".to_string(), true);
-                div_config.flags.insert("divergence_hidden".to_string(), true);
-                div_config.additional_params.insert("swing_lookback".to_string(), lookback as f64);
-                let inner = Box::new(Self::Macd(Box::new(Macd::with_full_config(
-                    fast, slow, signal,
-                    MovingAverageType::EMA, MovingAverageType::EMA, MovingAverageType::EMA,
-                    config.source, config.source,
-                ))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, &div_config))
-            }
-            BarIndicatorId::MacdHistDiv => {
-                let fast = config.periods.first().copied().unwrap_or(12).max(1);
-                let slow = config.periods.get(1).copied().unwrap_or(26).max(2);
-                let signal = config.periods.get(2).copied().unwrap_or(9).max(1);
-                let lookback = config.periods.get(3).copied().unwrap_or(14).max(5);
-                let mut div_config = config.clone();
-                div_config.flags.insert("with_divergence".to_string(), true);
-                div_config.flags.insert("divergence_regular".to_string(), true);
-                div_config.flags.insert("divergence_hidden".to_string(), true);
-                div_config.additional_params.insert("swing_lookback".to_string(), lookback as f64);
-                let inner = Box::new(Self::MacdHist(Box::new(MacdHistogram::new(fast, slow, signal))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, &div_config))
-            }
-            BarIndicatorId::StochDiv => {
-                let period_k = config.periods.first().copied().unwrap_or(14).max(1);
-                let period_d = config.periods.get(1).copied().unwrap_or(3).max(1);
-                let lookback = config.periods.get(2).copied().unwrap_or(14).max(5);
-                let mut div_config = config.clone();
-                div_config.flags.insert("with_divergence".to_string(), true);
-                div_config.flags.insert("divergence_regular".to_string(), true);
-                div_config.flags.insert("divergence_hidden".to_string(), true);
-                div_config.additional_params.insert("swing_lookback".to_string(), lookback as f64);
-                let inner = Box::new(Self::Stochastics(Box::new(Stochastics::new(period_k, period_d))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, &div_config))
-            }
-            BarIndicatorId::WilliamsDiv => {
-                let period = config.periods.first().copied().unwrap_or(14).max(1);
-                let lookback = config.periods.get(1).copied().unwrap_or(14).max(5);
-                let mut div_config = config.clone();
-                div_config.flags.insert("with_divergence".to_string(), true);
-                div_config.flags.insert("divergence_regular".to_string(), true);
-                div_config.flags.insert("divergence_hidden".to_string(), true);
-                div_config.additional_params.insert("swing_lookback".to_string(), lookback as f64);
-                let inner = Box::new(Self::WilliamsR(Box::new(WilliamsR::new(period))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, &div_config))
-            }
-            BarIndicatorId::ObvDiv => {
-                let lookback = config.periods.first().copied().unwrap_or(14).max(5);
-                let mut div_config = config.clone();
-                div_config.flags.insert("with_divergence".to_string(), true);
-                div_config.flags.insert("divergence_regular".to_string(), true);
-                div_config.flags.insert("divergence_hidden".to_string(), true);
-                div_config.additional_params.insert("swing_lookback".to_string(), lookback as f64);
-                let inner = Box::new(Self::Obv(Box::new(Obv::with_source(config.source))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, &div_config))
-            }
-            BarIndicatorId::VolDiv => {
-                let lookback = config.periods.first().copied().unwrap_or(14).max(5);
-                let mut div_config = config.clone();
-                div_config.flags.insert("with_divergence".to_string(), true);
-                div_config.flags.insert("divergence_regular".to_string(), true);
-                div_config.flags.insert("divergence_hidden".to_string(), true);
-                div_config.additional_params.insert("swing_lookback".to_string(), lookback as f64);
-                // Use Vfi as proxy for volume oscillator
-                let inner = Box::new(Self::Vfi(Box::new(Vfi::new(lookback))));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, &div_config))
-            }
-            BarIndicatorId::HiddenDiv => {
-                let period = config.periods.first().copied().unwrap_or(14).max(1);
-                let lookback = config.periods.get(1).copied().unwrap_or(14).max(5);
-                let mut div_config = config.clone();
-                div_config.flags.insert("with_divergence".to_string(), true);
-                div_config.flags.insert("divergence_regular".to_string(), false);
-                div_config.flags.insert("divergence_hidden".to_string(), true);
-                div_config.additional_params.insert("swing_lookback".to_string(), lookback as f64);
-                let inner = Box::new(Self::Rsi(Box::new(
-                    Rsi::with_source(period, MovingAverageType::RMA, config.source),
-                )));
-                Ok(*Self::wrap_with_divergence_if_requested(inner, &div_config))
-            }
-            BarIndicatorId::MtfMomDiv => {
-                Ok(Self::MultiTimeframeMomentumDivergence(Box::new(MultiTimeframeMomentumDivergence::with_source(config.source))))
-            }
-
-            // ========================================
             // BATCH 6 - Timestamp-dependent indicators
             // ========================================
             BarIndicatorId::HourDay => {
@@ -4816,91 +4735,6 @@ impl IndicatorInstance {
 
                 Ok(Self::Poc(Box::new(
                     PocDetector::new(price_precision, min_volume_threshold, rolling_period)
-                )))
-            }
-
-            BarIndicatorId::Zigzag => {
-                use crate::events::swing_detection::SwingMode;
-
-                // swing_mode selects the detection strategy:
-                //   0 = Percent (default), 1 = AtrMultiple, 2 = NBarExtreme,
-                //   3 = Lookahead, 4 = Time
-                let mode_code = config.additional_params.get("swing_mode")
-                    .copied()
-                    .unwrap_or(0.0) as i32;
-
-                match mode_code {
-                    0 => {
-                        // Support both "threshold_pct" and legacy "deviation" (scaled ×100).
-                        let threshold_pct = config.additional_params
-                            .get("threshold_pct")
-                            .copied()
-                            .unwrap_or_else(|| {
-                                config.additional_params
-                                    .get("deviation")
-                                    .copied()
-                                    .unwrap_or(0.05) * 100.0
-                            });
-                        Ok(Self::SwingDetection(Box::new(
-                            crate::events::SwingDetection::new(SwingMode::Percent { threshold_pct })
-                        )))
-                    }
-                    1 => {
-                        let mult = config.additional_params.get("atr_multiplier")
-                            .copied()
-                            .unwrap_or(2.0);
-                        let atr_period = config.additional_params.get("atr_period")
-                            .copied()
-                            .unwrap_or(14.0) as usize;
-                        let atr = Self::Atr(Box::new(
-                            crate::bar_indicators::volatility::atr::Atr::new(
-                                atr_period.max(2),
-                                MovingAverageType::RMA,
-                            )
-                        ));
-                        Ok(Self::SwingDetection(Box::new(
-                            crate::events::SwingDetection::with_atr_source(
-                                SwingMode::AtrMultiple { mult },
-                                atr,
-                            )
-                        )))
-                    }
-                    2 => {
-                        let n = config.additional_params.get("n")
-                            .copied()
-                            .unwrap_or(5.0) as usize;
-                        Ok(Self::SwingDetection(Box::new(
-                            crate::events::SwingDetection::new(SwingMode::NBarExtreme { n })
-                        )))
-                    }
-                    3 => {
-                        let n = config.additional_params.get("lookahead")
-                            .copied()
-                            .unwrap_or(3.0) as usize;
-                        Ok(Self::SwingDetection(Box::new(
-                            crate::events::SwingDetection::new(SwingMode::Lookahead { n })
-                        )))
-                    }
-                    4 => {
-                        let n_bars = config.additional_params.get("n_bars")
-                            .copied()
-                            .unwrap_or(10.0) as usize;
-                        Ok(Self::SwingDetection(Box::new(
-                            crate::events::SwingDetection::new(SwingMode::Time { n_bars })
-                        )))
-                    }
-                    other => Err(format!(
-                        "Zigzag: unknown swing_mode={other}, expected 0..4"
-                    )),
-                }
-            }
-
-            BarIndicatorId::ZigzagDiv => {
-                // Fallback: percent-based swing detection
-                Ok(Self::SwingDetection(Box::new(
-                    crate::events::SwingDetection::new(
-                        crate::events::swing_detection::SwingMode::Percent { threshold_pct: 5.0 }
-                    )
                 )))
             }
 
