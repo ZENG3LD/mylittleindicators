@@ -23,7 +23,8 @@ use mylittleindicators::bar_indicators::{
     indicator_value::IndicatorValue,
     instance_factory::{IndicatorConfig, IndicatorInstance},
 };
-use mylittleindicators::catalog::MasterIndicatorCatalog;
+use mylittleindicators::catalog::{MasterEventCatalog, MasterIndicatorCatalog};
+use mylittleindicators::events::{EventConfig, EventId, EventInstance};
 use mylittleindicators::core::types::{
     AggTrade, AuctionEvent, Basis, BlockTrade, CompositeIndex, FundingRate,
     FundingSettlement, HistoricalVolatility, IndexPrice, InsuranceFund,
@@ -1087,6 +1088,253 @@ fn extract_f64s(val: &IndicatorValue) -> Vec<f64> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// All 18 EventId variants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ALL_EVENT_IDS: &[EventId] = &[
+    EventId::BosEventDetector,
+    EventId::CandlePattern,
+    EventId::Confluence,
+    EventId::DirectionDetector,
+    EventId::Divergence,
+    EventId::FvgEventDetector,
+    EventId::LineCross,
+    EventId::OscillatorWithDivergence,
+    EventId::OscillatorWithVolumeWeight,
+    EventId::Pivot,
+    EventId::PriceLineCross,
+    EventId::RegimeGate,
+    EventId::RelativePosition,
+    EventId::StatisticalWickDetector,
+    EventId::SwingDetection,
+    EventId::Threshold,
+    EventId::VolatilityRegimeDetector,
+    EventId::VolumeEventDetector,
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-event state
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+struct EventRecord {
+    event_id: String,
+    name: String,
+    stream_kind: String,
+    status: String,
+    events_received: u64,
+    panic_count: u64,
+    is_ready: bool,
+    ready_at_event: Option<u64>,
+    last_value_repr: String,
+    max_abs_value: f64,
+    has_finite_nonzero: bool,
+    create_error: Option<String>,
+}
+
+struct EventState {
+    id: EventId,
+    name: String,
+    stream_kind: StreamKind,
+    aux_streams: &'static [StreamKind],
+    instance: Option<EventInstance>,
+    create_error: Option<String>,
+    events_received: u64,
+    panic_count: u64,
+    is_ready: bool,
+    ready_at_event: Option<u64>,
+    last_value: Option<IndicatorValue>,
+    max_abs_value: f64,
+    has_finite_nonzero: bool,
+}
+
+impl EventState {
+    fn accepts(&self, kind: StreamKind) -> bool {
+        self.stream_kind == kind || self.aux_streams.contains(&kind)
+    }
+
+    fn record_value(&mut self, val: IndicatorValue) {
+        self.last_value = Some(val);
+        let fs = extract_f64s(&val);
+        for v in &fs {
+            if v.is_finite() && *v != 0.0 {
+                self.has_finite_nonzero = true;
+            }
+            let av = v.abs();
+            if av > self.max_abs_value && av.is_finite() {
+                self.max_abs_value = av;
+            }
+        }
+    }
+
+    fn try_update_bar(&mut self, o: f64, h: f64, l: f64, c: f64, v: f64, _ts: i64) {
+        let inst = match &mut self.instance {
+            Some(i) => i,
+            None => return,
+        };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| {
+            inst.update_bar(o, h, l, c, v)
+        }));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    let r = panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready()));
+                    if matches!(r, Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => {
+                self.panic_count += 1;
+            }
+        }
+    }
+
+    fn finalize_record(&self) -> EventRecord {
+        let status = if self.create_error.is_some() {
+            "create_failed".to_string()
+        } else if self.panic_count > 0 && self.events_received == self.panic_count {
+            "panic".to_string()
+        } else if self.events_received == 0 {
+            "never_received_event".to_string()
+        } else if !self.is_ready {
+            "never_ready".to_string()
+        } else if !self.has_finite_nonzero {
+            let all_nan = self.last_value.map(|v| {
+                let fs = extract_f64s(&v);
+                fs.iter().all(|x| !x.is_finite())
+            }).unwrap_or(false);
+            if all_nan { "always_nan_inf".to_string() } else { "always_zero".to_string() }
+        } else {
+            "pass".to_string()
+        };
+
+        EventRecord {
+            event_id: format!("{:?}", self.id),
+            name: self.name.clone(),
+            stream_kind: self.stream_kind.as_str().to_string(),
+            status,
+            events_received: self.events_received,
+            panic_count: self.panic_count,
+            is_ready: self.is_ready,
+            ready_at_event: self.ready_at_event,
+            last_value_repr: self.last_value.map(|v| format!("{v:?}")).unwrap_or_default(),
+            max_abs_value: self.max_abs_value,
+            has_finite_nonzero: self.has_finite_nonzero,
+            create_error: self.create_error.clone(),
+        }
+    }
+}
+
+/// Build the EventConfig for each EventId with sensible defaults.
+fn build_event_config(id: EventId) -> EventConfig {
+    let name = id.as_str().to_string();
+    match id {
+        EventId::SwingDetection => EventConfig::new(id, name)
+            .with_string_param("mode", "percent")
+            .with_param("threshold_pct", 1.0),
+        EventId::Pivot => EventConfig::new(id, name)
+            .with_periods(vec![5, 5]),
+        EventId::Threshold => EventConfig::new(id, name)
+            .with_string_param("kind", "rsi")
+            .with_param("upper", 70.0)
+            .with_param("lower", 30.0),
+        EventId::VolumeEventDetector => EventConfig::new(id, name)
+            .with_periods(vec![20])
+            .with_param("multiplier", 2.0),
+        EventId::BosEventDetector => EventConfig::new(id, name)
+            .with_periods(vec![14]),
+        EventId::StatisticalWickDetector => EventConfig::new(id, name)
+            .with_periods(vec![50]),
+        EventId::VolatilityRegimeDetector => EventConfig::new(id, name)
+            .with_param("low", 0.5)
+            .with_param("high", 1.5),
+        EventId::RegimeGate => EventConfig::new(id, name)
+            .with_param("regime_threshold", 0.5)
+            .with_string_param("direction", "above"),
+        EventId::CandlePattern => EventConfig::new(id, name)
+            .with_string_param("kind", "doji"),
+        EventId::LineCross => EventConfig::new(id, name)
+            .with_string_param("left", "ma")
+            .with_string_param("right", "price")
+            .with_string_param("mode", "bullish"),
+        EventId::PriceLineCross => EventConfig::new(id, name)
+            .with_string_param("line", "ma")
+            .with_string_param("mode", "above"),
+        EventId::Divergence => EventConfig::new(id, name)
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Rsi, "rsi".to_string(), vec![14]))
+            .with_periods(vec![14])
+            .with_string_param("kind", "regular"),
+        EventId::RelativePosition => EventConfig::new(id, name)
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Rsi, "rsi".to_string(), vec![14]))
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Sma, "sma".to_string(), vec![20])),
+        EventId::Confluence => EventConfig::new(id, name)
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Rsi, "rsi".to_string(), vec![14]))
+            .with_inner(IndicatorConfig::new(BarIndicatorId::MacdHist, "macd_hist".to_string(), vec![12, 26, 9]))
+            .with_string_param("mode", "all"),
+        EventId::OscillatorWithDivergence => EventConfig::new(id, name)
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Rsi, "rsi".to_string(), vec![14]))
+            .with_periods(vec![14]),
+        EventId::OscillatorWithVolumeWeight => EventConfig::new(id, name)
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Rsi, "rsi".to_string(), vec![14]))
+            .with_periods(vec![14]),
+        // Parameter-less
+        EventId::DirectionDetector | EventId::FvgEventDetector => EventConfig::new(id, name),
+    }
+}
+
+/// Build stream-kind routing map from MasterEventCatalog.
+/// Returns map from EventId to (primary StreamKind, aux_streams).
+fn build_event_stream_map() -> HashMap<EventId, (StreamKind, &'static [StreamKind])> {
+    let catalog = MasterEventCatalog::new();
+    let mut map: HashMap<EventId, (StreamKind, &'static [StreamKind])> = HashMap::new();
+    for sig in catalog.iter_signatures() {
+        if let Some(machine_id) = sig.machine_id {
+            map.insert(machine_id, (sig.input_stream, sig.aux_streams));
+        }
+    }
+    // Default Bar for any not in catalog
+    for &id in ALL_EVENT_IDS {
+        map.entry(id).or_insert((StreamKind::Bar, &[]));
+    }
+    map
+}
+
+/// Construct all 18 EventStates, wrapping create in catch_unwind.
+fn build_event_states(stream_map: &HashMap<EventId, (StreamKind, &'static [StreamKind])>) -> Vec<EventState> {
+    ALL_EVENT_IDS
+        .iter()
+        .map(|&id| {
+            let (sk, aux) = stream_map.get(&id).copied().unwrap_or((StreamKind::Bar, &[]));
+            let cfg = build_event_config(id);
+            let (instance, create_error) = match panic::catch_unwind(AssertUnwindSafe(|| EventInstance::create(&cfg))) {
+                Ok(Ok(inst)) => (Some(inst), None),
+                Ok(Err(e)) => (None, Some(e)),
+                Err(_) => (None, Some("panic during create".to_string())),
+            };
+            EventState {
+                id,
+                name: id.as_str().to_string(),
+                stream_kind: sk,
+                aux_streams: aux,
+                instance,
+                create_error,
+                events_received: 0,
+                panic_count: 0,
+                is_ready: false,
+                ready_at_event: None,
+                last_value: None,
+                max_abs_value: 0.0,
+                has_finite_nonzero: false,
+            }
+        })
+        .collect()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helpers: convert station data points → core indicator types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1413,6 +1661,21 @@ async fn main() -> Result<()> {
         created_ok, create_failed
     );
 
+    // ── Build event states ───────────────────────────────────────────────────
+    let event_stream_map = build_event_stream_map();
+    let mut event_states: Vec<EventState> = build_event_states(&event_stream_map);
+    let ev_created_ok = event_states.iter().filter(|s| s.instance.is_some()).count();
+    let ev_create_failed = event_states.iter().filter(|s| s.create_error.is_some()).count();
+    tracing::info!(
+        "Events created OK: {}  create_failed: {}",
+        ev_created_ok, ev_create_failed
+    );
+    for s in &event_states {
+        if let Some(e) = &s.create_error {
+            tracing::warn!(id = ?s.id, error = %e, "event create_failed");
+        }
+    }
+
     // Build station subscription
     let station = Station::builder()
         .storage_root(std::path::PathBuf::from("./validator_data"))
@@ -1575,6 +1838,11 @@ async fn main() -> Result<()> {
                             point.open, point.high, point.low, point.close, point.volume,
                         );
                         for s in &mut states {
+                            if s.accepts(StreamKind::Bar) {
+                                s.try_update_bar(o, h, l, c, v, ts);
+                            }
+                        }
+                        for s in &mut event_states {
                             if s.accepts(StreamKind::Bar) {
                                 s.try_update_bar(o, h, l, c, v, ts);
                             }
@@ -1775,6 +2043,11 @@ async fn main() -> Result<()> {
                                 s.try_update_bar(o, h, l, c, v, ts);
                             }
                         }
+                        for s in &mut event_states {
+                            if s.accepts(StreamKind::Bar) {
+                                s.try_update_bar(o, h, l, c, v, ts);
+                            }
+                        }
                     }
                     Event::IndexPriceKline { point, .. } => {
                         let ts = point.open_time;
@@ -1782,6 +2055,11 @@ async fn main() -> Result<()> {
                             point.open, point.high, point.low, point.close, point.volume,
                         );
                         for s in &mut states {
+                            if s.accepts(StreamKind::Bar) {
+                                s.try_update_bar(o, h, l, c, v, ts);
+                            }
+                        }
+                        for s in &mut event_states {
                             if s.accepts(StreamKind::Bar) {
                                 s.try_update_bar(o, h, l, c, v, ts);
                             }
@@ -1797,11 +2075,19 @@ async fn main() -> Result<()> {
                                 s.try_update_bar(o, h, l, c, v, ts);
                             }
                         }
+                        for s in &mut event_states {
+                            if s.accepts(StreamKind::Bar) {
+                                s.try_update_bar(o, h, l, c, v, ts);
+                            }
+                        }
                     }
                 }
             }
         }
     }
+
+    // ─── Build event report ──────────────────────────────────────────────────
+    let event_records: Vec<EventRecord> = event_states.iter().map(|s| s.finalize_record()).collect();
 
     // ─── Build report ────────────────────────────────────────────────────────
     let records: Vec<IndicatorRecord> = states.iter().map(|s| s.finalize_record()).collect();
@@ -1896,9 +2182,59 @@ async fn main() -> Result<()> {
     println!();
     println!("Total events processed: {total_events}");
 
+    // ── Events summary ───────────────────────────────────────────────────────
+    let ev_n_created_ok = event_records.iter().filter(|r| r.status != "create_failed").count();
+    let ev_n_create_failed = event_records.iter().filter(|r| r.status == "create_failed").count();
+    let ev_n_panic = event_records.iter().filter(|r| r.status == "panic").count();
+    let ev_n_never_event = event_records.iter().filter(|r| r.status == "never_received_event").count();
+    let ev_n_never_ready = event_records.iter().filter(|r| r.status == "never_ready").count();
+    let ev_n_always_zero = event_records.iter().filter(|r| r.status == "always_zero" || r.status == "always_nan_inf").count();
+    let ev_n_pass = event_records.iter().filter(|r| r.status == "pass").count();
+
+    println!();
+    println!("=== Events ===");
+    println!("  created OK:             {ev_n_created_ok}");
+    println!("  create_failed:          {ev_n_create_failed}");
+    println!("  panic:                  {ev_n_panic}");
+    println!("  never_received_event:   {ev_n_never_event}");
+    println!("  never_ready:            {ev_n_never_ready}");
+    println!("  always_zero/nan_inf:    {ev_n_always_zero}");
+    println!("  pass:                   {ev_n_pass}");
+    println!();
+    println!("=== Per-event ===");
+    println!("{:<32}  {:<24}  events  ready  last_value", "event_id", "status");
+    for r in &event_records {
+        let val_short = if r.last_value_repr.len() > 40 {
+            &r.last_value_repr[..40]
+        } else {
+            &r.last_value_repr
+        };
+        println!(
+            "{:<32}  {:<24}  {:<6}  {:<5}  {}",
+            r.event_id,
+            r.status,
+            r.events_received,
+            if r.is_ready { "Y" } else { "N" },
+            val_short,
+        );
+    }
+    if ev_n_create_failed > 0 {
+        println!();
+        println!("=== Event create failures ===");
+        for r in event_records.iter().filter(|r| r.status == "create_failed") {
+            println!("  {}  {:?}", r.event_id, r.create_error);
+        }
+    }
+
     // Write JSON report
+    #[derive(Serialize)]
+    struct FullReport<'a> {
+        indicators: &'a Vec<IndicatorRecord>,
+        events: &'a Vec<EventRecord>,
+    }
     let report_path = "validator_report.json";
-    let json = serde_json::to_string_pretty(&records)?;
+    let full = FullReport { indicators: &records, events: &event_records };
+    let json = serde_json::to_string_pretty(&full)?;
     std::fs::write(report_path, &json)?;
     println!("Report written to {report_path}");
 

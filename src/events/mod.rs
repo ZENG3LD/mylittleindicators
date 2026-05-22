@@ -30,6 +30,12 @@ pub mod threshold;
 pub mod volatility_regime;
 pub mod volume_event;
 
+// Factory / catalog modules
+pub mod event_id;
+pub mod event_config;
+pub mod event_instance;
+pub mod events_catalog;
+
 pub use bos_event_detector::BosEventDetector;
 pub use fvg_event_detector::FvgEventDetector;
 pub use candle_pattern::{CandlePatternDetector, CandlePatternKind};
@@ -48,3 +54,7 @@ pub use swing_detection::SwingDetection;
 pub use threshold::Threshold;
 pub use volatility_regime::VolatilityRegimeDetector;
 pub use volume_event::VolumeEventDetector;
+
+pub use event_id::EventId;
+pub use event_config::EventConfig;
+pub use event_instance::EventInstance;
