@@ -1435,10 +1435,10 @@ async fn main() -> Result<()> {
         // actually declares topic-registry entries for that StreamKind.
         //
         // Deribit (Options + Futures perpetual)
-        (ExchangeId::Deribit, AccountType::Options, "BTC-PERPETUAL", Stream::OptionGreeks),
-        (ExchangeId::Deribit, AccountType::Options, "BTC-PERPETUAL", Stream::VolatilityIndex),
-        (ExchangeId::Deribit, AccountType::Options, "BTC-PERPETUAL", Stream::BlockTrade),
-        (ExchangeId::Deribit, AccountType::Options, "BTC-PERPETUAL", Stream::IndexPrice),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-23MAY26-86000-C", Stream::OptionGreeks),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-23MAY26-86000-C", Stream::VolatilityIndex),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-23MAY26-86000-C", Stream::BlockTrade),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-23MAY26-86000-C", Stream::IndexPrice),
         // OKX FuturesCross
         (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::OptionGreeks),
         (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::BlockTrade),
