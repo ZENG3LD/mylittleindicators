@@ -9,6 +9,7 @@ use crate::catalog::{
 };
 use crate::bar_indicators::indicator_value::IndicatorValueKind;
 use crate::bar_indicators::bar_indicator_id::BarIndicatorId;
+use crate::data_loader::stream_kind::StreamKind;
 
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -169,6 +170,7 @@ pub fn signature_price_change_24h_z_score() -> IndicatorSignature {
         .metadata("input", "price_change_percent_24h from Ticker")
         .metadata("uses_ticker", "true")
         .machine_id(BarIndicatorId::PriceChange24hZScore)
+        .input_stream(StreamKind::Ticker)
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .validated()

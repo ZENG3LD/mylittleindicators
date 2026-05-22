@@ -473,15 +473,42 @@ impl IndicatorState {
         }
     }
 
+    /// Per-id param overrides for indicators whose factory defaults don't
+    /// trigger on 1m bar data (e.g. Zigzag default 5% swing requires ~$3000
+    /// move on BTC — never fires in a 30min window).
+    fn tuned_params(id: BarIndicatorId) -> Vec<(&'static str, f64)> {
+        match id {
+            // SwingDetection::Percent — factory uses additional_params["deviation"] * 100
+            // → 0.005 * 100 = 0.5% (was 5%)
+            BarIndicatorId::Zigzag | BarIndicatorId::ZigzagDiv => {
+                vec![("deviation", 0.005)]
+            }
+            // CusumFilter threshold (factory default ~0.01 = 1% cumulative return)
+            // Lower to 0.003 (0.3%) — common per-bar BTC log-return scale.
+            BarIndicatorId::Cusum | BarIndicatorId::StCusum => {
+                vec![("threshold", 0.003)]
+            }
+            // BpCusum — kappa/threshold pair (test fixture: threshold=0.05, kappa=0.95)
+            BarIndicatorId::BpCusum => {
+                vec![("threshold", 0.05), ("kappa", 0.95)]
+            }
+            _ => Vec::new(),
+        }
+    }
+
     /// Try IndicatorInstance::create with PERIOD_LADDER fallbacks until one
     /// works. Returns (instance, error, periods_used_if_non_default).
     fn try_create_with_ladder(
         id: BarIndicatorId,
     ) -> (Option<IndicatorInstance>, Option<String>, Option<Vec<usize>>) {
         let mut last_err: Option<String> = None;
+        let extra_params = Self::tuned_params(id);
         for (idx, periods) in PERIOD_LADDER.iter().enumerate() {
             let p = periods.to_vec();
-            let cfg = IndicatorConfig::new(id, format!("{id:?}"), p.clone());
+            let mut cfg = IndicatorConfig::new(id, format!("{id:?}"), p.clone());
+            for (k, v) in &extra_params {
+                cfg = cfg.with_param(*k, *v);
+            }
             let result =
                 panic::catch_unwind(AssertUnwindSafe(|| IndicatorInstance::create(&cfg)));
             match result {

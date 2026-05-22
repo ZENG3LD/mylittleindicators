@@ -5477,6 +5477,10 @@ impl IndicatorInstance {
             Self::FundingMomentum(x) => x.value(),
             Self::FundingZScore(x) => x.value(),
             Self::OiChangeRate(x) => x.value(),
+            // Composites needing last close — propagate close to internal state
+            Self::FundingPriceDivergence(x) => { x.update_price(close); x.value() }
+            Self::MarkPriceVsLast(x) => { x.set_last_traded(close); x.value() }
+            Self::IndexPriceMomentum(x) => x.value(),
             // Open Interest indicators — bar pipeline is a no-op; use update_oi/update_mark instead
             Self::OiZScore(x) => x.value(),
             Self::OiMomentum(x) => x.value(),
