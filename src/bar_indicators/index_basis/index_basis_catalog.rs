@@ -114,6 +114,21 @@ pub fn signature_price_vs_index_spread() -> IndicatorSignature {
         .build()
 }
 
+pub fn signature_index_price_momentum() -> IndicatorSignature {
+    IndicatorSignature::builder("INDEX_PRICE_MOMENTUM", CATEGORY)
+        .name("Index Price Momentum")
+        .description("EMA-based momentum (slope) of the index/spot price from the mark price feed")
+        .add_constraint(ParamConstraint::period(2, 200, 14))
+        .machine_id(BarIndicatorId::IndexPriceMomentum)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Double)
+        .input_stream(StreamKind::IndexPrice)
+        .alias("index_price_momentum")
+        .alias("IndexPriceMomentum")
+        .alias("INDEXPRICEMOMENTUM")
+        .build()
+}
+
 // ============================================================================
 // Catalog
 // ============================================================================
@@ -126,6 +141,7 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("INDEX_COMPONENT_DRIFT", signature_index_component_drift as fn() -> IndicatorSignature),
     ("INDEX_CORRELATION_BREAKDOWN", signature_index_correlation_breakdown as fn() -> IndicatorSignature),
     ("PRICE_VS_INDEX_SPREAD", signature_price_vs_index_spread as fn() -> IndicatorSignature),
+    ("INDEX_PRICE_MOMENTUM", signature_index_price_momentum as fn() -> IndicatorSignature),
 ];
 
 pub static INDEX_BASIS_CATALOG: Lazy<HashMap<String, fn() -> IndicatorSignature>> = Lazy::new(|| {

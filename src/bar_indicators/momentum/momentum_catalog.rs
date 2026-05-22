@@ -2184,6 +2184,23 @@ pub fn signature_williams_r() -> IndicatorSignature {
         .build()
 }
 
+/// Directional Indicator (+DI/-DI)
+pub fn signature_di_plus_minus() -> IndicatorSignature {
+    IndicatorSignature::builder("DI_PLUS_MINUS", CATEGORY)
+        .name("Directional Indicator (+DI/-DI)")
+        .description("Measures upward (+DI) and downward (-DI) price movement strength")
+        .add_constraint(ParamConstraint::period(2, 512, 14))
+        .machine_id(BarIndicatorId::DiPlusMinus)
+        .role_kind(IndicatorRoleKind::Regime)
+        .output_kind(IndicatorValueKind::Double)
+        .output_bounds(0.0, 100.0)
+        .alias("DiPlusMinus")
+        .alias("di_plus_minus")
+        .alias("DIPLUSMINUS")
+        .alias("DI_PLUS_MINUS")
+        .build()
+}
+
 /// ZigZag - identifies significant price swings
 pub fn signature_zigzag() -> IndicatorSignature {
     IndicatorSignature::builder("ZIGZAG", CATEGORY)
@@ -2299,6 +2316,7 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("VWRSI", signature_volume_weighted_rsi as fn() -> IndicatorSignature),
     ("VORTEX", signature_vortex_indicator as fn() -> IndicatorSignature),
     ("WILLIAMS_R", signature_williams_r as fn() -> IndicatorSignature),
+    ("DI_PLUS_MINUS", signature_di_plus_minus as fn() -> IndicatorSignature),
     ("ZIGZAG", signature_zigzag as fn() -> IndicatorSignature),
 ];
 

@@ -86,6 +86,19 @@ pub fn signature_oi_z_score() -> IndicatorSignature {
         .build()
 }
 
+pub fn signature_oi_change_rate() -> IndicatorSignature {
+    IndicatorSignature::builder("OI_CHANGE_RATE", CATEGORY)
+        .name("OI Change Rate")
+        .description("Rate of change of open interest per unit time (change per second)")
+        .machine_id(BarIndicatorId::OiChangeRate)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Double)
+        .input_stream(StreamKind::OpenInterest)
+        .alias("oi_change_rate")
+        .alias("OiChangeRate")
+        .build()
+}
+
 // ============================================================================
 // Catalog
 // ============================================================================
@@ -96,6 +109,7 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("OI_PERCENTILE", signature_oi_percentile as fn() -> IndicatorSignature),
     ("OI_PRICE_CORRELATION", signature_oi_price_correlation as fn() -> IndicatorSignature),
     ("OI_Z_SCORE", signature_oi_z_score as fn() -> IndicatorSignature),
+    ("OI_CHANGE_RATE", signature_oi_change_rate as fn() -> IndicatorSignature),
 ];
 
 pub static OPEN_INTEREST_CATALOG: Lazy<HashMap<String, fn() -> IndicatorSignature>> = Lazy::new(|| {

@@ -369,6 +369,90 @@ pub fn signature_trade_book_absorption() -> IndicatorSignature {
         .build()
 }
 
+/// Iceberg Detector — detects hidden iceberg orders via level replenishment patterns
+pub fn signature_iceberg_detector() -> IndicatorSignature {
+    IndicatorSignature::builder("ICEBERG_DETECTOR", CATEGORY)
+        .name("Iceberg Detector")
+        .description("Detects hidden iceberg orders by tracking level replenishment events in delta updates")
+        .add_constraint(
+            ParamConstraint::new("price_bucket", ParamType::F64)
+                .with_min(ParamValue::F64(0.001))
+                .with_max(ParamValue::F64(10000.0))
+                .with_default(ParamValue::F64(1.0))
+                .required()
+        )
+        .add_constraint(
+            ParamConstraint::new("replenishment_threshold", ParamType::USize)
+                .with_min(ParamValue::USize(1))
+                .with_max(ParamValue::USize(1000))
+                .with_default(ParamValue::USize(3))
+                .required()
+        )
+        .metadata("outputs", "side (+1/-1/0), price, replenishment_count")
+        .metadata("requirements", "L2 orderbook delta stream")
+        .machine_id(BarIndicatorId::IcebergDetector)
+        .role_kind(IndicatorRoleKind::Pattern)
+        .input_stream(StreamKind::OrderbookDelta)
+        .output_kind(IndicatorValueKind::Triple)
+        .requires_l2()
+        .alias("IcebergDetector")
+        .alias("iceberg_detector")
+        .alias("ICEBERGDETECTOR")
+        .build()
+}
+
+/// Level Replenish Rate — rolling rate of positive-size orderbook updates per second
+pub fn signature_level_replenish_rate() -> IndicatorSignature {
+    IndicatorSignature::builder("LEVEL_REPLENISH_RATE", CATEGORY)
+        .name("Level Replenish Rate")
+        .description("Rolling rate of orderbook level replenishments (positive-size updates) in events/second")
+        .add_constraint(
+            ParamConstraint::new("rolling_window", ParamType::USize)
+                .with_min(ParamValue::USize(2))
+                .with_max(ParamValue::USize(10000))
+                .with_default(ParamValue::USize(200))
+                .required()
+        )
+        .metadata("outputs", "events_per_second")
+        .metadata("requirements", "L2 orderbook delta stream")
+        .machine_id(BarIndicatorId::LevelReplenishRate)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .input_stream(StreamKind::OrderbookDelta)
+        .output_kind(IndicatorValueKind::Single)
+        .requires_l2()
+        .alias("LevelReplenishRate")
+        .alias("level_replenish_rate")
+        .alias("LEVELREPLENISHRATE")
+        .alias("LevelReplenishmentRate")
+        .alias("level_replenishment_rate")
+        .build()
+}
+
+/// Book Churn Rate — rolling average number of level changes per delta
+pub fn signature_book_churn_rate() -> IndicatorSignature {
+    IndicatorSignature::builder("BOOK_CHURN_RATE", CATEGORY)
+        .name("Book Churn Rate")
+        .description("Rolling average of total bid/ask level changes per delta update")
+        .add_constraint(
+            ParamConstraint::new("rolling_window", ParamType::USize)
+                .with_min(ParamValue::USize(1))
+                .with_max(ParamValue::USize(10000))
+                .with_default(ParamValue::USize(50))
+                .required()
+        )
+        .metadata("outputs", "avg_changes_per_delta")
+        .metadata("requirements", "L2 orderbook delta stream")
+        .machine_id(BarIndicatorId::BookChurnRate)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .input_stream(StreamKind::OrderbookDelta)
+        .output_kind(IndicatorValueKind::Single)
+        .requires_l2()
+        .alias("BookChurnRate")
+        .alias("book_churn_rate")
+        .alias("BOOKCHURNRATE")
+        .build()
+}
+
 /// Sweep Impact Analyzer — measures how many book levels a trade consumed
 pub fn signature_sweep_impact_analyzer() -> IndicatorSignature {
     IndicatorSignature::builder("SWEEP_IMPACT_ANALYZER", CATEGORY)
@@ -410,6 +494,9 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("HIDDEN_LIQUIDITY_DETECTOR", signature_hidden_liquidity_detector as fn() -> IndicatorSignature),
     ("TRADE_BOOK_ABSORPTION", signature_trade_book_absorption as fn() -> IndicatorSignature),
     ("SWEEP_IMPACT_ANALYZER", signature_sweep_impact_analyzer as fn() -> IndicatorSignature),
+    ("ICEBERG_DETECTOR", signature_iceberg_detector as fn() -> IndicatorSignature),
+    ("LEVEL_REPLENISH_RATE", signature_level_replenish_rate as fn() -> IndicatorSignature),
+    ("BOOK_CHURN_RATE", signature_book_churn_rate as fn() -> IndicatorSignature),
 ];
 
 /// Expanded catalog with all aliases auto-generated from signatures
@@ -474,7 +561,7 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 14);
+        assert_eq!(count(), 17);
     }
 
     #[test]

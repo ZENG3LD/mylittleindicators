@@ -58,6 +58,23 @@ pub fn signature_mark_price_volatility() -> IndicatorSignature {
         .build()
 }
 
+static AUX_BAR: &[StreamKind] = &[StreamKind::Bar];
+
+pub fn signature_mark_price_vs_last() -> IndicatorSignature {
+    IndicatorSignature::builder("MARK_PRICE_VS_LAST", CATEGORY)
+        .name("Mark Price vs Last")
+        .description("Deviation of mark price from the last traded price (absolute and percentage)")
+        .machine_id(BarIndicatorId::MarkPriceVsLast)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Double)
+        .input_stream(StreamKind::MarkPrice)
+        .aux_streams(AUX_BAR)
+        .alias("mark_price_vs_last")
+        .alias("MarkPriceVsLast")
+        .alias("MARKPRICEVSLAST")
+        .build()
+}
+
 // ============================================================================
 // Catalog
 // ============================================================================
@@ -66,6 +83,7 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("MARK_PRICE_GAP_DETECTOR", signature_mark_price_gap_detector as fn() -> IndicatorSignature),
     ("MARK_PRICE_MOMENTUM", signature_mark_price_momentum as fn() -> IndicatorSignature),
     ("MARK_PRICE_VOLATILITY", signature_mark_price_volatility as fn() -> IndicatorSignature),
+    ("MARK_PRICE_VS_LAST", signature_mark_price_vs_last as fn() -> IndicatorSignature),
 ];
 
 pub static MARK_PRICE_ADVANCED_CATALOG: Lazy<HashMap<String, fn() -> IndicatorSignature>> = Lazy::new(|| {

@@ -254,6 +254,25 @@ pub fn signature_vol_regime_entry() -> IndicatorSignature {
         .build()
 }
 
+static AUX_FUNDING: &[StreamKind] = &[StreamKind::Funding];
+
+pub fn signature_funding_price_divergence() -> IndicatorSignature {
+    IndicatorSignature::builder("FUNDING_PRICE_DIVERGENCE", CATEGORY)
+        .name("Funding Price Divergence")
+        .description("Composite: funding momentum × price momentum divergence — detects short-squeeze or long-liquidation setups")
+        .add_constraint(ParamConstraint::period(2, 200, 14))
+        .machine_id(BarIndicatorId::FundingPriceDivergence)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Triple)
+        .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_FUNDING)
+        .alias("funding_price_divergence")
+        .alias("FundingPriceDivergence")
+        .alias("FUNDINGPRICEDIVERGENCE")
+        .alias("FundingPriceMomentumDivergence")
+        .build()
+}
+
 // ============================================================================
 // Catalog
 // ============================================================================
@@ -276,6 +295,7 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("SENTIMENT_COMPOSITE", signature_sentiment_composite as fn() -> IndicatorSignature),
     ("SQUEEZE_PROBABILITY", signature_squeeze_probability as fn() -> IndicatorSignature),
     ("VOL_REGIME_ENTRY", signature_vol_regime_entry as fn() -> IndicatorSignature),
+    ("FUNDING_PRICE_DIVERGENCE", signature_funding_price_divergence as fn() -> IndicatorSignature),
 ];
 
 pub static COMPOSITES_CATALOG: Lazy<HashMap<String, fn() -> IndicatorSignature>> = Lazy::new(|| {

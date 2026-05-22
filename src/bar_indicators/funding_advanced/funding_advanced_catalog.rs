@@ -58,6 +58,35 @@ pub fn signature_funding_extreme_alert() -> IndicatorSignature {
         .build()
 }
 
+pub fn signature_funding_momentum() -> IndicatorSignature {
+    IndicatorSignature::builder("FUNDING_MOMENTUM", CATEGORY)
+        .name("Funding Momentum")
+        .description("EMA-smoothed funding rate with slope direction")
+        .add_constraint(ParamConstraint::period(2, 200, 14))
+        .machine_id(BarIndicatorId::FundingMomentum)
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Double)
+        .input_stream(StreamKind::Funding)
+        .alias("funding_momentum")
+        .alias("FundingMomentum")
+        .build()
+}
+
+pub fn signature_funding_z_score() -> IndicatorSignature {
+    IndicatorSignature::builder("FUNDING_ZSCORE", CATEGORY)
+        .name("Funding Z-Score")
+        .description("Rolling Z-score of funding rate vs window mean and standard deviation")
+        .add_constraint(ParamConstraint::period(2, 200, 14))
+        .machine_id(BarIndicatorId::FundingZScore)
+        .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
+        .input_stream(StreamKind::Funding)
+        .alias("funding_z_score")
+        .alias("FundingZScore")
+        .alias("FUNDING_ZSCORE")
+        .build()
+}
+
 // ============================================================================
 // Catalog
 // ============================================================================
@@ -66,6 +95,8 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("ANNUALIZED_FUNDING_RATE", signature_annualized_funding_rate as fn() -> IndicatorSignature),
     ("FUNDING_DIRECTION_SHIFT", signature_funding_direction_shift as fn() -> IndicatorSignature),
     ("FUNDING_EXTREME_ALERT", signature_funding_extreme_alert as fn() -> IndicatorSignature),
+    ("FUNDING_MOMENTUM", signature_funding_momentum as fn() -> IndicatorSignature),
+    ("FUNDING_ZSCORE", signature_funding_z_score as fn() -> IndicatorSignature),
 ];
 
 pub static FUNDING_ADVANCED_CATALOG: Lazy<HashMap<String, fn() -> IndicatorSignature>> = Lazy::new(|| {
