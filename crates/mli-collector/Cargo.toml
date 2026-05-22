@@ -18,6 +18,7 @@ path = "src/bin/smoke.rs"
 [dependencies]
 mylittleindicators = { path = "../.." }
 digdigdig3 = "=0.3.4"
+digdigdig3-station = { path = "../../../digdigdig3/crates/digdigdig3-station" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"

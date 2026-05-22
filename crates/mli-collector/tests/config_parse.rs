@@ -1,28 +1,16 @@
-//! Integration tests for collector config parsing and EventWriter roundtrip.
+//! Integration tests for collector config parsing.
 
+use digdigdig3_station::Stream;
 use mli_collector_lib::config::CollectorConfig;
-use mli_collector_lib::writer::EventWriter;
-use mylittleindicators::core::types::FundingRate;
-use mylittleindicators::data_loader::{StorageRoot, StreamKind, TimedEvent};
-
-fn tempdir(tag: &str) -> std::path::PathBuf {
-    let mut p = std::env::temp_dir();
-    p.push(format!("mli_collector_test_{}_{}", std::process::id(), tag));
-    if p.exists() {
-        std::fs::remove_dir_all(&p).unwrap();
-    }
-    std::fs::create_dir_all(&p).unwrap();
-    p
-}
 
 #[test]
 fn config_from_toml_multi_exchange() {
     let toml = r#"
 storage_dir = "/tmp/collector_data"
+warm_start = 100
 
 [[exchanges]]
 id = "binance"
-account_types = ["FuturesCross"]
 
 [[exchanges.subscriptions]]
 symbol = "BTCUSDT"
@@ -36,7 +24,6 @@ stream_type = "Liquidation"
 
 [[exchanges]]
 id = "bybit"
-account_types = ["FuturesCross"]
 
 [[exchanges.subscriptions]]
 symbol = "BTCUSDT"
@@ -45,44 +32,39 @@ stream_type = "Liquidation"
 "#;
     let config: CollectorConfig = toml::from_str(toml).expect("toml parse failed");
     assert_eq!(config.exchanges.len(), 2);
+    assert_eq!(config.warm_start, 100);
 
     let binance = &config.exchanges[0];
     assert_eq!(binance.id.0, "binance");
-    assert_eq!(binance.account_types.len(), 1);
     assert_eq!(binance.subscriptions.len(), 2);
-    assert_eq!(binance.subscriptions[0].symbol, "BTCUSDT");
-    assert_eq!(binance.subscriptions[0].stream_type.0.to_lowercase(), "fundingrate");
 
-    let bybit = &config.exchanges[1];
-    assert_eq!(bybit.id.0, "bybit");
-    assert_eq!(bybit.subscriptions.len(), 1);
-
-    // Parse helpers
-    use digdigdig3::{AccountType, ExchangeId};
+    use digdigdig3::ExchangeId;
     assert_eq!(binance.exchange_id(), Some(ExchangeId::Binance));
-    assert_eq!(binance.parsed_account_types(), vec![AccountType::FuturesCross]);
-    assert_eq!(bybit.exchange_id(), Some(ExchangeId::Bybit));
+    assert_eq!(config.exchanges[1].exchange_id(), Some(ExchangeId::Bybit));
 }
 
 #[test]
-fn event_writer_roundtrip() {
-    let dir = tempdir("writer_roundtrip");
-    let writer = EventWriter::new(dir.clone());
+fn stream_type_parses_to_station_stream() {
+    use mli_collector_lib::config::StreamTypeStr;
+    assert!(matches!(StreamTypeStr("trade".into()).parse(), Some(Stream::Trade)));
+    assert!(matches!(StreamTypeStr("Ticker".into()).parse(), Some(Stream::Ticker)));
+    assert!(matches!(StreamTypeStr("FundingRate".into()).parse(), Some(Stream::FundingRate)));
+    assert!(matches!(StreamTypeStr("liquidation".into()).parse(), Some(Stream::Liquidation)));
+    assert!(matches!(StreamTypeStr("kline".into()).parse(), Some(Stream::Kline(_))));
+    assert!(matches!(StreamTypeStr("kline:5m".into()).parse(), Some(Stream::Kline(_))));
+    // Unsupported by Station (no corresponding variant)
+    assert!(StreamTypeStr("composite_index".into()).parse().is_none());
+    assert!(StreamTypeStr("option_greeks".into()).parse().is_none());
+}
 
-    let event = TimedEvent::Funding(FundingRate {
-        rate: 0.0001,
-        next_funding_time: None,
-        timestamp: 1_700_000_000_000,
-    });
+#[test]
+fn warm_start_defaults_to_zero() {
+    let toml = r#"
+storage_dir = "/tmp/x"
 
-    writer.write("BTCUSDT", &event).expect("write failed");
-
-    // Read back via StorageRoot.
-    let storage = StorageRoot::new(&dir);
-    let results = storage
-        .read_range("BTCUSDT", StreamKind::Funding, 0, i64::MAX)
-        .expect("read failed");
-
-    assert_eq!(results.len(), 1);
-    assert_eq!(results[0].timestamp_ms(), 1_700_000_000_000);
+[[exchanges]]
+id = "binance"
+"#;
+    let cfg: CollectorConfig = toml::from_str(toml).expect("parse");
+    assert_eq!(cfg.warm_start, 0);
 }

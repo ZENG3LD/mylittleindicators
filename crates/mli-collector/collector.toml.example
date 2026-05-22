@@ -1,14 +1,49 @@
+# mli-collector config — Station-based.
+#
+# Station handles WS multiplex, REST warm-start, persistence to binary storage,
+# and auto-heal on disconnect. Per-subscription account_type drives Station's
+# automatic REST+WS wiring (no need to pre-declare account_types at exchange).
+
 storage_dir = "./collector_data"
-exchange = "binance"
-symbols = ["BTCUSDT", "ETHUSDT"]
+# warm_start: emit last-N points from disk (or REST fallback) before live.
+# 0 disables warm-start.
+warm_start = 100
 
-[[streams]]
-kind = "Funding"
+[[exchanges]]
+id = "binance"
 
-[[streams]]
-kind = "OpenInterest"
+[[exchanges.subscriptions]]
+symbol = "BTCUSDT"
+account_type = "FuturesCross"
+stream_type = "FundingRate"
 
-[[streams]]
-kind = "Liquidation"
-# Override symbols for this stream only:
-# symbols = ["BTCUSDT"]
+[[exchanges.subscriptions]]
+symbol = "BTCUSDT"
+account_type = "FuturesCross"
+stream_type = "Liquidation"
+
+[[exchanges.subscriptions]]
+symbol = "BTCUSDT"
+account_type = "FuturesCross"
+stream_type = "OpenInterest"
+
+[[exchanges.subscriptions]]
+symbol = "BTCUSDT"
+account_type = "FuturesCross"
+stream_type = "Kline:1m"
+
+[[exchanges]]
+id = "bybit"
+
+[[exchanges.subscriptions]]
+symbol = "BTCUSDT"
+account_type = "FuturesCross"
+stream_type = "Liquidation"
+
+# Supported stream_type values (Station kinds):
+#   trade, agg_trade, ticker, orderbook, mark_price, funding_rate,
+#   open_interest, liquidation, kline (defaults to 1m), kline:1m, kline:5m, ...
+#
+# NOT supported by Station daemon (use mli-collector-smoke binary for audit):
+#   composite_index, option_greeks, basis, settlement_event, market_warning,
+#   risk_limit, predicted_funding, funding_settlement, orderbook_l3, etc.
