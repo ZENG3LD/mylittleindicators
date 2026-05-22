@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "digdigdig3"
-version = "0.3.4"
+version = "0.3.6"
 dependencies = [
  "async-trait",
  "base64",

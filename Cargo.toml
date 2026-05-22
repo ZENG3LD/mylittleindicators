@@ -6,7 +6,7 @@ description = "Technical indicators library — 480+ indicators across 23 catego
 license = "MIT"
 
 [dependencies]
-digdigdig3 = "=0.3.4"
+digdigdig3 = "=0.3.6"
 async-trait = "0.1"
 once_cell = "1.21"
 arrayvec = "0.7"

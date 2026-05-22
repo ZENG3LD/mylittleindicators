@@ -25,8 +25,11 @@ use mylittleindicators::bar_indicators::{
 };
 use mylittleindicators::catalog::MasterIndicatorCatalog;
 use mylittleindicators::core::types::{
-    AggTrade, FundingRate, Liquidation, MarkPrice, OpenInterest, OrderBook,
-    OrderBookLevel, Ticker, Tick, TradeSide,
+    AggTrade, AuctionEvent, Basis, BlockTrade, CompositeIndex, FundingRate,
+    FundingSettlement, HistoricalVolatility, IndexPrice, InsuranceFund,
+    L3Action, Liquidation, MarkPrice, MarketWarning, OpenInterest, OptionGreeks,
+    OrderBook, OrderBookLevel, OrderBookSide, OrderbookL3Event, PredictedFunding,
+    RiskLimit, SettlementEvent, Ticker, Tick, TradeSide, VolatilityIndex,
 };
 use mylittleindicators::data_loader::stream_kind::StreamKind;
 use serde::Serialize;
@@ -700,6 +703,278 @@ impl IndicatorState {
         }
     }
 
+    fn try_update_block_trade(&mut self, bt: &BlockTrade) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_block_trade(bt)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_index_price(&mut self, ip: &IndexPrice) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_index_price(ip)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_composite_index(&mut self, ci: &CompositeIndex) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_composite_index(ci)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_option_greeks(&mut self, g: &OptionGreeks) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_option_greeks(g)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_volatility_index(&mut self, vi: &VolatilityIndex) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_volatility_index(vi)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_historical_volatility(&mut self, hv: &HistoricalVolatility) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result =
+            panic::catch_unwind(AssertUnwindSafe(|| inst.update_historical_volatility(hv)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_basis(&mut self, b: &Basis) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_basis(b)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_insurance_fund(&mut self, ins: &InsuranceFund) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_insurance_fund(ins)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_orderbook_l3(&mut self, l3: &OrderbookL3Event) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_orderbook_l3(l3)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_settlement(&mut self, s: &SettlementEvent) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_settlement(s)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_auction(&mut self, a: &AuctionEvent) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_auction(a)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_market_warning(&mut self, w: &MarketWarning) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_market_warning(w)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_risk_limit(&mut self, r: &RiskLimit) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_risk_limit(r)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_predicted_funding(&mut self, pf: &PredictedFunding) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_predicted_funding(pf)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_funding_settlement(&mut self, fs: &FundingSettlement) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result =
+            panic::catch_unwind(AssertUnwindSafe(|| inst.update_funding_settlement(fs)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
     fn finalize_record(&self) -> IndicatorRecord {
         let status = if self.create_error.is_some() {
             "create_failed".to_string()
@@ -878,6 +1153,154 @@ fn agg_trade_point_to_core(p: &digdigdig3_station::data::AggTradePoint) -> AggTr
     }
 }
 
+fn block_trade_point_to_core(p: &digdigdig3_station::data::BlockTradePoint) -> BlockTrade {
+    BlockTrade {
+        block_id: p.block_id.clone(),
+        price: p.price,
+        quantity: p.quantity,
+        is_buy: p.side == digdigdig3::core::types::TradeSide::Buy,
+        timestamp: p.ts_ms,
+        is_iv: p.is_iv,
+    }
+}
+
+fn index_price_point_to_core(p: &digdigdig3_station::data::IndexPricePoint) -> IndexPrice {
+    IndexPrice {
+        price: p.price,
+        timestamp: p.ts_ms,
+    }
+}
+
+fn composite_index_point_to_core(
+    p: &digdigdig3_station::data::CompositeIndexPoint,
+) -> CompositeIndex {
+    CompositeIndex {
+        price: p.price,
+        components: Vec::new(),
+        timestamp: p.ts_ms,
+    }
+}
+
+fn option_greeks_point_to_core(p: &digdigdig3_station::data::OptionGreeksPoint) -> OptionGreeks {
+    OptionGreeks {
+        delta: p.delta,
+        gamma: p.gamma,
+        vega: p.vega,
+        theta: p.theta,
+        rho: p.rho,
+        mark_iv: p.mark_iv,
+        bid_iv: if p.bid_iv.is_nan() { None } else { Some(p.bid_iv) },
+        ask_iv: if p.ask_iv.is_nan() { None } else { Some(p.ask_iv) },
+        timestamp: p.ts_ms,
+    }
+}
+
+fn volatility_index_point_to_core(
+    p: &digdigdig3_station::data::VolatilityIndexPoint,
+) -> VolatilityIndex {
+    VolatilityIndex {
+        value: p.value,
+        timestamp: p.ts_ms,
+    }
+}
+
+fn historical_volatility_point_to_core(
+    p: &digdigdig3_station::data::HistoricalVolatilityPoint,
+) -> HistoricalVolatility {
+    HistoricalVolatility {
+        volatility: p.volatility,
+        timestamp: p.ts_ms,
+    }
+}
+
+fn basis_point_to_core(p: &digdigdig3_station::data::BasisPoint) -> Basis {
+    Basis {
+        basis: p.basis,
+        timestamp: p.ts_ms,
+    }
+}
+
+fn insurance_fund_point_to_core(p: &digdigdig3_station::data::InsuranceFundPoint) -> InsuranceFund {
+    InsuranceFund {
+        balance: p.balance,
+        timestamp: p.ts_ms,
+    }
+}
+
+fn orderbook_l3_point_to_core(p: &digdigdig3_station::data::OrderbookL3Point) -> OrderbookL3Event {
+    OrderbookL3Event {
+        side: match p.side {
+            digdigdig3::core::types::OrderSide::Buy => OrderBookSide::Bid,
+            digdigdig3::core::types::OrderSide::Sell => OrderBookSide::Ask,
+        },
+        order_id: p.order_id.clone(),
+        price: p.price,
+        quantity: p.quantity,
+        action: L3Action::Add,
+        timestamp: p.ts_ms,
+    }
+}
+
+fn settlement_event_point_to_core(
+    p: &digdigdig3_station::data::SettlementEventPoint,
+) -> SettlementEvent {
+    SettlementEvent {
+        settlement_price: p.settlement_price,
+        settlement_time: p.settlement_time,
+        timestamp: p.ts_ms,
+    }
+}
+
+fn auction_event_point_to_core(p: &digdigdig3_station::data::AuctionEventPoint) -> AuctionEvent {
+    AuctionEvent {
+        auction_id: p.auction_id.clone(),
+        indicative_price: p.indicative_price,
+        indicative_qty: p.indicative_qty,
+        state: p.state.clone(),
+        timestamp: p.ts_ms,
+    }
+}
+
+fn market_warning_point_to_core(p: &digdigdig3_station::data::MarketWarningPoint) -> MarketWarning {
+    MarketWarning {
+        symbol: String::new(),
+        warning_kind: p.warning_kind.clone(),
+        message: p.message.clone(),
+        timestamp: p.ts_ms,
+    }
+}
+
+fn risk_limit_point_to_core(p: &digdigdig3_station::data::RiskLimitPoint) -> RiskLimit {
+    RiskLimit {
+        tier: p.tier,
+        max_leverage: p.max_leverage,
+        max_position_value: p.max_position_value,
+        mmr: p.maintenance_margin_rate,
+        imr: p.initial_margin_rate,
+        timestamp: p.ts_ms,
+    }
+}
+
+fn predicted_funding_point_to_core(
+    p: &digdigdig3_station::data::PredictedFundingPoint,
+) -> PredictedFunding {
+    PredictedFunding {
+        predicted_rate: p.predicted_rate,
+        next_funding_time: p.next_funding_time,
+        timestamp: p.ts_ms,
+    }
+}
+
+fn funding_settlement_point_to_core(
+    p: &digdigdig3_station::data::FundingSettlementPoint,
+) -> FundingSettlement {
+    FundingSettlement {
+        settled_rate: p.settled_rate,
+        settlement_time: p.settlement_time,
+        timestamp: p.ts_ms,
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1009,6 +1432,43 @@ async fn main() -> Result<()> {
         (ExchangeId::Bybit, Stream::Liquidation),
         // Bybit OI: try
         (ExchangeId::Bybit, Stream::OpenInterest),
+        // Extended streams — most will fail silently if unsupported
+        (ExchangeId::Binance, Stream::BlockTrade),
+        (ExchangeId::Binance, Stream::IndexPrice),
+        (ExchangeId::Binance, Stream::CompositeIndex),
+        (ExchangeId::Binance, Stream::OptionGreeks),
+        (ExchangeId::Binance, Stream::VolatilityIndex),
+        (ExchangeId::Binance, Stream::HistoricalVolatility),
+        (ExchangeId::Binance, Stream::Basis),
+        (ExchangeId::Binance, Stream::InsuranceFund),
+        (ExchangeId::Binance, Stream::OrderbookL3),
+        (ExchangeId::Binance, Stream::SettlementEvent),
+        (ExchangeId::Binance, Stream::AuctionEvent),
+        (ExchangeId::Binance, Stream::MarketWarning),
+        (ExchangeId::Binance, Stream::RiskLimit),
+        (ExchangeId::Binance, Stream::PredictedFunding),
+        (ExchangeId::Binance, Stream::FundingSettlement),
+        (ExchangeId::Binance, Stream::MarkPriceKline(interval_1m.clone())),
+        (ExchangeId::Binance, Stream::IndexPriceKline(interval_1m.clone())),
+        (ExchangeId::Binance, Stream::PremiumIndexKline(interval_1m.clone())),
+        (ExchangeId::Bybit, Stream::BlockTrade),
+        (ExchangeId::Bybit, Stream::IndexPrice),
+        (ExchangeId::Bybit, Stream::CompositeIndex),
+        (ExchangeId::Bybit, Stream::OptionGreeks),
+        (ExchangeId::Bybit, Stream::VolatilityIndex),
+        (ExchangeId::Bybit, Stream::HistoricalVolatility),
+        (ExchangeId::Bybit, Stream::Basis),
+        (ExchangeId::Bybit, Stream::InsuranceFund),
+        (ExchangeId::Bybit, Stream::OrderbookL3),
+        (ExchangeId::Bybit, Stream::SettlementEvent),
+        (ExchangeId::Bybit, Stream::AuctionEvent),
+        (ExchangeId::Bybit, Stream::MarketWarning),
+        (ExchangeId::Bybit, Stream::RiskLimit),
+        (ExchangeId::Bybit, Stream::PredictedFunding),
+        (ExchangeId::Bybit, Stream::FundingSettlement),
+        (ExchangeId::Bybit, Stream::MarkPriceKline(interval_1m.clone())),
+        (ExchangeId::Bybit, Stream::IndexPriceKline(interval_1m.clone())),
+        (ExchangeId::Bybit, Stream::PremiumIndexKline(interval_1m.clone())),
     ];
 
     let mut handles: Vec<_> = Vec::new();
@@ -1144,6 +1604,160 @@ async fn main() -> Result<()> {
                         for s in &mut states {
                             if s.stream_kind == StreamKind::Liquidation {
                                 s.try_update_liquidation(&liq);
+                            }
+                        }
+                    }
+                    Event::BlockTrade { point, .. } => {
+                        let bt = block_trade_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::BlockTrade {
+                                s.try_update_block_trade(&bt);
+                            }
+                        }
+                    }
+                    Event::IndexPrice { point, .. } => {
+                        let ip = index_price_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::IndexPrice {
+                                s.try_update_index_price(&ip);
+                            }
+                        }
+                    }
+                    Event::CompositeIndex { point, .. } => {
+                        let ci = composite_index_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::CompositeIndex {
+                                s.try_update_composite_index(&ci);
+                            }
+                        }
+                    }
+                    Event::OptionGreeks { point, .. } => {
+                        let g = option_greeks_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::OptionGreeks {
+                                s.try_update_option_greeks(&g);
+                            }
+                        }
+                    }
+                    Event::VolatilityIndex { point, .. } => {
+                        let vi = volatility_index_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::VolatilityIndex {
+                                s.try_update_volatility_index(&vi);
+                            }
+                        }
+                    }
+                    Event::HistoricalVolatility { point, .. } => {
+                        let hv = historical_volatility_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::HistoricalVolatility {
+                                s.try_update_historical_volatility(&hv);
+                            }
+                        }
+                    }
+                    Event::Basis { point, .. } => {
+                        let b = basis_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::Basis {
+                                s.try_update_basis(&b);
+                            }
+                        }
+                    }
+                    Event::InsuranceFund { point, .. } => {
+                        let ins = insurance_fund_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::InsuranceFund {
+                                s.try_update_insurance_fund(&ins);
+                            }
+                        }
+                    }
+                    Event::OrderbookL3 { point, .. } => {
+                        let l3 = orderbook_l3_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::OrderbookL3 {
+                                s.try_update_orderbook_l3(&l3);
+                            }
+                        }
+                    }
+                    Event::SettlementEvent { point, .. } => {
+                        let se = settlement_event_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::Settlement {
+                                s.try_update_settlement(&se);
+                            }
+                        }
+                    }
+                    Event::AuctionEvent { point, .. } => {
+                        let a = auction_event_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::Auction {
+                                s.try_update_auction(&a);
+                            }
+                        }
+                    }
+                    Event::MarketWarning { point, .. } => {
+                        let w = market_warning_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::MarketWarning {
+                                s.try_update_market_warning(&w);
+                            }
+                        }
+                    }
+                    Event::RiskLimit { point, .. } => {
+                        let r = risk_limit_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::RiskLimit {
+                                s.try_update_risk_limit(&r);
+                            }
+                        }
+                    }
+                    Event::PredictedFunding { point, .. } => {
+                        let pf = predicted_funding_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::PredictedFunding {
+                                s.try_update_predicted_funding(&pf);
+                            }
+                        }
+                    }
+                    Event::FundingSettlement { point, .. } => {
+                        let fs = funding_settlement_point_to_core(point);
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::FundingSettlement {
+                                s.try_update_funding_settlement(&fs);
+                            }
+                        }
+                    }
+                    // Kline variants for mark/index/premium — routed as Bar
+                    Event::MarkPriceKline { point, .. } => {
+                        let ts = point.open_time;
+                        let (o, h, l, c, v) = (
+                            point.open, point.high, point.low, point.close, point.volume,
+                        );
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::Bar {
+                                s.try_update_bar(o, h, l, c, v, ts);
+                            }
+                        }
+                    }
+                    Event::IndexPriceKline { point, .. } => {
+                        let ts = point.open_time;
+                        let (o, h, l, c, v) = (
+                            point.open, point.high, point.low, point.close, point.volume,
+                        );
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::Bar {
+                                s.try_update_bar(o, h, l, c, v, ts);
+                            }
+                        }
+                    }
+                    Event::PremiumIndexKline { point, .. } => {
+                        let ts = point.open_time;
+                        let (o, h, l, c, v) = (
+                            point.open, point.high, point.low, point.close, point.volume,
+                        );
+                        for s in &mut states {
+                            if s.stream_kind == StreamKind::Bar {
+                                s.try_update_bar(o, h, l, c, v, ts);
                             }
                         }
                     }
