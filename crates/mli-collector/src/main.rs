@@ -65,8 +65,17 @@ async fn main() -> anyhow::Result<()> {
         anyhow::bail!("no valid subscriptions in config");
     }
 
-    let mut handle = station.subscribe(set).await?;
-    tracing::info!("Station subscribed; active streams = {}", station.active_streams());
+    let report = station.subscribe(set).await?;
+    tracing::info!(
+        ok = report.ok.len(),
+        failed = report.failed.len(),
+        active = station.active_streams(),
+        "Station subscribed"
+    );
+    for f in &report.failed {
+        tracing::warn!(reason = ?f, "per-stream subscribe failed");
+    }
+    let mut handle = report.handle;
 
     let recv_task = tokio::spawn(async move {
         let mut count: u64 = 0;

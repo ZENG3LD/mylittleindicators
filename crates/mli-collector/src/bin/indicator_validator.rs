@@ -1412,78 +1412,86 @@ async fn main() -> Result<()> {
     // via a single multi-add SubscriptionSet — but if even one fails the
     // whole subscribe() fails. So we do N tiny one-stream subscribes and
     // collect handles.
-    let combos: &[(ExchangeId, Stream)] = &[
-        (ExchangeId::Binance, Stream::Trade),
-        (ExchangeId::Binance, Stream::AggTrade),
-        (ExchangeId::Binance, Stream::Kline(interval_1m.clone())),
-        (ExchangeId::Binance, Stream::Ticker),
-        (ExchangeId::Binance, Stream::Orderbook),
-        (ExchangeId::Binance, Stream::MarkPrice),
-        (ExchangeId::Binance, Stream::FundingRate),
-        (ExchangeId::Binance, Stream::Liquidation),
-        // Binance OI: WS NotSupported by exchange, skip.
-        (ExchangeId::Bybit, Stream::Trade),
-        (ExchangeId::Bybit, Stream::AggTrade),
-        (ExchangeId::Bybit, Stream::Kline(interval_1m.clone())),
-        (ExchangeId::Bybit, Stream::Ticker),
-        (ExchangeId::Bybit, Stream::Orderbook),
-        (ExchangeId::Bybit, Stream::MarkPrice),
-        (ExchangeId::Bybit, Stream::FundingRate),
-        (ExchangeId::Bybit, Stream::Liquidation),
-        // Bybit OI: try
-        (ExchangeId::Bybit, Stream::OpenInterest),
-        // Extended streams — most will fail silently if unsupported
-        (ExchangeId::Binance, Stream::BlockTrade),
-        (ExchangeId::Binance, Stream::IndexPrice),
-        (ExchangeId::Binance, Stream::CompositeIndex),
-        (ExchangeId::Binance, Stream::OptionGreeks),
-        (ExchangeId::Binance, Stream::VolatilityIndex),
-        (ExchangeId::Binance, Stream::HistoricalVolatility),
-        (ExchangeId::Binance, Stream::Basis),
-        (ExchangeId::Binance, Stream::InsuranceFund),
-        (ExchangeId::Binance, Stream::OrderbookL3),
-        (ExchangeId::Binance, Stream::SettlementEvent),
-        (ExchangeId::Binance, Stream::AuctionEvent),
-        (ExchangeId::Binance, Stream::MarketWarning),
-        (ExchangeId::Binance, Stream::RiskLimit),
-        (ExchangeId::Binance, Stream::PredictedFunding),
-        (ExchangeId::Binance, Stream::FundingSettlement),
-        (ExchangeId::Binance, Stream::MarkPriceKline(interval_1m.clone())),
-        (ExchangeId::Binance, Stream::IndexPriceKline(interval_1m.clone())),
-        (ExchangeId::Binance, Stream::PremiumIndexKline(interval_1m.clone())),
-        (ExchangeId::Bybit, Stream::BlockTrade),
-        (ExchangeId::Bybit, Stream::IndexPrice),
-        (ExchangeId::Bybit, Stream::CompositeIndex),
-        (ExchangeId::Bybit, Stream::OptionGreeks),
-        (ExchangeId::Bybit, Stream::VolatilityIndex),
-        (ExchangeId::Bybit, Stream::HistoricalVolatility),
-        (ExchangeId::Bybit, Stream::Basis),
-        (ExchangeId::Bybit, Stream::InsuranceFund),
-        (ExchangeId::Bybit, Stream::OrderbookL3),
-        (ExchangeId::Bybit, Stream::SettlementEvent),
-        (ExchangeId::Bybit, Stream::AuctionEvent),
-        (ExchangeId::Bybit, Stream::MarketWarning),
-        (ExchangeId::Bybit, Stream::RiskLimit),
-        (ExchangeId::Bybit, Stream::PredictedFunding),
-        (ExchangeId::Bybit, Stream::FundingSettlement),
-        (ExchangeId::Bybit, Stream::MarkPriceKline(interval_1m.clone())),
-        (ExchangeId::Bybit, Stream::IndexPriceKline(interval_1m.clone())),
-        (ExchangeId::Bybit, Stream::PremiumIndexKline(interval_1m.clone())),
+    let combos: &[(ExchangeId, AccountType, &str, Stream)] = &[
+        // Core 9 streams on Binance + Bybit FuturesCross — well-covered indicators
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Trade),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::AggTrade),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Kline(interval_1m.clone())),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Ticker),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Orderbook),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPrice),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::FundingRate),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Liquidation),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Trade),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::AggTrade),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Kline(interval_1m.clone())),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Ticker),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Orderbook),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPrice),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::FundingRate),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Liquidation),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::OpenInterest),
+        // Extended streams — targeted at exchanges whose dig3 protocol.rs
+        // actually declares topic-registry entries for that StreamKind.
+        //
+        // Deribit (Options + Futures perpetual)
+        (ExchangeId::Deribit, AccountType::Options, "BTC-PERPETUAL", Stream::OptionGreeks),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-PERPETUAL", Stream::VolatilityIndex),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-PERPETUAL", Stream::BlockTrade),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-PERPETUAL", Stream::IndexPrice),
+        // OKX FuturesCross
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::OptionGreeks),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::BlockTrade),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPriceKline(interval_1m.clone())),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPriceKline(interval_1m.clone())),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::SettlementEvent),
+        // Binance FuturesCross — index/composite kline family
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::CompositeIndex),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPriceKline(interval_1m.clone())),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPriceKline(interval_1m.clone())),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::PremiumIndexKline(interval_1m.clone())),
+        // Bybit — risk + insurance
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::InsuranceFund),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::RiskLimit),
+        // GateIO
+        (ExchangeId::GateIO, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPriceKline(interval_1m.clone())),
+        // Hyperliquid
+        (ExchangeId::HyperLiquid, AccountType::FuturesCross, "BTC", Stream::IndexPrice),
+        (ExchangeId::HyperLiquid, AccountType::FuturesCross, "BTC", Stream::MarketWarning),
+        // HTX
+        (ExchangeId::HTX, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
+        (ExchangeId::HTX, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPriceKline(interval_1m.clone())),
+        // Index-price only
+        (ExchangeId::Bitget, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
+        (ExchangeId::KuCoin, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
+        (ExchangeId::MEXC, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
     ];
 
     let mut handles: Vec<_> = Vec::new();
-    for (exch, stream) in combos {
+    let mut total_failed = 0usize;
+    for (exch, acct, sym, stream) in combos {
         let single = SubscriptionSet::new().add(
             *exch,
-            "BTCUSDT",
-            AccountType::FuturesCross,
+            *sym,
+            *acct,
             [stream.clone()],
         );
         match station.subscribe(single).await {
-            Ok(h) => handles.push(h),
-            Err(e) => tracing::warn!(?exch, ?stream, error = %e, "subscribe skipped"),
+            Ok(report) => {
+                for f in &report.failed {
+                    total_failed += 1;
+                    tracing::warn!(?exch, ?acct, sym = sym, ?stream, reason = ?f, "per-stream subscribe failed");
+                }
+                if !report.ok.is_empty() {
+                    handles.push(report.handle);
+                }
+            }
+            Err(e) => tracing::warn!(?exch, ?acct, sym = sym, ?stream, error = %e, "subscribe call errored"),
         }
     }
+    tracing::info!("Subscribe pass complete: {} live handles, {} per-stream failures", handles.len(), total_failed);
     if handles.is_empty() {
         anyhow::bail!("all subscriptions failed");
     }
