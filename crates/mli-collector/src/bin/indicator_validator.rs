@@ -1239,7 +1239,7 @@ fn build_event_config(id: EventId) -> EventConfig {
         EventId::Pivot => EventConfig::new(id, name)
             .with_periods(vec![5, 5]),
         EventId::Threshold => EventConfig::new(id, name)
-            .with_string_param("kind", "rsi")
+            .with_string_param("kind", "out_of_range")
             .with_param("upper", 70.0)
             .with_param("lower", 30.0),
         EventId::VolumeEventDetector => EventConfig::new(id, name)
