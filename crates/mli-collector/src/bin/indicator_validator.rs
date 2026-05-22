@@ -1472,12 +1472,13 @@ async fn main() -> Result<()> {
     let mut handles: Vec<_> = Vec::new();
     let mut total_failed = 0usize;
     for (exch, acct, sym, stream) in combos {
-        let single = SubscriptionSet::new().add(
-            *exch,
-            *sym,
-            *acct,
-            [stream.clone()],
-        );
+        // Use add_raw for exchange-native instrument IDs that don't fit
+        // canonical BASE-QUOTE shape (e.g. Deribit options).
+        let single = if matches!(exch, ExchangeId::Deribit) {
+            SubscriptionSet::new().add_raw(*exch, *sym, *acct, [stream.clone()])
+        } else {
+            SubscriptionSet::new().add(*exch, *sym, *acct, [stream.clone()])
+        };
         match station.subscribe(single).await {
             Ok(report) => {
                 for f in &report.failed {
