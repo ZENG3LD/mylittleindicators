@@ -73,7 +73,6 @@ mod tests {
 
     fn make_oi(oi: f64) -> OpenInterest {
         OpenInterest {
-            symbol: "BTCUSDT".to_string(),
             open_interest: oi,
             open_interest_value: None,
             timestamp: 0,

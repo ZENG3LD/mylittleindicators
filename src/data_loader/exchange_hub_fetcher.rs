@@ -29,7 +29,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use digdigdig3::{
-    AccountType, ExchangeId, Symbol,
+    AccountType, ExchangeId, Symbol, SymbolInput,
     connector_manager::ExchangeHub,
 };
 
@@ -80,7 +80,7 @@ impl RestFetcher for ExchangeHubFetcher {
                     .unwrap_or(1500);
 
                 let klines = conn
-                    .get_klines(sym, "1m", Some(limit), account_type, Some(to_ts))
+                    .get_klines(SymbolInput::Canonical(&sym), "1m", Some(limit), account_type, Some(to_ts))
                     .await
                     .map_err(|e| format!("get_klines: {e}"))?;
 
@@ -113,7 +113,7 @@ impl RestFetcher for ExchangeHubFetcher {
                 }
 
                 let trades = conn
-                    .get_recent_trades(&sym, Some(1000), account_type)
+                    .get_recent_trades(SymbolInput::Canonical(&sym), Some(1000), account_type)
                     .await
                     .map_err(|e| format!("get_recent_trades: {e}"))?;
 
@@ -138,7 +138,7 @@ impl RestFetcher for ExchangeHubFetcher {
             // Useful for getting the current book; returns empty if to_ts < now.
             StreamKind::OrderBook => {
                 let book = conn
-                    .get_orderbook(sym, Some(50), account_type)
+                    .get_orderbook(SymbolInput::Canonical(&sym), Some(50), account_type)
                     .await
                     .map_err(|e| format!("get_orderbook: {e}"))?;
 
@@ -154,7 +154,7 @@ impl RestFetcher for ExchangeHubFetcher {
             // MarketDataPublic::get_funding_rate_history — full time-ranged history.
             StreamKind::Funding => {
                 let rates = conn
-                    .get_funding_rate_history(&sym, Some(from_ts), Some(to_ts), Some(1000), account_type)
+                    .get_funding_rate_history(SymbolInput::Canonical(&sym), Some(from_ts), Some(to_ts), Some(1000), account_type)
                     .await
                     .map_err(|e| format!("get_funding_rate_history: {e}"))?;
                 Ok(rates
@@ -167,7 +167,7 @@ impl RestFetcher for ExchangeHubFetcher {
             // ── Liquidation history ────────────────────────────────────────────
             StreamKind::Liquidation => {
                 let liqs = conn
-                    .get_liquidation_history(Some(&sym), Some(from_ts), Some(to_ts), Some(1000), account_type)
+                    .get_liquidation_history(Some(SymbolInput::Canonical(&sym)), Some(from_ts), Some(to_ts), Some(1000), account_type)
                     .await
                     .map_err(|e| format!("get_liquidation_history: {e}"))?;
                 Ok(liqs
@@ -180,7 +180,7 @@ impl RestFetcher for ExchangeHubFetcher {
             // ── Open interest history ──────────────────────────────────────────
             StreamKind::OpenInterest => {
                 let history = conn
-                    .get_open_interest_history(&sym, "5m", Some(from_ts), Some(to_ts), Some(500), account_type)
+                    .get_open_interest_history(SymbolInput::Canonical(&sym), "5m", Some(from_ts), Some(to_ts), Some(500), account_type)
                     .await
                     .map_err(|e| format!("get_open_interest_history: {e}"))?;
                 Ok(history
@@ -193,7 +193,7 @@ impl RestFetcher for ExchangeHubFetcher {
             // ── Long/short ratio history ───────────────────────────────────────
             StreamKind::LongShortRatio => {
                 let ratios = conn
-                    .get_long_short_ratio_history(&sym, "5m", Some(from_ts), Some(to_ts), Some(500), account_type)
+                    .get_long_short_ratio_history(SymbolInput::Canonical(&sym), "5m", Some(from_ts), Some(to_ts), Some(500), account_type)
                     .await
                     .map_err(|e| format!("get_long_short_ratio_history: {e}"))?;
                 Ok(ratios

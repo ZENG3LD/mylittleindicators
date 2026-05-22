@@ -161,7 +161,6 @@ mod tests {
 
     fn make_oi(oi: f64) -> OpenInterest {
         OpenInterest {
-            symbol: "BTCUSDT".to_string(),
             open_interest: oi,
             open_interest_value: None,
             timestamp: 0,
@@ -170,7 +169,6 @@ mod tests {
 
     fn make_mark(price: f64) -> MarkPrice {
         MarkPrice {
-            symbol: "BTCUSDT".to_string(),
             mark_price: price,
             index_price: None,
             funding_rate: None,

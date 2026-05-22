@@ -69,7 +69,6 @@ mod tests {
 
     fn make_fr(rate: f64) -> FundingRate {
         FundingRate {
-            symbol: "BTCUSDT".to_string(),
             rate,
             next_funding_time: None,
             timestamp: 1000,

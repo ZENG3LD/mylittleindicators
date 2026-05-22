@@ -85,7 +85,6 @@ mod tests {
 
     fn mp(mark: f64) -> MarkPrice {
         MarkPrice {
-            symbol: "BTCUSDT".to_string(),
             mark_price: mark,
             index_price: None,
             funding_rate: None,

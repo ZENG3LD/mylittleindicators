@@ -136,7 +136,6 @@ mod tests {
 
     fn make_funding(ts: i64) -> TimedEvent {
         TimedEvent::Funding(FundingRate {
-            symbol: "BTCUSDT".into(),
             rate: 0.0001,
             next_funding_time: None,
             timestamp: ts,

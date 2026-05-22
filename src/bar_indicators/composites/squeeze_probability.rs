@@ -211,11 +211,11 @@ mod tests {
     use crate::core::types::TradeSide;
 
     fn make_oi(open_interest: f64, ts: i64) -> OpenInterest {
-        OpenInterest { symbol: "BTCUSDT".to_string(), open_interest, open_interest_value: None, timestamp: ts }
+        OpenInterest { open_interest, open_interest_value: None, timestamp: ts }
     }
 
     fn make_mp(mark_price: f64, ts: i64) -> MarkPrice {
-        MarkPrice { symbol: "BTCUSDT".to_string(), mark_price, index_price: None, funding_rate: None, timestamp: ts }
+        MarkPrice { mark_price, index_price: None, funding_rate: None, timestamp: ts }
     }
 
     fn make_liq(ts: i64) -> Liquidation {

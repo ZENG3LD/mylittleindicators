@@ -188,7 +188,7 @@ mod tests {
     }
 
     fn make_mp(mark_price: f64) -> MarkPrice {
-        MarkPrice { symbol: "BTCUSDT".to_string(), mark_price, index_price: None, funding_rate: None, timestamp: 1000 }
+        MarkPrice { mark_price, index_price: None, funding_rate: None, timestamp: 1000 }
     }
 
     #[test]

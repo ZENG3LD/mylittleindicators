@@ -70,7 +70,6 @@ fn event_writer_roundtrip() {
     let writer = EventWriter::new(dir.clone());
 
     let event = TimedEvent::Funding(FundingRate {
-        symbol: "BTCUSDT".into(),
         rate: 0.0001,
         next_funding_time: None,
         timestamp: 1_700_000_000_000,

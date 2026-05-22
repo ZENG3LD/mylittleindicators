@@ -23,7 +23,7 @@ use std::{
 
 use anyhow::Result;
 use digdigdig3::{
-    AccountType, ExchangeId, StreamEvent, StreamType, SubscriptionRequest, Symbol,
+    AccountType, ExchangeId, StreamEvent, StreamType, SubscriptionRequest, Symbol, SymbolInput,
     connector_manager::ExchangeHub,
 };
 use futures_util::StreamExt;
@@ -36,7 +36,7 @@ use tokio::task::JoinSet;
 // ─────────────────────────────────────────────────────────────────────────────
 
 const REST_CALL_TIMEOUT_SECS: u64 = 10;
-/// Lighter connector is known to hang — use reduced timeout.
+/// Lighter WS subscribe timeout (reduced due to known dig3 hang bug).
 const LIGHTER_REST_TIMEOUT_SECS: u64 = 5;
 const WS_SUBSCRIBE_TIMEOUT_SECS: u64 = 5;
 const CONNECT_FULL_TIMEOUT_SECS: u64 = 15;
@@ -297,10 +297,27 @@ enum RestStatus {
     UnsupportedOperation,
     /// Method skipped — semantically impossible for this account type (e.g. funding on Spot).
     SkippedSpotNoDerivative,
+    /// Method skipped — Deribit Options require specific contract instrument_name, not generic Symbol.
+    SkippedDeribitOptions,
     HttpError { code: Option<i64>, msg: String },
+    /// Endpoint requires authentication (API key). Not a bug — connect_public was used.
+    AuthRequired { msg: String },
     Timeout,
     ParseError { msg: String },
     Other { msg: String },
+}
+
+fn is_auth_error(msg: &str, code: u16) -> bool {
+    let lc = msg.to_lowercase();
+    code == 401
+        || code == 403
+        || lc.contains("invalid credentials")
+        || lc.contains("api-key")
+        || lc.contains("api key")
+        || lc.contains("unauthorized")
+        || lc.contains("authentication")
+        || lc.contains("apikey")
+        || lc.contains("invalid key")
 }
 
 fn classify_exchange_error(e: &digdigdig3::core::types::ExchangeError) -> RestStatus {
@@ -313,16 +330,36 @@ fn classify_exchange_error(e: &digdigdig3::core::types::ExchangeError) -> RestSt
         ExchangeError::Parse(msg) | ExchangeError::ParseError(msg) => {
             RestStatus::ParseError { msg: msg.clone() }
         }
-        ExchangeError::Http(msg) => RestStatus::HttpError { code: None, msg: msg.clone() },
-        ExchangeError::Api { code, message } => RestStatus::HttpError {
-            code: Some(*code as i64),
-            msg: message.clone(),
-        },
+        ExchangeError::Http(msg) => {
+            if is_auth_error(msg, 0) {
+                RestStatus::AuthRequired { msg: msg.clone() }
+            } else {
+                RestStatus::HttpError { code: None, msg: msg.clone() }
+            }
+        }
+        ExchangeError::Api { code, message } => {
+            let code_u16 = *code as u16;
+            if is_auth_error(message, code_u16) {
+                RestStatus::AuthRequired { msg: message.clone() }
+            } else {
+                RestStatus::HttpError {
+                    code: Some(*code as i64),
+                    msg: message.clone(),
+                }
+            }
+        }
         ExchangeError::RateLimitExceeded { message, .. } => RestStatus::HttpError {
             code: Some(429),
             msg: message.clone(),
         },
-        other => RestStatus::Other { msg: format!("{other}") },
+        other => {
+            let msg = format!("{other}");
+            if is_auth_error(&msg, 0) {
+                RestStatus::AuthRequired { msg }
+            } else {
+                RestStatus::Other { msg }
+            }
+        }
     }
 }
 
@@ -348,27 +385,70 @@ async fn run_rest_audit_for_exchange(
 ) -> Vec<RestEndpointResult> {
     let mut results = Vec::new();
 
-    // Lighter is known to hang in dig3 — skip REST audit entirely, log warning.
-    if exchange_id == ExchangeId::Lighter {
-        tracing::warn!(
-            "[REST] lighter: skipped REST audit — known dig3 hang bug ({}s timeout would fire)",
-            LIGHTER_REST_TIMEOUT_SECS
-        );
-        return results;
-    }
-
     let rest = match hub.rest(exchange_id) {
         Some(r) => r,
         None => return results,
     };
 
+    // Lighter REST полностью skipped — `get_klines` блокирует tokio runtime
+    // (sync код внутри dig3 connector, tokio::time::timeout не прерывает).
+    // Подтверждено diagnostic run: timeout 3s → real hang > 6 min on first call.
+    if exchange_id == ExchangeId::Lighter {
+        tracing::warn!("Lighter REST audit skipped — dig3 connector blocks tokio (sync code in get_klines)");
+        return results;
+    }
+
+    let rest_timeout = Duration::from_secs(REST_CALL_TIMEOUT_SECS);
+
     for account_type in account_types {
+        // Deribit Options: basic REST methods (klines/ticker/orderbook/recent_trades) require
+        // a specific contract instrument_name (e.g. BTC-30MAY25-50000-C), not a generic Symbol.
+        // Skip all basic REST methods here — only derivative-specific methods that don't need
+        // a specific expiry might work, but they will return UnsupportedOperation from dig3 anyway.
+        if exchange_id == ExchangeId::Deribit && account_type == AccountType::Options {
+            tracing::info!(
+                "Deribit Options REST skipped — basic methods require specific contract instrument_name, not generic Symbol"
+            );
+            let sym_str = format!("{:?}", primary_symbol(exchange_id, account_type));
+            let ex_str = exchange_id.as_str().to_string();
+            let at_str = account_type.as_key_str().to_string();
+            let skipped_methods = &[
+                "get_klines", "get_ticker", "get_orderbook", "get_recent_trades",
+                "get_funding_rate_history", "get_liquidation_history",
+                "get_open_interest_history", "get_long_short_ratio_history",
+                "get_premium_index", "get_open_interest", "get_mark_price",
+            ];
+            for method in skipped_methods {
+                results.push(RestEndpointResult {
+                    exchange: ex_str.clone(),
+                    account_type: at_str.clone(),
+                    method: method.to_string(),
+                    symbol: sym_str.clone(),
+                    status: RestStatus::SkippedDeribitOptions,
+                    duration_ms: 0,
+                });
+            }
+            continue;
+        }
+
         let symbol = primary_symbol(exchange_id, account_type);
         // sym_str for logging and for &str-based methods (get_open_interest, get_mark_price)
         let sym_str = format!("{:?}", symbol);
         let ex_str = exchange_id.as_str().to_string();
         let at_str = account_type.as_key_str().to_string();
         let derivative = is_derivative_account(account_type);
+
+        // Returns true for statuses that are "expected" — suppress info log for these.
+        fn is_expected_status(s: &RestStatus) -> bool {
+            matches!(
+                s,
+                RestStatus::Ok { .. }
+                    | RestStatus::Empty
+                    | RestStatus::UnsupportedOperation
+                    | RestStatus::SkippedSpotNoDerivative
+                    | RestStatus::SkippedDeribitOptions
+            )
+        }
 
         // Macro: Vec-returning REST call with timeout + whitelist check
         macro_rules! rest_timed {
@@ -383,12 +463,9 @@ async fn run_rest_audit_for_exchange(
                         duration_ms: 0,
                     });
                 } else {
-                    tracing::debug!("[REST] {}/{}.{}({:?}) starting", ex_str, at_str, $method, symbol);
+                    tracing::debug!("[REST-START] {}/{}.{}", ex_str, at_str, $method);
                     let t0 = Instant::now();
-                    let timed = tokio::time::timeout(
-                        Duration::from_secs(REST_CALL_TIMEOUT_SECS),
-                        $future,
-                    ).await;
+                    let timed = tokio::time::timeout(rest_timeout, $future).await;
                     let duration_ms = t0.elapsed().as_millis() as u64;
                     let status = match timed {
                         Err(_elapsed) => RestStatus::Timeout,
@@ -400,10 +477,17 @@ async fn run_rest_audit_for_exchange(
                             Err(e) => classify_exchange_error(&e),
                         },
                     };
-                    tracing::info!(
-                        "[REST] {}/{}.{}({:?}) -> {:?} ({}ms)",
-                        ex_str, at_str, $method, symbol, status, duration_ms
-                    );
+                    if is_expected_status(&status) {
+                        tracing::debug!(
+                            "[REST] {}/{}.{} -> {:?} ({}ms)",
+                            ex_str, at_str, $method, status, duration_ms
+                        );
+                    } else {
+                        tracing::info!(
+                            "[REST] {}/{}.{} -> {:?} ({}ms)",
+                            ex_str, at_str, $method, status, duration_ms
+                        );
+                    }
                     results.push(RestEndpointResult {
                         exchange: ex_str.clone(),
                         account_type: at_str.clone(),
@@ -429,12 +513,9 @@ async fn run_rest_audit_for_exchange(
                         duration_ms: 0,
                     });
                 } else {
-                    tracing::debug!("[REST] {}/{}.{}({:?}) starting", ex_str, at_str, $method, symbol);
+                    tracing::debug!("[REST-START] {}/{}.{}", ex_str, at_str, $method);
                     let t0 = Instant::now();
-                    let timed = tokio::time::timeout(
-                        Duration::from_secs(REST_CALL_TIMEOUT_SECS),
-                        $future,
-                    ).await;
+                    let timed = tokio::time::timeout(rest_timeout, $future).await;
                     let duration_ms = t0.elapsed().as_millis() as u64;
                     let status = match timed {
                         Err(_elapsed) => RestStatus::Timeout,
@@ -443,10 +524,17 @@ async fn run_rest_audit_for_exchange(
                             Err(e) => classify_exchange_error(&e),
                         },
                     };
-                    tracing::info!(
-                        "[REST] {}/{}.{}({:?}) -> {:?} ({}ms)",
-                        ex_str, at_str, $method, symbol, status, duration_ms
-                    );
+                    if is_expected_status(&status) {
+                        tracing::debug!(
+                            "[REST] {}/{}.{} -> {:?} ({}ms)",
+                            ex_str, at_str, $method, status, duration_ms
+                        );
+                    } else {
+                        tracing::info!(
+                            "[REST] {}/{}.{} -> {:?} ({}ms)",
+                            ex_str, at_str, $method, status, duration_ms
+                        );
+                    }
                     results.push(RestEndpointResult {
                         exchange: ex_str.clone(),
                         account_type: at_str.clone(),
@@ -464,47 +552,47 @@ async fn run_rest_audit_for_exchange(
 
         rest_timed!(
             "get_klines",
-            rest.get_klines(symbol.clone(), "1m", Some(100), account_type, None)
+            rest.get_klines(SymbolInput::Canonical(&symbol), "1m", Some(100), account_type, None)
         );
 
         rest_timed_single!(
             "get_ticker",
-            rest.get_ticker(symbol.clone(), account_type)
+            rest.get_ticker(SymbolInput::Canonical(&symbol), account_type)
         );
 
         rest_timed_single!(
             "get_orderbook",
-            rest.get_orderbook(symbol.clone(), Some(20), account_type)
+            rest.get_orderbook(SymbolInput::Canonical(&symbol), Some(20), account_type)
         );
 
         rest_timed!(
             "get_recent_trades",
-            rest.get_recent_trades(&symbol, Some(100), account_type)
+            rest.get_recent_trades(SymbolInput::Canonical(&symbol), Some(100), account_type)
         );
 
         rest_timed!(
             "get_funding_rate_history",
-            rest.get_funding_rate_history(&symbol, None, None, Some(10), account_type)
+            rest.get_funding_rate_history(SymbolInput::Canonical(&symbol), None, None, Some(10), account_type)
         );
 
         rest_timed!(
             "get_liquidation_history",
-            rest.get_liquidation_history(Some(&symbol), None, None, Some(10), account_type)
+            rest.get_liquidation_history(Some(SymbolInput::Canonical(&symbol)), None, None, Some(10), account_type)
         );
 
         rest_timed!(
             "get_open_interest_history",
-            rest.get_open_interest_history(&symbol, "5m", None, None, Some(10), account_type)
+            rest.get_open_interest_history(SymbolInput::Canonical(&symbol), "5m", None, None, Some(10), account_type)
         );
 
         rest_timed!(
             "get_long_short_ratio_history",
-            rest.get_long_short_ratio_history(&symbol, "5m", None, None, Some(10), account_type)
+            rest.get_long_short_ratio_history(SymbolInput::Canonical(&symbol), "5m", None, None, Some(10), account_type)
         );
 
         rest_timed!(
             "get_premium_index",
-            rest.get_premium_index(Some(&symbol), account_type)
+            rest.get_premium_index(Some(SymbolInput::Canonical(&symbol)), account_type)
         );
 
         rest_timed_single!(
@@ -564,9 +652,72 @@ async fn run_rest_audit(
 enum WsStatus {
     Skipped { reason: String },
     SubscribeFailed { error: String },
+    /// Subscribe failed due to missing/invalid API key.
+    AuthRequired { msg: String },
+    /// Subscribe failed due to symbol/instrument format mismatch.
+    SymbolFormatError { msg: String },
+    /// Subscribe failed due to rate limiting.
+    RateLimit { msg: String },
+    /// Exchange explicitly does not support this stream type (e.g. "Unsupported stream type").
+    UnsupportedByExchange { msg: String },
     Subscribed { events_received: u64 },
     SilentNoEvents,
     ConnectionDropped { error: String },
+}
+
+fn classify_ws_error(error: String) -> WsStatus {
+    let lc = error.to_lowercase();
+
+    // ConnectionDropped — check first (message may also contain other keywords)
+    if lc.contains("closed connection")
+        || lc.contains("trying to work")
+        || lc.contains("connection reset")
+        || lc.contains("connection closed")
+    {
+        return WsStatus::ConnectionDropped { error };
+    }
+
+    // Auth
+    if lc.contains("auth")
+        || lc.contains("api-key")
+        || lc.contains("api key")
+        || lc.contains("apikey")
+        || lc.contains("unauthorized")
+        || lc.contains("invalid credentials")
+        || lc.contains("invalid key")
+    {
+        return WsStatus::AuthRequired { msg: error };
+    }
+
+    // UnsupportedByExchange — before SymbolFormatError to avoid misclassification
+    if lc.contains("unsupported stream")
+        || lc.contains("unsupported subscription")
+        || (lc.contains("stream type") && lc.contains("not supported"))
+        || (lc.contains("subscription type") && lc.contains("not supported"))
+    {
+        return WsStatus::UnsupportedByExchange { msg: error };
+    }
+
+    // Symbol / instrument format
+    if lc.contains("symbol")
+        || lc.contains("instrument")
+        || lc.contains("format")
+        || lc.contains("invalid contract")
+        || lc.contains("market not found")
+    {
+        return WsStatus::SymbolFormatError { msg: error };
+    }
+
+    // Rate limit
+    if lc.contains("rate limit")
+        || lc.contains("too many")
+        || lc.contains("429")
+        || lc.contains("throttl")
+    {
+        return WsStatus::RateLimit { msg: error };
+    }
+
+    WsStatus::SubscribeFailed { error }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -633,11 +784,11 @@ fn stream_type_label(st: &StreamType) -> String {
 
 fn stream_label_of_event(ev: &StreamEvent) -> &'static str {
     match ev {
-        StreamEvent::Ticker(_) => "ticker",
-        StreamEvent::Trade(_) => "trade",
-        StreamEvent::OrderbookSnapshot(_) => "orderbook",
-        StreamEvent::OrderbookDelta(_) => "orderbook_delta",
-        StreamEvent::Kline(_) => "kline:1m",
+        StreamEvent::Ticker { .. } => "ticker",
+        StreamEvent::Trade { .. } => "trade",
+        StreamEvent::OrderbookSnapshot { .. } => "orderbook",
+        StreamEvent::OrderbookDelta { .. } => "orderbook_delta",
+        StreamEvent::Kline { .. } => "kline:1m",
         StreamEvent::MarkPrice { .. } => "mark_price",
         StreamEvent::FundingRate { .. } => "funding_rate",
         StreamEvent::Liquidation { .. } => "liquidation",
@@ -662,9 +813,9 @@ fn stream_label_of_event(ev: &StreamEvent) -> &'static str {
         StreamEvent::RiskLimit { .. } => "risk_limit",
         StreamEvent::PredictedFunding { .. } => "predicted_funding",
         StreamEvent::FundingSettlement { .. } => "funding_settlement",
-        StreamEvent::OrderUpdate(_) => "order_update",
+        StreamEvent::OrderUpdate { .. } => "order_update",
         StreamEvent::BalanceUpdate(_) => "balance_update",
-        StreamEvent::PositionUpdate(_) => "position_update",
+        StreamEvent::PositionUpdate { .. } => "position_update",
     }
 }
 
@@ -708,12 +859,25 @@ async fn subscribe_all_streams(
             let ex_str = exchange_id.as_str().to_string();
             let at_str = account_type.as_key_str().to_string();
 
-            // Lighter WS: use reduced timeout — log warning
+            // Lighter WS: skip entirely — dig3 connector hangs on subscribe (blocks tokio)
             if *exchange_id == ExchangeId::Lighter {
-                tracing::warn!(
-                    "[WS] lighter/{}: using {}s timeout due to known dig3 hang bug",
-                    at_str, LIGHTER_REST_TIMEOUT_SECS
-                );
+                tracing::warn!("[WS] lighter/{}: skipping all streams (known dig3 hang bug)", at_str);
+                for st in stream_types {
+                    let stream_label = stream_type_label(st);
+                    let (_, cap_res, _) = capability_for_stream(hub, *exchange_id, account_type, st);
+                    no_ws_details.push(WsSubscriptionDetail {
+                        exchange: ex_str.clone(),
+                        account_type: at_str.clone(),
+                        stream_type: stream_label,
+                        symbol: sym_log.clone(),
+                        capability: cap_res,
+                        status: WsStatus::Skipped { reason: "lighter known hang".into() },
+                        subscribed_at_ms: None,
+                        first_event_at_ms: None,
+                        last_event_at_ms: None,
+                    });
+                }
+                continue;
             }
 
             let ws_opt = hub.ws(*exchange_id, account_type);
@@ -851,7 +1015,7 @@ async fn subscribe_all_streams(
                 let status = if subscribed {
                     WsStatus::Subscribed { events_received: 0 }
                 } else {
-                    WsStatus::SubscribeFailed { error: last_error }
+                    classify_ws_error(last_error)
                 };
 
                 local.push(WsSubscriptionDetail {
@@ -942,11 +1106,16 @@ async fn run_ws_audit(
     }
 
     tracing::info!(
-        "WS subscriptions: {} total ({} subscribed, {} skipped, {} failed)",
+        "WS subscriptions: {} total ({} subscribed, {} skipped, {} failed, {} unsupported_by_exchange, {} auth_required, {} symbol_err, {} rate_limit, {} dropped)",
         details.len(),
         details.iter().filter(|d| matches!(d.status, WsStatus::Subscribed { .. })).count(),
         details.iter().filter(|d| matches!(d.status, WsStatus::Skipped { .. })).count(),
         details.iter().filter(|d| matches!(d.status, WsStatus::SubscribeFailed { .. })).count(),
+        details.iter().filter(|d| matches!(d.status, WsStatus::UnsupportedByExchange { .. })).count(),
+        details.iter().filter(|d| matches!(d.status, WsStatus::AuthRequired { .. })).count(),
+        details.iter().filter(|d| matches!(d.status, WsStatus::SymbolFormatError { .. })).count(),
+        details.iter().filter(|d| matches!(d.status, WsStatus::RateLimit { .. })).count(),
+        details.iter().filter(|d| matches!(d.status, WsStatus::ConnectionDropped { .. })).count(),
     );
 
     // Spawn event listeners for each connected WS
@@ -1102,6 +1271,8 @@ fn print_exchange_matrix(
                         RestStatus::Empty => format!("0 items, {}ms", r.duration_ms),
                         RestStatus::UnsupportedOperation => "unsupported".to_string(),
                         RestStatus::SkippedSpotNoDerivative => "skipped (spot, no derivative)".to_string(),
+                        RestStatus::SkippedDeribitOptions => "skipped (deribit options, needs instrument_name)".to_string(),
+                        RestStatus::AuthRequired { msg } => format!("AUTH_REQUIRED: {}", truncate(msg, 60)),
                         RestStatus::HttpError { code, msg } => {
                             let code_str = code.map(|c| format!("HTTP {c} ")).unwrap_or_default();
                             format!("{}{}", code_str, truncate(msg, 60))
@@ -1135,6 +1306,18 @@ fn print_exchange_matrix(
                         WsStatus::Skipped { reason } => format!("Skipped: {reason}"),
                         WsStatus::SubscribeFailed { error } => {
                             format!("FAILED: {}", truncate(error, 60))
+                        }
+                        WsStatus::AuthRequired { msg } => {
+                            format!("AUTH_REQUIRED: {}", truncate(msg, 60))
+                        }
+                        WsStatus::SymbolFormatError { msg } => {
+                            format!("SYMBOL_FORMAT: {}", truncate(msg, 60))
+                        }
+                        WsStatus::RateLimit { msg } => {
+                            format!("RATE_LIMIT: {}", truncate(msg, 60))
+                        }
+                        WsStatus::UnsupportedByExchange { msg } => {
+                            format!("UNSUPPORTED_BY_EXCHANGE: {}", truncate(msg, 60))
                         }
                         WsStatus::ConnectionDropped { error } => {
                             format!("DROPPED: {}", truncate(error, 60))
@@ -1185,6 +1368,42 @@ fn print_stream_availability_matrix(
             .map(|d| format!("{}:{}", d.exchange, d.account_type))
             .collect();
 
+        let auth_required: Vec<String> = ws_details
+            .iter()
+            .filter(|d| {
+                d.stream_type == label
+                    && matches!(d.status, WsStatus::AuthRequired { .. })
+            })
+            .map(|d| format!("{}:{}", d.exchange, d.account_type))
+            .collect();
+
+        let symbol_format_errors: Vec<String> = ws_details
+            .iter()
+            .filter(|d| {
+                d.stream_type == label
+                    && matches!(d.status, WsStatus::SymbolFormatError { .. })
+            })
+            .map(|d| format!("{}:{}", d.exchange, d.account_type))
+            .collect();
+
+        let rate_limit_errors: Vec<String> = ws_details
+            .iter()
+            .filter(|d| {
+                d.stream_type == label
+                    && matches!(d.status, WsStatus::RateLimit { .. })
+            })
+            .map(|d| format!("{}:{}", d.exchange, d.account_type))
+            .collect();
+
+        let unsupported_by_exchange: Vec<String> = ws_details
+            .iter()
+            .filter(|d| {
+                d.stream_type == label
+                    && matches!(d.status, WsStatus::UnsupportedByExchange { .. })
+            })
+            .map(|d| format!("{}:{}", d.exchange, d.account_type))
+            .collect();
+
         let skipped: Vec<String> = ws_details
             .iter()
             .filter(|d| {
@@ -1194,7 +1413,15 @@ fn print_stream_availability_matrix(
             .map(|d| format!("{}:{}", d.exchange, d.account_type))
             .collect();
 
-        if working.is_empty() && silent.is_empty() && failed.is_empty() && skipped.is_empty() {
+        if working.is_empty()
+            && silent.is_empty()
+            && failed.is_empty()
+            && auth_required.is_empty()
+            && symbol_format_errors.is_empty()
+            && rate_limit_errors.is_empty()
+            && unsupported_by_exchange.is_empty()
+            && skipped.is_empty()
+        {
             continue;
         }
 
@@ -1207,6 +1434,18 @@ fn print_stream_availability_matrix(
         }
         if !failed.is_empty() {
             println!("  Failed: {}", failed.join(", "));
+        }
+        if !unsupported_by_exchange.is_empty() {
+            println!("  Unsupported by exchange: {}", unsupported_by_exchange.join(", "));
+        }
+        if !auth_required.is_empty() {
+            println!("  Auth required: {}", auth_required.join(", "));
+        }
+        if !symbol_format_errors.is_empty() {
+            println!("  Symbol format error: {}", symbol_format_errors.join(", "));
+        }
+        if !rate_limit_errors.is_empty() {
+            println!("  Rate limited: {}", rate_limit_errors.join(", "));
         }
         if !skipped.is_empty() {
             println!("  Skipped: {}", skipped.join(", "));
@@ -1226,16 +1465,30 @@ fn print_summary(
     let total_secs = rest_duration_secs + ws_duration_secs_actual;
     let rest_ok = rest_results.iter().filter(|r| matches!(r.status, RestStatus::Ok { .. })).count();
     let rest_unsupported = rest_results.iter().filter(|r| matches!(r.status, RestStatus::UnsupportedOperation)).count();
-    let rest_skipped = rest_results.iter().filter(|r| matches!(r.status, RestStatus::SkippedSpotNoDerivative)).count();
+    let rest_skipped = rest_results.iter().filter(|r| matches!(
+        r.status,
+        RestStatus::SkippedSpotNoDerivative | RestStatus::SkippedDeribitOptions
+    )).count();
+    let rest_auth = rest_results.iter().filter(|r| matches!(r.status, RestStatus::AuthRequired { .. })).count();
     let rest_errors = rest_results.iter().filter(|r| !matches!(
         r.status,
-        RestStatus::Ok { .. } | RestStatus::Empty | RestStatus::UnsupportedOperation | RestStatus::SkippedSpotNoDerivative
+        RestStatus::Ok { .. }
+            | RestStatus::Empty
+            | RestStatus::UnsupportedOperation
+            | RestStatus::SkippedSpotNoDerivative
+            | RestStatus::SkippedDeribitOptions
+            | RestStatus::AuthRequired { .. }
     )).count();
 
     let ws_subscribed = ws_details.iter().filter(|d| matches!(d.status, WsStatus::Subscribed { .. } | WsStatus::SilentNoEvents)).count();
     let ws_with_data = ws_details.iter().filter(|d| matches!(&d.status, WsStatus::Subscribed { events_received } if *events_received > 0)).count();
     let ws_silent = ws_details.iter().filter(|d| matches!(d.status, WsStatus::SilentNoEvents)).count();
     let ws_failed = ws_details.iter().filter(|d| matches!(d.status, WsStatus::SubscribeFailed { .. })).count();
+    let ws_unsupported = ws_details.iter().filter(|d| matches!(d.status, WsStatus::UnsupportedByExchange { .. })).count();
+    let ws_auth = ws_details.iter().filter(|d| matches!(d.status, WsStatus::AuthRequired { .. })).count();
+    let ws_symbol_err = ws_details.iter().filter(|d| matches!(d.status, WsStatus::SymbolFormatError { .. })).count();
+    let ws_rate_limit = ws_details.iter().filter(|d| matches!(d.status, WsStatus::RateLimit { .. })).count();
+    let ws_dropped = ws_details.iter().filter(|d| matches!(d.status, WsStatus::ConnectionDropped { .. })).count();
     let ws_skipped = ws_details.iter().filter(|d| matches!(d.status, WsStatus::Skipped { .. })).count();
     let total_events: u64 = ws_details.iter().filter_map(|d| {
         if let WsStatus::Subscribed { events_received } = &d.status { Some(*events_received) } else { None }
@@ -1253,12 +1506,13 @@ fn print_summary(
         }
     }
     println!(
-        "REST endpoints: {} total, {} OK, {} unsupported, {} skipped (spot/no-derivative), {} errors",
-        rest_results.len(), rest_ok, rest_unsupported, rest_skipped, rest_errors
+        "REST endpoints: {} total, {} OK, {} unsupported, {} skipped, {} auth_required, {} errors",
+        rest_results.len(), rest_ok, rest_unsupported, rest_skipped, rest_auth, rest_errors
     );
     println!("WS subscriptions: {} total", ws_details.len());
     println!("  {} subscribed ({} with data, {} silent)", ws_subscribed, ws_with_data, ws_silent);
-    println!("  {} failed, {} skipped", ws_failed, ws_skipped);
+    println!("  {} failed, {} unsupported_by_exchange, {} auth_required, {} symbol_format, {} rate_limit, {} dropped, {} skipped",
+        ws_failed, ws_unsupported, ws_auth, ws_symbol_err, ws_rate_limit, ws_dropped, ws_skipped);
     println!("  {} total events", total_events);
 }
 
@@ -1297,6 +1551,11 @@ struct StreamAvailability {
     working: Vec<String>,
     silent: Vec<String>,
     failed: Vec<String>,
+    unsupported_by_exchange: Vec<String>,
+    auth_required: Vec<String>,
+    symbol_format_error: Vec<String>,
+    rate_limit: Vec<String>,
+    dropped: Vec<String>,
     skipped: Vec<String>,
 }
 
@@ -1369,12 +1628,47 @@ fn build_json_report(
             .filter(|d| d.stream_type == label && matches!(d.status, WsStatus::SubscribeFailed { .. }))
             .map(|d| format!("{}:{}", d.exchange, d.account_type))
             .collect();
+        let unsupported_by_exchange = ws_details
+            .iter()
+            .filter(|d| d.stream_type == label && matches!(d.status, WsStatus::UnsupportedByExchange { .. }))
+            .map(|d| format!("{}:{}", d.exchange, d.account_type))
+            .collect();
+        let auth_required = ws_details
+            .iter()
+            .filter(|d| d.stream_type == label && matches!(d.status, WsStatus::AuthRequired { .. }))
+            .map(|d| format!("{}:{}", d.exchange, d.account_type))
+            .collect();
+        let symbol_format_error = ws_details
+            .iter()
+            .filter(|d| d.stream_type == label && matches!(d.status, WsStatus::SymbolFormatError { .. }))
+            .map(|d| format!("{}:{}", d.exchange, d.account_type))
+            .collect();
+        let rate_limit = ws_details
+            .iter()
+            .filter(|d| d.stream_type == label && matches!(d.status, WsStatus::RateLimit { .. }))
+            .map(|d| format!("{}:{}", d.exchange, d.account_type))
+            .collect();
+        let dropped = ws_details
+            .iter()
+            .filter(|d| d.stream_type == label && matches!(d.status, WsStatus::ConnectionDropped { .. }))
+            .map(|d| format!("{}:{}", d.exchange, d.account_type))
+            .collect();
         let skipped = ws_details
             .iter()
             .filter(|d| d.stream_type == label && matches!(d.status, WsStatus::Skipped { .. }))
             .map(|d| format!("{}:{}", d.exchange, d.account_type))
             .collect();
-        stream_avail.insert(label, StreamAvailability { working, silent, failed, skipped });
+        stream_avail.insert(label, StreamAvailability {
+            working,
+            silent,
+            failed,
+            unsupported_by_exchange,
+            auth_required,
+            symbol_format_error,
+            rate_limit,
+            dropped,
+            skipped,
+        });
     }
 
     SmokeReport {
@@ -1445,13 +1739,19 @@ async fn run_full_smoke(
 
     let rest_ok = rest_results.iter().filter(|r| matches!(r.status, RestStatus::Ok { .. })).count();
     let rest_unsupported = rest_results.iter().filter(|r| matches!(r.status, RestStatus::UnsupportedOperation)).count();
+    let rest_auth = rest_results.iter().filter(|r| matches!(r.status, RestStatus::AuthRequired { .. })).count();
     let rest_errors = rest_results.iter().filter(|r| !matches!(
         r.status,
-        RestStatus::Ok { .. } | RestStatus::Empty | RestStatus::UnsupportedOperation | RestStatus::SkippedSpotNoDerivative
+        RestStatus::Ok { .. }
+            | RestStatus::Empty
+            | RestStatus::UnsupportedOperation
+            | RestStatus::SkippedSpotNoDerivative
+            | RestStatus::SkippedDeribitOptions
+            | RestStatus::AuthRequired { .. }
     )).count();
     println!(
-        "REST done: {} total, {} OK, {} unsupported, {} errors ({}s)\n",
-        rest_results.len(), rest_ok, rest_unsupported, rest_errors, rest_duration_secs
+        "REST done: {} total, {} OK, {} unsupported, {} auth_required, {} errors ({}s)\n",
+        rest_results.len(), rest_ok, rest_unsupported, rest_auth, rest_errors, rest_duration_secs
     );
 
     // ── Phase 2: WS audit ───────────────────────────────────────────────────

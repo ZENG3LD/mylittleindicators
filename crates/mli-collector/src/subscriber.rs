@@ -198,48 +198,43 @@ fn dig3_trade_to_mli_tick(t: digdigdig3::core::types::PublicTrade) -> Tick {
 fn stream_event_to_timed(ev: StreamEvent) -> Option<(String, TimedEvent)> {
     match ev {
         // ── public trades ────────────────────────────────────────────────────
-        StreamEvent::Trade(t) => {
-            let symbol = t.symbol.clone();
-            Some((symbol, TimedEvent::Tick(dig3_trade_to_mli_tick(t))))
+        StreamEvent::Trade { symbol, trade } => {
+            Some((symbol, TimedEvent::Tick(dig3_trade_to_mli_tick(trade))))
         }
 
         // ── orderbook snapshot ────────────────────────────────────────────────
-        StreamEvent::OrderbookSnapshot(b) => {
-            // OrderBook has no symbol field; symbol context comes from subscription.
-            // Use empty string — writer will filter via StorageRoot which uses symbol
-            // directory paths (empty string → root, harmless).
-            Some(("".to_string(), TimedEvent::OrderBook(b)))
+        StreamEvent::OrderbookSnapshot { symbol, book } => {
+            Some((symbol, TimedEvent::OrderBook(book)))
         }
 
-        StreamEvent::OrderbookDelta(d) => {
-            Some(("".to_string(), TimedEvent::OrderbookDelta(d)))
+        StreamEvent::OrderbookDelta { symbol, delta } => {
+            Some((symbol, TimedEvent::OrderbookDelta(delta)))
         }
 
         // ── ticker ────────────────────────────────────────────────────────────
-        StreamEvent::Ticker(t) => {
-            let symbol = t.symbol.clone();
-            Some((symbol, TimedEvent::Ticker(t)))
+        StreamEvent::Ticker { symbol, ticker } => {
+            Some((symbol, TimedEvent::Ticker(ticker)))
         }
 
         // ── kline → Bar ───────────────────────────────────────────────────────
-        StreamEvent::Kline(k) => {
+        StreamEvent::Kline { symbol, interval: _, kline } => {
             use mylittleindicators::core::types::Bar;
-            let time = k.close_time.unwrap_or(k.open_time);
-            let bar = Bar::new(time, k.open, k.high, k.low, k.close, k.volume);
-            Some(("".to_string(), TimedEvent::Bar(bar)))
+            let time = kline.close_time.unwrap_or(kline.open_time);
+            let bar = Bar::new(time, kline.open, kline.high, kline.low, kline.close, kline.volume);
+            Some((symbol, TimedEvent::Bar(bar)))
         }
 
         // ── mark price ────────────────────────────────────────────────────────
         StreamEvent::MarkPrice { symbol, mark_price, index_price, timestamp } => {
             use digdigdig3::core::types::MarkPrice;
-            let mp = MarkPrice { symbol: symbol.clone(), mark_price, index_price, funding_rate: None, timestamp };
+            let mp = MarkPrice { mark_price, index_price, funding_rate: None, timestamp };
             Some((symbol, TimedEvent::MarkPrice(mp)))
         }
 
         // ── funding rate ──────────────────────────────────────────────────────
         StreamEvent::FundingRate { symbol, rate, next_funding_time, timestamp } => {
             use digdigdig3::core::types::FundingRate;
-            let fr = FundingRate { symbol: symbol.clone(), rate, next_funding_time, timestamp };
+            let fr = FundingRate { rate, next_funding_time, timestamp };
             Some((symbol, TimedEvent::Funding(fr)))
         }
 
@@ -253,7 +248,7 @@ fn stream_event_to_timed(ev: StreamEvent) -> Option<(String, TimedEvent)> {
         // ── open interest ─────────────────────────────────────────────────────
         StreamEvent::OpenInterestUpdate { symbol, open_interest, open_interest_value, timestamp } => {
             use digdigdig3::core::types::OpenInterest;
-            let oi = OpenInterest { symbol: symbol.clone(), open_interest, open_interest_value, timestamp };
+            let oi = OpenInterest { open_interest, open_interest_value, timestamp };
             Some((symbol, TimedEvent::OpenInterest(oi)))
         }
 
@@ -351,8 +346,9 @@ fn stream_event_to_timed(ev: StreamEvent) -> Option<(String, TimedEvent)> {
         // ── market warning ────────────────────────────────────────────────────
         StreamEvent::MarketWarning { symbol, warning_kind, message, timestamp } => {
             use digdigdig3::core::types::MarketWarning;
-            let mw = MarketWarning { symbol: symbol.clone(), warning_kind, message, timestamp };
-            Some((symbol, TimedEvent::MarketWarning(mw)))
+            let sym = symbol.unwrap_or_default();
+            let mw = MarketWarning { symbol: sym.clone(), warning_kind, message, timestamp };
+            Some((sym, TimedEvent::MarketWarning(mw)))
         }
 
         // ── settlement ────────────────────────────────────────────────────────
@@ -449,9 +445,9 @@ fn stream_event_to_timed(ev: StreamEvent) -> Option<(String, TimedEvent)> {
         | StreamEvent::PremiumIndexKline { .. } => None,
 
         // ── private events ─────────────────────────────────────────────────────
-        StreamEvent::OrderUpdate(_)
+        StreamEvent::OrderUpdate { .. }
         | StreamEvent::BalanceUpdate(_)
-        | StreamEvent::PositionUpdate(_) => None,
+        | StreamEvent::PositionUpdate { .. } => None,
     }
 }
 
@@ -469,13 +465,12 @@ mod tests {
     fn trade_event_converts_to_tick() {
         let trade = PublicTrade {
             id: "1".into(),
-            symbol: "BTCUSDT".into(),
             price: 50000.0,
             quantity: 0.5,
             side: TradeSide::Buy,
             timestamp: 1_000_000,
         };
-        let ev = StreamEvent::Trade(trade);
+        let ev = StreamEvent::Trade { symbol: "BTCUSDT".into(), trade };
         let result = stream_event_to_timed(ev);
         assert!(result.is_some());
         let (sym, timed) = result.unwrap();
@@ -507,10 +502,9 @@ mod tests {
     #[test]
     fn private_events_return_none() {
         use digdigdig3::core::types::{OrderSide, OrderStatus, OrderType, OrderUpdateEvent};
-        let ev = StreamEvent::OrderUpdate(OrderUpdateEvent {
+        let event = OrderUpdateEvent {
             order_id: "x".into(),
             client_order_id: None,
-            symbol: "BTCUSDT".into(),
             side: OrderSide::Buy,
             order_type: OrderType::Market,
             status: OrderStatus::New,
@@ -524,7 +518,8 @@ mod tests {
             commission_asset: None,
             trade_id: None,
             timestamp: 1_000,
-        });
+        };
+        let ev = StreamEvent::OrderUpdate { symbol: "BTCUSDT".into(), event };
         assert!(stream_event_to_timed(ev).is_none());
     }
 
@@ -532,7 +527,6 @@ mod tests {
     fn dig3_trade_to_tick_buy() {
         let trade = PublicTrade {
             id: "42".into(),
-            symbol: "SOLUSDT".into(),
             price: 200.0,
             quantity: 3.0,
             side: TradeSide::Buy,

@@ -111,7 +111,6 @@ mod tests {
 
     fn make_mark(price: f64) -> MarkPrice {
         MarkPrice {
-            symbol: "BTC-USDT".to_string(),
             mark_price: price,
             index_price: None,
             funding_rate: None,

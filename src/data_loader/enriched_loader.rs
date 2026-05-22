@@ -145,7 +145,6 @@ mod tests {
 
     fn make_funding_event(ts: i64) -> TimedEvent {
         TimedEvent::Funding(FundingRate {
-            symbol: "BTCUSDT".into(),
             rate: 0.0001,
             next_funding_time: None,
             timestamp: ts,
@@ -154,7 +153,6 @@ mod tests {
 
     fn make_oi_event(ts: i64) -> TimedEvent {
         TimedEvent::OpenInterest(OpenInterest {
-            symbol: "BTCUSDT".into(),
             open_interest: 1000.0,
             open_interest_value: None,
             timestamp: ts,

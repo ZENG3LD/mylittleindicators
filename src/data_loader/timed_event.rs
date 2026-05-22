@@ -125,7 +125,6 @@ mod tests {
     #[test]
     fn funding_timestamp() {
         let f = FundingRate {
-            symbol: "BTCUSDT".into(),
             rate: 0.0001,
             next_funding_time: None,
             timestamp: 2_000_000,

@@ -51,7 +51,6 @@ mod tests {
 
     fn ticker(bid: Option<f64>, ask: Option<f64>, last: f64) -> Ticker {
         Ticker {
-            symbol: "BTCUSDT".to_string(),
             last_price: last,
             bid_price: bid,
             ask_price: ask,

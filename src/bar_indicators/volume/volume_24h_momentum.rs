@@ -96,7 +96,6 @@ mod tests {
 
     fn ticker(vol: f64) -> Ticker {
         Ticker {
-            symbol: "BTCUSDT".to_string(),
             last_price: 50000.0,
             bid_price: None,
             ask_price: None,

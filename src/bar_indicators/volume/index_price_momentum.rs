@@ -72,7 +72,6 @@ mod tests {
 
     fn mp_with_index(mark: f64, index: f64) -> MarkPrice {
         MarkPrice {
-            symbol: "BTCUSDT".to_string(),
             mark_price: mark,
             index_price: Some(index),
             funding_rate: None,
@@ -82,7 +81,6 @@ mod tests {
 
     fn mp_no_index(mark: f64) -> MarkPrice {
         MarkPrice {
-            symbol: "BTCUSDT".to_string(),
             mark_price: mark,
             index_price: None,
             funding_rate: None,

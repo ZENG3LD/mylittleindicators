@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "digdigdig3"
-version = "0.2.0"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "base64",
@@ -388,6 +388,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite",
+ "toml",
  "totp-rs",
  "tracing",
  "tracing-subscriber",

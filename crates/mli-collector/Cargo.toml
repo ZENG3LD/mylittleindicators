@@ -17,7 +17,7 @@ path = "src/bin/smoke.rs"
 
 [dependencies]
 mylittleindicators = { path = "../.." }
-digdigdig3 = "=0.2.0"
+digdigdig3 = "=0.3.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
@@ -28,4 +28,4 @@ anyhow = "1"
 futures-util = "0.3"
 
 [patch.crates-io]
-digdigdig3 = { path = "../../../digdigdig3" }
+digdigdig3 = { path = "../../../digdigdig3/crates/digdigdig3" }

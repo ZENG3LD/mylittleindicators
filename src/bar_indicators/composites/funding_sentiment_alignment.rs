@@ -130,7 +130,7 @@ mod tests {
     use super::*;
 
     fn make_fr(rate: f64) -> FundingRate {
-        FundingRate { symbol: "BTCUSDT".to_string(), rate, next_funding_time: None, timestamp: 1000 }
+        FundingRate { rate, next_funding_time: None, timestamp: 1000 }
     }
 
     fn make_lsr(long_ratio: f64) -> LongShortRatio {

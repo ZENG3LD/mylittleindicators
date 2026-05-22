@@ -77,7 +77,7 @@ mod tests {
     use super::*;
 
     fn make_oi(oi: f64, ts: i64) -> OpenInterest {
-        OpenInterest { symbol: "BTCUSDT".to_string(), open_interest: oi, open_interest_value: None, timestamp: ts }
+        OpenInterest { open_interest: oi, open_interest_value: None, timestamp: ts }
     }
 
     #[test]
