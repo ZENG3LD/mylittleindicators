@@ -25,6 +25,7 @@ pub fn signature_adaptive_threshold() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_TICK)
         .alias("adaptive_threshold")
         .alias("AdaptiveThreshold")
         .build()
@@ -39,6 +40,7 @@ pub fn signature_adaptive_window_selector() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_TICK)
         .alias("adaptive_window_selector")
         .alias("AdaptiveWindowSelector")
         .build()
@@ -53,6 +55,7 @@ pub fn signature_block_trade_volume_ratio() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_BLOCK_AGG)
         .alias("block_trade_volume_ratio")
         .alias("BlockTradeVolumeRatio")
         .build()
@@ -67,6 +70,7 @@ pub fn signature_capitulation_detector() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_LIQUIDATION_AGGTRADE_MARKPRICE)
         .alias("capitulation_detector")
         .alias("CapitulationDetector")
         .build()
@@ -81,6 +85,7 @@ pub fn signature_compound_squeeze_probability() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_OI_MARKPRICE_LIQUIDATION_FUNDING)
         .alias("compound_squeeze_probability")
         .alias("CompoundSqueezeProbability")
         .build()
@@ -95,6 +100,7 @@ pub fn signature_cross_asset_beta() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_TICK)
         .alias("cross_asset_beta")
         .alias("CrossAssetBeta")
         .build()
@@ -109,6 +115,7 @@ pub fn signature_funding_oi_pressure() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_FUNDING_OI)
         .alias("funding_oi_pressure")
         .alias("FundingOiPressure")
         .build()
@@ -123,6 +130,7 @@ pub fn signature_funding_sentiment_alignment() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_FUNDING_LSR)
         .alias("funding_sentiment_alignment")
         .alias("FundingSentimentAlignment")
         .build()
@@ -137,6 +145,7 @@ pub fn signature_index_tracking_error() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_INDEXPRICE_COMPOSITEINDEX)
         .alias("index_tracking_error")
         .alias("IndexTrackingError")
         .build()
@@ -151,6 +160,7 @@ pub fn signature_iv_hv_spread() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_HV_VIXIV)
         .alias("iv_hv_spread")
         .alias("IvHvSpread")
         .build()
@@ -165,6 +175,7 @@ pub fn signature_market_stress_composite() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_VIXIV_LIQUIDATION_FUNDING_INSURANCE)
         .alias("market_stress_composite")
         .alias("MarketStressComposite")
         .build()
@@ -179,6 +190,7 @@ pub fn signature_pairs_cointegration_proxy() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_TICK)
         .alias("pairs_cointegration_proxy")
         .alias("PairsCointegrationProxy")
         .build()
@@ -193,6 +205,7 @@ pub fn signature_relative_strength_cross() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_TICK)
         .alias("relative_strength_cross")
         .alias("RelativeStrengthCross")
         .build()
@@ -207,6 +220,7 @@ pub fn signature_risk_off_detector() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_VIXIV_LIQUIDATION_FUNDING_INSURANCE)
         .alias("risk_off_detector")
         .alias("RiskOffDetector")
         .build()
@@ -221,6 +235,7 @@ pub fn signature_sentiment_composite() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_LSR_AGGTRADE_FUNDING)
         .alias("sentiment_composite")
         .alias("SentimentComposite")
         .build()
@@ -235,6 +250,7 @@ pub fn signature_squeeze_probability() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_OI_MARKPRICE_LIQUIDATION)
         .alias("squeeze_probability")
         .alias("SqueezeProbability")
         .build()
@@ -249,11 +265,24 @@ pub fn signature_vol_regime_entry() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Bar)
+        .aux_streams(AUX_VIXIV_MARKPRICE)
         .alias("vol_regime_entry")
         .alias("VolRegimeEntry")
         .build()
 }
 
+static AUX_TICK: &[StreamKind] = &[StreamKind::Tick];
+static AUX_BLOCK_AGG: &[StreamKind] = &[StreamKind::BlockTrade, StreamKind::AggTrade];
+static AUX_LIQUIDATION_AGGTRADE_MARKPRICE: &[StreamKind] = &[StreamKind::Liquidation, StreamKind::AggTrade, StreamKind::MarkPrice];
+static AUX_OI_MARKPRICE_LIQUIDATION_FUNDING: &[StreamKind] = &[StreamKind::OpenInterest, StreamKind::MarkPrice, StreamKind::Liquidation, StreamKind::Funding];
+static AUX_FUNDING_OI: &[StreamKind] = &[StreamKind::Funding, StreamKind::OpenInterest];
+static AUX_FUNDING_LSR: &[StreamKind] = &[StreamKind::Funding, StreamKind::LongShortRatio];
+static AUX_INDEXPRICE_COMPOSITEINDEX: &[StreamKind] = &[StreamKind::IndexPrice, StreamKind::CompositeIndex];
+static AUX_HV_VIXIV: &[StreamKind] = &[StreamKind::HistoricalVolatility, StreamKind::VolatilityIndex];
+static AUX_VIXIV_LIQUIDATION_FUNDING_INSURANCE: &[StreamKind] = &[StreamKind::VolatilityIndex, StreamKind::Liquidation, StreamKind::Funding, StreamKind::InsuranceFund];
+static AUX_LSR_AGGTRADE_FUNDING: &[StreamKind] = &[StreamKind::LongShortRatio, StreamKind::AggTrade, StreamKind::Funding];
+static AUX_OI_MARKPRICE_LIQUIDATION: &[StreamKind] = &[StreamKind::OpenInterest, StreamKind::MarkPrice, StreamKind::Liquidation];
+static AUX_VIXIV_MARKPRICE: &[StreamKind] = &[StreamKind::VolatilityIndex, StreamKind::MarkPrice];
 static AUX_FUNDING: &[StreamKind] = &[StreamKind::Funding];
 
 pub fn signature_funding_price_divergence() -> IndicatorSignature {
