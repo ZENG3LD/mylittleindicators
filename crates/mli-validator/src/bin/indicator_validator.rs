@@ -1077,11 +1077,100 @@ impl IndicatorState {
             panic_count: self.panic_count,
             is_ready: self.is_ready,
             ready_at_event: self.ready_at_event,
-            last_value_repr: self.last_value.map(|v| format!("{v:?}")).unwrap_or_default(),
+            last_value_repr: self.last_value.map(|v| fmt_indicator_value(&v)).unwrap_or_default(),
             max_abs_value: self.max_abs_value,
             has_finite_nonzero: self.has_finite_nonzero,
             create_error: self.create_error.clone(),
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Human-readable formatter for IndicatorValue
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Format a f64 without scientific notation, trimming trailing zeros.
+/// 0 → "0", 75438.6 → "75438.6", -0.0000447 → "-0.0000447", 1e8 → "100000000".
+fn fmt_f64(v: f64) -> String {
+    if !v.is_finite() {
+        return format!("{v}"); // NaN / inf
+    }
+    if v == 0.0 {
+        return "0".to_string();
+    }
+    let abs = v.abs();
+    // Pick decimals based on magnitude — small values need more digits to be readable.
+    let decimals = if abs >= 1000.0 { 2 }
+        else if abs >= 100.0 { 3 }
+        else if abs >= 10.0 { 4 }
+        else if abs >= 1.0 { 5 }
+        else if abs >= 0.01 { 6 }
+        else if abs >= 0.0001 { 8 }
+        else if abs >= 0.000001 { 10 }
+        else { 12 };
+    let s = format!("{v:.*}", decimals);
+    // Trim trailing zeros after decimal point (but keep ".0" minimum if dot exists).
+    if s.contains('.') {
+        let trimmed = s.trim_end_matches('0').trim_end_matches('.').to_string();
+        if trimmed.is_empty() || trimmed == "-" { "0".to_string() } else { trimmed }
+    } else {
+        s
+    }
+}
+
+fn fmt_indicator_value(val: &IndicatorValue) -> String {
+    match val {
+        IndicatorValue::Single(v) => format!("Single({})", fmt_f64(*v)),
+        IndicatorValue::Signal(s) => format!("Signal({s})"),
+        IndicatorValue::Flag(b) => format!("Flag({b})"),
+        IndicatorValue::Double(a, b) => format!("Double({}, {})", fmt_f64(*a), fmt_f64(*b)),
+        IndicatorValue::Triple(a, b, c) => format!("Triple({}, {}, {})", fmt_f64(*a), fmt_f64(*b), fmt_f64(*c)),
+        IndicatorValue::Channel3 { upper, middle, lower } => format!(
+            "Channel3 {{ upper: {}, middle: {}, lower: {} }}",
+            fmt_f64(*upper), fmt_f64(*middle), fmt_f64(*lower)
+        ),
+        IndicatorValue::Macd { line, signal, histogram } => format!(
+            "Macd {{ line: {}, signal: {}, histogram: {} }}",
+            fmt_f64(*line), fmt_f64(*signal), fmt_f64(*histogram)
+        ),
+        IndicatorValue::Ichimoku { tenkan, kijun, senkou_a, senkou_b, chikou } => format!(
+            "Ichimoku {{ tenkan: {}, kijun: {}, senkou_a: {}, senkou_b: {}, chikou: {} }}",
+            fmt_f64(*tenkan), fmt_f64(*kijun), fmt_f64(*senkou_a), fmt_f64(*senkou_b), fmt_f64(*chikou)
+        ),
+        IndicatorValue::Candle { open, high, low, close } => format!(
+            "Candle {{ open: {}, high: {}, low: {}, close: {} }}",
+            fmt_f64(*open), fmt_f64(*high), fmt_f64(*low), fmt_f64(*close)
+        ),
+        IndicatorValue::ChannelExtended { upper, middle, lower, bandwidth, percent_b } => format!(
+            "ChannelExtended {{ upper: {}, middle: {}, lower: {}, bandwidth: {}, percent_b: {} }}",
+            fmt_f64(*upper), fmt_f64(*middle), fmt_f64(*lower), fmt_f64(*bandwidth), fmt_f64(*percent_b)
+        ),
+        IndicatorValue::Adaptive { value, period, alpha } => format!(
+            "Adaptive {{ value: {}, period: {}, alpha: {} }}",
+            fmt_f64(*value), fmt_f64(*period), fmt_f64(*alpha)
+        ),
+        IndicatorValue::StatTest { statistic, p_value, .. } => format!(
+            "StatTest {{ statistic: {}, p_value: {} }}",
+            fmt_f64(*statistic), fmt_f64(*p_value)
+        ),
+        IndicatorValue::Volatility { total, close_close, high_low } => format!(
+            "Volatility {{ total: {}, close_close: {}, high_low: {} }}",
+            fmt_f64(*total), fmt_f64(*close_close), fmt_f64(*high_low)
+        ),
+        IndicatorValue::ValueFlag(v, f) => format!("ValueFlag({}, {f})", fmt_f64(*v)),
+        IndicatorValue::DoubleFlag(a, b) => format!("DoubleFlag({a}, {b})"),
+        IndicatorValue::FuzzyCandle { direction, size, body_size, upper_wick, lower_wick } => format!(
+            "FuzzyCandle {{ direction: {}, size: {}, body_size: {}, upper_wick: {}, lower_wick: {} }}",
+            *direction as i32, *size as i32, *body_size as i32, *upper_wick as i32, *lower_wick as i32
+        ),
+        IndicatorValue::CandleAnatomy { body, upper_wick, lower_wick, .. } => format!(
+            "CandleAnatomy {{ body: {}, upper_wick: {}, lower_wick: {} }}",
+            fmt_f64(*body), fmt_f64(*upper_wick), fmt_f64(*lower_wick)
+        ),
+        IndicatorValue::Hilbert { amplitude, phase, frequency } => format!(
+            "Hilbert {{ amplitude: {}, phase: {}, frequency: {} }}",
+            fmt_f64(*amplitude), fmt_f64(*phase), fmt_f64(*frequency)
+        ),
     }
 }
 
@@ -1295,7 +1384,7 @@ impl EventState {
             panic_count: self.panic_count,
             is_ready: self.is_ready,
             ready_at_event: self.ready_at_event,
-            last_value_repr: self.last_value.map(|v| format!("{v:?}")).unwrap_or_default(),
+            last_value_repr: self.last_value.map(|v| fmt_indicator_value(&v)).unwrap_or_default(),
             max_abs_value: self.max_abs_value,
             has_finite_nonzero: self.has_finite_nonzero,
             create_error: self.create_error.clone(),
