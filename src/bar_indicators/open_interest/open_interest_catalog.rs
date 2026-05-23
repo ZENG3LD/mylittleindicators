@@ -12,6 +12,10 @@ use std::collections::HashMap;
 
 pub const CATEGORY: IndicatorCategory = IndicatorCategory::OpenInterest;
 
+// Dual-consumer indicators (OpenInterest + MarkPrice) need MarkPrice
+// declared as aux so the validator dispatch delivers both streams.
+static AUX_MARK_PRICE: &[StreamKind] = &[StreamKind::MarkPrice];
+
 // ============================================================================
 // Individual indicator signatures
 // ============================================================================
@@ -25,6 +29,7 @@ pub fn signature_long_squeeze_detector() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::OpenInterest)
+        .aux_streams(AUX_MARK_PRICE)
         .alias("long_squeeze_detector")
         .alias("LongSqueezeDetector")
         .build()
@@ -67,6 +72,7 @@ pub fn signature_oi_price_correlation() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::Statistical)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::OpenInterest)
+        .aux_streams(AUX_MARK_PRICE)
         .alias("oi_price_correlation")
         .alias("OiPriceCorrelation")
         .build()
