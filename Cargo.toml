@@ -24,9 +24,3 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 # similar users; chart/alerts code can drop it as a feature.
 proc-macro2 = "1"
 
-# Local development: point dig3 pin to the local path.
-# When mli is consumed as a published crate, this section is stripped or
-# overridden by the downstream Cargo.toml (mli's published Cargo.toml will not
-# contain a patch section — only the version pin in [dependencies] above).
-[patch.crates-io]
-digdigdig3 = { path = "../digdigdig3/crates/digdigdig3" }

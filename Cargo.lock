@@ -361,6 +361,8 @@ dependencies = [
 [[package]]
 name = "digdigdig3"
 version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b7131373d9b0330a461a32e8649d40ca431d6f601b7d4d93aa863aa570ea197"
 dependencies = [
  "async-trait",
  "base64",
@@ -1076,7 +1078,7 @@ dependencies = [
 
 [[package]]
 name = "mylittleindicators"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "arrayvec",
  "async-trait",
