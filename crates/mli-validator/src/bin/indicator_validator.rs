@@ -484,7 +484,40 @@ impl IndicatorState {
             BarIndicatorId::BpCusum => {
                 vec![("threshold", 0.05), ("kappa", 0.95)]
             }
+            // Vpin — smaller smoothing_window so VPIN reports ready within a
+            // 60s validator slice on 1m bars (default 50 is too large for our
+            // typical run lengths).
+            BarIndicatorId::Vpin => {
+                vec![("bucket_size", 10.0), ("smoothing_window", 8.0)]
+            }
             _ => Vec::new(),
+        }
+    }
+
+    /// Per-id period overrides for indicators whose library defaults (often
+    /// industry-standard 200+ bar windows) never warm up inside a 60s/30min
+    /// validator slice. Returning `Some(_)` short-circuits the PERIOD_LADDER.
+    fn tuned_periods(id: BarIndicatorId) -> Option<Vec<usize>> {
+        match id {
+            // EwmacRobust default (32/128/252) needs 252+ bars — too long for
+            // short validator slices. Shorten the fast/slow/robust triple.
+            BarIndicatorId::EwmacRobust => Some(vec![8, 32, 64]),
+            // RocPct rolls a percentile over 200 bars by default — shorten.
+            BarIndicatorId::RocPct => Some(vec![10, 60]),
+            // NviPvi cumulates with 255-bar MA by default — shorten.
+            BarIndicatorId::NviPvi => Some(vec![60, 60]),
+            // SpectralSlopeZscore: FFT window 256 + z window 256 by default.
+            // Shorten both so they warm up inside a short slice (FFT window
+            // must remain a power of two >= 32 per factory clamp).
+            BarIndicatorId::Sslopez => Some(vec![64, 64]),
+            // SpectralSlope default 256 — same logic.
+            BarIndicatorId::Sslope => Some(vec![64]),
+            // SpectralEntropyZ — FFT 256 + z 256 in factory.
+            BarIndicatorId::Ser => Some(vec![64, 64]),
+            // HigherMoments default 50 — fine. ArchLm default 50 — fine.
+            // TsSwings — short lookback is fine; default already 5 (warmup
+            // depends on actual swings, which is calibration on short window).
+            _ => None,
         }
     }
 
@@ -495,6 +528,20 @@ impl IndicatorState {
     ) -> (Option<IndicatorInstance>, Option<String>, Option<Vec<usize>>) {
         let mut last_err: Option<String> = None;
         let extra_params = Self::tuned_params(id);
+        // If a per-id period override exists, try it first; on failure, fall
+        // back to the standard ladder.
+        let tuned = Self::tuned_periods(id);
+        if let Some(p) = &tuned {
+            let mut cfg = IndicatorConfig::new(id, format!("{id:?}"), p.clone());
+            for (k, v) in &extra_params {
+                cfg = cfg.with_param(*k, *v);
+            }
+            let result =
+                panic::catch_unwind(AssertUnwindSafe(|| IndicatorInstance::create(&cfg)));
+            if let Ok(Ok(inst)) = result {
+                return (Some(inst), None, Some(p.clone()));
+            }
+        }
         for (idx, periods) in PERIOD_LADDER.iter().enumerate() {
             let p = periods.to_vec();
             let mut cfg = IndicatorConfig::new(id, format!("{id:?}"), p.clone());
