@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.1 — 2026-05-24
+## Unreleased
 
 - Cross-asset events (`CrossAssetBeta`, `PairsCointegrationProxy`,
   `RelativeStrengthCross`) now receive both primary AND secondary symbol
