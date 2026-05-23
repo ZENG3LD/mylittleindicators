@@ -1464,18 +1464,19 @@ fn build_event_config(id: EventId) -> EventConfig {
     match id {
         EventId::SwingDetection => EventConfig::new(id, name)
             .with_string_param("mode", "percent")
-            // 0.2% swing on BTC 1m bars ≈ $150 — fires multiple times in 30min
-            .with_param("threshold_pct", 0.2),
+            // 0.05% swing on BTC ≈ $38 — fires on routine 1m bar wobble.
+            .with_param("threshold_pct", 0.05),
         EventId::Pivot => EventConfig::new(id, name)
             .with_periods(vec![5, 5]),
         // Threshold receives its scalar from an optional inner indicator now.
-        // Wire RSI(14) so the bands (30/70) sit on the RSI scale, fires whenever
-        // RSI exits the 30..70 band regardless of spot price.
+        // Wire RSI(14); use a tighter 45..55 band so the gate flips on any
+        // material momentum move inside a 60s slice (canonical 30/70 only
+        // triggers a few times per session — too rare for short validation).
         EventId::Threshold => EventConfig::new(id, name)
             .with_inner(IndicatorConfig::new(BarIndicatorId::Rsi, "rsi".into(), vec![14]))
             .with_string_param("kind", "out_of_range")
-            .with_param("upper", 70.0)
-            .with_param("lower", 30.0),
+            .with_param("upper", 55.0)
+            .with_param("lower", 45.0),
         EventId::VolumeEventDetector => EventConfig::new(id, name)
             .with_periods(vec![20])
             .with_param("multiplier", 2.0),
@@ -1484,15 +1485,19 @@ fn build_event_config(id: EventId) -> EventConfig {
         EventId::StatisticalWickDetector => EventConfig::new(id, name)
             .with_periods(vec![50]),
         // VolatilityRegimeDetector now receives its scalar from ATR(14) via the
-        // optional inner indicator wrapper. ATR on BTC 1m bars typically sits in
-        // the 20..400 range; pick low=50/high=200 so transitions fire on any
-        // meaningful change in 1m realized vol.
+        // optional inner indicator wrapper. On BTC 1m bars ATR typically sits
+        // in 5..50 range; pick a tight 10/30 band so any meaningful change
+        // flips the regime inside a 60s slice.
         EventId::VolatilityRegimeDetector => EventConfig::new(id, name)
             .with_inner(IndicatorConfig::new(BarIndicatorId::Atr, "atr".into(), vec![14]))
-            .with_param("low_threshold", 50.0)
-            .with_param("high_threshold", 200.0),
+            .with_param("low_threshold", 10.0)
+            .with_param("high_threshold", 30.0),
+        // RegimeGate only emits on *transition* across the threshold; if the
+        // boundary sits far from current spot, the price never crosses and
+        // we see all zeros. Use a threshold close to live BTC (~76k) so
+        // typical 1m bar wobble crosses it both ways inside a 60s slice.
         EventId::RegimeGate => EventConfig::new(id, name)
-            .with_param("regime_threshold", 75_250.0)
+            .with_param("regime_threshold", 76_000.0)
             .with_string_param("direction", "above"),
         EventId::CandlePattern => EventConfig::new(id, name)
             .with_string_param("kind", "doji"),
