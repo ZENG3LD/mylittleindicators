@@ -13,6 +13,7 @@ use std::{
     panic::{self, AssertUnwindSafe},
     time::{Duration, Instant},
 };
+use rust_decimal::prelude::ToPrimitive;
 
 use anyhow::Result;
 use digdigdig3_station::{PersistenceConfig, Station, Stream, SubscriptionSet};
@@ -1637,6 +1638,31 @@ fn funding_settlement_point_to_core(
     }
 }
 
+fn tracker_to_orderbook(tracker: &digdigdig3_station::OrderBookTracker, n: usize) -> OrderBook {
+    let bids: Vec<OrderBookLevel> = tracker
+        .top_bids(n)
+        .into_iter()
+        .map(|(p, s)| OrderBookLevel::new(p.to_f64().unwrap_or(0.0), s.to_f64().unwrap_or(0.0)))
+        .collect();
+    let asks: Vec<OrderBookLevel> = tracker
+        .top_asks(n)
+        .into_iter()
+        .map(|(p, s)| OrderBookLevel::new(p.to_f64().unwrap_or(0.0), s.to_f64().unwrap_or(0.0)))
+        .collect();
+    OrderBook {
+        bids,
+        asks,
+        timestamp: tracker.last_timestamp_ms(),
+        sequence: None,
+        last_update_id: None,
+        first_update_id: None,
+        prev_update_id: None,
+        event_time: None,
+        transaction_time: None,
+        checksum: None,
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1865,6 +1891,10 @@ async fn main() -> Result<()> {
     }
     drop(merged_tx);
 
+    // Per-(exchange, symbol) orderbook tracker for snapshot reconstruction.
+    let mut trackers: HashMap<(ExchangeId, String), digdigdig3_station::OrderBookTracker> =
+        HashMap::new();
+
     let deadline = Instant::now() + Duration::from_secs(duration_secs);
     let mut total_events: u64 = 0;
 
@@ -1934,19 +1964,51 @@ async fn main() -> Result<()> {
                             }
                         }
                     }
-                    Event::OrderbookSnapshot { point, .. } => {
+                    Event::OrderbookSnapshot { exchange, symbol, point } => {
                         let book = obs_to_orderbook(point);
+                        trackers
+                            .entry((*exchange, symbol.clone()))
+                            .or_insert_with(|| {
+                                digdigdig3_station::OrderBookTracker::new(symbol.clone())
+                            })
+                            .apply_snapshot(&book)
+                            .ok();
                         for s in &mut states {
                             if s.accepts(StreamKind::OrderBook) {
                                 s.try_update_orderbook(&book);
                             }
                         }
                     }
-                    Event::OrderbookDelta { point, .. } => {
+                    Event::OrderbookDelta { exchange, symbol, point } => {
                         let delta = obd_to_orderbook_delta(point);
+                        // Loop A — delta-native indicators
                         for s in &mut states {
                             if s.accepts(StreamKind::OrderbookDelta) {
                                 s.try_update_delta(&delta);
+                            }
+                        }
+                        // Loop B — reconstruct full book and feed snapshot-aware indicators
+                        let tracker = trackers
+                            .entry((*exchange, symbol.clone()))
+                            .or_insert_with(|| {
+                                digdigdig3_station::OrderBookTracker::new(symbol.clone())
+                            });
+                        match tracker.apply_delta(&delta) {
+                            Ok(()) => {
+                                let book = tracker_to_orderbook(tracker, 50);
+                                for s in &mut states {
+                                    if s.accepts(StreamKind::OrderBook) {
+                                        s.try_update_orderbook(&book);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    exchange = ?exchange,
+                                    symbol = %symbol,
+                                    error = %e,
+                                    "orderbook tracker apply_delta failed — skipping reconstructed feed"
+                                );
                             }
                         }
                     }

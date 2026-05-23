@@ -1180,6 +1180,7 @@ dependencies = [
  "digdigdig3-station",
  "futures-util",
  "mylittleindicators",
+ "rust_decimal",
  "serde",
  "serde_json",
  "tokio",
