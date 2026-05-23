@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.1.0 — unreleased
+## 0.1.1 — 2026-05-24
+
+- Cross-asset events (`CrossAssetBeta`, `PairsCointegrationProxy`,
+  `RelativeStrengthCross`) now receive both primary AND secondary symbol
+  feeds via `EventInstance::update_secondary_bar(o,h,l,c,v,ts)`. Live
+  validator confirms beta/cointegration/strength calculations against
+  BTCUSDT (primary) + ETHUSDT (secondary).
+
+## 0.1.0 — 2026-05-23
 
 Initial public release.
 

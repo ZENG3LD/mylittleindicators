@@ -1239,6 +1239,34 @@ impl EventState {
         }
     }
 
+    /// Feed a secondary-symbol bar (e.g. ETHUSDT when primary is BTCUSDT) to
+    /// cross-asset events. No-op for non-cross-asset events.
+    fn try_update_secondary_bar(&mut self, o: f64, h: f64, l: f64, c: f64, v: f64, ts: i64) {
+        let inst = match &mut self.instance {
+            Some(i) => i,
+            None => return,
+        };
+        let result = panic::catch_unwind(AssertUnwindSafe(|| {
+            inst.update_secondary_bar(o, h, l, c, v, ts);
+        }));
+        match result {
+            Ok(_) => {
+                // events_received NOT incremented — secondary feed is
+                // background context; the primary update_bar is what counts.
+                if !self.is_ready {
+                    let r = panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready()));
+                    if matches!(r, Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+            }
+            Err(_) => {
+                self.panic_count += 1;
+            }
+        }
+    }
+
     fn finalize_record(&self) -> EventRecord {
         let status = if self.create_error.is_some() {
             "create_failed".to_string()
@@ -1832,6 +1860,12 @@ async fn main() -> Result<()> {
         (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::FundingRate),
         (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Liquidation),
         (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::OpenInterest),
+        // Secondary symbol (ETHUSDT) for cross-asset events
+        // (CrossAssetBeta, PairsCointegrationProxy, RelativeStrengthCross).
+        // Validator routes Bar events with symbol == "ETHUSDT" to
+        // EventInstance::update_secondary_bar() instead of update_bar().
+        (ExchangeId::Binance, AccountType::FuturesCross, "ETHUSDT", Stream::Kline(interval_1m.clone())),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "ETHUSDT", Stream::Kline(interval_1m.clone())),
         // Extended streams — targeted at exchanges whose dig3 protocol.rs
         // actually declares topic-registry entries for that StreamKind.
         //
@@ -1946,19 +1980,32 @@ async fn main() -> Result<()> {
 
                 use digdigdig3_station::Event;
                 match &ev {
-                    Event::Bar { point, .. } => {
+                    Event::Bar { symbol, point, .. } => {
                         let ts = point.open_time;
                         let (o, h, l, c, v) = (
                             point.open, point.high, point.low, point.close, point.volume,
                         );
-                        for s in &mut states {
-                            if s.accepts(StreamKind::Bar) {
-                                s.try_update_bar(o, h, l, c, v, ts);
+                        // Primary symbol = BTCUSDT. Secondary (ETHUSDT, ...)
+                        // routed only to events implementing
+                        // update_secondary_bar (cross-asset events).
+                        let is_primary = symbol.as_str() == "BTCUSDT";
+                        if is_primary {
+                            for s in &mut states {
+                                if s.accepts(StreamKind::Bar) {
+                                    s.try_update_bar(o, h, l, c, v, ts);
+                                }
                             }
-                        }
-                        for s in &mut event_states {
-                            if s.accepts(StreamKind::Bar) {
-                                s.try_update_bar(o, h, l, c, v, ts);
+                            for s in &mut event_states {
+                                if s.accepts(StreamKind::Bar) {
+                                    s.try_update_bar(o, h, l, c, v, ts);
+                                }
+                            }
+                        } else {
+                            // Secondary symbol — dispatch via
+                            // EventInstance::update_secondary_bar to
+                            // cross-asset events; no-op for everything else.
+                            for s in &mut event_states {
+                                s.try_update_secondary_bar(o, h, l, c, v, ts);
                             }
                         }
                     }
