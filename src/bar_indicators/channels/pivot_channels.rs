@@ -115,9 +115,10 @@ pub struct PivotChannels {
     // Счетчики времени
     bars_since_period_start: usize,
     bars_per_period: usize,
-    
+
     // Статистика
     bar_count: usize,
+    levels_computed: bool,
 }
 
 impl PivotChannels {
@@ -166,6 +167,7 @@ impl PivotChannels {
             bars_since_period_start: 0,
             bars_per_period,
             bar_count: 0,
+            levels_computed: false,
         }
     }
     
@@ -195,8 +197,15 @@ impl PivotChannels {
         // Проверяем, нужно ли пересчитать пивоты
         if self.should_recalculate_pivots() {
             self.calculate_pivot_levels();
+            self.levels_computed = true;
             self.update_active_channels(close);
             self.reset_period_data(open);
+        } else if !self.levels_computed {
+            // Seed first-period levels from current accumulated H/L/C so output is
+            // usable before a full period elapses (otherwise validator on a 60s
+            // window with daily period would never see real values).
+            self.calculate_pivot_levels();
+            self.levels_computed = true;
         }
         
         // Обновляем адаптивные параметры
@@ -365,7 +374,7 @@ impl PivotChannels {
         // Находим ближайшие уровни выше и ниже текущей цены
         let mut resistance = f64::INFINITY;
         let mut support = f64::NEG_INFINITY;
-        
+
         for &level in &levels {
             if level > current_price && level < resistance {
                 resistance = level;
@@ -374,7 +383,18 @@ impl PivotChannels {
                 support = level;
             }
         }
-        
+
+        // Fallback: when price sits outside all computed levels, use the extreme
+        // R3/S3 level and mirror the channel width around the price, instead of
+        // emitting +/-inf sentinels that propagate NaN downstream.
+        let range = (self.current_levels.resistance_3 - self.current_levels.support_3).max(0.0);
+        if !resistance.is_finite() {
+            resistance = if range > 0.0 { current_price + range * 0.5 } else { current_price };
+        }
+        if !support.is_finite() {
+            support = if range > 0.0 { current_price - range * 0.5 } else { current_price };
+        }
+
         // Применяем адаптивную ширину если включена
         if self.adaptive_width && self.width_multiplier != 1.0 {
             let center = (resistance + support) / 2.0;
@@ -382,7 +402,7 @@ impl PivotChannels {
             resistance = center + half_width;
             support = center - half_width;
         }
-        
+
         self.active_resistance = resistance;
         self.active_support = support;
         self.channel_width = resistance - support;
@@ -547,8 +567,8 @@ impl PivotChannels {
     
     /// Проверить, готов ли индикатор
     pub fn is_ready(&self) -> bool {
-        // Ready after first bar - pivot levels calculated from period data
-        self.bar_count > 0
+        // Ready once pivot levels have actually been computed from accumulated H/L/C.
+        self.levels_computed
     }
     
     /// Получить параметры
@@ -598,6 +618,7 @@ impl PivotChannels {
         self.bounce_count = 0;
         self.bars_since_period_start = 0;
         self.bar_count = 0;
+        self.levels_computed = false;
     }
 }
 

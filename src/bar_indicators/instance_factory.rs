@@ -2605,7 +2605,8 @@ impl IndicatorInstance {
             }
             BarIndicatorId::TradeBookAbsorption => {
                 let window = config.periods.first().copied().unwrap_or(50);
-                Ok(Self::TradeBookAbsorption(Box::new(TradeBookAbsorptionIndicator::new(window))))
+                let ratio = config.additional_params.get("ratio").copied().unwrap_or(0.5);
+                Ok(Self::TradeBookAbsorption(Box::new(TradeBookAbsorptionIndicator::with_ratio(window, ratio))))
             }
             BarIndicatorId::SweepImpactAnalyzer => {
                 let window = config.periods.first().copied().unwrap_or(50);
