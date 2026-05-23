@@ -104,6 +104,9 @@ pub fn signature_funding_time_decay() -> IndicatorSignature {
 }
 
 pub fn signature_funding_settlement_impact() -> IndicatorSignature {
+    // FundingSettlementImpact buffers MarkPrice updates (update_mark) and emits
+    // impact computed against the latest FundingSettlement timestamp — both
+    // streams are required for is_ready (buffer.len() >= 2 MarkPrice samples).
     IndicatorSignature::builder("FUNDING_SETTLEMENT_IMPACT", CATEGORY)
         .name("Funding Settlement Impact")
         .description("Price impact around funding settlement events")
@@ -112,6 +115,7 @@ pub fn signature_funding_settlement_impact() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::FundingSettlement)
+        .aux_streams(&[StreamKind::MarkPrice])
         .alias("funding_settlement_impact")
         .alias("FundingSettlementImpact")
         .build()

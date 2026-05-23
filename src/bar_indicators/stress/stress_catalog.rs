@@ -12,6 +12,8 @@ use std::collections::HashMap;
 
 pub const CATEGORY: IndicatorCategory = IndicatorCategory::Stress;
 
+static AUX_MARK_PRICE: &[StreamKind] = &[StreamKind::MarkPrice];
+
 // ============================================================================
 // Individual indicator signatures
 // ============================================================================
@@ -95,6 +97,7 @@ pub fn signature_settlement_vs_mark_spread() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Settlement)
+        .aux_streams(AUX_MARK_PRICE)
         .alias("settlement_vs_mark_spread")
         .alias("SettlementVsMarkSpread")
         .build()

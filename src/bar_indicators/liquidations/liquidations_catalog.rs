@@ -12,6 +12,8 @@ use std::collections::HashMap;
 
 pub const CATEGORY: IndicatorCategory = IndicatorCategory::Liquidations;
 
+static AUX_MARK_PRICE: &[StreamKind] = &[StreamKind::MarkPrice];
+
 // ============================================================================
 // Individual indicator signatures
 // ============================================================================
@@ -109,6 +111,7 @@ pub fn signature_stop_hunt_detector() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::Liquidation)
+        .aux_streams(AUX_MARK_PRICE)
         .alias("stop_hunt_detector")
         .alias("StopHuntDetector")
         .build()
