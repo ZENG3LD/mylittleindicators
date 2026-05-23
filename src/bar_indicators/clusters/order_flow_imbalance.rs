@@ -90,6 +90,9 @@ pub struct OrderFlowImbalance {
     max_buy_level: Option<PriceLevel>,
     max_sell_level: Option<PriceLevel>,
     strongest_imbalance_level: Option<PriceLevel>,
+
+    /// Number of `update_orderbook` calls received on the L2 path.
+    l2_updates: usize,
 }
 
 impl OrderFlowImbalance {
@@ -113,6 +116,7 @@ impl OrderFlowImbalance {
             max_buy_level: None,
             max_sell_level: None,
             strongest_imbalance_level: None,
+            l2_updates: 0,
         }
     }
 
@@ -301,7 +305,8 @@ impl OrderFlowImbalance {
     }
 
     pub fn is_ready(&self) -> bool {
-        self.volume_bars.len() >= (self.period / 2).max(1) && !self.price_levels.is_empty()
+        (self.volume_bars.len() >= (self.period / 2).max(1) && !self.price_levels.is_empty())
+            || self.l2_updates >= 5
     }
 
     pub fn reset(&mut self) {
@@ -320,6 +325,7 @@ impl OrderFlowImbalance {
         self.max_buy_level = None;
         self.max_sell_level = None;
         self.strongest_imbalance_level = None;
+        self.l2_updates = 0;
     }
 }
 
@@ -330,6 +336,7 @@ impl OrderBookConsumer for OrderFlowImbalance {
         let bid_depth = book.bid_depth(self.l2_depth_levels);
         let ask_depth = book.ask_depth(self.l2_depth_levels);
         self.apply_l2_ofi(bid_depth, ask_depth);
+        self.l2_updates += 1;
         self.value()
     }
 

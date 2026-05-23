@@ -51,6 +51,10 @@ impl FootprintImbalance {
     }
 
     /// Accumulate one tick into the in-progress bar.
+    ///
+    /// Eagerly recomputes `last_signal`, `last_imb_price`, and `last_imb_pct`
+    /// from the live in-bar levels so that live consumers see non-zero values
+    /// without waiting for `close_bar()`. `close_bar()` still finalises the bar.
     pub fn update_tick(&mut self, tick: &Tick) -> IndicatorValue {
         let bucket = (tick.price / self.price_bucket).floor() as i64;
         let entry = self.levels.entry(bucket).or_insert((0.0, 0.0));
@@ -59,6 +63,29 @@ impl FootprintImbalance {
         } else {
             entry.1 += tick.size;
         }
+        // Eagerly update cached fields from live in-bar state
+        let mut max_signed_pct = 0.0f64;
+        let mut max_price = 0.0f64;
+        for (&bkt, &(buy, sell)) in &self.levels {
+            let total = buy + sell;
+            if total <= 0.0 {
+                continue;
+            }
+            let signed_pct = ((buy - sell) / total) * 100.0;
+            if signed_pct.abs() > max_signed_pct.abs() {
+                max_signed_pct = signed_pct;
+                max_price = bkt as f64 * self.price_bucket;
+            }
+        }
+        self.last_signal = if max_signed_pct >= self.threshold_pct {
+            1
+        } else if max_signed_pct <= -self.threshold_pct {
+            -1
+        } else {
+            0
+        };
+        self.last_imb_price = max_price;
+        self.last_imb_pct = max_signed_pct.abs();
         self.value()
     }
 

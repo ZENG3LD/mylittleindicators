@@ -75,7 +75,10 @@ impl FootprintChart {
             entry.1 += tick.size;
             self.total_sell += tick.size;
         }
-        IndicatorValue::Single(self.total_buy - self.total_sell)
+        // Eagerly update cached totals so is_ready() returns true mid-bar
+        self.last_total_volume = self.total_buy + self.total_sell;
+        self.last_net_delta = self.total_buy - self.total_sell;
+        IndicatorValue::Single(self.last_net_delta)
     }
 
     /// SYNTHETIC ESTIMATE: split bar volume across OHLCV price points.

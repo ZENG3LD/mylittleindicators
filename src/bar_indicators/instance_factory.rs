@@ -8779,6 +8779,13 @@ impl IndicatorInstance {
             Self::BookBestLevelVolatility(x) => x.update_orderbook(book),
             Self::BookLayerConcentration(x) => x.update_orderbook(book),
             Self::BookPriceLevelDensity(x) => x.update_orderbook(book),
+            Self::BookSlope(x) => x.update_orderbook(book),
+            Self::Ofi(x) => x.update_orderbook(book),
+            Self::QueueImb(x) => x.update_orderbook(book),
+            Self::ClQueueImb(x) => x.update_orderbook(book),
+            Self::MarketMicro(x) => x.update_orderbook(book),
+            Self::OrderBookSlope(x) => x.update_orderbook(book),
+            Self::OrderFlowImb(x) => x.update_orderbook(book),
             _ => self.value(),
         }
     }

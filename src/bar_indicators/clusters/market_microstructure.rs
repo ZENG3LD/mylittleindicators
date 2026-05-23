@@ -82,6 +82,9 @@ pub struct MarketMicrostructure {
 
     market_regime: MarketRegime,
     microstructure_score: f64,
+
+    /// Number of `update_orderbook` calls received on the L2 path.
+    l2_updates: usize,
 }
 
 impl MarketMicrostructure {
@@ -119,6 +122,7 @@ impl MarketMicrostructure {
             cumulative_price_volume: 0.0,
             market_regime: MarketRegime::NormalMarket,
             microstructure_score: 0.5,
+            l2_updates: 0,
         }
     }
 
@@ -361,7 +365,7 @@ impl MarketMicrostructure {
     pub fn microstructure_score(&self) -> f64 { self.microstructure_score }
 
     pub fn is_ready(&self) -> bool {
-        self.volume_bars.len() >= (self.period / 2).max(5)
+        self.volume_bars.len() >= (self.period / 2).max(5) || self.l2_updates >= 5
     }
 
     pub fn update_bar(&mut self, o: f64, h: f64, l: f64, c: f64, v: f64) -> f64 {
@@ -388,6 +392,7 @@ impl MarketMicrostructure {
         self.liquidity_metrics.depth_imbalance = 0.5;
         self.liquidity_metrics.price_impact = 0.0;
         self.liquidity_metrics.liquidity_score = 0.5;
+        self.l2_updates = 0;
     }
 }
 
@@ -400,6 +405,7 @@ impl OrderBookConsumer for MarketMicrostructure {
         self.calculate_execution_quality();
         self.determine_market_regime();
         self.calculate_microstructure_score();
+        self.l2_updates += 1;
         self.value()
     }
 

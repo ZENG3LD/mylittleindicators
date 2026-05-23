@@ -33,10 +33,20 @@ impl FootprintPoc {
 
     /// Accumulate one tick into the in-progress bar.
     ///
-    /// POC is only updated on `close_bar()`; in-bar calls return the cached value.
+    /// Eagerly updates `last_poc` from the live in-bar levels so that
+    /// `is_ready()` returns true after the first tick without waiting for
+    /// `close_bar()`. `close_bar()` still finalises and resets the bar.
     pub fn update_tick(&mut self, tick: &Tick) -> IndicatorValue {
         let bucket = (tick.price / self.price_bucket).floor() as i64;
         *self.levels.entry(bucket).or_insert(0.0) += tick.size;
+        // Update live POC so is_ready() flips true mid-bar
+        if let Some((&poc_bucket, _)) = self
+            .levels
+            .iter()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+        {
+            self.last_poc = poc_bucket as f64 * self.price_bucket;
+        }
         IndicatorValue::Single(self.last_poc)
     }
 
