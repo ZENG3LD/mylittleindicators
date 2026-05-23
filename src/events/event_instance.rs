@@ -9,9 +9,12 @@ use crate::bar_indicators::instance_factory::IndicatorInstance;
 use super::bos_event_detector::BosEventDetector;
 use super::candle_pattern::{CandlePatternDetector, CandlePatternKind};
 use super::confluence::{Confluence, ConfluenceMode};
+use super::cross_asset_beta::CrossAssetBeta;
 use super::direction_detector::DirectionDetector;
 use super::divergence::{Divergence, DivergenceKind};
 use super::fvg_event_detector::FvgEventDetector;
+use super::pairs_cointegration_proxy::PairsCointegrationProxy;
+use super::relative_strength_cross::RelativeStrengthCross;
 use super::line_cross::{CrossMode, LineCross, LineSource as LineCrossSource};
 use super::oscillator_with_divergence::OscillatorWithDivergence;
 use super::oscillator_with_volume_weight::OscillatorWithVolumeWeight;
@@ -35,10 +38,14 @@ pub enum EventInstance {
     BosEventDetector(Box<BosEventDetector>),
     CandlePattern(Box<CandlePatternDetector>),
     Confluence(Box<Confluence>),
+    /// Rolling cross-asset beta. Primary via `update_bar`; secondary via `update_secondary_bar`.
+    CrossAssetBeta(Box<CrossAssetBeta>),
     /// DirectionDetector operates on a scalar; `update_bar` feeds close price.
     DirectionDetector(Box<DirectionDetector>),
     Divergence(Box<Divergence>),
     FvgEventDetector(Box<FvgEventDetector>),
+    /// Cointegration proxy (spread z-score). Primary via `update_bar`; secondary via `update_secondary_bar`.
+    PairsCointegrationProxy(Box<PairsCointegrationProxy>),
     LineCross(Box<LineCross>),
     OscillatorWithDivergence(Box<OscillatorWithDivergence>),
     OscillatorWithVolumeWeight(Box<OscillatorWithVolumeWeight>),
@@ -48,6 +55,8 @@ pub enum EventInstance {
     /// RegimeGate operates on a scalar; `update_bar` feeds close price.
     RegimeGate(Box<RegimeGate>),
     RelativePosition(Box<RelativePosition>),
+    /// Relative strength cross. Primary via `update_bar`; secondary via `update_secondary_bar`.
+    RelativeStrengthCross(Box<RelativeStrengthCross>),
     StatisticalWickDetector(Box<StatisticalWickDetector>),
     SwingDetection(Box<SwingDetection>),
     /// Threshold operates on a scalar; `update_bar` feeds close price.
@@ -239,6 +248,24 @@ impl EventInstance {
                 let multiplier = config.param_or("multiplier", 2.0);
                 Ok(Self::VolumeEventDetector(Box::new(VolumeEventDetector::new(period, multiplier))))
             }
+
+            // ── CrossAssetBeta ────────────────────────────────────────────────
+            EventId::CrossAssetBeta => {
+                let window = config.period_or(50);
+                Ok(Self::CrossAssetBeta(Box::new(CrossAssetBeta::new(window))))
+            }
+
+            // ── PairsCointegrationProxy ───────────────────────────────────────
+            EventId::PairsCointegrationProxy => {
+                let window = config.period_or(50);
+                Ok(Self::PairsCointegrationProxy(Box::new(PairsCointegrationProxy::new(window))))
+            }
+
+            // ── RelativeStrengthCross ─────────────────────────────────────────
+            EventId::RelativeStrengthCross => {
+                let window = config.period_or(50);
+                Ok(Self::RelativeStrengthCross(Box::new(RelativeStrengthCross::new(window))))
+            }
         }
     }
 
@@ -264,6 +291,9 @@ impl EventInstance {
         match self {
             Self::BosEventDetector(d) => d.update_bar(open, high, low, close, volume),
             Self::CandlePattern(d) => d.update_bar(open, high, low, close, volume),
+            Self::CrossAssetBeta(d) => d.update_bar(open, high, low, close, volume),
+            Self::PairsCointegrationProxy(d) => d.update_bar(open, high, low, close, volume),
+            Self::RelativeStrengthCross(d) => d.update_bar(open, high, low, close, volume),
             Self::Confluence(d) => {
                 let v = d.update_bar(open, high, low, close, volume);
                 IndicatorValue::Single(v)
@@ -347,6 +377,9 @@ impl EventInstance {
             Self::BosEventDetector(d) => d.value(),
             Self::CandlePattern(d) => d.value(),
             Self::Confluence(d) => d.value(),
+            Self::CrossAssetBeta(d) => d.indicator_value(),
+            Self::PairsCointegrationProxy(d) => d.indicator_value(),
+            Self::RelativeStrengthCross(d) => d.indicator_value(),
             Self::DirectionDetector(_) => IndicatorValue::Signal(0),
             Self::Divergence(d) => d.value(),
             Self::FvgEventDetector(d) => d.value(),
@@ -371,6 +404,9 @@ impl EventInstance {
             Self::BosEventDetector(d) => d.is_ready(),
             Self::CandlePattern(d) => d.is_ready(),
             Self::Confluence(d) => d.is_ready(),
+            Self::CrossAssetBeta(d) => d.indicator_is_ready(),
+            Self::PairsCointegrationProxy(d) => d.indicator_is_ready(),
+            Self::RelativeStrengthCross(d) => d.indicator_is_ready(),
             Self::DirectionDetector(_) => true,
             Self::Divergence(d) => d.is_ready(),
             Self::FvgEventDetector(d) => d.is_ready(),
@@ -395,6 +431,9 @@ impl EventInstance {
             Self::BosEventDetector(d) => d.reset(),
             Self::CandlePattern(d) => d.reset(),
             Self::Confluence(d) => d.reset(),
+            Self::CrossAssetBeta(d) => d.indicator_reset(),
+            Self::PairsCointegrationProxy(d) => d.indicator_reset(),
+            Self::RelativeStrengthCross(d) => d.indicator_reset(),
             Self::DirectionDetector(d) => d.reset(),
             Self::Divergence(d) => d.reset(),
             Self::FvgEventDetector(d) => d.reset(),
@@ -410,6 +449,27 @@ impl EventInstance {
             Self::Threshold(d) => d.reset(),
             Self::VolatilityRegimeDetector(d) => d.reset(),
             Self::VolumeEventDetector(d) => d.reset(),
+        }
+    }
+
+    /// Feed a secondary-symbol bar to multi-symbol events.
+    ///
+    /// Only `CrossAssetBeta`, `PairsCointegrationProxy`, and `RelativeStrengthCross`
+    /// consume this call. All other events ignore it (no-op).
+    pub fn update_secondary_bar(
+        &mut self,
+        _open: f64,
+        _high: f64,
+        _low: f64,
+        close: f64,
+        _volume: f64,
+        ts_ms: i64,
+    ) {
+        match self {
+            Self::CrossAssetBeta(x) => { x.update_secondary_price(close, ts_ms); }
+            Self::PairsCointegrationProxy(x) => { x.update_secondary_price(close, ts_ms); }
+            Self::RelativeStrengthCross(x) => { x.update_secondary_price(close, ts_ms); }
+            _ => {}
         }
     }
 }

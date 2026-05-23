@@ -253,6 +253,48 @@ pub fn signature_volume_event_detector() -> EventSignature {
         .build()
 }
 
+pub fn signature_cross_asset_beta() -> EventSignature {
+    EventSignature::builder("cross_asset_beta")
+        .name("Cross Asset Beta")
+        .description("Rolling beta of primary asset returns vs secondary asset returns. Secondary symbol fed via update_secondary_bar.")
+        .machine_id(EventId::CrossAssetBeta)
+        .add_constraint(ParamConstraint::period(4, 500, 50))
+        .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
+        .source_type(SourceType::PriceOnly)
+        .alias("CrossAssetBeta")
+        .alias("crossassetbeta")
+        .build()
+}
+
+pub fn signature_pairs_cointegration_proxy() -> EventSignature {
+    EventSignature::builder("pairs_cointegration_proxy")
+        .name("Pairs Cointegration Proxy")
+        .description("Rolling cointegration proxy (spread z-score) between two price series. Secondary symbol fed via update_secondary_bar.")
+        .machine_id(EventId::PairsCointegrationProxy)
+        .add_constraint(ParamConstraint::period(4, 500, 50))
+        .role_kind(IndicatorRoleKind::Statistical)
+        .output_kind(IndicatorValueKind::Single)
+        .source_type(SourceType::PriceOnly)
+        .alias("PairsCointegrationProxy")
+        .alias("pairscointegrationproxy")
+        .build()
+}
+
+pub fn signature_relative_strength_cross() -> EventSignature {
+    EventSignature::builder("relative_strength_cross")
+        .name("Relative Strength Cross")
+        .description("Relative strength of primary vs secondary symbol over a rolling window. Secondary symbol fed via update_secondary_bar.")
+        .machine_id(EventId::RelativeStrengthCross)
+        .add_constraint(ParamConstraint::period(2, 500, 50))
+        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
+        .output_kind(IndicatorValueKind::Single)
+        .source_type(SourceType::PriceOnly)
+        .alias("RelativeStrengthCross")
+        .alias("relativestrengthcross")
+        .build()
+}
+
 // ── Lookup ────────────────────────────────────────────────────────────────────
 
 /// Get the event signature by id string or alias (case-insensitive).
@@ -294,26 +336,36 @@ pub fn get_signature(id: &str) -> Option<EventSignature> {
         "volume_event_detector" | "volumeeventdetector" | "volume_event" => {
             Some(signature_volume_event_detector())
         }
+        "cross_asset_beta" | "crossassetbeta" | "CrossAssetBeta" => Some(signature_cross_asset_beta()),
+        "pairs_cointegration_proxy" | "pairscointegrationproxy" | "PairsCointegrationProxy" => {
+            Some(signature_pairs_cointegration_proxy())
+        }
+        "relative_strength_cross" | "relativestrengthcross" | "RelativeStrengthCross" => {
+            Some(signature_relative_strength_cross())
+        }
         _ => None,
     }
 }
 
-/// Iterate all 18 event signatures.
+/// Iterate all 21 event signatures.
 pub fn all_signatures() -> impl Iterator<Item = EventSignature> {
     [
         signature_bos_event_detector(),
         signature_candle_pattern(),
         signature_confluence(),
+        signature_cross_asset_beta(),
         signature_direction_detector(),
         signature_divergence(),
         signature_fvg_event_detector(),
         signature_line_cross(),
         signature_oscillator_with_divergence(),
         signature_oscillator_with_volume_weight(),
+        signature_pairs_cointegration_proxy(),
         signature_pivot(),
         signature_price_line_cross(),
         signature_regime_gate(),
         signature_relative_position(),
+        signature_relative_strength_cross(),
         signature_statistical_wick_detector(),
         signature_swing_detection(),
         signature_threshold(),

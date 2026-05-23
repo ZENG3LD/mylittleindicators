@@ -91,21 +91,6 @@ pub fn signature_compound_squeeze_probability() -> IndicatorSignature {
         .build()
 }
 
-pub fn signature_cross_asset_beta() -> IndicatorSignature {
-    IndicatorSignature::builder("CROSS_ASSET_BETA", CATEGORY)
-        .name("Cross-Asset Beta")
-        .description("Rolling beta coefficient between primary and secondary asset price series")
-        .add_constraint(ParamConstraint::period(2, 200, 14))
-        .machine_id(BarIndicatorId::CrossAssetBeta)
-        .role_kind(IndicatorRoleKind::Statistical)
-        .output_kind(IndicatorValueKind::Single)
-        .input_stream(StreamKind::Bar)
-        .aux_streams(AUX_TICK)
-        .alias("cross_asset_beta")
-        .alias("CrossAssetBeta")
-        .build()
-}
-
 pub fn signature_funding_oi_pressure() -> IndicatorSignature {
     IndicatorSignature::builder("FUNDING_OI_PRESSURE", CATEGORY)
         .name("Funding OI Pressure")
@@ -178,36 +163,6 @@ pub fn signature_market_stress_composite() -> IndicatorSignature {
         .aux_streams(AUX_VIXIV_LIQUIDATION_FUNDING_INSURANCE)
         .alias("market_stress_composite")
         .alias("MarketStressComposite")
-        .build()
-}
-
-pub fn signature_pairs_cointegration_proxy() -> IndicatorSignature {
-    IndicatorSignature::builder("PAIRS_COINTEGRATION_PROXY", CATEGORY)
-        .name("Pairs Cointegration Proxy")
-        .description("Rolling cointegration proxy between two price series for pairs trading")
-        .add_constraint(ParamConstraint::period(2, 200, 14))
-        .machine_id(BarIndicatorId::PairsCointegrationProxy)
-        .role_kind(IndicatorRoleKind::Statistical)
-        .output_kind(IndicatorValueKind::Single)
-        .input_stream(StreamKind::Bar)
-        .aux_streams(AUX_TICK)
-        .alias("pairs_cointegration_proxy")
-        .alias("PairsCointegrationProxy")
-        .build()
-}
-
-pub fn signature_relative_strength_cross() -> IndicatorSignature {
-    IndicatorSignature::builder("RELATIVE_STRENGTH_CROSS", CATEGORY)
-        .name("Relative Strength Cross")
-        .description("Relative strength comparison between two assets using rolling returns")
-        .add_constraint(ParamConstraint::period(2, 200, 14))
-        .machine_id(BarIndicatorId::RelativeStrengthCross)
-        .role_kind(IndicatorRoleKind::OscillatorUnbounded)
-        .output_kind(IndicatorValueKind::Single)
-        .input_stream(StreamKind::Bar)
-        .aux_streams(AUX_TICK)
-        .alias("relative_strength_cross")
-        .alias("RelativeStrengthCross")
         .build()
 }
 
@@ -312,14 +267,11 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("BLOCK_TRADE_VOLUME_RATIO", signature_block_trade_volume_ratio as fn() -> IndicatorSignature),
     ("CAPITULATION_DETECTOR", signature_capitulation_detector as fn() -> IndicatorSignature),
     ("COMPOUND_SQUEEZE_PROBABILITY", signature_compound_squeeze_probability as fn() -> IndicatorSignature),
-    ("CROSS_ASSET_BETA", signature_cross_asset_beta as fn() -> IndicatorSignature),
     ("FUNDING_OI_PRESSURE", signature_funding_oi_pressure as fn() -> IndicatorSignature),
     ("FUNDING_SENTIMENT_ALIGNMENT", signature_funding_sentiment_alignment as fn() -> IndicatorSignature),
     ("INDEX_TRACKING_ERROR", signature_index_tracking_error as fn() -> IndicatorSignature),
     ("IV_HV_SPREAD", signature_iv_hv_spread as fn() -> IndicatorSignature),
     ("MARKET_STRESS_COMPOSITE", signature_market_stress_composite as fn() -> IndicatorSignature),
-    ("PAIRS_COINTEGRATION_PROXY", signature_pairs_cointegration_proxy as fn() -> IndicatorSignature),
-    ("RELATIVE_STRENGTH_CROSS", signature_relative_strength_cross as fn() -> IndicatorSignature),
     ("RISK_OFF_DETECTOR", signature_risk_off_detector as fn() -> IndicatorSignature),
     ("SENTIMENT_COMPOSITE", signature_sentiment_composite as fn() -> IndicatorSignature),
     ("SQUEEZE_PROBABILITY", signature_squeeze_probability as fn() -> IndicatorSignature),

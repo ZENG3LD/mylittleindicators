@@ -714,14 +714,11 @@ use crate::bar_indicators::composites::{
     BlockTradeVolumeRatio,
     CapitulationDetector,
     CompoundSqueezeProbability,
-    CrossAssetBeta,
     FundingOiPressure,
     FundingSentimentAlignment,
     IndexTrackingError,
     IvHvSpread,
     MarketStressComposite,
-    PairsCointegrationProxy,
-    RelativeStrengthCross,
     RiskOffDetector,
     SentimentComposite,
     SqueezeProbability,
@@ -1866,12 +1863,6 @@ pub enum IndicatorInstance {
     CmpAdaptiveWindowSelector(Box<AdaptiveWindowSelector>),
     /// Dynamic threshold = mean + N×std. Output: `Triple(mean, std, threshold)`.
     CmpAdaptiveThreshold(Box<AdaptiveThreshold>),
-    /// Spread z-score cointegration proxy (primary tick + secondary price). Output: `Single(zscore)`.
-    CmpPairsCointegrationProxy(Box<PairsCointegrationProxy>),
-    /// Rolling cross-asset beta (primary tick + secondary price). Output: `Single(beta)`.
-    CmpCrossAssetBeta(Box<CrossAssetBeta>),
-    /// Relative strength cross (primary tick + secondary price). Output: `Single(rs)`.
-    CmpRelativeStrengthCross(Box<RelativeStrengthCross>),
 }
 
 impl IndicatorInstance {
@@ -2036,8 +2027,7 @@ impl IndicatorInstance {
             // Category C indicators
             MarketStressComposite | RiskOffDetector | SentimentComposite |
             CompoundSqueezeProbability | TpoSessionBalance | CompositeWeightDrift |
-            AdaptiveWindowSelector | AdaptiveThreshold |
-            PairsCointegrationProxy | CrossAssetBeta | RelativeStrengthCross
+            AdaptiveWindowSelector | AdaptiveThreshold
 
             // Note: Most other indicators are PriceOnly and will use config.source
         )
@@ -5105,18 +5095,6 @@ impl IndicatorInstance {
                 let mult = config.additional_params.get("multiplier").copied().unwrap_or(2.0);
                 Ok(Self::CmpAdaptiveThreshold(Box::new(AdaptiveThreshold::new(win, mult))))
             }
-            BarIndicatorId::PairsCointegrationProxy => {
-                let win = config.periods.first().copied().unwrap_or(50);
-                Ok(Self::CmpPairsCointegrationProxy(Box::new(PairsCointegrationProxy::new(win))))
-            }
-            BarIndicatorId::CrossAssetBeta => {
-                let win = config.periods.first().copied().unwrap_or(50);
-                Ok(Self::CmpCrossAssetBeta(Box::new(CrossAssetBeta::new(win))))
-            }
-            BarIndicatorId::RelativeStrengthCross => {
-                let win = config.periods.first().copied().unwrap_or(50);
-                Ok(Self::CmpRelativeStrengthCross(Box::new(RelativeStrengthCross::new(win))))
-            }
         }
     }
 
@@ -7027,9 +7005,6 @@ impl IndicatorInstance {
             Self::IdxCompositeWeightDrift(x) => x.update_bar(open, high, low, close, volume),
             Self::CmpAdaptiveWindowSelector(x) => x.update_bar(open, high, low, close, volume),
             Self::CmpAdaptiveThreshold(x) => x.update_bar(open, high, low, close, volume),
-            Self::CmpPairsCointegrationProxy(x) => x.update_bar(open, high, low, close, volume),
-            Self::CmpCrossAssetBeta(x) => x.update_bar(open, high, low, close, volume),
-            Self::CmpRelativeStrengthCross(x) => x.update_bar(open, high, low, close, volume),
             // Catch-all for remaining legacy indicators
             _ => IndicatorValue::Single(0.0),
         }
@@ -7623,9 +7598,6 @@ impl IndicatorInstance {
             Self::IdxCompositeWeightDrift(ind) => ind.indicator_value(),
             Self::CmpAdaptiveWindowSelector(ind) => ind.indicator_value(),
             Self::CmpAdaptiveThreshold(ind) => ind.indicator_value(),
-            Self::CmpPairsCointegrationProxy(ind) => ind.indicator_value(),
-            Self::CmpCrossAssetBeta(ind) => ind.indicator_value(),
-            Self::CmpRelativeStrengthCross(ind) => ind.indicator_value(),
         }
     }
 
@@ -8206,9 +8178,6 @@ impl IndicatorInstance {
             Self::IdxCompositeWeightDrift(ind) => ind.indicator_is_ready(),
             Self::CmpAdaptiveWindowSelector(ind) => ind.indicator_is_ready(),
             Self::CmpAdaptiveThreshold(ind) => ind.indicator_is_ready(),
-            Self::CmpPairsCointegrationProxy(ind) => ind.indicator_is_ready(),
-            Self::CmpCrossAssetBeta(ind) => ind.indicator_is_ready(),
-            Self::CmpRelativeStrengthCross(ind) => ind.indicator_is_ready(),
         }
     }
 
@@ -8789,9 +8758,6 @@ impl IndicatorInstance {
             Self::IdxCompositeWeightDrift(ind) => ind.indicator_reset(),
             Self::CmpAdaptiveWindowSelector(ind) => ind.indicator_reset(),
             Self::CmpAdaptiveThreshold(ind) => ind.indicator_reset(),
-            Self::CmpPairsCointegrationProxy(ind) => ind.indicator_reset(),
-            Self::CmpCrossAssetBeta(ind) => ind.indicator_reset(),
-            Self::CmpRelativeStrengthCross(ind) => ind.indicator_reset(),
         }
     }
 
@@ -8928,9 +8894,6 @@ impl IndicatorInstance {
             Self::TickAdvTpoSessionBalance(x) => x.update_tick(tick),
             Self::CmpAdaptiveWindowSelector(x) => x.update_tick(tick),
             Self::CmpAdaptiveThreshold(x) => x.update_tick(tick),
-            Self::CmpPairsCointegrationProxy(x) => x.update_tick(tick),
-            Self::CmpCrossAssetBeta(x) => x.update_tick(tick),
-            Self::CmpRelativeStrengthCross(x) => x.update_tick(tick),
             _ => self.value(),
         }
     }
@@ -9157,19 +9120,6 @@ impl IndicatorInstance {
         match self {
             Self::FndSettledFundingMomentum(x) => x.update_funding_settlement(fs),
             Self::FndFundingSettlementImpact(x) => x.update_funding_settlement(fs),
-            _ => self.value(),
-        }
-    }
-
-    /// Update secondary symbol price for cross-asset indicators.
-    ///
-    /// Dispatches to `PairsCointegrationProxy`, `CrossAssetBeta`, and `RelativeStrengthCross`.
-    /// All other indicators return their current value unchanged.
-    pub fn update_secondary_price(&mut self, price: f64, timestamp: i64) -> IndicatorValue {
-        match self {
-            Self::CmpPairsCointegrationProxy(x) => x.update_secondary_price(price, timestamp),
-            Self::CmpCrossAssetBeta(x) => x.update_secondary_price(price, timestamp),
-            Self::CmpRelativeStrengthCross(x) => x.update_secondary_price(price, timestamp),
             _ => self.value(),
         }
     }

@@ -175,7 +175,6 @@ fn all_ids() -> Vec<BarIndicatorId> {
         // Category C composites
         MarketStressComposite, RiskOffDetector, SentimentComposite, CompoundSqueezeProbability,
         TpoSessionBalance, CompositeWeightDrift, AdaptiveWindowSelector, AdaptiveThreshold,
-        PairsCointegrationProxy, CrossAssetBeta, RelativeStrengthCross,
     ]
 }
 
@@ -340,8 +339,7 @@ fn category_of(id: BarIndicatorId) -> &'static str {
 
         MarketStressComposite | RiskOffDetector | SentimentComposite
         | CompoundSqueezeProbability | TpoSessionBalance | CompositeWeightDrift
-        | AdaptiveWindowSelector | AdaptiveThreshold | PairsCointegrationProxy | CrossAssetBeta
-        | RelativeStrengthCross => "composites_c",
+        | AdaptiveWindowSelector | AdaptiveThreshold => "composites_c",
     }
 }
 
@@ -563,6 +561,28 @@ impl IndicatorState {
         };
         self.events_received += 1;
         let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_orderbook(book)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    let r = panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready()));
+                    if matches!(r, Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
+    fn try_update_delta(&mut self, delta: &digdigdig3::core::types::OrderbookDelta) {
+        let inst = match &mut self.instance {
+            Some(i) => i,
+            None => return,
+        };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_delta(delta)));
         match result {
             Ok(val) => {
                 if !self.is_ready {
@@ -1095,16 +1115,19 @@ const ALL_EVENT_IDS: &[EventId] = &[
     EventId::BosEventDetector,
     EventId::CandlePattern,
     EventId::Confluence,
+    EventId::CrossAssetBeta,
     EventId::DirectionDetector,
     EventId::Divergence,
     EventId::FvgEventDetector,
     EventId::LineCross,
     EventId::OscillatorWithDivergence,
     EventId::OscillatorWithVolumeWeight,
+    EventId::PairsCointegrationProxy,
     EventId::Pivot,
     EventId::PriceLineCross,
     EventId::RegimeGate,
     EventId::RelativePosition,
+    EventId::RelativeStrengthCross,
     EventId::StatisticalWickDetector,
     EventId::SwingDetection,
     EventId::Threshold,
@@ -1296,6 +1319,13 @@ fn build_event_config(id: EventId) -> EventConfig {
         EventId::OscillatorWithVolumeWeight => EventConfig::new(id, name)
             .with_inner(IndicatorConfig::new(BarIndicatorId::Rsi, "rsi".to_string(), vec![14]))
             .with_periods(vec![14]),
+        // Cross-asset multi-symbol events.
+        // NOTE: These will land in "never_ready" status in the validator because
+        // update_secondary_bar is never called — wiring requires a second symbol
+        // subscription and separate dispatch path (separate follow-up task).
+        EventId::CrossAssetBeta => EventConfig::new(id, name).with_periods(vec![50]),
+        EventId::PairsCointegrationProxy => EventConfig::new(id, name).with_periods(vec![50]),
+        EventId::RelativeStrengthCross => EventConfig::new(id, name).with_periods(vec![50]),
         // Parameter-less
         EventId::DirectionDetector | EventId::FvgEventDetector => EventConfig::new(id, name),
     }
@@ -1364,6 +1394,21 @@ fn obs_to_orderbook(p: &digdigdig3_station::data::ObSnapshotPoint) -> OrderBook 
         prev_update_id: None,
         event_time: None,
         transaction_time: None,
+        checksum: None,
+    }
+}
+
+fn obd_to_orderbook_delta(
+    p: &digdigdig3_station::data::ObDeltaPoint,
+) -> digdigdig3::core::types::OrderbookDelta {
+    digdigdig3::core::types::OrderbookDelta {
+        bids: p.bid_changes.iter().map(|(pr, sz)| OrderBookLevel::new(*pr, *sz)).collect(),
+        asks: p.ask_changes.iter().map(|(pr, sz)| OrderBookLevel::new(*pr, *sz)).collect(),
+        timestamp: p.ts_ms,
+        first_update_id: None,
+        last_update_id: None,
+        prev_update_id: None,
+        event_time: None,
         checksum: None,
     }
 }
@@ -1725,6 +1770,7 @@ async fn main() -> Result<()> {
         (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Kline(interval_1m.clone())),
         (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Ticker),
         (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Orderbook),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::OrderbookDelta),
         (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPrice),
         (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::FundingRate),
         (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Liquidation),
@@ -1733,6 +1779,7 @@ async fn main() -> Result<()> {
         (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Kline(interval_1m.clone())),
         (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Ticker),
         (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Orderbook),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::OrderbookDelta),
         (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPrice),
         (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::FundingRate),
         (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Liquidation),
@@ -1892,6 +1939,14 @@ async fn main() -> Result<()> {
                         for s in &mut states {
                             if s.accepts(StreamKind::OrderBook) {
                                 s.try_update_orderbook(&book);
+                            }
+                        }
+                    }
+                    Event::OrderbookDelta { point, .. } => {
+                        let delta = obd_to_orderbook_delta(point);
+                        for s in &mut states {
+                            if s.accepts(StreamKind::OrderbookDelta) {
+                                s.try_update_delta(&delta);
                             }
                         }
                     }

@@ -18,7 +18,7 @@ use crate::core::types::Tick;
 ///
 /// Primary prices arrive via `TickConsumer::update_tick` (or `update_bar` for close).
 /// Secondary prices arrive via `update_secondary_price(price, timestamp)`.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CrossAssetBeta {
     window: usize,
     primary_prices: VecDeque<f64>,

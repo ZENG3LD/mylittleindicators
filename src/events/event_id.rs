@@ -12,16 +12,22 @@ pub enum EventId {
     /// CandlePattern with `kind` from `EventConfig.string_params["kind"]`
     CandlePattern,
     Confluence,
+    /// Rolling beta of primary asset returns vs secondary asset returns.
+    CrossAssetBeta,
     DirectionDetector,
     Divergence,
     FvgEventDetector,
     LineCross,
     OscillatorWithDivergence,
     OscillatorWithVolumeWeight,
+    /// Rolling cointegration proxy (spread z-score) between two price series.
+    PairsCointegrationProxy,
     Pivot,
     PriceLineCross,
     RegimeGate,
     RelativePosition,
+    /// Relative strength of primary vs secondary symbol over a rolling window.
+    RelativeStrengthCross,
     StatisticalWickDetector,
     SwingDetection,
     Threshold,
@@ -36,16 +42,19 @@ impl EventId {
             EventId::BosEventDetector => "BosEventDetector",
             EventId::CandlePattern => "CandlePattern",
             EventId::Confluence => "Confluence",
+            EventId::CrossAssetBeta => "CrossAssetBeta",
             EventId::DirectionDetector => "DirectionDetector",
             EventId::Divergence => "Divergence",
             EventId::FvgEventDetector => "FvgEventDetector",
             EventId::LineCross => "LineCross",
             EventId::OscillatorWithDivergence => "OscillatorWithDivergence",
             EventId::OscillatorWithVolumeWeight => "OscillatorWithVolumeWeight",
+            EventId::PairsCointegrationProxy => "PairsCointegrationProxy",
             EventId::Pivot => "Pivot",
             EventId::PriceLineCross => "PriceLineCross",
             EventId::RegimeGate => "RegimeGate",
             EventId::RelativePosition => "RelativePosition",
+            EventId::RelativeStrengthCross => "RelativeStrengthCross",
             EventId::StatisticalWickDetector => "StatisticalWickDetector",
             EventId::SwingDetection => "SwingDetection",
             EventId::Threshold => "Threshold",
@@ -80,6 +89,9 @@ pub static EVENT_ID_MAP: Lazy<HashMap<&'static str, EventId>> = Lazy::new(|| {
     m.insert("candle_pattern_detector", EventId::CandlePattern);
     // Confluence
     m.insert("confluence", EventId::Confluence);
+    // CrossAssetBeta
+    m.insert("crossassetbeta", EventId::CrossAssetBeta);
+    m.insert("cross_asset_beta", EventId::CrossAssetBeta);
     // DirectionDetector
     m.insert("directiondetector", EventId::DirectionDetector);
     m.insert("direction_detector", EventId::DirectionDetector);
@@ -99,6 +111,9 @@ pub static EVENT_ID_MAP: Lazy<HashMap<&'static str, EventId>> = Lazy::new(|| {
     // OscillatorWithVolumeWeight
     m.insert("oscillatorwithvolumeweight", EventId::OscillatorWithVolumeWeight);
     m.insert("oscillator_with_volume_weight", EventId::OscillatorWithVolumeWeight);
+    // PairsCointegrationProxy
+    m.insert("pairscointegrationproxy", EventId::PairsCointegrationProxy);
+    m.insert("pairs_cointegration_proxy", EventId::PairsCointegrationProxy);
     // Pivot
     m.insert("pivot", EventId::Pivot);
     // PriceLineCross
@@ -110,6 +125,9 @@ pub static EVENT_ID_MAP: Lazy<HashMap<&'static str, EventId>> = Lazy::new(|| {
     // RelativePosition
     m.insert("relativeposition", EventId::RelativePosition);
     m.insert("relative_position", EventId::RelativePosition);
+    // RelativeStrengthCross
+    m.insert("relativestrengthcross", EventId::RelativeStrengthCross);
+    m.insert("relative_strength_cross", EventId::RelativeStrengthCross);
     // StatisticalWickDetector
     m.insert("statisticalwickdetector", EventId::StatisticalWickDetector);
     m.insert("statistical_wick_detector", EventId::StatisticalWickDetector);

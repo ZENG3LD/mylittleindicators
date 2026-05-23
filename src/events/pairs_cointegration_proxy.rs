@@ -24,7 +24,7 @@ use crate::core::types::Tick;
 ///
 /// **Note**: β is estimated by simple rolling OLS (cov/var), not ADF test.
 /// This is a practical approximation, not a formal cointegration test.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PairsCointegrationProxy {
     window: usize,
     primary_prices: VecDeque<f64>,

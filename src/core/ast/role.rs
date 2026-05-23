@@ -473,9 +473,6 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         BarIndicatorId::CompositeWeightDrift => RoleKind::OscillatorBounded,
         BarIndicatorId::AdaptiveWindowSelector => RoleKind::OscillatorUnbounded,
         BarIndicatorId::AdaptiveThreshold => RoleKind::OscillatorUnbounded,
-        BarIndicatorId::PairsCointegrationProxy => RoleKind::OscillatorBounded,
-        BarIndicatorId::CrossAssetBeta => RoleKind::OscillatorUnbounded,
-        BarIndicatorId::RelativeStrengthCross => RoleKind::OscillatorUnbounded,
 
         // ── Everything else ───────────────────────────────────────────────────
         _ => RoleKind::Other,

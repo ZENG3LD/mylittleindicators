@@ -654,9 +654,6 @@ pub enum BarIndicatorId {
     CompositeWeightDrift,        // COMPOSITE_WEIGHT_DRIFT (CompositeIndex)
     AdaptiveWindowSelector,      // ADAPTIVE_WINDOW_SELECTOR (Tick)
     AdaptiveThreshold,           // ADAPTIVE_THRESHOLD (Tick)
-    PairsCointegrationProxy,     // PAIRS_COINTEGRATION_PROXY (Tick + secondary price)
-    CrossAssetBeta,              // CROSS_ASSET_BETA (Tick + secondary price)
-    RelativeStrengthCross,       // RELATIVE_STRENGTH_CROSS (Tick + secondary price)
 
 }
 
