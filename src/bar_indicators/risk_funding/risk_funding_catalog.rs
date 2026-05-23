@@ -73,6 +73,9 @@ pub fn signature_funding_drift() -> IndicatorSignature {
 }
 
 pub fn signature_settled_funding_momentum() -> IndicatorSignature {
+    // SettledFundingMomentum consumes FundingSettlement events (not Funding) —
+    // its FundingSettlementConsumer impl is the only update path, so the
+    // catalog must point at FundingSettlement for validator dispatch.
     IndicatorSignature::builder("SETTLED_FUNDING_MOMENTUM", CATEGORY)
         .name("Settled Funding Momentum")
         .description("Momentum of the settled funding rate series")
@@ -80,7 +83,7 @@ pub fn signature_settled_funding_momentum() -> IndicatorSignature {
         .machine_id(BarIndicatorId::SettledFundingMomentum)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
-        .input_stream(StreamKind::Funding)
+        .input_stream(StreamKind::FundingSettlement)
         .alias("settled_funding_momentum")
         .alias("SettledFundingMomentum")
         .build()
