@@ -12,6 +12,10 @@ use std::collections::HashMap;
 
 pub const CATEGORY: IndicatorCategory = IndicatorCategory::IndexBasis;
 
+// PriceVsIndexSpread and IndexPriceMomentum need spot (close) from the Bar
+// stream to compute index↔spot spread / index momentum relative to spot.
+static AUX_BAR: &[StreamKind] = &[StreamKind::Bar];
+
 // ============================================================================
 // Individual indicator signatures
 // ============================================================================
@@ -109,12 +113,16 @@ pub fn signature_price_vs_index_spread() -> IndicatorSignature {
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Single)
         .input_stream(StreamKind::IndexPrice)
+        .aux_streams(AUX_BAR)
         .alias("price_vs_index_spread")
         .alias("PriceVsIndexSpread")
         .build()
 }
 
 pub fn signature_index_price_momentum() -> IndicatorSignature {
+    // IndexPriceMomentum implements update_mark (not update_index_price), so the
+    // catalog primary input must be MarkPrice for the validator dispatch to feed
+    // events into it. Bar is declared as aux for spot-relative momentum context.
     IndicatorSignature::builder("INDEX_PRICE_MOMENTUM", CATEGORY)
         .name("Index Price Momentum")
         .description("EMA-based momentum (slope) of the index/spot price from the mark price feed")
@@ -122,7 +130,8 @@ pub fn signature_index_price_momentum() -> IndicatorSignature {
         .machine_id(BarIndicatorId::IndexPriceMomentum)
         .role_kind(IndicatorRoleKind::OscillatorUnbounded)
         .output_kind(IndicatorValueKind::Double)
-        .input_stream(StreamKind::IndexPrice)
+        .input_stream(StreamKind::MarkPrice)
+        .aux_streams(AUX_BAR)
         .alias("index_price_momentum")
         .alias("IndexPriceMomentum")
         .alias("INDEXPRICEMOMENTUM")
