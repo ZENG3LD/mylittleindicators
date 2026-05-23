@@ -709,6 +709,28 @@ impl IndicatorState {
         }
     }
 
+    fn try_update_tick_with_book(&mut self, tick: &Tick, book: &OrderBook) {
+        let inst = match &mut self.instance {
+            Some(i) => i,
+            None => return,
+        };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_tick_with_book(tick, book)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    let r = panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready()));
+                    if matches!(r, Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
     fn try_update_liquidation(&mut self, liq: &Liquidation) {
         let inst = match &mut self.instance {
             Some(i) => i,
@@ -1940,10 +1962,20 @@ async fn main() -> Result<()> {
                             }
                         }
                     }
-                    Event::Trade { point, .. } => {
+                    Event::Trade { exchange, symbol, point } => {
                         let tick = trade_point_to_tick(point);
+                        let key = (*exchange, symbol.clone());
+                        let maybe_book: Option<OrderBook> = trackers
+                            .get(&key)
+                            .filter(|t| t.has_snapshot())
+                            .map(|t| tracker_to_orderbook(t, 50));
                         for s in &mut states {
-                            if s.accepts(StreamKind::Tick) {
+                            if s.accepts(StreamKind::Tick) && s.aux_streams.contains(&StreamKind::OrderBook) {
+                                if let Some(book) = &maybe_book {
+                                    s.try_update_tick_with_book(&tick, book);
+                                }
+                                // No book yet — skip; can't fabricate a book for hybrid indicator.
+                            } else if s.accepts(StreamKind::Tick) {
                                 s.try_update_tick(&tick);
                             }
                         }

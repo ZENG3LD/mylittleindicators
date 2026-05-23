@@ -16,6 +16,9 @@ use std::collections::HashMap;
 /// Category for all indicators in this module
 pub const CATEGORY: IndicatorCategory = IndicatorCategory::Book;
 
+/// Auxiliary streams for hybrid Tick+Book indicators (triggered by Trade, need current book).
+static AUX_ORDERBOOK: &[StreamKind] = &[StreamKind::OrderBook];
+
 // ============================================================================
 // Individual indicator signatures
 // ============================================================================
@@ -340,7 +343,8 @@ pub fn signature_hidden_liquidity_detector() -> IndicatorSignature {
         .metadata("interpretation", "+1 = buy aggressor hit hidden ask, -1 = sell hit hidden bid")
         .machine_id(BarIndicatorId::HiddenLiquidityDetector)
         .role_kind(IndicatorRoleKind::Pattern)
-        .input_stream(StreamKind::OrderBook)
+        .input_stream(StreamKind::Tick)
+        .aux_streams(AUX_ORDERBOOK)
         .output_kind(IndicatorValueKind::Triple)
         .requires_l2()
         .alias("HiddenLiquidityDetector")
@@ -360,7 +364,8 @@ pub fn signature_trade_book_absorption() -> IndicatorSignature {
         .metadata("interpretation", "+1 = buy absorbed at ask, -1 = sell absorbed at bid")
         .machine_id(BarIndicatorId::TradeBookAbsorption)
         .role_kind(IndicatorRoleKind::Pattern)
-        .input_stream(StreamKind::OrderBook)
+        .input_stream(StreamKind::Tick)
+        .aux_streams(AUX_ORDERBOOK)
         .output_kind(IndicatorValueKind::Triple)
         .requires_l2()
         .alias("TradeBookAbsorption")
@@ -464,7 +469,8 @@ pub fn signature_sweep_impact_analyzer() -> IndicatorSignature {
         .metadata("interpretation", "levels_swept ≥ 2 = real sweep; slippage = price distance from best to last level")
         .machine_id(BarIndicatorId::SweepImpactAnalyzer)
         .role_kind(IndicatorRoleKind::Pattern)
-        .input_stream(StreamKind::OrderBook)
+        .input_stream(StreamKind::Tick)
+        .aux_streams(AUX_ORDERBOOK)
         .output_kind(IndicatorValueKind::Triple)
         .requires_l2()
         .alias("SweepImpactAnalyzer")
