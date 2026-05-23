@@ -1990,107 +1990,114 @@ async fn main() -> Result<()> {
 
     let interval_1m = KlineInterval::new("1m");
 
+    // Auto-pick live ATM Deribit options. Weekly options expire every Friday
+    // so the hardcoded instrument-name strings rot fast — query Deribit REST
+    // at startup for the next-out-but-still-multiday expiry and grab strikes
+    // around current BTC index price.
+    let deribit_strikes = pick_deribit_atm_strikes().await
+        .unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "Deribit ATM picker failed — using empty list");
+            Vec::new()
+        });
+    if !deribit_strikes.is_empty() {
+        tracing::info!("Deribit ATM picker resolved: {:?}", deribit_strikes);
+    }
+
     // Per-stream subscribe with best-effort fallback: some (exchange, stream)
     // combos eagerly return NotSupported (e.g. Binance OI WS, BingX OI WS).
     // We try each individually and merge into one handle's stream of events
     // via a single multi-add SubscriptionSet — but if even one fails the
     // whole subscribe() fails. So we do N tiny one-stream subscribes and
     // collect handles.
-    let combos: &[(ExchangeId, AccountType, &str, Stream)] = &[
+    let mut combos: Vec<(ExchangeId, AccountType, String, Stream)> = vec![
         // Core 9 streams on Binance + Bybit FuturesCross — well-covered indicators
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Trade),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::AggTrade),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Kline(interval_1m.clone())),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Ticker),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Orderbook),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::OrderbookDelta),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPrice),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::FundingRate),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::Liquidation),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Trade),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::AggTrade),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Kline(interval_1m.clone())),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Ticker),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Orderbook),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::OrderbookDelta),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPrice),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::FundingRate),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::Liquidation),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::OpenInterest),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Trade),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::AggTrade),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Kline(interval_1m.clone())),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Ticker),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Orderbook),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::OrderbookDelta),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::MarkPrice),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::FundingRate),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Liquidation),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Trade),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::AggTrade),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Kline(interval_1m.clone())),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Ticker),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Orderbook),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::OrderbookDelta),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::MarkPrice),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::FundingRate),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Liquidation),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::OpenInterest),
         // Secondary symbol (ETHUSDT) for cross-asset events
-        // (CrossAssetBeta, PairsCointegrationProxy, RelativeStrengthCross).
-        // Validator routes Bar events with symbol == "ETHUSDT" to
-        // EventInstance::update_secondary_bar() instead of update_bar().
-        (ExchangeId::Binance, AccountType::FuturesCross, "ETHUSDT", Stream::Kline(interval_1m.clone())),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "ETHUSDT", Stream::Kline(interval_1m.clone())),
-        // Extended streams — targeted at exchanges whose dig3 protocol.rs
-        // actually declares topic-registry entries for that StreamKind.
-        //
-        // Deribit (Options + Futures perpetual). Instrument names must point at
-        // live options — Deribit weeklies expire every Friday so update the
-        // 25MAY26 tag below when the expiry passes. Multiple strikes are
-        // subscribed because greeks updates are sparse on a single illiquid
-        // strike; ATM ± a few strikes gives the validator a reasonable shot at
-        // catching events inside a 60s slice.
-        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-76000-C", Stream::OptionGreeks),
-        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-75000-C", Stream::OptionGreeks),
-        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-77000-C", Stream::OptionGreeks),
-        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-76000-P", Stream::OptionGreeks),
-        // VolatilityIndex/IndexPrice/BlockTrade are venue-wide, single subscription is enough.
-        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-76000-C", Stream::VolatilityIndex),
-        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-76000-C", Stream::BlockTrade),
-        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-76000-C", Stream::IndexPrice),
+        (ExchangeId::Binance, AccountType::FuturesCross, "ETHUSDT".into(), Stream::Kline(interval_1m.clone())),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "ETHUSDT".into(), Stream::Kline(interval_1m.clone())),
         // OKX FuturesCross
-        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::OptionGreeks),
-        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::BlockTrade),
-        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
-        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPriceKline(interval_1m.clone())),
-        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPriceKline(interval_1m.clone())),
-        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::SettlementEvent),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::OptionGreeks),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::BlockTrade),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPrice),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPriceKline(interval_1m.clone())),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::MarkPriceKline(interval_1m.clone())),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::SettlementEvent),
         // Binance FuturesCross — index/composite kline family
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::CompositeIndex),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPriceKline(interval_1m.clone())),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPriceKline(interval_1m.clone())),
-        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT", Stream::PremiumIndexKline(interval_1m.clone())),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPrice),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::CompositeIndex),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPriceKline(interval_1m.clone())),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::MarkPriceKline(interval_1m.clone())),
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::PremiumIndexKline(interval_1m.clone())),
         // Bybit — risk + insurance
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::InsuranceFund),
-        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT", Stream::RiskLimit),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::InsuranceFund),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::RiskLimit),
         // GateIO
-        (ExchangeId::GateIO, AccountType::FuturesCross, "BTCUSDT", Stream::MarkPriceKline(interval_1m.clone())),
+        (ExchangeId::GateIO, AccountType::FuturesCross, "BTCUSDT".into(), Stream::MarkPriceKline(interval_1m.clone())),
         // Hyperliquid
-        (ExchangeId::HyperLiquid, AccountType::FuturesCross, "BTC", Stream::IndexPrice),
-        (ExchangeId::HyperLiquid, AccountType::FuturesCross, "BTC", Stream::MarketWarning),
+        (ExchangeId::HyperLiquid, AccountType::FuturesCross, "BTC".into(), Stream::IndexPrice),
+        (ExchangeId::HyperLiquid, AccountType::FuturesCross, "BTC".into(), Stream::MarketWarning),
         // HTX
-        (ExchangeId::HTX, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
-        (ExchangeId::HTX, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPriceKline(interval_1m.clone())),
+        (ExchangeId::HTX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPrice),
+        (ExchangeId::HTX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPriceKline(interval_1m.clone())),
         // Index-price only
-        (ExchangeId::Bitget, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
-        (ExchangeId::KuCoin, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
-        (ExchangeId::MEXC, AccountType::FuturesCross, "BTCUSDT", Stream::IndexPrice),
+        (ExchangeId::Bitget, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPrice),
+        (ExchangeId::KuCoin, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPrice),
+        (ExchangeId::MEXC, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPrice),
     ];
+
+    // Deribit options — instrument names resolved at startup via REST helper,
+    // so the validator survives the weekly Friday expiry without code edits.
+    // VolatilityIndex/BlockTrade/IndexPrice are venue-wide on Deribit but the
+    // subscribe API still wants an instrument name as the symbol slot, so we
+    // reuse the first picked strike.
+    if let Some(first_strike) = deribit_strikes.first().cloned() {
+        for strike in &deribit_strikes {
+            combos.push((ExchangeId::Deribit, AccountType::Options, strike.clone(), Stream::OptionGreeks));
+        }
+        combos.push((ExchangeId::Deribit, AccountType::Options, first_strike.clone(), Stream::VolatilityIndex));
+        combos.push((ExchangeId::Deribit, AccountType::Options, first_strike.clone(), Stream::BlockTrade));
+        combos.push((ExchangeId::Deribit, AccountType::Options, first_strike, Stream::IndexPrice));
+    }
 
     let mut handles: Vec<_> = Vec::new();
     let mut total_failed = 0usize;
-    for (exch, acct, sym, stream) in combos {
+    for (exch, acct, sym, stream) in &combos {
         // Use add_raw for exchange-native instrument IDs that don't fit
         // canonical BASE-QUOTE shape (e.g. Deribit options).
         let single = if matches!(exch, ExchangeId::Deribit) {
-            SubscriptionSet::new().add_raw(*exch, *sym, *acct, [stream.clone()])
+            SubscriptionSet::new().add_raw(*exch, sym.as_str(), *acct, [stream.clone()])
         } else {
-            SubscriptionSet::new().add(*exch, *sym, *acct, [stream.clone()])
+            SubscriptionSet::new().add(*exch, sym.as_str(), *acct, [stream.clone()])
         };
         match station.subscribe(single).await {
             Ok(report) => {
                 for f in &report.failed {
                     total_failed += 1;
-                    tracing::warn!(?exch, ?acct, sym = sym, ?stream, reason = ?f, "per-stream subscribe failed");
+                    tracing::warn!(?exch, ?acct, sym = sym.as_str(), ?stream, reason = ?f, "per-stream subscribe failed");
                 }
                 if !report.ok.is_empty() {
                     handles.push(report.handle);
                 }
             }
-            Err(e) => tracing::warn!(?exch, ?acct, sym = sym, ?stream, error = %e, "subscribe call errored"),
+            Err(e) => tracing::warn!(?exch, ?acct, sym = sym.as_str(), ?stream, error = %e, "subscribe call errored"),
         }
     }
     tracing::info!("Subscribe pass complete: {} live handles, {} per-stream failures", handles.len(), total_failed);
@@ -2616,4 +2623,75 @@ async fn main() -> Result<()> {
     println!("Report written to {report_path}");
 
     Ok(())
+}
+
+/// Query Deribit public REST for the next-out-but-still-multiday weekly
+/// expiry and return 4 ATM BTC option instrument names (calls + puts around
+/// current index price). Returns empty Vec on any network/parse error — the
+/// caller logs and proceeds without Deribit subscriptions in that case.
+///
+/// Why: Deribit weeklies expire every Friday at 13:00 UTC. Hardcoded names
+/// like "BTC-25MAY26-76000-C" go stale within a week. Picking at startup
+/// keeps the validator running indefinitely without code edits.
+async fn pick_deribit_atm_strikes() -> Result<Vec<String>, anyhow::Error> {
+    use serde_json::Value;
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()?;
+
+    // Current BTC index from Deribit (same source the options are priced against).
+    let idx_resp: Value = client
+        .get("https://www.deribit.com/api/v2/public/get_index_price?index_name=btc_usd")
+        .send().await?.json().await?;
+    let spot = idx_resp.pointer("/result/index_price")
+        .and_then(|v| v.as_f64())
+        .ok_or_else(|| anyhow::anyhow!("Deribit index_price missing"))?;
+
+    // All live BTC option instruments.
+    let inst_resp: Value = client
+        .get("https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false")
+        .send().await?.json().await?;
+    let instruments = inst_resp.pointer("/result")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow::anyhow!("Deribit get_instruments: result missing"))?;
+
+    // Group by expiry. Skip the earliest one (it expires in hours — greeks die fast).
+    let mut by_expiry: std::collections::BTreeMap<i64, Vec<&Value>> = std::collections::BTreeMap::new();
+    for inst in instruments {
+        let exp = inst.pointer("/expiration_timestamp").and_then(|v| v.as_i64());
+        if let Some(ts) = exp { by_expiry.entry(ts).or_default().push(inst); }
+    }
+    let expiries: Vec<i64> = by_expiry.keys().copied().collect();
+    if expiries.is_empty() { return Ok(Vec::new()); }
+
+    // Prefer the second-earliest expiry (gives a few days of liquidity); fall
+    // back to first if only one exists.
+    let target_expiry = expiries.get(1).copied().unwrap_or(expiries[0]);
+    let pool = &by_expiry[&target_expiry];
+
+    // Round spot down to nearest standard strike grid (Deribit uses 500-USD
+    // grid near ATM on BTC). Pick ATM ± 1 grid step on both call and put.
+    let atm = (spot / 500.0).round() * 500.0;
+    let wanted_strikes: [(f64, &str); 4] = [
+        (atm,         "C"),
+        (atm + 500.0, "C"),
+        (atm - 500.0, "C"),
+        (atm,         "P"),
+    ];
+
+    let mut out: Vec<String> = Vec::new();
+    for (strike, kind) in wanted_strikes {
+        let hit = pool.iter().find(|inst| {
+            inst.pointer("/strike").and_then(|v| v.as_f64()) == Some(strike)
+                && inst.pointer("/option_type").and_then(|v| v.as_str())
+                    == Some(if kind == "C" { "call" } else { "put" })
+        });
+        if let Some(inst) = hit {
+            if let Some(name) = inst.pointer("/instrument_name").and_then(|v| v.as_str()) {
+                out.push(name.to_string());
+            }
+        }
+    }
+    Ok(out)
 }
