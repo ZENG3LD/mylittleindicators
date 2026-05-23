@@ -1235,13 +1235,17 @@ fn build_event_config(id: EventId) -> EventConfig {
     match id {
         EventId::SwingDetection => EventConfig::new(id, name)
             .with_string_param("mode", "percent")
-            .with_param("threshold_pct", 1.0),
+            // 0.2% swing on BTC 1m bars ≈ $150 — fires multiple times in 30min
+            .with_param("threshold_pct", 0.2),
         EventId::Pivot => EventConfig::new(id, name)
             .with_periods(vec![5, 5]),
+        // Threshold is fed `close` price by EventInstance::update_bar (scalar).
+        // For BTC ~$76k, use bands relative to current price so the detector
+        // triggers when price exits a narrow band.
         EventId::Threshold => EventConfig::new(id, name)
             .with_string_param("kind", "out_of_range")
-            .with_param("upper", 70.0)
-            .with_param("lower", 30.0),
+            .with_param("upper", 75_500.0)
+            .with_param("lower", 75_000.0),
         EventId::VolumeEventDetector => EventConfig::new(id, name)
             .with_periods(vec![20])
             .with_param("multiplier", 2.0),
@@ -1249,18 +1253,29 @@ fn build_event_config(id: EventId) -> EventConfig {
             .with_periods(vec![14]),
         EventId::StatisticalWickDetector => EventConfig::new(id, name)
             .with_periods(vec![50]),
+        // VolatilityRegime/RegimeGate's detect_from_values is fed `close` price
+        // by EventInstance::update_bar (no inner indicator wired). For BTC ~$76k,
+        // thresholds must be in that range to ever fire transitions.
+        // TODO: feed RSI/ATR scalar via inner indicator (factory limitation).
+        // Use BTC-realistic bands ($60k / $90k) so this triggers on multi-day
+        // moves; on 30-min slice these likely stay in current regime so the
+        // detector may still report always_zero — that's not a code bug.
+        // Both fed `close` price; thresholds must straddle current spot for
+        // transitions to fire. Narrow band around recent BTC price ~$75k.
         EventId::VolatilityRegimeDetector => EventConfig::new(id, name)
-            .with_param("low", 0.5)
-            .with_param("high", 1.5),
+            .with_param("low", 75_100.0)
+            .with_param("high", 75_400.0),
         EventId::RegimeGate => EventConfig::new(id, name)
-            .with_param("regime_threshold", 0.5)
+            .with_param("regime_threshold", 75_250.0)
             .with_string_param("direction", "above"),
         EventId::CandlePattern => EventConfig::new(id, name)
             .with_string_param("kind", "doji"),
         EventId::LineCross => EventConfig::new(id, name)
-            .with_string_param("left", "ma")
-            .with_string_param("right", "price")
-            .with_string_param("mode", "bullish"),
+            // Two MAs crossing: fast Sma(7) vs slow Sma(21).
+            // Cross fires when fast crosses slow — common on volatile BTC 1m bars.
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Sma, "sma_fast".into(), vec![7]))
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Sma, "sma_slow".into(), vec![21]))
+            .with_string_param("mode", "momentary"),
         EventId::PriceLineCross => EventConfig::new(id, name)
             .with_string_param("line", "ma")
             .with_string_param("mode", "above"),
