@@ -2026,11 +2026,20 @@ async fn main() -> Result<()> {
         // Extended streams — targeted at exchanges whose dig3 protocol.rs
         // actually declares topic-registry entries for that StreamKind.
         //
-        // Deribit (Options + Futures perpetual)
-        (ExchangeId::Deribit, AccountType::Options, "BTC-23MAY26-86000-C", Stream::OptionGreeks),
-        (ExchangeId::Deribit, AccountType::Options, "BTC-23MAY26-86000-C", Stream::VolatilityIndex),
-        (ExchangeId::Deribit, AccountType::Options, "BTC-23MAY26-86000-C", Stream::BlockTrade),
-        (ExchangeId::Deribit, AccountType::Options, "BTC-23MAY26-86000-C", Stream::IndexPrice),
+        // Deribit (Options + Futures perpetual). Instrument names must point at
+        // live options — Deribit weeklies expire every Friday so update the
+        // 25MAY26 tag below when the expiry passes. Multiple strikes are
+        // subscribed because greeks updates are sparse on a single illiquid
+        // strike; ATM ± a few strikes gives the validator a reasonable shot at
+        // catching events inside a 60s slice.
+        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-76000-C", Stream::OptionGreeks),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-75000-C", Stream::OptionGreeks),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-77000-C", Stream::OptionGreeks),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-76000-P", Stream::OptionGreeks),
+        // VolatilityIndex/IndexPrice/BlockTrade are venue-wide, single subscription is enough.
+        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-76000-C", Stream::VolatilityIndex),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-76000-C", Stream::BlockTrade),
+        (ExchangeId::Deribit, AccountType::Options, "BTC-25MAY26-76000-C", Stream::IndexPrice),
         // OKX FuturesCross
         (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::OptionGreeks),
         (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT", Stream::BlockTrade),
