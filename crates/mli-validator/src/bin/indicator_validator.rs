@@ -490,6 +490,14 @@ impl IndicatorState {
             BarIndicatorId::Vpin => {
                 vec![("bucket_size", 10.0), ("smoothing_window", 8.0)]
             }
+            // LargeTickMomentum default size_threshold = 1.0 BTC; most retail
+            // ticks on BTC perps are < 0.1, so the indicator's "large tick"
+            // event ring stays empty and is_ready() never flips. Lower the
+            // threshold to 0.05 so the validator can observe real momentum
+            // values without distorting the indicator's intent.
+            BarIndicatorId::LargeTickMomentum => {
+                vec![("size_threshold", 0.05)]
+            }
             _ => Vec::new(),
         }
     }
