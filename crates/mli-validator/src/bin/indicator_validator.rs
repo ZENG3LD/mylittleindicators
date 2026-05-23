@@ -478,11 +478,20 @@ impl IndicatorState {
             // CusumFilter threshold (factory default ~0.01 = 1% cumulative return)
             // Lower to 0.003 (0.3%) — common per-bar BTC log-return scale.
             BarIndicatorId::Cusum | BarIndicatorId::StCusum => {
-                vec![("threshold", 0.003)]
+                // 0.0005 ≈ 5 bps cumulative — fires several times per hour on
+                // BTC 1m bars during normal volatility.
+                vec![("threshold", 0.0005)]
             }
-            // BpCusum — kappa/threshold pair (test fixture: threshold=0.05, kappa=0.95)
+            // BpCusum — kappa/threshold pair. Default threshold=0.05 takes
+            // hours to accumulate; lower so it can flip inside a 60s slice.
             BarIndicatorId::BpCusum => {
-                vec![("threshold", 0.05), ("kappa", 0.95)]
+                vec![("threshold", 0.005), ("kappa", 0.95)]
+            }
+            // Thresh and Hyst gate on internal RSI(14); default 30/70 band is
+            // industry-standard but RSI rarely exits 30..70 on a calm 60s
+            // slice. Widen to 40/60 so transitions fire.
+            BarIndicatorId::Thresh | BarIndicatorId::Hyst => {
+                vec![("lower", 40.0), ("upper", 60.0)]
             }
             // Vpin — smaller smoothing_window so VPIN reports ready within a
             // 60s validator slice on 1m bars (default 50 is too large for our
