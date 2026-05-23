@@ -365,7 +365,7 @@ impl CamarillaPivots {
     pub fn strongest_level(&self) -> Option<String> {
         self.level_touches
             .iter()
-            .max_by_key(|(_, &count)| count)
+            .max_by_key(|&(_, &count)| count)
             .map(|(name, _)| name.clone())
     }
     

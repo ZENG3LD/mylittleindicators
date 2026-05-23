@@ -20,10 +20,16 @@ env/
 data/
 
 # Agent artifacts (internal, not public)
-docs/research/
+docs/
 CLAUDE.md
 .nemo-service.toml
 .claude/
+
+# Validator runtime artifacts
+crates/mli-validator/validator_*.log
+crates/mli-validator/validator_*.json
+crates/mli-validator/validator_data/
+crates/mli-validator/validator_report.json
 
 # OS
 .DS_Store

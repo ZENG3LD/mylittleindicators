@@ -137,7 +137,7 @@ impl DonchianChannel {
                 },
                 DonchianMode::Smoothed => {
                     // Сглаженный режим - применяем MA к уровням каналов
-                    if let (Some(ref mut upper_ma), Some(ref mut lower_ma), Some(ref mut middle_ma)) =
+                    if let (Some(upper_ma), Some(lower_ma), Some(middle_ma)) =
                         (&mut self.upper_ma, &mut self.lower_ma, &mut self.middle_ma) {
 
                         // ✅ Обновляем MA для каждого уровня (передаем значение как close)

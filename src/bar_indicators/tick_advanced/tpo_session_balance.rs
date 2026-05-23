@@ -64,7 +64,7 @@ impl TpoSessionBalance {
 
         let (&poc_bucket, &max_count) = counts
             .iter()
-            .max_by_key(|(_, &c)| c)
+            .max_by_key(|&(_, &c)| c)
             .unwrap(); // safe: non-empty
 
         let balance_price = poc_bucket as f64 * self.price_bucket + self.price_bucket / 2.0;

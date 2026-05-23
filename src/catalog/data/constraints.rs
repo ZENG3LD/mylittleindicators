@@ -281,7 +281,7 @@ impl fmt::Display for ParamConstraint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.name, self.param_type)?;
 
-        if let (Some(ref min), Some(ref max)) = (&self.min, &self.max) {
+        if let (Some(min), Some(max)) = (&self.min, &self.max) {
             write!(f, " [{}, {}]", min, max)?;
         } else if let Some(ref min) = self.min {
             write!(f, " [{}, ∞)", min)?;

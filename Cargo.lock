@@ -360,9 +360,7 @@ dependencies = [
 
 [[package]]
 name = "digdigdig3"
-version = "0.3.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c19f5e8e5521c4ef19c0c874c3a42c594b02ebd928f1a8f79a6e06d24e7ef27e"
+version = "0.3.9"
 dependencies = [
  "async-trait",
  "base64",
@@ -2970,7 +2968,3 @@ name = "zmij"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
-
-[[patch.unused]]
-name = "digdigdig3"
-version = "0.3.9"

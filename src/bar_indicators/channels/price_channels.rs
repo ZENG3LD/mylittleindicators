@@ -154,7 +154,7 @@ impl PriceChannels {
 
     /// Рассчитать сглаженные каналы
     fn calculate_smoothed_channels(&mut self, _current_high: f64, _current_low: f64) {
-        if let (Some(ref mut ma_high), Some(ref mut ma_low)) = (&mut self.ma_high, &mut self.ma_low) {
+        if let (Some(ma_high), Some(ma_low)) = (&mut self.ma_high, &mut self.ma_low) {
             // Получаем текущие max/min для периода
             let buffer_len = if self.buffer_filled { self.period } else { self.high_buffer.len() };
 
@@ -228,7 +228,7 @@ impl PriceChannels {
         match self.mode {
             PriceChannelMode::Raw => self.buffer_filled,
             PriceChannelMode::Smoothed => {
-                if let (Some(ref ma_high), Some(ref ma_low)) = (&self.ma_high, &self.ma_low) {
+                if let (Some(ma_high), Some(ma_low)) = (&self.ma_high, &self.ma_low) {
                     self.buffer_filled && ma_high.is_ready() && ma_low.is_ready()
                 } else {
                     self.buffer_filled
