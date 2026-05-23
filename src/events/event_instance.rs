@@ -33,7 +33,7 @@ use super::event_id::EventId;
 /// Enum wrapper around every event/detector primitive.
 ///
 /// All variants are `Box<T>` to keep the enum size small.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum EventInstance {
     BosEventDetector(Box<BosEventDetector>),
     CandlePattern(Box<CandlePatternDetector>),
@@ -59,10 +59,13 @@ pub enum EventInstance {
     RelativeStrengthCross(Box<RelativeStrengthCross>),
     StatisticalWickDetector(Box<StatisticalWickDetector>),
     SwingDetection(Box<SwingDetection>),
-    /// Threshold operates on a scalar; `update_bar` feeds close price.
-    Threshold(Box<Threshold>),
-    /// VolatilityRegimeDetector operates on a scalar; `update_bar` feeds close price.
-    VolatilityRegimeDetector(Box<VolatilityRegimeDetector>),
+    /// Threshold operates on a scalar; `update_bar` feeds close price (or the
+    /// inner indicator's main scalar when one is configured).
+    Threshold(Box<Threshold>, Option<Box<IndicatorInstance>>),
+    /// VolatilityRegimeDetector operates on a scalar; `update_bar` feeds close
+    /// (or the inner indicator's main scalar when one is configured — typically
+    /// an ATR/StdDev so thresholds match the indicator's natural scale).
+    VolatilityRegimeDetector(Box<VolatilityRegimeDetector>, Option<Box<IndicatorInstance>>),
     /// VolumeEventDetector operates on volume; `update_bar` feeds volume parameter.
     VolumeEventDetector(Box<VolumeEventDetector>),
 }
@@ -232,14 +235,22 @@ impl EventInstance {
                 let kind_str = config.str_param_or("kind", "above");
                 let kind = parse_threshold_kind(kind_str)
                     .ok_or_else(|| format!("unknown ThresholdKind: {kind_str}"))?;
-                Ok(Self::Threshold(Box::new(Threshold::new(kind, upper, lower))))
+                let inner = match config.inner_indicators.first() {
+                    Some(cfg) => Some(Box::new(IndicatorInstance::create(cfg)?)),
+                    None => None,
+                };
+                Ok(Self::Threshold(Box::new(Threshold::new(kind, upper, lower)), inner))
             }
 
             // ── VolatilityRegimeDetector ─────────────────────────────────────
             EventId::VolatilityRegimeDetector => {
                 let low = config.param_or("low_threshold", 0.5);
                 let high = config.param_or("high_threshold", 1.5);
-                Ok(Self::VolatilityRegimeDetector(Box::new(VolatilityRegimeDetector::new(low, high))))
+                let inner = match config.inner_indicators.first() {
+                    Some(cfg) => Some(Box::new(IndicatorInstance::create(cfg)?)),
+                    None => None,
+                };
+                Ok(Self::VolatilityRegimeDetector(Box::new(VolatilityRegimeDetector::new(low, high)), inner))
             }
 
             // ── VolumeEventDetector ──────────────────────────────────────────
@@ -345,17 +356,37 @@ impl EventInstance {
                 let v = d.update_bar(open, high, low, close, volume);
                 IndicatorValue::Single(v)
             }
-            Self::Threshold(d) => {
-                // Threshold operates on a scalar value; use close price.
-                match d.detect_from_values(close) {
+            Self::Threshold(d, inner) => {
+                // Optional inner indicator (e.g. RSI) normalizes raw close into
+                // a scalar whose range matches the configured upper/lower band.
+                // Without an inner, fall back to feeding raw close directly.
+                let scalar = match inner.as_deref_mut() {
+                    Some(ind) => {
+                        let v = ind.update_bar(open, high, low, close, volume, None);
+                        if !ind.is_ready() { return IndicatorValue::Signal(0); }
+                        v.main()
+                    }
+                    None => close,
+                };
+                match d.detect_from_values(scalar) {
                     Some((_, crate::core::signal::direction::Direction::Up)) => IndicatorValue::Signal(1),
                     Some((_, crate::core::signal::direction::Direction::Down)) => IndicatorValue::Signal(-1),
                     _ => IndicatorValue::Signal(0),
                 }
             }
-            Self::VolatilityRegimeDetector(d) => {
-                // VolatilityRegimeDetector expects ATR/StdDev; use close as fallback scalar.
-                match d.detect_from_values(close) {
+            Self::VolatilityRegimeDetector(d, inner) => {
+                // Optional inner indicator (e.g. ATR) provides the natural
+                // volatility scalar; without it we'd compare raw close to
+                // tiny thresholds which never calibrate across spot drift.
+                let scalar = match inner.as_deref_mut() {
+                    Some(ind) => {
+                        let v = ind.update_bar(open, high, low, close, volume, None);
+                        if !ind.is_ready() { return IndicatorValue::Signal(0); }
+                        v.main()
+                    }
+                    None => close,
+                };
+                match d.detect_from_values(scalar) {
                     Some((_, crate::core::signal::direction::Direction::Up)) => IndicatorValue::Signal(1),
                     Some((_, crate::core::signal::direction::Direction::Down)) => IndicatorValue::Signal(-1),
                     _ => IndicatorValue::Signal(0),
@@ -392,8 +423,8 @@ impl EventInstance {
             Self::RelativePosition(d) => d.value(),
             Self::StatisticalWickDetector(d) => d.value(),
             Self::SwingDetection(d) => d.value(),
-            Self::Threshold(_) => IndicatorValue::Signal(0),
-            Self::VolatilityRegimeDetector(_) => IndicatorValue::Signal(0),
+            Self::Threshold(_, _) => IndicatorValue::Signal(0),
+            Self::VolatilityRegimeDetector(_, _) => IndicatorValue::Signal(0),
             Self::VolumeEventDetector(_) => IndicatorValue::Signal(0),
         }
     }
@@ -419,8 +450,8 @@ impl EventInstance {
             Self::RelativePosition(d) => d.is_ready(),
             Self::StatisticalWickDetector(d) => d.is_ready(),
             Self::SwingDetection(d) => d.is_ready(),
-            Self::Threshold(_) => true,
-            Self::VolatilityRegimeDetector(_) => true,
+            Self::Threshold(_, inner) => inner.as_deref().map(|i| i.is_ready()).unwrap_or(true),
+            Self::VolatilityRegimeDetector(_, inner) => inner.as_deref().map(|i| i.is_ready()).unwrap_or(true),
             Self::VolumeEventDetector(_) => true,
         }
     }
@@ -446,8 +477,8 @@ impl EventInstance {
             Self::RelativePosition(d) => d.reset(),
             Self::StatisticalWickDetector(d) => d.reset(),
             Self::SwingDetection(d) => d.reset(),
-            Self::Threshold(d) => d.reset(),
-            Self::VolatilityRegimeDetector(d) => d.reset(),
+            Self::Threshold(d, inner) => { d.reset(); if let Some(i) = inner.as_deref_mut() { i.reset(); } }
+            Self::VolatilityRegimeDetector(d, inner) => { d.reset(); if let Some(i) = inner.as_deref_mut() { i.reset(); } }
             Self::VolumeEventDetector(d) => d.reset(),
         }
     }
@@ -471,6 +502,41 @@ impl EventInstance {
             Self::RelativeStrengthCross(x) => { x.update_secondary_price(close, ts_ms); }
             _ => {}
         }
+    }
+}
+
+impl std::fmt::Debug for EventInstance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // IndicatorInstance does not implement Debug, so we elide inner indicator
+        // contents and emit only the variant name + a hint when an inner is set.
+        let name = match self {
+            Self::BosEventDetector(_) => "BosEventDetector",
+            Self::CandlePattern(_) => "CandlePattern",
+            Self::Confluence(_) => "Confluence",
+            Self::CrossAssetBeta(_) => "CrossAssetBeta",
+            Self::DirectionDetector(_) => "DirectionDetector",
+            Self::Divergence(_) => "Divergence",
+            Self::FvgEventDetector(_) => "FvgEventDetector",
+            Self::PairsCointegrationProxy(_) => "PairsCointegrationProxy",
+            Self::LineCross(_) => "LineCross",
+            Self::OscillatorWithDivergence(_) => "OscillatorWithDivergence",
+            Self::OscillatorWithVolumeWeight(_) => "OscillatorWithVolumeWeight",
+            Self::Pivot(_) => "Pivot",
+            Self::PriceLineCross(_) => "PriceLineCross",
+            Self::RegimeGate(_) => "RegimeGate",
+            Self::RelativePosition(_) => "RelativePosition",
+            Self::RelativeStrengthCross(_) => "RelativeStrengthCross",
+            Self::StatisticalWickDetector(_) => "StatisticalWickDetector",
+            Self::SwingDetection(_) => "SwingDetection",
+            Self::Threshold(_, inner) => {
+                return write!(f, "Threshold {{ inner: {} }}", if inner.is_some() { "yes" } else { "no" });
+            }
+            Self::VolatilityRegimeDetector(_, inner) => {
+                return write!(f, "VolatilityRegimeDetector {{ inner: {} }}", if inner.is_some() { "yes" } else { "no" });
+            }
+            Self::VolumeEventDetector(_) => "VolumeEventDetector",
+        };
+        f.write_str(name)
     }
 }
 

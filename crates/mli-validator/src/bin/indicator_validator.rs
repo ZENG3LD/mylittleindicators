@@ -1402,13 +1402,14 @@ fn build_event_config(id: EventId) -> EventConfig {
             .with_param("threshold_pct", 0.2),
         EventId::Pivot => EventConfig::new(id, name)
             .with_periods(vec![5, 5]),
-        // Threshold is fed `close` price by EventInstance::update_bar (scalar).
-        // For BTC ~$76k, use bands relative to current price so the detector
-        // triggers when price exits a narrow band.
+        // Threshold receives its scalar from an optional inner indicator now.
+        // Wire RSI(14) so the bands (30/70) sit on the RSI scale, fires whenever
+        // RSI exits the 30..70 band regardless of spot price.
         EventId::Threshold => EventConfig::new(id, name)
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Rsi, "rsi".into(), vec![14]))
             .with_string_param("kind", "out_of_range")
-            .with_param("upper", 75_500.0)
-            .with_param("lower", 75_000.0),
+            .with_param("upper", 70.0)
+            .with_param("lower", 30.0),
         EventId::VolumeEventDetector => EventConfig::new(id, name)
             .with_periods(vec![20])
             .with_param("multiplier", 2.0),
@@ -1416,18 +1417,14 @@ fn build_event_config(id: EventId) -> EventConfig {
             .with_periods(vec![14]),
         EventId::StatisticalWickDetector => EventConfig::new(id, name)
             .with_periods(vec![50]),
-        // VolatilityRegime/RegimeGate's detect_from_values is fed `close` price
-        // by EventInstance::update_bar (no inner indicator wired). For BTC ~$76k,
-        // thresholds must be in that range to ever fire transitions.
-        // TODO: feed RSI/ATR scalar via inner indicator (factory limitation).
-        // Use BTC-realistic bands ($60k / $90k) so this triggers on multi-day
-        // moves; on 30-min slice these likely stay in current regime so the
-        // detector may still report always_zero — that's not a code bug.
-        // Both fed `close` price; thresholds must straddle current spot for
-        // transitions to fire. Narrow band around recent BTC price ~$75k.
+        // VolatilityRegimeDetector now receives its scalar from ATR(14) via the
+        // optional inner indicator wrapper. ATR on BTC 1m bars typically sits in
+        // the 20..400 range; pick low=50/high=200 so transitions fire on any
+        // meaningful change in 1m realized vol.
         EventId::VolatilityRegimeDetector => EventConfig::new(id, name)
-            .with_param("low", 75_100.0)
-            .with_param("high", 75_400.0),
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Atr, "atr".into(), vec![14]))
+            .with_param("low_threshold", 50.0)
+            .with_param("high_threshold", 200.0),
         EventId::RegimeGate => EventConfig::new(id, name)
             .with_param("regime_threshold", 75_250.0)
             .with_string_param("direction", "above"),
