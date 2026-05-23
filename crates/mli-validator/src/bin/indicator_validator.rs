@@ -532,8 +532,10 @@ impl IndicatorState {
             // SpectralEntropyZ — FFT 256 + z 256 in factory.
             BarIndicatorId::Ser => Some(vec![64, 64]),
             // HigherMoments default 50 — fine. ArchLm default 50 — fine.
-            // TsSwings — short lookback is fine; default already 5 (warmup
-            // depends on actual swings, which is calibration on short window).
+            // TsSwings (SwingStop) needs lookback*2+1 strict-extremum bars +
+            // a clean swing; with look=5 on calm BTC tape no candidate ever
+            // passes the strict > test. Try look=2 — more candidates flip.
+            BarIndicatorId::TsSwings => Some(vec![2]),
             _ => None,
         }
     }
