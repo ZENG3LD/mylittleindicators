@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.1.3 — 2026-05-24
+
+100% event pass-rate (21/21) and expanded validator coverage. No
+public API surface changes; mli-core (the published crate) gains
+`Option<Box<IndicatorInstance>>` on `EventInstance::RegimeGate` to
+match the pattern shipped for `Threshold` + `VolatilityRegimeDetector`
+in 0.1.1.
+
+### Newly passing
+
+- `RegimeGate` event — accepts optional inner indicator via
+  `EventConfig.inner_indicators[0]`. When set, `update_bar` routes
+  through the inner first and feeds its `.value().main()` into
+  `detect_from_values`. Removes the spot-drift coupling where the gate
+  compared raw close (~77k BTC) to a constant `regime_threshold` and
+  almost never transitioned across the boundary. With Rsi(14) as inner
+  and threshold 50, the gate now fires on every RSI crossover.
+- Events: **21 / 21 = 100% pass** (was 20/21 in 0.1.2).
+
+### Validator coverage expansion (dev tool, not published)
+
+Previously the validator subscribed Liquidation / OpenInterest /
+FundingRate / MarkPrice on Binance + Bybit only — 2 of 12 venues that
+dig3 declares support these streams. Now subscribes 6+ venues per
+stream:
+
+- **Liquidation**: Binance + Bybit + OKX + Bitget + GateIO + HTX +
+  HyperLiquid, plus ETHUSDT on the three majors (8 subscriptions).
+- **OpenInterest**: + OKX + Bitget + HTX + GateIO + MEXC + Deribit +
+  HyperLiquid (Binance OI is REST-only — kept Bybit WS as primary).
+- **FundingRate**: + OKX + Bitget + HTX + GateIO + HyperLiquid.
+- **MarkPrice**: + OKX + Bitget + HTX + GateIO + Deribit.
+
+Many funding / OI / mark indicators that previously fed off a single
+venue now receive multi-venue events. Combined pass-rate stays ~89%
+on a 150s slice because the new indicators that flipped to pass are
+counter-balanced by the same wire-silent set (liquidation cascades,
+8h settlement transitions, option flow surges).
+
+### Documentation
+
+- README Status section refreshed: 12 verified venues, 89% combined,
+  21/21 events, mli-validator usage instructions.
+- Cargo.toml description enumerates all 27 supported stream kinds and
+  cites the 12-venue verification baseline.
+- AuctionEvent dropped from the documented StreamKind list (removed
+  upstream in dig3 0.3.10).
+
 ## 0.1.2 — 2026-05-24
 
 Consumes dig3 0.3.10 (BitMEX + Bitstamp connectors, polling/derived
