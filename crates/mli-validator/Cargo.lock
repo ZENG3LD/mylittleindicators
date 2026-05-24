@@ -383,7 +383,7 @@ dependencies = [
 
 [[package]]
 name = "digdigdig3"
-version = "0.3.9"
+version = "0.3.10"
 dependencies = [
  "async-trait",
  "base64",
@@ -422,7 +422,7 @@ dependencies = [
 
 [[package]]
 name = "digdigdig3-station"
-version = "0.3.9"
+version = "0.3.10"
 dependencies = [
  "async-trait",
  "bincode",

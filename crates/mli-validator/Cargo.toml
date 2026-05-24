@@ -12,7 +12,7 @@ path = "src/bin/indicator_validator.rs"
 
 [dependencies]
 mylittleindicators = { path = "../.." }
-digdigdig3 = "=0.3.9"
+digdigdig3 = "=0.3.10"
 digdigdig3-station = { path = "../../../digdigdig3/crates/digdigdig3-station" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

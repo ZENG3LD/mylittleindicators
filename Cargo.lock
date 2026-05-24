@@ -360,9 +360,9 @@ dependencies = [
 
 [[package]]
 name = "digdigdig3"
-version = "0.3.9"
+version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b7131373d9b0330a461a32e8649d40ca431d6f601b7d4d93aa863aa570ea197"
+checksum = "59324b9902ee23c4e2d0f61d47d9afcd99d636ee69212a35f8b77cb2832c9ee3"
 dependencies = [
  "async-trait",
  "base64",

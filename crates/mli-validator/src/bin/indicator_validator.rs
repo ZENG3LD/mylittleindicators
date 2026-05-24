@@ -27,7 +27,7 @@ use mylittleindicators::bar_indicators::{
 use mylittleindicators::catalog::{MasterEventCatalog, MasterIndicatorCatalog};
 use mylittleindicators::events::{EventConfig, EventId, EventInstance};
 use mylittleindicators::core::types::{
-    AggTrade, AuctionEvent, Basis, BlockTrade, CompositeIndex, FundingRate,
+    AggTrade, Basis, BlockTrade, CompositeIndex, FundingRate,
     FundingSettlement, HistoricalVolatility, IndexPrice, InsuranceFund,
     L3Action, Liquidation, MarkPrice, MarketWarning, OpenInterest, OptionGreeks,
     OrderBook, OrderBookLevel, OrderBookSide, OrderbookL3Event, PredictedFunding,
@@ -950,6 +950,24 @@ impl IndicatorState {
         }
     }
 
+    fn try_update_long_short_ratio(&mut self, lsr: &mylittleindicators::core::types::LongShortRatio) {
+        let inst = match &mut self.instance { Some(i) => i, None => return };
+        self.events_received += 1;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_long_short_ratio(lsr)));
+        match result {
+            Ok(val) => {
+                if !self.is_ready {
+                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
+                        self.is_ready = true;
+                        self.ready_at_event = Some(self.events_received);
+                    }
+                }
+                self.record_value(val);
+            }
+            Err(_) => { self.panic_count += 1; }
+        }
+    }
+
     fn try_update_basis(&mut self, b: &Basis) {
         let inst = match &mut self.instance { Some(i) => i, None => return };
         self.events_received += 1;
@@ -1022,23 +1040,8 @@ impl IndicatorState {
         }
     }
 
-    fn try_update_auction(&mut self, a: &AuctionEvent) {
-        let inst = match &mut self.instance { Some(i) => i, None => return };
-        self.events_received += 1;
-        let result = panic::catch_unwind(AssertUnwindSafe(|| inst.update_auction(a)));
-        match result {
-            Ok(val) => {
-                if !self.is_ready {
-                    if matches!(panic::catch_unwind(AssertUnwindSafe(|| inst.is_ready())), Ok(true)) {
-                        self.is_ready = true;
-                        self.ready_at_event = Some(self.events_received);
-                    }
-                }
-                self.record_value(val);
-            }
-            Err(_) => { self.panic_count += 1; }
-        }
-    }
+    // try_update_auction removed in dig3 0.3.10 (Event::AuctionEvent variant deleted).
+    // Auction indicators in mli stay catalogued but never receive events.
 
     fn try_update_market_warning(&mut self, w: &MarketWarning) {
         let inst = match &mut self.instance { Some(i) => i, None => return };
@@ -1758,8 +1761,22 @@ fn historical_volatility_point_to_core(
 }
 
 fn basis_point_to_core(p: &digdigdig3_station::data::BasisPoint) -> Basis {
+    // dig3 0.3.10: BasisPoint field renamed `basis` -> `value` (mark - index).
     Basis {
-        basis: p.basis,
+        basis: p.value,
+        timestamp: p.ts_ms,
+    }
+}
+
+fn long_short_ratio_point_to_core(
+    p: &digdigdig3_station::data::LongShortRatioPoint,
+) -> mylittleindicators::core::types::LongShortRatio {
+    mylittleindicators::core::types::LongShortRatio {
+        symbol: String::new(),
+        ratio_type: "global_account".to_string(),
+        long_ratio: p.long_pct,
+        short_ratio: p.short_pct,
+        ratio: Some(p.ratio),
         timestamp: p.ts_ms,
     }
 }
@@ -1791,16 +1808,6 @@ fn settlement_event_point_to_core(
     SettlementEvent {
         settlement_price: p.settlement_price,
         settlement_time: p.settlement_time,
-        timestamp: p.ts_ms,
-    }
-}
-
-fn auction_event_point_to_core(p: &digdigdig3_station::data::AuctionEventPoint) -> AuctionEvent {
-    AuctionEvent {
-        auction_id: p.auction_id.clone(),
-        indicative_price: p.indicative_price,
-        indicative_qty: p.indicative_qty,
-        state: p.state.clone(),
         timestamp: p.ts_ms,
     }
 }
@@ -2061,6 +2068,32 @@ async fn main() -> Result<()> {
         (ExchangeId::Bitget, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPrice),
         (ExchangeId::KuCoin, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPrice),
         (ExchangeId::MEXC, AccountType::FuturesCross, "BTCUSDT".into(), Stream::IndexPrice),
+        // ── dig3 0.3.10 new streams ──────────────────────────────────────
+        // BitMEX PredictedFunding — primary goal of bitmex/ module, via
+        // `instrument` WS channel on FuturesCross.
+        (ExchangeId::Bitmex, AccountType::FuturesCross, "XBTUSD".into(), Stream::PredictedFunding),
+        // LongShortRatio — polling layer in dig3-station, calls REST
+        // get_long_short_ratio_history. Available on Binance, Bybit, OKX.
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::LongShortRatio),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::LongShortRatio),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::LongShortRatio),
+        // Deribit HistoricalVolatility — REST polling via DeribitHvPoll. The
+        // symbol slot is passed verbatim to `get_historical_volatility(currency)`,
+        // so we must use the bare currency code ("BTC") here, not "BTC-PERPETUAL".
+        (ExchangeId::Deribit, AccountType::FuturesCross, "BTC".into(), Stream::HistoricalVolatility),
+        // Bitstamp OrderbookL3 — full L3 lifecycle via live_orders_* WS channel.
+        (ExchangeId::Bitstamp, AccountType::Spot, "btcusd".into(), Stream::OrderbookL3),
+        // Basis (derived: joins MarkPrice + IndexPrice; both already subscribed
+        // on Binance and OKX above, so dig3-station auto-spawns the joiner).
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Basis),
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Basis),
+        // FundingSettlement (derived: monitors FundingRate transitions across the
+        // 8h boundary; FundingRate already subscribed on Binance + Bybit above).
+        (ExchangeId::Binance, AccountType::FuturesCross, "BTCUSDT".into(), Stream::FundingSettlement),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "BTCUSDT".into(), Stream::FundingSettlement),
+        // OKX PredictedFunding (now emitted from funding-rate channel per dig3
+        // 0.3.10) — second source besides BitMEX for higher live-event odds.
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::PredictedFunding),
     ];
 
     // Deribit options — instrument names resolved at startup via REST helper,
@@ -2082,7 +2115,10 @@ async fn main() -> Result<()> {
     for (exch, acct, sym, stream) in &combos {
         // Use add_raw for exchange-native instrument IDs that don't fit
         // canonical BASE-QUOTE shape (e.g. Deribit options).
-        let single = if matches!(exch, ExchangeId::Deribit) {
+        // Some exchanges use venue-native symbol formats that the canonical
+        // BASE-QUOTE normalizer doesn't know about (Deribit options, BitMEX
+        // XBT prefix). Use add_raw for those — symbol passes through as-is.
+        let single = if matches!(exch, ExchangeId::Deribit | ExchangeId::Bitmex) {
             SubscriptionSet::new().add_raw(*exch, sym.as_str(), *acct, [stream.clone()])
         } else {
             SubscriptionSet::new().add(*exch, sym.as_str(), *acct, [stream.clone()])
@@ -2352,6 +2388,14 @@ async fn main() -> Result<()> {
                             }
                         }
                     }
+                    Event::LongShortRatio { point, .. } => {
+                        let lsr = long_short_ratio_point_to_core(point);
+                        for s in &mut states {
+                            if s.accepts(StreamKind::LongShortRatio) {
+                                s.try_update_long_short_ratio(&lsr);
+                            }
+                        }
+                    }
                     Event::InsuranceFund { point, .. } => {
                         let ins = insurance_fund_point_to_core(point);
                         for s in &mut states {
@@ -2376,14 +2420,9 @@ async fn main() -> Result<()> {
                             }
                         }
                     }
-                    Event::AuctionEvent { point, .. } => {
-                        let a = auction_event_point_to_core(point);
-                        for s in &mut states {
-                            if s.accepts(StreamKind::Auction) {
-                                s.try_update_auction(&a);
-                            }
-                        }
-                    }
+                    // Event::AuctionEvent removed in dig3 0.3.10 (no public
+                    // anonymous wire source exists). Auction indicators remain
+                    // in mli but receive no events.
                     Event::MarketWarning { point, .. } => {
                         let w = market_warning_point_to_core(point);
                         for s in &mut states {
