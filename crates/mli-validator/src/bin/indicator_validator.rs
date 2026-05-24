@@ -2098,6 +2098,44 @@ async fn main() -> Result<()> {
         // OKX PredictedFunding (now emitted from funding-rate channel per dig3
         // 0.3.10) — second source besides BitMEX for higher live-event odds.
         (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::PredictedFunding),
+        // ── Expanded Liquidation coverage ────────────────────────────────
+        // dig3 declares Liquidation on 12 exchanges (Binance/Bybit/Bitget/
+        // BitMEX/Deribit/GateIO/HTX/Hyperliquid/KuCoin/MEXC/OKX). Below we
+        // subscribe the busiest 6 venues × 2 symbols (BTC + ETH) — gives
+        // the validator a much wider chance of catching liquidations in
+        // any 60s slice. Bybit Liq is sparse on a single symbol (~1 per
+        // 2.1 min for BTCUSDT per dig3's own liq_capture test), so volume
+        // comes from cross-venue + ETH inclusion.
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Liquidation),
+        (ExchangeId::Bitget, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Liquidation),
+        (ExchangeId::GateIO, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Liquidation),
+        (ExchangeId::HTX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::Liquidation),
+        (ExchangeId::HyperLiquid, AccountType::FuturesCross, "BTC".into(), Stream::Liquidation),
+        (ExchangeId::Binance, AccountType::FuturesCross, "ETHUSDT".into(), Stream::Liquidation),
+        (ExchangeId::Bybit, AccountType::FuturesCross, "ETHUSDT".into(), Stream::Liquidation),
+        (ExchangeId::OKX, AccountType::FuturesCross, "ETHUSDT".into(), Stream::Liquidation),
+        // ── Expanded OpenInterest coverage ───────────────────────────────
+        // OI declared on 11 venues; Binance OI is REST-only (not WS), so
+        // primary WS sources are Bybit/OKX/Bitget/HTX/GateIO/MEXC/Deribit.
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::OpenInterest),
+        (ExchangeId::Bitget, AccountType::FuturesCross, "BTCUSDT".into(), Stream::OpenInterest),
+        (ExchangeId::HTX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::OpenInterest),
+        (ExchangeId::GateIO, AccountType::FuturesCross, "BTCUSDT".into(), Stream::OpenInterest),
+        (ExchangeId::MEXC, AccountType::FuturesCross, "BTCUSDT".into(), Stream::OpenInterest),
+        (ExchangeId::Deribit, AccountType::FuturesCross, "BTC-PERPETUAL".into(), Stream::OpenInterest),
+        (ExchangeId::HyperLiquid, AccountType::FuturesCross, "BTC".into(), Stream::OpenInterest),
+        // ── Expanded FundingRate coverage ────────────────────────────────
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::FundingRate),
+        (ExchangeId::Bitget, AccountType::FuturesCross, "BTCUSDT".into(), Stream::FundingRate),
+        (ExchangeId::HTX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::FundingRate),
+        (ExchangeId::GateIO, AccountType::FuturesCross, "BTCUSDT".into(), Stream::FundingRate),
+        (ExchangeId::HyperLiquid, AccountType::FuturesCross, "BTC".into(), Stream::FundingRate),
+        // ── Expanded MarkPrice coverage ──────────────────────────────────
+        (ExchangeId::OKX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::MarkPrice),
+        (ExchangeId::Bitget, AccountType::FuturesCross, "BTCUSDT".into(), Stream::MarkPrice),
+        (ExchangeId::HTX, AccountType::FuturesCross, "BTCUSDT".into(), Stream::MarkPrice),
+        (ExchangeId::GateIO, AccountType::FuturesCross, "BTCUSDT".into(), Stream::MarkPrice),
+        (ExchangeId::Deribit, AccountType::FuturesCross, "BTC-PERPETUAL".into(), Stream::MarkPrice),
     ];
 
     // Deribit options — instrument names resolved at startup via REST helper,
