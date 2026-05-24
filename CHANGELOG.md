@@ -1,5 +1,82 @@
 # Changelog
 
+## 0.1.2 — 2026-05-24
+
+Consumes dig3 0.3.10 (BitMEX + Bitstamp connectors, polling/derived
+stream layers, 7 new `Stream` variants wired into Station). Validator
+pass-rate up to ~89% combined on 150s BTC slice.
+
+### dig3 pin bump
+
+`digdigdig3 = "=0.3.9"` → `"=0.3.10"`. Picks up:
+- `Stream::LongShortRatio` (Binance/Bybit/OKX REST polling)
+- `Stream::HistoricalVolatility` (Deribit REST polling)
+- `Stream::Basis` derived (joins MarkPrice + IndexPrice)
+- `Stream::FundingSettlement` derived (monitors FundingRate transitions)
+- `Stream::PredictedFunding` (BitMEX `instrument` WS + OKX funding-rate)
+- `Stream::OrderbookL3` (Bitstamp `live_orders_*` WS, real wire path)
+- `BasisPoint` field rename `.basis` → `.value` (mark − index)
+- `Stream::AuctionEvent` removed upstream (no public anonymous wire
+  source exists)
+
+### Newly passing indicators (live-verified on 150s slice)
+
+| Indicator                  | Stream                | Last value example       |
+|----------------------------|-----------------------|--------------------------|
+| `LongShortRatioMomentum`   | LongShortRatio        | `Single(-0.0004)`        |
+| `HvMomentum`               | HistoricalVolatility  | `Single(0.00477)`        |
+| `L3OrderRate`              | OrderbookL3 (Bitstamp)| `Single(9.3)` orders/sec |
+| `L3LargeOrderTracker`      | OrderbookL3 (Bitstamp)| `Triple(side, qty, px)`  |
+| `L3SpooferScore`           | OrderbookL3 (Bitstamp)| `Single(0.107)`          |
+
+Total flip: +5 indicators move `never_received_event` → `pass`.
+
+Additional indicators that now receive events but are calibration- or
+market-state-bound (status not yet `pass` but pipeline is alive):
+- `LongShortExtremeDetector` (always_zero — narrow LSR band)
+- `RatioVsPriceDivergence`   (never_ready — needs longer LSR history)
+- `HvSpike`                  (always_zero — calm HV)
+- `L3CancelRatio` / `QuoteStuffingDetector` / `QuoteLifecycleTracker`
+  (Bitstamp wire delivers OrderbookL3 events but Bitstamp is mostly
+  create-side, cancels rare)
+- `PredictedFundingExtreme`  (4 ev seen, threshold not crossed)
+- `FundingSettlementImpact`  (242 ev seen but no actual settlement
+  inside slice)
+
+### Code changes (validator only — no mli-core API change)
+
+- New `Event::LongShortRatio` dispatch arm + `try_update_long_short_ratio`
+  method + `long_short_ratio_point_to_core` mapper.
+- Removed `Event::AuctionEvent` dispatch (variant deleted upstream).
+- BitMEX + Deribit subscribes now go through `.add_raw()` (venue-native
+  instrument names that the canonical normalizer doesn't know).
+- Deribit HV symbol passes verbatim to `get_historical_volatility()` as
+  a currency code (`"BTC"`, not `"BTC-PERPETUAL"`).
+
+### Validator pass-rate delta
+
+| Bucket     | 0.1.1     | 0.1.2     |
+|------------|-----------|-----------|
+| Indicators | 472/556 (84.9%) | 494/556 (88.8%) |
+| Events     |  19/21  (90.5%) |  20/21  (95.2%) |
+| Combined   | 489/577 (84.7%) | 514/577 (89.1%) |
+
+### Still gated on wire / market state (not code)
+
+- `Basis` derived indicators (`BasisMomentum`, `BasisExtreme`,
+  `BasisZScore`, `IndexCorrelationBreakdown`): `Stream::Basis`
+  subscribed on Binance + OKX (both MarkPrice + IndexPrice present),
+  derived joiner spawn returns OK but no `Event::Basis` reaches our
+  consumer in the 150s window. Need dig3-side diagnostic to confirm
+  whether the joiner buffer is dropping events or the emit path is
+  hooked up.
+- `Settlement` primary indicators (`SettlementApproachSignal`,
+  `SettlementPriceMomentum`): live wire stayed silent in 150s
+  (settlement is an 8h-cycle event).
+- `OptionGreeks` / `VolatilityIndex` / `BlockTrade`: subscribed via
+  Deribit ATM strikes (auto-picked at startup) but option flow quiet
+  on this slice.
+
 ## 0.1.1 — 2026-05-24
 
 Bug fixes + indicator routing cleanup. Live validator pass-rate up from

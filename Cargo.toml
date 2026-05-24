@@ -1,6 +1,6 @@
 [package]
 name = "mylittleindicators"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "Multi-stream financial indicators library — 559 bar indicators + 21 event primitives across 35 categories. Consumes OHLCV bars, ticks, orderbook (snapshot/delta), funding, mark price, open interest, liquidations, ticker, agg trades, and 12+ extended stream types from digdigdig3 exchange connectors."
 license = "MIT"
