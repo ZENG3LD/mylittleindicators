@@ -52,8 +52,10 @@ pub enum EventInstance {
     /// Pivot operates on a scalar; `update_bar` feeds close price.
     Pivot(Box<Pivot>),
     PriceLineCross(Box<PriceLineCross>),
-    /// RegimeGate operates on a scalar; `update_bar` feeds close price.
-    RegimeGate(Box<RegimeGate>),
+    /// RegimeGate operates on a scalar; `update_bar` feeds close price (or
+    /// the inner indicator's main scalar when one is configured — typically
+    /// an RSI/ATR so the regime_threshold lives in the indicator's natural scale).
+    RegimeGate(Box<RegimeGate>, Option<Box<IndicatorInstance>>),
     RelativePosition(Box<RelativePosition>),
     /// Relative strength cross. Primary via `update_bar`; secondary via `update_secondary_bar`.
     RelativeStrengthCross(Box<RelativeStrengthCross>),
@@ -198,7 +200,11 @@ impl EventInstance {
                     "below" => GateDirection::Below,
                     _ => GateDirection::Above,
                 };
-                Ok(Self::RegimeGate(Box::new(RegimeGate::new(threshold, direction))))
+                let inner = match config.inner_indicators.first() {
+                    Some(cfg) => Some(Box::new(IndicatorInstance::create(cfg)?)),
+                    None => None,
+                };
+                Ok(Self::RegimeGate(Box::new(RegimeGate::new(threshold, direction)), inner))
             }
 
             // ── RelativePosition ─────────────────────────────────────────────
@@ -336,9 +342,20 @@ impl EventInstance {
                 }
             }
             Self::PriceLineCross(d) => d.update_bar(open, high, low, close, volume),
-            Self::RegimeGate(d) => {
-                // RegimeGate operates on a scalar regime value; use close price.
-                match d.detect_from_values(close) {
+            Self::RegimeGate(d, inner) => {
+                // Optional inner indicator (e.g. RSI) normalises raw close into
+                // a regime-natural scalar; without it the gate compares raw
+                // close to a constant threshold and almost never transitions
+                // on a stable spot.
+                let scalar = match inner.as_deref_mut() {
+                    Some(ind) => {
+                        let v = ind.update_bar(open, high, low, close, volume, None);
+                        if !ind.is_ready() { return IndicatorValue::Signal(0); }
+                        v.main()
+                    }
+                    None => close,
+                };
+                match d.detect_from_values(scalar) {
                     Some((_, crate::core::signal::direction::Direction::Up)) => IndicatorValue::Signal(1),
                     Some((_, crate::core::signal::direction::Direction::Down)) => IndicatorValue::Signal(-1),
                     _ => IndicatorValue::Signal(0),
@@ -419,7 +436,7 @@ impl EventInstance {
             Self::OscillatorWithVolumeWeight(d) => d.value(),
             Self::Pivot(_) => IndicatorValue::Signal(0),
             Self::PriceLineCross(d) => d.value(),
-            Self::RegimeGate(_) => IndicatorValue::Signal(0),
+            Self::RegimeGate(_, _) => IndicatorValue::Signal(0),
             Self::RelativePosition(d) => d.value(),
             Self::StatisticalWickDetector(d) => d.value(),
             Self::SwingDetection(d) => d.value(),
@@ -446,7 +463,7 @@ impl EventInstance {
             Self::OscillatorWithVolumeWeight(d) => d.is_ready(),
             Self::Pivot(_) => true,
             Self::PriceLineCross(d) => d.is_ready(),
-            Self::RegimeGate(_) => true,
+            Self::RegimeGate(_, inner) => inner.as_deref().map(|i| i.is_ready()).unwrap_or(true),
             Self::RelativePosition(d) => d.is_ready(),
             Self::StatisticalWickDetector(d) => d.is_ready(),
             Self::SwingDetection(d) => d.is_ready(),
@@ -473,7 +490,7 @@ impl EventInstance {
             Self::OscillatorWithVolumeWeight(d) => d.reset(),
             Self::Pivot(d) => d.reset(),
             Self::PriceLineCross(d) => d.reset(),
-            Self::RegimeGate(d) => d.reset(),
+            Self::RegimeGate(d, inner) => { d.reset(); if let Some(i) = inner.as_deref_mut() { i.reset(); } }
             Self::RelativePosition(d) => d.reset(),
             Self::StatisticalWickDetector(d) => d.reset(),
             Self::SwingDetection(d) => d.reset(),
@@ -523,7 +540,7 @@ impl std::fmt::Debug for EventInstance {
             Self::OscillatorWithVolumeWeight(_) => "OscillatorWithVolumeWeight",
             Self::Pivot(_) => "Pivot",
             Self::PriceLineCross(_) => "PriceLineCross",
-            Self::RegimeGate(_) => "RegimeGate",
+            Self::RegimeGate(_, _) => "RegimeGate",
             Self::RelativePosition(_) => "RelativePosition",
             Self::RelativeStrengthCross(_) => "RelativeStrengthCross",
             Self::StatisticalWickDetector(_) => "StatisticalWickDetector",

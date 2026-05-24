@@ -1499,8 +1499,12 @@ fn build_event_config(id: EventId) -> EventConfig {
         // boundary sits far from current spot, the price never crosses and
         // we see all zeros. Use a threshold close to live BTC (~76k) so
         // typical 1m bar wobble crosses it both ways inside a 60s slice.
+        // RegimeGate now accepts an optional inner indicator (same pattern as
+        // Threshold + VolatilityRegime). Wire RSI(14) so the threshold lives
+        // on the RSI scale; gate fires whenever RSI crosses above 50.
         EventId::RegimeGate => EventConfig::new(id, name)
-            .with_param("regime_threshold", 76_000.0)
+            .with_inner(IndicatorConfig::new(BarIndicatorId::Rsi, "rsi".into(), vec![14]))
+            .with_param("regime_threshold", 50.0)
             .with_string_param("direction", "above"),
         EventId::CandlePattern => EventConfig::new(id, name)
             .with_string_param("kind", "doji"),
