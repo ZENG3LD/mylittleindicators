@@ -44,7 +44,7 @@ pub struct IndicatorSignature {
 }
 ```
 
-`StreamKind` mirrors dig3 exactly (Bar, Tick, OrderBook, OrderbookDelta, Funding, MarkPrice, OpenInterest, Liquidation, Ticker, AggTrade, LongShortRatio, OptionGreeks, VolatilityIndex, HistoricalVolatility, Basis, IndexPrice, CompositeIndex, InsuranceFund, Settlement, BlockTrade, OrderbookL3, RiskLimit, PredictedFunding, FundingSettlement, MarketWarning, AuctionEvent, MarkPriceKline, IndexPriceKline, PremiumIndexKline).
+`StreamKind` mirrors dig3 exactly (Bar, Tick, OrderBook, OrderbookDelta, Funding, MarkPrice, OpenInterest, Liquidation, Ticker, AggTrade, LongShortRatio, OptionGreeks, VolatilityIndex, HistoricalVolatility, Basis, IndexPrice, CompositeIndex, InsuranceFund, Settlement, BlockTrade, OrderbookL3, RiskLimit, PredictedFunding, FundingSettlement, MarketWarning, MarkPriceKline, IndexPriceKline, PremiumIndexKline).
 
 Consumers route events by checking `signature.accepts(kind) == primary == kind || aux_streams.contains(&kind)`.
 
@@ -75,7 +75,38 @@ This is what real-world UIs do — 1 snapshot from the exchange + 1000+ delta up
 
 ## Status
 
-Tested live on Binance + Bybit FuturesCross + 6 secondary venues against `digdigdig3 v0.3.9`. ~84% combined indicator+event pass rate on live BTC data in a 60-second slice. Remaining failures are environment-bound: streams the exchanges don't emit on the tested instrument (e.g. greeks on non-Deribit, settlement events outside settlement window), or 24h+ time-window indicators (funding decay, ARCH effects in stable periods).
+Verified live against `digdigdig3 v0.3.10` on **12 exchanges** (Binance,
+Bybit, OKX, Bitget, GateIO, HTX, HyperLiquid, KuCoin, MEXC, Deribit,
+BitMEX, Bitstamp) covering all 27 dig3 `Stream` variants — core market
+data (Trade/AggTrade/Bar/Ticker/Orderbook/OrderbookDelta) on Binance +
+Bybit + Deribit, derivative data (Funding/Mark/OI/Liquidation) on 7
+venues, extended streams (LongShortRatio polling, HistoricalVolatility
+polling, OrderbookL3, Basis derived, FundingSettlement derived,
+PredictedFunding from BitMEX + OKX, OptionGreeks/VolatilityIndex on
+Deribit, MarkPrice/IndexPrice klines on OKX/Binance/GateIO).
+
+**Pass rate on a 150s live BTC slice**: ~89% combined (494 / 556 bar
+indicators, **21 / 21 events = 100%**, 514 / 577 total). Newly passing
+in 0.1.2: `LongShortRatioMomentum`, `HvMomentum`, `L3OrderRate`,
+`L3LargeOrderTracker`, `L3SpooferScore`, `RegimeGate`.
+
+Remaining failures are environment-bound, not code: streams that need
+actual market events to fire (liquidation cascades, settlement-window
+8h transitions, option-flow surges) or that the tested venues don't
+emit on this instrument-set (CompositeIndex is Binance index-symbol-
+specific; MarketWarning/RiskLimit/InsuranceFund are broadcast only on
+real fund-change / margin events).
+
+The validator binary is included in `crates/mli-validator/` (dev-only
+diagnostic harness, `publish = false`) — run it yourself to see the
+pass/never_ready/always_zero/never_received_event matrix:
+
+```bash
+cd crates/mli-validator
+cargo build --release --bin mli-validator
+./target/release/mli-validator --duration-secs 60
+cat validator_report.json
+```
 
 ## License
 

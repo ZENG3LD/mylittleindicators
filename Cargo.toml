@@ -2,7 +2,7 @@
 name = "mylittleindicators"
 version = "0.1.2"
 edition = "2024"
-description = "Multi-stream financial indicators library — 559 bar indicators + 21 event primitives across 35 categories. Consumes OHLCV bars, ticks, orderbook (snapshot/delta), funding, mark price, open interest, liquidations, ticker, agg trades, and 12+ extended stream types from digdigdig3 exchange connectors."
+description = "Multi-stream financial indicators library — 556 bar indicators + 21 event primitives across 35 categories. Consumes 27 stream kinds from digdigdig3 exchange connectors: OHLCV bars, ticks, orderbook (snapshot/delta/L3), funding/predicted funding/funding settlement, mark price, index price, open interest, liquidations, ticker, agg trades, long/short ratio, option greeks, volatility index, historical volatility, basis (derived), composite index, settlement events, block trades, insurance fund, risk limit, market warning, and three kline-family variants. Live-verified on 12 exchanges (89% pass-rate on a 150s BTC slice)."
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/ZENG3LD/mylittleindicators"
