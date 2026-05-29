@@ -1,8 +1,20 @@
 //! VAR Model - Vector AutoRegression
 //! Векторная авторегрессионная модель для анализа множественных временных рядов
 //! VAR(p) - p лагов для каждой переменной во всех уравнениях
+//!
+//! REAL implementation. Three corrections over the prior version:
+//! 1. Per-equation coefficients via the shared `linalg::ols` (full Gaussian
+//!    elimination + pivot) instead of the diagonal-only normal-equations hack
+//!    (`xty[i]/xtx[i][i]`) that ignored regressor correlation entirely.
+//! 2. The Gaussian log-likelihood uses the TRUE determinant of Σ
+//!    (`linalg::determinant`), not the product of its diagonal.
+//! 3. Impulse responses are the genuine orthogonalized VMA(∞) responses —
+//!    Ψ_h = Σ_{i=1..min(h,p)} A_i Ψ_{h-i}, Ψ_0 = I, post-multiplied by the
+//!    Cholesky factor of Σ for a structural (one-S.D.) shock — replacing the
+//!    invented `coeff · 0.95^h` discount.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::utils::math::linalg::{cholesky, determinant, ols};
 
 /// VAR Model - Vector AutoRegression
 #[derive(Clone)]
@@ -211,44 +223,19 @@ impl Var {
         }
     }
     
-    /// Простой решатель OLS (метод нормальных уравнений)
+    /// OLS for one VAR equation via the shared full solver. Flattens the dense
+    /// design to row-major and delegates to `linalg::ols` (proper (XᵀX)⁻¹Xᵀy).
     fn solve_ols(&self, x_matrix: &[Vec<f64>], y_vector: &[f64]) -> Vec<f64> {
         if x_matrix.is_empty() || y_vector.is_empty() {
             return Vec::new();
         }
-        
-        let n = x_matrix.len();
+        let rows = x_matrix.len();
         let k = x_matrix[0].len();
-        
-        // X'X матрица
-        let mut xtx = vec![vec![0.0; k]; k];
-        for i in 0..k {
-            for j in 0..k {
-                for row in &x_matrix[..n] {
-                    xtx[i][j] += row[i] * row[j];
-                }
-            }
+        let mut flat = Vec::with_capacity(rows * k);
+        for row in &x_matrix[..rows] {
+            flat.extend_from_slice(&row[..k]);
         }
-
-        // X'y вектор
-        let mut xty = vec![0.0; k];
-        for i in 0..k {
-            for (row, &y) in x_matrix[..n].iter().zip(y_vector[..n].iter()) {
-                xty[i] += row[i] * y;
-            }
-        }
-        
-        // Решение системы (диагональное приближение)
-        let mut coeffs = Vec::new();
-        for i in 0..k {
-            if xtx[i][i].abs() > 1e-10 {
-                coeffs.push(xty[i] / xtx[i][i]);
-            } else {
-                coeffs.push(0.0);
-            }
-        }
-        
-        coeffs
+        ols(&flat, &y_vector[..rows], rows, k).unwrap_or_else(|| vec![0.0; k])
     }
     
     /// Рассчитать остатки и подогнанные значения
@@ -353,76 +340,120 @@ impl Var {
         self.bic = -2.0 * self.log_likelihood + n_params * n_obs.ln();
     }
     
-    /// Вычисление определителя матрицы (упрощенно - только для диагональных элементов)
+    /// Определитель ковариационной матрицы остатков (полный LU determinant).
     fn calculate_determinant(&self, matrix: &[Vec<f64>]) -> f64 {
-        let mut det = 1.0;
-        for (i, row) in matrix.iter().enumerate().take(self.n_vars) {
-            if i < row.len() {
-                det *= row[i].abs();
-            }
-        }
-        det
-    }
-    
-    /// Рассчитать импульсные отклики (упрощенная версия)
-    fn calculate_impulse_responses(&mut self) {
-        self.impulse_responses.clear();
-        
-        let max_horizon = 20;
-        
-        // Для каждого горизонта
-        for h in 0..max_horizon {
-            let mut horizon_responses: Vec<Vec<f64>> = Vec::with_capacity(self.n_vars);
-
-            // Для каждой переменной-шока
-            for shock_var in 0..self.n_vars {
-                let mut shock_responses: Vec<f64> = Vec::with_capacity(self.n_vars);
-
-                // Для каждой переменной-отклика
-                for response_var in 0..self.n_vars {
-                    let impulse_response = self.calculate_single_impulse_response(
-                        shock_var, response_var, h
-                    );
-                    shock_responses.push(impulse_response);
-                }
-
-                horizon_responses.push(shock_responses);
-            }
-
-            self.impulse_responses.push(horizon_responses);
-        }
-    }
-    
-    /// Рассчитать одиночный импульсный отклик
-    fn calculate_single_impulse_response(&self, shock_var: usize, response_var: usize, horizon: usize) -> f64 {
-        if horizon == 0 {
-            // Немедленный отклик
-            if shock_var == response_var {
-                // Стандартное отклонение шока
-                if shock_var < self.residual_covariance.len() && 
-                   shock_var < self.residual_covariance[shock_var].len() {
-                    return self.residual_covariance[shock_var][shock_var].sqrt();
-                }
-            }
+        let n = self.n_vars;
+        if matrix.len() < n {
             return 0.0;
         }
-        
-        // Упрощенный расчет отклика через прямое умножение коэффициентов
-        let mut response = 0.0;
-        
-        for lag in 1..=self.p.min(horizon) {
-            if lag <= self.coefficients.len() &&
-               shock_var < self.coefficients[lag - 1].len() &&
-               response_var < self.coefficients[lag - 1][shock_var].len() {
-                let coeff = self.coefficients[lag - 1][shock_var][response_var];
-                
-                // Дисконтируем отклик по времени
-                let discount_factor = 0.95_f64.powi(horizon as i32);
-                response += coeff * discount_factor;
+        let mut flat = Vec::with_capacity(n * n);
+        for row in matrix.iter().take(n) {
+            if row.len() < n {
+                return 0.0;
             }
+            flat.extend_from_slice(&row[..n]);
         }
-        
-        response
+        determinant(&flat, n).unwrap_or(0.0)
+    }
+    
+    /// Рассчитать ортогонализованные импульсные отклики (настоящий VMA(∞)).
+    ///
+    /// The reduced-form VMA(∞) responses obey Ψ₀ = I,
+    /// Ψ_h = Σ_{i=1..min(h,p)} A_i · Ψ_{h−i}, where A_i is the lag-i coefficient
+    /// matrix in standard orientation (`A_i[to][from]`). For a structural
+    /// (one-standard-deviation, Cholesky-orthogonalized) shock we post-multiply
+    /// by P = chol(Σ): Θ_h = Ψ_h · P. We store
+    /// `impulse_responses[h][shock][response] = Θ_h[response][shock]`.
+    fn calculate_impulse_responses(&mut self) {
+        self.impulse_responses.clear();
+        let n = self.n_vars;
+        let max_horizon = 20;
+        if n == 0 || self.coefficients.is_empty() {
+            return;
+        }
+
+        // Lag matrices A_i as flat row-major n×n, A_i[to][from].
+        let a: Vec<Vec<f64>> = (0..self.p)
+            .map(|lag| {
+                let mut m = vec![0.0; n * n];
+                for from in 0..n {
+                    for to in 0..n {
+                        m[to * n + from] = self.coefficients[lag][from][to];
+                    }
+                }
+                m
+            })
+            .collect();
+
+        // Cholesky factor P of Σ (lower-triangular). Fall back to a diagonal of
+        // residual standard deviations if Σ is not numerically PD.
+        let sigma_flat: Vec<f64> = {
+            let mut s = vec![0.0; n * n];
+            for i in 0..n {
+                for j in 0..n {
+                    s[i * n + j] = self.residual_covariance[i][j];
+                }
+            }
+            s
+        };
+        let p_chol = cholesky(&sigma_flat, n).unwrap_or_else(|| {
+            let mut d = vec![0.0; n * n];
+            for i in 0..n {
+                d[i * n + i] = self.residual_covariance[i][i].max(0.0).sqrt();
+            }
+            d
+        });
+
+        // Ψ history of flat n×n matrices. Ψ₀ = I.
+        let mut psi: Vec<Vec<f64>> = Vec::with_capacity(max_horizon);
+        let mut psi0 = vec![0.0; n * n];
+        for i in 0..n {
+            psi0[i * n + i] = 1.0;
+        }
+        psi.push(psi0);
+
+        for h in 1..max_horizon {
+            let mut psi_h = vec![0.0; n * n];
+            for i in 1..=self.p.min(h) {
+                let ai = &a[i - 1];
+                let prev = &psi[h - i];
+                // psi_h += A_i · prev
+                for r in 0..n {
+                    for c in 0..n {
+                        let mut acc = 0.0;
+                        for k in 0..n {
+                            acc += ai[r * n + k] * prev[k * n + c];
+                        }
+                        psi_h[r * n + c] += acc;
+                    }
+                }
+            }
+            psi.push(psi_h);
+        }
+
+        // Θ_h = Ψ_h · P, then reorder to [shock][response].
+        for psi_h in psi.iter().take(max_horizon) {
+            let mut theta = vec![0.0; n * n];
+            for r in 0..n {
+                for c in 0..n {
+                    let mut acc = 0.0;
+                    for k in 0..n {
+                        acc += psi_h[r * n + k] * p_chol[k * n + c];
+                    }
+                    theta[r * n + c] = acc;
+                }
+            }
+            // impulse_responses[h][shock][response] = Θ_h[response][shock].
+            let mut horizon: Vec<Vec<f64>> = Vec::with_capacity(n);
+            for shock in 0..n {
+                let mut row = Vec::with_capacity(n);
+                for response in 0..n {
+                    row.push(theta[response * n + shock]);
+                }
+                horizon.push(row);
+            }
+            self.impulse_responses.push(horizon);
+        }
     }
     
     /// Генерация прогнозов
@@ -580,7 +611,82 @@ mod tests {
         let result = ind.update(&[100.0, 50.0]);
         assert!(result.is_empty());
     }
-} 
+
+    fn lcg(n: usize, seed: u64) -> Vec<f64> {
+        let mut s = seed;
+        let mut out = Vec::with_capacity(n);
+        for _ in 0..n {
+            s = s
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            out.push(((s >> 33) as f64) / (1u64 << 31) as f64 - 1.0);
+        }
+        out
+    }
+
+    /// Full OLS must recover the cross-equation coefficient (y₁ → y₂) that the
+    /// old diagonal-only solver would badly bias. VAR(1), 2 vars:
+    ///   y₁_t = 0.5 y₁_{t-1} + e₁
+    ///   y₂_t = 0.4 y₁_{t-1} + 0.3 y₂_{t-1} + e₂
+    /// coefficients[lag=0][from][to]: [0][0][1] is the 0.4 cross term.
+    #[test]
+    fn ols_recovers_cross_equation_coefficient() {
+        let e1 = lcg(800, 31);
+        let e2 = lcg(800, 67);
+        let mut y1 = vec![0.0_f64; e1.len()];
+        let mut y2 = vec![0.0_f64; e2.len()];
+        for t in 1..e1.len() {
+            y1[t] = 0.5 * y1[t - 1] + e1[t];
+            y2[t] = 0.4 * y1[t - 1] + 0.3 * y2[t - 1] + e2[t];
+        }
+        let mut v = Var::new(1, 2);
+        for t in 0..y1.len() {
+            v.update(&[y1[t], y2[t]]);
+        }
+        let c = v.get_coefficients();
+        assert_eq!(c.len(), 1);
+        // own lag of y₁.
+        assert!((c[0][0][0] - 0.5).abs() < 0.1, "φ₁₁ {} ≈ 0.5", c[0][0][0]);
+        // cross: y₁ → y₂.
+        assert!((c[0][0][1] - 0.4).abs() < 0.1, "cross {} ≈ 0.4", c[0][0][1]);
+        // own lag of y₂.
+        assert!((c[0][1][1] - 0.3).abs() < 0.1, "φ₂₂ {} ≈ 0.3", c[0][1][1]);
+        // y₂ does not feed back into y₁ → coefficient ≈ 0.
+        assert!(c[0][1][0].abs() < 0.1, "no feedback {} ≈ 0", c[0][1][0]);
+    }
+
+    /// The horizon-0 orthogonalized impulse response equals the Cholesky factor
+    /// of Σ: a unit structural shock to variable j moves variable i on impact
+    /// by P[i][j], lower-triangular (P[i][j]=0 for i<j). We check the impact
+    /// matrix is lower-triangular in [response][shock] terms.
+    #[test]
+    fn impulse_response_impact_is_cholesky() {
+        let e1 = lcg(600, 5);
+        let e2 = lcg(600, 9);
+        let mut y1 = vec![0.0_f64; e1.len()];
+        let mut y2 = vec![0.0_f64; e2.len()];
+        for t in 1..e1.len() {
+            y1[t] = 0.3 * y1[t - 1] + e1[t];
+            // Correlate the innovations so Σ is non-diagonal.
+            y2[t] = 0.2 * y2[t - 1] + e2[t] + 0.5 * e1[t];
+        }
+        let mut v = Var::new(1, 2);
+        for t in 0..y1.len() {
+            v.update(&[y1[t], y2[t]]);
+        }
+        let irf = v.impulse_responses();
+        assert!(!irf.is_empty());
+        // irf[h=0][shock][response]. A shock to var1 (index1) must NOT move
+        // var0 on impact (Cholesky lower-triangular → upper entry zero).
+        let shock1_response0 = irf[0][1][0];
+        assert!(
+            shock1_response0.abs() < 1e-9,
+            "impact of shock-to-1 on var-0 must be 0 (lower-tri), got {shock1_response0}"
+        );
+        // The own-impact of shock-to-0 on var0 = sqrt(Σ₀₀) > 0.
+        assert!(irf[0][0][0] > 0.0, "own impact must be positive");
+    }
+}
 
 
 

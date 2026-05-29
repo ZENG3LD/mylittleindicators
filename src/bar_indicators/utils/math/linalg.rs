@@ -83,6 +83,54 @@ pub fn solve_linear_system(a: &mut [f64], b: &mut [f64], n: usize) -> Option<Vec
     Some(xsol)
 }
 
+/// Determinant of a row-major `n × n` matrix via LU with partial pivoting.
+/// Returns the product of the pivots times the permutation sign. Robust for
+/// the small dense matrices here (e.g. a VAR residual covariance Σ), unlike a
+/// diagonal-only product which ignores off-diagonal correlation. `None` on a
+/// dimension mismatch; a singular matrix yields `0.0`.
+pub fn determinant(a: &[f64], n: usize) -> Option<f64> {
+    if a.len() != n * n {
+        return None;
+    }
+    if n == 0 {
+        return Some(1.0);
+    }
+    let mut m = a.to_vec();
+    let mut det = 1.0_f64;
+    for col in 0..n {
+        // Partial pivot.
+        let mut pivot_row = col;
+        let mut pivot_val = m[col * n + col].abs();
+        for r in (col + 1)..n {
+            let v = m[r * n + col].abs();
+            if v > pivot_val {
+                pivot_val = v;
+                pivot_row = r;
+            }
+        }
+        if pivot_val < 1e-300 {
+            return Some(0.0); // singular
+        }
+        if pivot_row != col {
+            for c in 0..n {
+                m.swap(col * n + c, pivot_row * n + c);
+            }
+            det = -det; // row swap flips sign
+        }
+        let diag = m[col * n + col];
+        det *= diag;
+        for r in (col + 1)..n {
+            let factor = m[r * n + col] / diag;
+            if factor != 0.0 {
+                for c in col..n {
+                    m[r * n + c] -= factor * m[col * n + c];
+                }
+            }
+        }
+    }
+    Some(det)
+}
+
 /// Cholesky decomposition of a symmetric positive-definite matrix `a`
 /// (row-major `n × n`). Returns lower-triangular `L` (row-major) with
 /// `A = L Lᵀ`, or `None` if not positive-definite. Used where SPD is
@@ -184,5 +232,20 @@ mod tests {
         approx(l[0] * l[0], 4.0, 1e-9);
         approx(l[2] * l[0], 2.0, 1e-9);
         approx(l[2] * l[2] + l[3] * l[3], 3.0, 1e-9);
+    }
+
+    #[test]
+    fn determinant_known() {
+        // 2×2: det[[4,2],[2,3]] = 4·3 − 2·2 = 8.
+        approx(determinant(&[4.0, 2.0, 2.0, 3.0], 2).unwrap(), 8.0, 1e-9);
+        // 3×3 with a row swap needed (zero leading pivot): det = 1·(forced).
+        // [[0,1,2],[3,4,5],[6,7,9]] → det = 0·(..) expansion = -3. Verify.
+        let m = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0];
+        // cofactor: 0·(4·9−5·7) − 1·(3·9−5·6) + 2·(3·7−4·6) = -(27-30)+2(21-24)
+        //         = -(-3) + 2(-3) = 3 - 6 = -3.
+        approx(determinant(&m, 3).unwrap(), -3.0, 1e-9);
+        // Identity → 1; singular (duplicate row) → 0.
+        approx(determinant(&[1.0, 0.0, 0.0, 1.0], 2).unwrap(), 1.0, 1e-12);
+        approx(determinant(&[2.0, 4.0, 1.0, 2.0], 2).unwrap(), 0.0, 1e-12);
     }
 }
