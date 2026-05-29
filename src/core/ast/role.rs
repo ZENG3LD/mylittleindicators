@@ -479,6 +479,35 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
     }
 }
 
+impl From<RoleKind> for crate::catalog::data::indicator_signature::IndicatorRoleKind {
+    /// Map the finer AST `RoleKind` (13 variants) onto the coarser catalog
+    /// `IndicatorRoleKind` (12 variants) the codegen pools filter on.
+    ///
+    /// The catalog enum rolls several AST roles into coarser buckets:
+    /// `VolumeFlow→Volume`, `PivotIndicator→Level`, `StatisticalScoring→Statistical`,
+    /// and both `TrendStrength` + `RegimeFilter` → `Regime` (catalog has no
+    /// separate regime-filter bucket). Single source: AST classification flows
+    /// into catalog filtering through this one conversion.
+    fn from(r: RoleKind) -> Self {
+        use crate::catalog::data::indicator_signature::IndicatorRoleKind as Ik;
+        match r {
+            RoleKind::Smoother => Ik::Smoother,
+            RoleKind::OscillatorBounded => Ik::OscillatorBounded,
+            RoleKind::OscillatorUnbounded => Ik::OscillatorUnbounded,
+            RoleKind::Channel => Ik::Channel,
+            RoleKind::Volatility => Ik::Volatility,
+            RoleKind::TrendStrength => Ik::Regime,
+            RoleKind::VolumeFlow => Ik::Volume,
+            RoleKind::PivotIndicator => Ik::Level,
+            RoleKind::PatternDetector => Ik::Pattern,
+            RoleKind::RegimeFilter => Ik::Regime,
+            RoleKind::TrendStop => Ik::TrendStop,
+            RoleKind::StatisticalScoring => Ik::Statistical,
+            RoleKind::Other => Ik::Other,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,7 +1,7 @@
 //! High-performance mapping factory for all bar indicators (NO allocations, NO logic, just static mapping)
 //! Usage: BAR_INDICATOR_MAP.get("sma") -> Some(BarIndicatorId::Sma
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum::EnumIter)]
 pub enum BarIndicatorId {
 
     // Average (23 indicators) - Legacy Ama/Wma/Hma replaced by optimized O(1) versions
@@ -680,9 +680,60 @@ impl BarIndicatorId {
                 | BarIndicatorId::VoltsAtr
         )
     }
+
+    /// Canonical enumeration of every `BarIndicatorId` variant.
+    ///
+    /// Single source of truth for "all indicators" — downstream consumers
+    /// (mlq strategy codegen, validators, catalogs) iterate this instead of
+    /// maintaining their own hand-written lists that drift on every add/remove.
+    /// Backed by `strum::EnumIter`, so adding a variant to the enum makes it
+    /// appear here automatically with no manual edit anywhere.
+    pub fn all() -> impl Iterator<Item = BarIndicatorId> {
+        use strum::IntoEnumIterator;
+        <BarIndicatorId as IntoEnumIterator>::iter()
+    }
 }
 
 
 // Original variants: 487
 // Added long aliases: 155
 // Total: 637
+
+#[cfg(test)]
+mod all_iter_tests {
+    use super::*;
+
+    /// `all()` enumerates every variant with no duplicates. Guards against a
+    /// future hand-edit accidentally breaking the EnumIter contract.
+    #[test]
+    fn all_enumerates_every_variant() {
+        let n = BarIndicatorId::all().count();
+        assert!(n >= 550, "expected 550+ variants, got {n}");
+        let set: std::collections::HashSet<_> = BarIndicatorId::all().collect();
+        assert_eq!(set.len(), n, "all() yielded duplicate variants");
+    }
+
+    /// Every variant `all()` yields must have a catalog signature — this is
+    /// the single-source-of-truth contract: the enum and the catalog cannot
+    /// drift. A missing signature means codegen / validators silently skip it.
+    ///
+    /// Coverage is checked by the catalog's own `machine_id` reverse mapping
+    /// (NOT by string-key lookup — catalog ids use SCREAMING_SNAKE like
+    /// `AV_FRAMA` while the variant Debug is `AvFrama`, so string matching
+    /// would give false negatives).
+    #[test]
+    fn every_variant_has_catalog_signature() {
+        use crate::catalog::data::master_catalog::all_signatures;
+        let covered: std::collections::HashSet<BarIndicatorId> =
+            all_signatures().filter_map(|s| s.machine_id).collect();
+        let missing: Vec<String> = BarIndicatorId::all()
+            .filter(|id| !covered.contains(id))
+            .map(|id| format!("{id:?}"))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "{} BarIndicatorId variants have no catalog signature (machine_id): {:?}",
+            missing.len(), missing
+        );
+    }
+}

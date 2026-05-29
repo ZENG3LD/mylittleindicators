@@ -13,6 +13,10 @@ categories = ["finance", "api-bindings"]
 digdigdig3 = "=0.3.10"
 async-trait = "0.1"
 once_cell = "1.21"
+# EnumIter derive on BarIndicatorId/EventId — single source of truth for "all
+# variants". Lightweight, no proc-macro runtime cost; replaces hand-maintained
+# ID lists in downstream consumers (mlq codegen).
+strum = { version = "0.27", features = ["derive"] }
 arrayvec = "0.7"
 rayon = "1.10"
 serde = { version = "1.0", features = ["derive"] }

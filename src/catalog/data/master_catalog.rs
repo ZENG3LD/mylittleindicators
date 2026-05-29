@@ -402,6 +402,23 @@ pub fn catalog() -> &'static MasterIndicatorCatalog {
     &MASTER_CATALOG
 }
 
+/// Look up one signature by string id against the global catalog.
+///
+/// Free-function form used by downstream codegen (mlq-strategies-codegen
+/// `pools.rs`) which composes with `?` in an `Option` context. Returns `None`
+/// for not-found or ambiguous ids (the codegen treats both as "no signature").
+pub fn get_signature(id: &str) -> Option<IndicatorSignature> {
+    MASTER_CATALOG.get_signature(id).ok()
+}
+
+/// Iterate every signature in the global catalog.
+///
+/// Free-function form mirroring `MasterIndicatorCatalog::iter_signatures`,
+/// used by downstream codegen pool filters.
+pub fn all_signatures() -> impl Iterator<Item = IndicatorSignature> {
+    MASTER_CATALOG.iter_signatures()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
