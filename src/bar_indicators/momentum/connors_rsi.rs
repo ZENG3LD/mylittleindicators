@@ -592,7 +592,20 @@ mod tests {
         let crsi = ConnorsRsi::new();
         assert_eq!(crsi.period(), 3);
     }
-} 
+
+    #[test]
+    fn test_connors_rsi_richer_ctor() {
+        // rsi_period is configurable via with_periods — already confirmed configurable
+        let mut crsi = ConnorsRsi::with_periods(5, 3, 50);
+        assert_eq!(crsi.parameters(), (5, 3, 50));
+        for i in 1..=60 {
+            let p = 100.0 + i as f64 * 0.5;
+            let r = crsi.update_price(p);
+            assert!(r.connors_rsi.is_finite());
+        }
+        assert!(crsi.is_ready());
+    }
+}
 
 
 

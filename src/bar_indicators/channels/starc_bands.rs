@@ -18,20 +18,33 @@ pub struct StarcBands {
 }
 
 impl StarcBands {
-    /// Create STARC Bands with default MA type (SMA)
+    /// Create STARC Bands with default MA type (SMA) and Wilder ATR smoothing (RMA).
     pub fn new(ma_period: usize, atr_period: usize, k: f64) -> Self {
         Self::new_with_ma_type(ma_period, atr_period, k, MovingAverageType::SMA)
     }
 
-    /// Create STARC Bands with specified MA type
+    /// Create STARC Bands with specified center MA type; ATR uses Wilder (RMA) smoothing.
     pub fn new_with_ma_type(ma_period: usize, atr_period: usize, k: f64, ma_type: MovingAverageType) -> Self {
+        Self::new_with_ma_types(ma_period, atr_period, k, ma_type, MovingAverageType::RMA)
+    }
+
+    /// Create STARC Bands with explicit center MA type and ATR smoothing MA type.
+    ///
+    /// Defaults used by `new`: center=`SMA`, atr=`RMA` (Wilder).
+    pub fn new_with_ma_types(
+        ma_period: usize,
+        atr_period: usize,
+        k: f64,
+        ma_type: MovingAverageType,
+        atr_ma_type: MovingAverageType,
+    ) -> Self {
         let ma_p = ma_period.max(1);
         Self {
             ma_period: ma_p,
             ma_type,
             source: OhlcvField::Close,
             ma: MovingAverageProvider::new(ma_type, ma_p),
-            atr: Atr::new_wilder(atr_period.max(1)),
+            atr: Atr::new(atr_period.max(1), atr_ma_type),
             k,
             upper: 0.0,
             middle: 0.0,
@@ -47,7 +60,7 @@ impl StarcBands {
             ma_type,
             source,
             ma: MovingAverageProvider::new(ma_type, ma_p),
-            atr: Atr::new_wilder(atr_period.max(1)),
+            atr: Atr::new(atr_period.max(1), MovingAverageType::RMA),
             k,
             upper: 0.0,
             middle: 0.0,
@@ -125,6 +138,21 @@ mod tests {
         }
         assert!(sb.upper >= sb.middle);
         assert!(sb.middle >= sb.lower);
+    }
+
+    #[test]
+    fn test_new_with_ma_types_non_default_atr() {
+        // center=EMA, atr=EMA (non-default: default atr=RMA)
+        let mut sb = StarcBands::new_with_ma_types(20, 14, 2.0, MovingAverageType::EMA, MovingAverageType::EMA);
+        assert!(!sb.is_ready());
+        for i in 0..30 {
+            let p = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let (u, m, l) = sb.update_bar(p, p + 2.0, p - 2.0, p, 1000.0);
+            assert!(u.is_finite());
+            assert!(m.is_finite());
+            assert!(l.is_finite());
+        }
+        assert!(sb.is_ready());
     }
 
     #[test]

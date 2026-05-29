@@ -1,6 +1,8 @@
 // PPO Signal wrapper: outputs PPO signal line
 
+use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::momentum::ppo::Ppo;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Debug, Clone)]
@@ -13,6 +15,29 @@ impl PpoSignal {
     pub fn new(fast: usize, slow: usize, signal: usize) -> Self {
         Self {
             ppo: Ppo::new(fast, slow, signal),
+            value: 0.0,
+        }
+    }
+
+    /// Create PPO Signal with full MA type + source configuration.
+    ///
+    /// Mirrors `Ppo::with_full_config`.
+    ///
+    /// # Arguments
+    /// * `fast`, `slow`, `signal`                         - Periods
+    /// * `source`                                         - Price field (default Close)
+    /// * `fast_ma_type`, `slow_ma_type`, `signal_ma_type` - MA types per component
+    pub fn with_full_config(
+        fast: usize,
+        slow: usize,
+        signal: usize,
+        source: OhlcvField,
+        fast_ma_type: MovingAverageType,
+        slow_ma_type: MovingAverageType,
+        signal_ma_type: MovingAverageType,
+    ) -> Self {
+        Self {
+            ppo: Ppo::with_full_config(fast, slow, signal, source, fast_ma_type, slow_ma_type, signal_ma_type),
             value: 0.0,
         }
     }
@@ -45,6 +70,23 @@ mod tests {
         let sig = PpoSignal::new(12, 26, 9);
         assert!(!sig.is_ready());
         assert_eq!(sig.value().main(), 0.0);
+    }
+
+    #[test]
+    fn test_ppo_signal_with_full_config() {
+        use crate::bar_indicators::average::MovingAverageType;
+        use crate::bar_indicators::ohlcv_field::OhlcvField;
+        let mut sig = PpoSignal::with_full_config(
+            12, 26, 9,
+            OhlcvField::Close,
+            MovingAverageType::EMA, MovingAverageType::EMA, MovingAverageType::SMA,
+        );
+        for i in 1..=60 {
+            let p = 100.0 + i as f64 * 0.5;
+            let v = sig.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(sig.is_ready());
     }
 
     #[test]

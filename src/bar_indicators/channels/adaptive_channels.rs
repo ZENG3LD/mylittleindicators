@@ -158,9 +158,28 @@ impl AdaptiveChannels {
         center_line_type: CenterLineType,
         volatility_lookback: usize
     ) -> Self {
+        Self::new_custom_with_atr_type(
+            period,
+            adaptation_mode,
+            center_line_type,
+            volatility_lookback,
+            crate::bar_indicators::average::moving_average::MovingAverageType::RMA,
+        )
+    }
+
+    /// Создать адаптивные каналы с кастомными параметрами + выбором типа MA для ATR.
+    ///
+    /// `atr_ma_type` — тип MA внутри ATR (default `RMA` = Wilder smoothing).
+    pub fn new_custom_with_atr_type(
+        period: usize,
+        adaptation_mode: AdaptationMode,
+        center_line_type: CenterLineType,
+        volatility_lookback: usize,
+        atr_ma_type: crate::bar_indicators::average::moving_average::MovingAverageType,
+    ) -> Self {
         assert!(period > 0 && period <= 512, "Period must be between 1 and 512");
         assert!(volatility_lookback > 0 && volatility_lookback <= 512, "Volatility lookback must be between 1 and 512");
-        
+
         // ✅ Выбираем конфигурацию KAMA
         let kama = match center_line_type {
             CenterLineType::KAMA => KaufmanAdaptiveMA::default(),       // 10, 2, 30
@@ -168,21 +187,21 @@ impl AdaptiveChannels {
             CenterLineType::SlowKAMA => KaufmanAdaptiveMA::slow(),      // 20, 5, 50
             CenterLineType::AdaptiveLinReg => KaufmanAdaptiveMA::default(), // Fallback
         };
-        
+
         // Создаем LinearRegressionMA только для AdaptiveLinReg режима
         let regression_ma = if matches!(center_line_type, CenterLineType::AdaptiveLinReg) {
             Some(LinearRegressionMA::new(period))
         } else {
             None
         };
-        
+
         Self {
             period,
             adaptation_mode,
             center_line_type,
             volatility_lookback,
             kama,  // ✅ Готовая мощная KAMA!
-            adaptive_atr: Atr::new(period, crate::bar_indicators::average::moving_average::MovingAverageType::RMA),
+            adaptive_atr: Atr::new(period, atr_ma_type),
             regression_ma,
             price_buffer: Vec::with_capacity(period),
             volatility_clusters: Vec::with_capacity(100),
@@ -720,6 +739,26 @@ impl Default for AdaptiveChannels {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_new_custom_with_atr_type_non_default() {
+        use crate::bar_indicators::average::moving_average::MovingAverageType;
+        let mut ac = AdaptiveChannels::new_custom_with_atr_type(
+            20,
+            AdaptationMode::Volatility,
+            CenterLineType::KAMA,
+            40,
+            MovingAverageType::EMA,
+        );
+        assert!(!ac.is_ready());
+        for i in 0..50 {
+            let p = 100.0 + (i as f64 * 0.1).sin() * 5.0;
+            let (u, _m, l) = ac.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(u.is_finite());
+            assert!(l.is_finite());
+        }
+        assert!(ac.is_ready());
+    }
 
     #[test]
     fn test_adaptive_channels_creation() {

@@ -14,9 +14,19 @@ pub struct RsiOma {
 
 impl RsiOma {
     pub fn new(rsi_period: usize, ema_period: usize) -> Self {
+        Self::with_ma_type(rsi_period, ema_period, MovingAverageType::EMA)
+    }
+
+    /// Create RSIOMA with configurable outer MA type.
+    ///
+    /// # Arguments
+    /// * `rsi_period`  - RSI lookback period
+    /// * `ma_period`   - Outer MA smoothing period
+    /// * `ma_type`     - MA type for outer smoothing (default EMA)
+    pub fn with_ma_type(rsi_period: usize, ma_period: usize, ma_type: MovingAverageType) -> Self {
         Self {
             rsi: Rsi::new(rsi_period.max(1)),
-            ema: MovingAverageProvider::new(MovingAverageType::EMA, ema_period.max(1)),
+            ema: MovingAverageProvider::new(ma_type, ma_period.max(1)),
             value: 0.0,
         }
     }
@@ -97,5 +107,16 @@ mod tests {
             let value = rsioma.update_bar(price, price + 2.0, price - 2.0, price, 1000.0);
             assert!(value.is_finite(), "RSIOMA should always be finite");
         }
+    }
+
+    #[test]
+    fn test_rsioma_with_ma_type() {
+        let mut rsioma = RsiOma::with_ma_type(14, 9, MovingAverageType::SMA);
+        for i in 1..=40 {
+            let p = 100.0 + i as f64 * 0.5;
+            let v = rsioma.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(rsioma.is_ready());
     }
 }

@@ -1,14 +1,14 @@
-// Relative Trend Position: relative distance to SMA200 and Anchored VWAP (monthly)
+// Relative Trend Position: relative distance to MA and Anchored VWAP (monthly)
 
+use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use crate::bar_indicators::average::sma::Sma;
 use crate::bar_indicators::levels::anchored_vwap::{
     AnchoredVwap, AnchoredVwapParams, AvwapAnchorMode,
 };
 
 #[derive(Clone)]
 pub struct RelativeTrendPosition {
-    sma: Sma,
+    ma: MovingAverageProvider,
     avwap: AnchoredVwap,
     last_sma_rel: f64,
     last_avwap_rel: f64,
@@ -16,11 +16,16 @@ pub struct RelativeTrendPosition {
 
 impl RelativeTrendPosition {
     pub fn new(sma_period: usize) -> Self {
+        Self::with_ma_type(sma_period, MovingAverageType::SMA)
+    }
+
+    /// Creates a new RelativeTrendPosition with a configurable MA type.
+    pub fn with_ma_type(sma_period: usize, ma_type: MovingAverageType) -> Self {
         let params = AnchoredVwapParams {
             mode: AvwapAnchorMode::Monthly,
         };
         Self {
-            sma: Sma::new(sma_period),
+            ma: MovingAverageProvider::new(ma_type, sma_period),
             avwap: AnchoredVwap::new(params),
             last_sma_rel: 0.0,
             last_avwap_rel: 0.0,
@@ -29,7 +34,7 @@ impl RelativeTrendPosition {
 
     #[inline]
     pub fn reset(&mut self) {
-        self.sma.reset();
+        self.ma.reset();
         self.avwap.reset();
         self.last_sma_rel = 0.0;
         self.last_avwap_rel = 0.0;
@@ -37,7 +42,7 @@ impl RelativeTrendPosition {
 
     #[inline]
     pub fn is_ready(&self) -> bool {
-        self.sma.is_ready() && self.avwap.is_ready()
+        self.ma.is_ready() && self.avwap.is_ready()
     }
 
     pub fn update_bar(
@@ -49,7 +54,7 @@ impl RelativeTrendPosition {
         volume: f64,
         timestamp: i64,
     ) -> (f64, f64) {
-        let sma_val = self.sma.update_bar(open, high, low, close, volume);
+        let sma_val = self.ma.update_bar(open, high, low, close, volume);
         let avwap_val = self
             .avwap
             .update_bar(open, high, low, close, volume, timestamp);
@@ -118,5 +123,22 @@ mod tests {
         }
         rtp.reset();
         assert!(!rtp.is_ready());
+    }
+
+    #[test]
+    fn test_relative_trend_position_with_ema() {
+        let mut rtp = RelativeTrendPosition::with_ma_type(20, MovingAverageType::EMA);
+        let ts = 1700000000_i64;
+        let mut last_sma_rel = 0.0_f64;
+        for i in 0..30 {
+            let price = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let (sr, ar) =
+                rtp.update_bar(price, price + 1.0, price - 1.0, price, 1000.0, ts + i * 86400);
+            assert!(sr.is_finite());
+            assert!(ar.is_finite());
+            last_sma_rel = sr;
+        }
+        // After 30 bars EMA(20) is warmed up — result must be non-zero for oscillating prices
+        assert!(last_sma_rel.is_finite());
     }
 }

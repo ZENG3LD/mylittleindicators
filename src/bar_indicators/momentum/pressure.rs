@@ -19,11 +19,21 @@ impl Pressure {
     /// Create new Pressure indicator
     ///
     /// # Arguments
-    /// * `period` - Lookback period for ATR and volume averaging
-    /// * `ma_type` - Type of moving average for volume smoothing
+    /// * `period`  - Lookback period for ATR and volume averaging
+    /// * `ma_type` - Type of moving average for volume smoothing (ATR uses RMA internally)
     pub fn new(period: usize, ma_type: MovingAverageType) -> Self {
+        Self::with_atr_type(period, ma_type, MovingAverageType::RMA)
+    }
+
+    /// Create new Pressure indicator with configurable ATR smoothing MA type.
+    ///
+    /// # Arguments
+    /// * `period`      - Lookback period for ATR and volume averaging
+    /// * `ma_type`     - Type of moving average for volume smoothing
+    /// * `atr_ma_type` - MA type for internal ATR smoothing (default RMA)
+    pub fn with_atr_type(period: usize, ma_type: MovingAverageType, atr_ma_type: MovingAverageType) -> Self {
         Self {
-            atr: Atr::new(period, MovingAverageType::RMA),
+            atr: Atr::new(period, atr_ma_type),
             avg_volume: MovingAverageWithField::new(ma_type, period, OhlcvField::Volume),
             value: 0.0,
             value_cumulative: 0.0,
@@ -79,6 +89,17 @@ mod tests {
         let p = Pressure::new(14, MovingAverageType::EMA);
         assert!(!p.is_ready());
         assert_eq!(p.value().main(), 0.0);
+    }
+
+    #[test]
+    fn test_pressure_with_atr_type() {
+        let mut p = Pressure::with_atr_type(10, MovingAverageType::EMA, MovingAverageType::EMA);
+        for i in 1..=30 {
+            let price = 100.0 + i as f64 * 0.5;
+            let v = p.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(p.is_ready());
     }
 
     #[test]

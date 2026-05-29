@@ -16,6 +16,7 @@
 //! not a true two-series cointegration test — that belongs in `events::`
 //! (deferred). Name retained for backward-compat with existing catalog ids.
 
+use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::statistics::cointegration_proxy::CointegrationProxy;
 
@@ -29,6 +30,14 @@ impl EngleGrangerProxy {
     pub fn new(window: usize) -> Self {
         Self {
             inner: CointegrationProxy::new(window),
+            t_stat: 0.0,
+        }
+    }
+
+    /// Creates a new EngleGrangerProxy with a configurable MA type.
+    pub fn with_ma_type(window: usize, ma_type: MovingAverageType) -> Self {
+        Self {
+            inner: CointegrationProxy::with_ma_type(window, ma_type),
             t_stat: 0.0,
         }
     }
@@ -95,5 +104,16 @@ mod tests {
         egp.reset();
         assert!(!egp.is_ready());
         assert_eq!(egp.t_stat, 0.0);
+    }
+
+    #[test]
+    fn test_engle_granger_proxy_with_ema() {
+        let mut egp = EngleGrangerProxy::with_ma_type(50, MovingAverageType::EMA);
+        for i in 0..60 {
+            let price = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let t = egp.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+            assert!(t.is_finite());
+        }
+        assert!(egp.is_ready());
     }
 }

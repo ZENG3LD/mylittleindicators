@@ -111,7 +111,7 @@ impl AdaptiveStochastic {
     pub fn new() -> Self {
         Self::with_parameters(14, 7, 28, 3, 1.5)
     }
-    
+
     /// Создать с настраиваемыми параметрами
     pub fn with_parameters(
         base_period: usize,
@@ -120,15 +120,38 @@ impl AdaptiveStochastic {
         d_period: usize,
         volatility_sensitivity: f64
     ) -> Self {
+        Self::with_atr_config(base_period, min_period, max_period, d_period, volatility_sensitivity, 14, MovingAverageType::RMA)
+    }
+
+    /// Создать с настраиваемым ATR (period + ma_type для внутреннего ATR).
+    ///
+    /// # Arguments
+    /// * `base_period` - Базовый стохастик период
+    /// * `min_period` - Минимальный адаптивный период
+    /// * `max_period` - Максимальный адаптивный период
+    /// * `d_period` - Период сглаживания %D
+    /// * `volatility_sensitivity` - Чувствительность к волатильности
+    /// * `atr_period` - Период внутреннего ATR (default 14)
+    /// * `atr_ma_type` - Тип MA внутреннего ATR (default RMA = Wilder)
+    pub fn with_atr_config(
+        base_period: usize,
+        min_period: usize,
+        max_period: usize,
+        d_period: usize,
+        volatility_sensitivity: f64,
+        atr_period: usize,
+        atr_ma_type: MovingAverageType,
+    ) -> Self {
         assert!(base_period > 0, "Base period must be greater than 0");
         assert!(min_period > 0 && min_period <= base_period, "Invalid min period");
         assert!(max_period >= base_period, "Invalid max period");
         assert!(d_period > 0, "D period must be greater than 0");
         assert!(volatility_sensitivity > 0.0, "Volatility sensitivity must be positive");
-        
+        assert!(atr_period > 0, "ATR period must be greater than 0");
+
         Self {
             // Переиспользуем существующие компоненты
-            atr: Atr::new_wilder(14),
+            atr: Atr::new(atr_period, atr_ma_type),
             volatility_ma: MovingAverageProvider::new(MovingAverageType::EMA, 10),
             d_ma: MovingAverageProvider::new(MovingAverageType::SMA, d_period),
             momentum_ma: MovingAverageProvider::new(MovingAverageType::EMA, 5),
@@ -530,6 +553,18 @@ mod tests {
         let adaptive_stoch = AdaptiveStochastic::new();
         assert!(!adaptive_stoch.is_ready());
         assert_eq!(adaptive_stoch.parameters().0, 14);
+    }
+
+    #[test]
+    fn test_adaptive_stochastic_with_atr_config() {
+        use crate::bar_indicators::average::MovingAverageType;
+        let mut s = AdaptiveStochastic::with_atr_config(14, 7, 28, 3, 1.5, 10, MovingAverageType::EMA);
+        for i in 0..25 {
+            let p = 100.0 + i as f64 * 0.5;
+            let r = s.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(r.k_percent.is_finite());
+        }
+        assert!(s.is_ready());
     }
     
     #[test]

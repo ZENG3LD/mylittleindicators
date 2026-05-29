@@ -5,6 +5,7 @@
 //! Логика остановки позиций реализуется в стратегиях на основе этих уровней.
 
 use crate::bar_indicators::trend::supertrend::Supertrend;
+use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// SuperTrend Stop индикатор - вычисляет динамические уровни на основе SuperTrend
@@ -20,13 +21,18 @@ impl SuperTrendStop {
     pub fn new() -> Self {
         Self::with_params(10, 3.0)
     }
-    
-    /// Создать SuperTrend Stop с настраиваемыми параметрами
+
+    /// Создать SuperTrend Stop с настраиваемыми параметрами (RMA ATR по умолчанию)
     /// * `period` - период для ATR (обычно 10-14)
     /// * `multiplier` - множитель ATR (обычно 2.0-3.0)
     pub fn with_params(period: usize, multiplier: f64) -> Self {
+        Self::with_atr_ma_type(period, multiplier, MovingAverageType::RMA)
+    }
+
+    /// Создать SuperTrend Stop с настраиваемым типом MA для ATR.
+    pub fn with_atr_ma_type(period: usize, multiplier: f64, atr_ma_type: MovingAverageType) -> Self {
         Self {
-            supertrend: Supertrend::with_params(period, multiplier),
+            supertrend: Supertrend::with_atr_ma_type(period, multiplier, atr_ma_type),
             current_level: 0.0,
             trend_direction: 1,
         }
@@ -113,6 +119,17 @@ mod tests {
         let ind = SuperTrendStop::new();
         assert!(!ind.is_ready());
         assert_eq!(ind.value().main(), 0.0);
+    }
+
+    #[test]
+    fn test_supertrend_stop_with_ema_atr_warmup_finite() {
+        let mut ind = SuperTrendStop::with_atr_ma_type(10, 3.0, MovingAverageType::EMA);
+        for i in 0..25 {
+            let price = 100.0 + (i as f64 * 0.2).sin() * 5.0;
+            let v = ind.update_bar(price, price + 2.0, price - 2.0, price, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(ind.is_ready());
     }
 
     #[test]

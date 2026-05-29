@@ -1,6 +1,8 @@
 // MACD Signal wrapper: outputs signal line of MACD
 
+use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::momentum::macd::Macd;
+use crate::bar_indicators::ohlcv_field::OhlcvField;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 
@@ -14,6 +16,32 @@ impl MacdSignal {
     pub fn new(fast: usize, slow: usize, signal: usize) -> Self {
         Self {
             macd: Macd::new_with_signal(fast.max(1), slow.max(1), signal.max(1)),
+            value: 0.0,
+        }
+    }
+
+    /// Create MACD Signal with full MA type + source configuration.
+    ///
+    /// Mirrors `Macd::with_different_ma_types_and_source`.
+    ///
+    /// # Arguments
+    /// * `fast`, `slow`, `signal`                         - Periods
+    /// * `fast_ma_type`, `slow_ma_type`, `signal_ma_type` - MA types per component
+    /// * `source`                                         - Price field (default Close)
+    pub fn with_full_config(
+        fast: usize,
+        slow: usize,
+        signal: usize,
+        fast_ma_type: MovingAverageType,
+        slow_ma_type: MovingAverageType,
+        signal_ma_type: MovingAverageType,
+        source: OhlcvField,
+    ) -> Self {
+        Self {
+            macd: Macd::with_different_ma_types_and_source(
+                fast.max(1), slow.max(1), signal.max(1),
+                fast_ma_type, slow_ma_type, signal_ma_type, source,
+            ),
             value: 0.0,
         }
     }
@@ -46,6 +74,23 @@ mod tests {
         let sig = MacdSignal::new(12, 26, 9);
         assert!(!sig.is_ready());
         assert_eq!(sig.value().main(), 0.0);
+    }
+
+    #[test]
+    fn test_macd_signal_with_full_config() {
+        use crate::bar_indicators::average::MovingAverageType;
+        use crate::bar_indicators::ohlcv_field::OhlcvField;
+        let mut sig = MacdSignal::with_full_config(
+            12, 26, 9,
+            MovingAverageType::EMA, MovingAverageType::EMA, MovingAverageType::SMA,
+            OhlcvField::Close,
+        );
+        for i in 1..=60 {
+            let p = 100.0 + i as f64 * 0.5;
+            let v = sig.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(sig.is_ready());
     }
 
     #[test]

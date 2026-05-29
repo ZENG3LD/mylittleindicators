@@ -13,11 +13,18 @@ pub struct PriceChannelOscillator {
 
 impl PriceChannelOscillator {
     pub fn new(period: usize) -> Self {
+        Self::with_ma_type(period, crate::bar_indicators::average::MovingAverageType::SMA)
+    }
+
+    /// Create with an explicit MA type for the price channel middle line.
+    ///
+    /// Default used by `new`: `SMA`.
+    pub fn with_ma_type(period: usize, ma_type: crate::bar_indicators::average::MovingAverageType) -> Self {
         Self {
             channels: PriceChannels::new(
                 period.max(2),
                 PriceChannelMode::Raw,
-                crate::bar_indicators::average::MovingAverageType::SMA,
+                ma_type,
             ),
             value: 0.0,
         }
@@ -46,6 +53,19 @@ impl PriceChannelOscillator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_with_ma_type_non_default() {
+        use crate::bar_indicators::average::MovingAverageType;
+        let mut pco = PriceChannelOscillator::with_ma_type(20, MovingAverageType::EMA);
+        assert!(!pco.is_ready());
+        for i in 0..30 {
+            let p = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let v = pco.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(v >= -1.0 && v <= 1.0);
+        }
+        assert!(pco.is_ready());
+    }
 
     #[test]
     fn test_price_channel_oscillator_creation() {

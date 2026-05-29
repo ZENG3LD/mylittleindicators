@@ -2,6 +2,7 @@
 // (c) 2024
 
 use super::atr::Atr;
+use crate::bar_indicators::average::moving_average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
@@ -18,14 +19,20 @@ pub struct Kc {
 }
 
 impl Kc {
+    /// Default ctor — ATR smoothed with RMA (Wilder).
     pub fn new(period: usize, k_multiplier: f64) -> Self {
+        Self::with_atr_ma_type(period, k_multiplier, MovingAverageType::RMA)
+    }
+
+    /// Custom ATR smoothing type.
+    pub fn with_atr_ma_type(period: usize, k_multiplier: f64, atr_ma_type: MovingAverageType) -> Self {
         Self {
             period,
             k_multiplier,
             sma_buf: Vec::with_capacity(period),
             sma_sum: 0.0,
             sma_filled: false,
-            atr: Atr::new(period, crate::bar_indicators::average::moving_average::MovingAverageType::RMA),
+            atr: Atr::new(period, atr_ma_type),
             upper: 0.0,
             middle: 0.0,
             lower: 0.0,
@@ -105,6 +112,17 @@ mod tests {
                 assert!(middle >= lower, "Middle should be >= lower");
             }
         }
+    }
+
+    #[test]
+    fn test_kc_with_atr_ma_type_ema() {
+        let mut kc = Kc::with_atr_ma_type(20, 2.0, MovingAverageType::EMA);
+        for i in 0..50 {
+            let price = 100.0 + (i as f64 * 0.1).sin() * 5.0;
+            let (upper, middle, lower) = kc.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+            assert!(upper.is_finite() && middle.is_finite() && lower.is_finite());
+        }
+        assert!(kc.is_ready());
     }
 
     #[test]

@@ -25,6 +25,16 @@ pub struct DssBressert {
 
 impl DssBressert {
     pub fn new(k_period: usize, smooth_period: usize) -> Self {
+        Self::with_ma_type(k_period, smooth_period, MovingAverageType::EMA)
+    }
+
+    /// Create DSS Bressert with configurable double-smoothing MA type.
+    ///
+    /// # Arguments
+    /// * `k_period`     - Stochastic %K lookback (clamped 2..512)
+    /// * `smooth_period`- Period for double smoothing
+    /// * `ma_type`      - MA type for both smoothing passes (default EMA)
+    pub fn with_ma_type(k_period: usize, smooth_period: usize, ma_type: MovingAverageType) -> Self {
         let k = k_period.clamp(2, 512);
         let s = smooth_period.max(1);
         Self {
@@ -34,8 +44,8 @@ impl DssBressert {
             lows: Vec::with_capacity(k),
             idx: 0,
             count: 0,
-            ema1: MovingAverageProvider::new(MovingAverageType::EMA, s),
-            ema2: MovingAverageProvider::new(MovingAverageType::EMA, s),
+            ema1: MovingAverageProvider::new(ma_type, s),
+            ema2: MovingAverageProvider::new(ma_type, s),
             value: 0.0,
         }
     }
@@ -105,6 +115,17 @@ mod tests {
         assert_eq!(dss.value().main(), 0.0);
         assert_eq!(dss.k_period(), 10);
         assert_eq!(dss.smooth_period(), 3);
+    }
+
+    #[test]
+    fn test_dss_with_ma_type() {
+        let mut dss = DssBressert::with_ma_type(10, 3, MovingAverageType::SMA);
+        for i in 1..=30 {
+            let p = 100.0 + i as f64 * 0.5;
+            let v = dss.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(dss.is_ready());
     }
 
     #[test]

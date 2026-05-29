@@ -474,6 +474,19 @@ mod tests {
         assert!(!vw_rsi.is_ready());
         assert_eq!(vw_rsi.parameters(), (14, 20));
     }
+
+    #[test]
+    fn test_volume_weighted_rsi_rsi_period_configurable() {
+        // rsi_period exposed via with_periods — confirmed configurable
+        let mut vw = VolumeWeightedRsi::with_periods(9, 15);
+        assert_eq!(vw.parameters(), (9, 15));
+        for i in 0..25 {
+            let p = 100.0 + i as f64 * 0.5;
+            let r = vw.update_bar(p, p + 0.5, p - 0.5, p, 1000.0);
+            assert!(r.vw_rsi.is_finite());
+        }
+        assert!(vw.is_ready());
+    }
     
     #[test]
     fn test_volume_weighted_rsi_with_periods() {

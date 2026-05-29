@@ -1,6 +1,7 @@
 //! Average Directional Index (ADX) indicator.
 
 use crate::bar_indicators::volatility::atr::Atr;
+use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 /// Average Directional Index (ADX) - measures trend strength regardless of direction.
@@ -61,13 +62,18 @@ pub struct Adx {
 }
 
 impl Adx {
-    /// Создать новый ADX индикатор
+    /// Создать новый ADX индикатор (Wilder's RMA по умолчанию)
     pub fn new(period: usize) -> Self {
+        Self::with_atr_ma_type(period, MovingAverageType::RMA)
+    }
+
+    /// Создать ADX с настраиваемым типом MA для ATR
+    pub fn with_atr_ma_type(period: usize, atr_ma_type: MovingAverageType) -> Self {
         assert!(period > 0 && period <= 512, "ADX period must be > 0 and <= 512");
-        
+
         Self {
             period,
-            atr: Atr::new_wilder(period), // ADX традиционно использует Wilder's smoothing
+            atr: Atr::new(period, atr_ma_type),
             tr_sum: 0.0,
             plus_dm_sum: 0.0,
             minus_dm_sum: 0.0,
@@ -324,6 +330,18 @@ mod tests {
         assert_eq!(adx.period(), 14);
         assert!(!adx.is_ready());
         assert_eq!(adx.value().main(), 0.0);
+    }
+
+    #[test]
+    fn test_adx_with_ema_atr_warmup_finite() {
+        use crate::bar_indicators::average::MovingAverageType;
+        let mut adx = Adx::with_atr_ma_type(7, MovingAverageType::EMA);
+        for i in 0..50 {
+            let price = 100.0 + (i as f64 * 0.3).sin() * 4.0;
+            let v = adx.update_bar(price, price + 1.5, price - 1.5, price, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(adx.is_ready());
     }
     
     #[test]

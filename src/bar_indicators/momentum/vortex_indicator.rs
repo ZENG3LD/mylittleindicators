@@ -63,8 +63,17 @@ impl VortexIndicator {
     /// # Arguments
     /// * `period` - Lookback period (typically 14)
     pub fn with_period(period: usize) -> Self {
+        Self::with_period_and_atr_type(period, MovingAverageType::RMA)
+    }
+
+    /// Creates a new Vortex Indicator with custom period and ATR smoothing MA type.
+    ///
+    /// # Arguments
+    /// * `period`      - Lookback period (typically 14)
+    /// * `atr_ma_type` - MA type for internal ATR (default RMA)
+    pub fn with_period_and_atr_type(period: usize, atr_ma_type: MovingAverageType) -> Self {
         assert!(period > 0, "Period must be greater than 0");
-        
+
         Self {
             period,
             vi_plus_values: Vec::with_capacity(period),
@@ -75,7 +84,7 @@ impl VortexIndicator {
             positive_vortex_buffer: Vec::with_capacity(period),
             negative_vortex_buffer: Vec::with_capacity(period),
             true_range_buffer: Vec::with_capacity(period),
-            atr: Atr::new(period, MovingAverageType::RMA),
+            atr: Atr::new(period, atr_ma_type),
             prev_high: 0.0,
             prev_low: 0.0,
             vi_plus: 1.0,
@@ -427,6 +436,18 @@ mod tests {
     fn test_vortex_period() {
         let vi = VortexIndicator::with_period(21);
         assert_eq!(vi.period(), 21);
+    }
+
+    #[test]
+    fn test_vortex_with_period_and_atr_type() {
+        let mut vi = VortexIndicator::with_period_and_atr_type(14, MovingAverageType::EMA);
+        for i in 1..=25 {
+            let base = 100.0 + i as f64;
+            vi.update_bar(base, base + 1.0, base - 0.5, base, 0.0);
+        }
+        assert!(vi.is_ready());
+        let (vp, vm) = vi.values();
+        assert!(vp.is_finite() && vm.is_finite());
     }
 
     #[test]

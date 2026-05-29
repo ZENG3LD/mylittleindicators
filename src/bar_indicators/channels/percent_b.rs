@@ -12,12 +12,19 @@ pub struct PercentB {
 
 impl PercentB {
     pub fn new(period: usize, std_mult: f64) -> Self {
+        Self::with_ma_type(period, std_mult, MovingAverageType::SMA)
+    }
+
+    /// Create with an explicit MA type for the Bollinger center line.
+    ///
+    /// Default used by `new`: `SMA`.
+    pub fn with_ma_type(period: usize, std_mult: f64, ma_type: MovingAverageType) -> Self {
         Self {
             bb: BollingerBands::new(
                 period.max(2),
                 std_mult.max(0.1),
                 BollingerMode::Close,
-                MovingAverageType::SMA,
+                ma_type,
             ),
             value: 0.5,
         }
@@ -45,6 +52,18 @@ impl PercentB {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_with_ma_type_non_default() {
+        let mut pb = PercentB::with_ma_type(20, 2.0, MovingAverageType::EMA);
+        assert!(!pb.is_ready());
+        for i in 0..30 {
+            let p = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let v = pb.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(pb.is_ready());
+    }
 
     #[test]
     fn test_percent_b_creation() {

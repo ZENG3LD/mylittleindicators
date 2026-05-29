@@ -18,9 +18,15 @@ pub struct VolatilityPercentileRankBands {
 }
 
 impl VolatilityPercentileRankBands {
+    /// Default ctor — ATR smoothed with EMA (original default).
     pub fn new(atr_period: usize, rank_window: usize) -> Self {
+        Self::with_atr_ma_type(atr_period, rank_window, MovingAverageType::EMA)
+    }
+
+    /// Custom ATR smoothing type.
+    pub fn with_atr_ma_type(atr_period: usize, rank_window: usize, atr_ma_type: MovingAverageType) -> Self {
         Self {
-            atr: Atr::new(atr_period.max(1), MovingAverageType::EMA),
+            atr: Atr::new(atr_period.max(1), atr_ma_type),
             window: rank_window.clamp(5, 512),
             buf: Vec::with_capacity(rank_window.clamp(5, 512)),
             idx: 0,
@@ -106,6 +112,17 @@ mod tests {
                 assert!(middle >= lower, "Middle should be >= lower");
             }
         }
+    }
+
+    #[test]
+    fn test_vprb_with_atr_ma_type_rma() {
+        let mut vprb = VolatilityPercentileRankBands::with_atr_ma_type(14, 50, MovingAverageType::RMA);
+        for i in 0..60 {
+            let price = 100.0 + (i as f64 * 0.1).sin() * 5.0;
+            let (upper, middle, lower) = vprb.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+            assert!(upper.is_finite() && middle.is_finite() && lower.is_finite());
+        }
+        assert!(vprb.is_ready());
     }
 
     #[test]

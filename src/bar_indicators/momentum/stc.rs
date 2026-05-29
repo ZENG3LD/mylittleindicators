@@ -17,10 +17,30 @@ pub struct Stc {
 
 impl Stc {
     pub fn new(fast: usize, slow: usize, k_period: usize, d_period: usize) -> Self {
+        Self::with_signal_config(fast, slow, 9, k_period, d_period, MovingAverageType::EMA)
+    }
+
+    /// Create STC with configurable MACD signal period and smoothing MA type.
+    ///
+    /// # Arguments
+    /// * `fast`          - MACD fast period
+    /// * `slow`          - MACD slow period
+    /// * `signal_period` - MACD signal period (default 9)
+    /// * `k_period`      - %K smoothing period
+    /// * `d_period`      - %D smoothing period
+    /// * `ma_type`       - MA type for %K/%D smoothing (default EMA)
+    pub fn with_signal_config(
+        fast: usize,
+        slow: usize,
+        signal_period: usize,
+        k_period: usize,
+        d_period: usize,
+        ma_type: MovingAverageType,
+    ) -> Self {
         Self {
-            macd: Macd::new_with_signal(fast, slow, 9),
-            k_ma: MovingAverageProvider::new(MovingAverageType::EMA, k_period.max(1)),
-            d_ma: MovingAverageProvider::new(MovingAverageType::EMA, d_period.max(1)),
+            macd: Macd::new_with_signal(fast, slow, signal_period.max(1)),
+            k_ma: MovingAverageProvider::new(ma_type, k_period.max(1)),
+            d_ma: MovingAverageProvider::new(ma_type, d_period.max(1)),
             k: 0.0,
             d: 0.0,
             ready: false,
@@ -66,6 +86,17 @@ mod tests {
         let stc = Stc::new(12, 26, 10, 3);
         assert!(!stc.is_ready());
         assert_eq!(stc.value(), IndicatorValue::Double(0.0, 0.0));
+    }
+
+    #[test]
+    fn test_stc_with_signal_config() {
+        let mut stc = Stc::with_signal_config(12, 26, 5, 10, 3, MovingAverageType::SMA);
+        for i in 1..=60 {
+            let p = 100.0 + i as f64 * 0.5;
+            let (k, d) = stc.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(k.is_finite() && d.is_finite());
+        }
+        assert!(stc.is_ready());
     }
 
     #[test]

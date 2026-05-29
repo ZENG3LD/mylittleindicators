@@ -38,18 +38,23 @@ impl Supertrend {
     pub fn new() -> Self {
         Self::with_params(10, 3.0)
     }
-    
-    /// Создать новый Supertrend с настраиваемыми параметрами
+
+    /// Создать новый Supertrend с настраиваемыми параметрами (RMA по умолчанию)
     pub fn with_params(period: usize, multiplier: f64) -> Self {
+        Self::with_atr_ma_type(period, multiplier, MovingAverageType::RMA)
+    }
+
+    /// Создать Supertrend с настраиваемым типом MA для ATR
+    pub fn with_atr_ma_type(period: usize, multiplier: f64, atr_ma_type: MovingAverageType) -> Self {
         assert!(period > 0, "Period must be greater than 0");
         assert!(multiplier > 0.0, "Multiplier must be greater than 0");
-        
+
         Self {
             period,
             multiplier,
             supertrend_values: Vec::with_capacity(512),
             trend_direction: Vec::with_capacity(512),
-            atr: Atr::new(period, MovingAverageType::RMA),
+            atr: Atr::new(period, atr_ma_type),
             supertrend_value: 0.0,
             current_trend: 1,
             prev_supertrend: 0.0,
@@ -413,6 +418,17 @@ mod tests {
         let st = Supertrend::new();
         assert!(!st.is_ready());
         assert_eq!(st.parameters(), (10, 3.0));
+    }
+
+    #[test]
+    fn test_supertrend_with_ema_atr_warmup_finite() {
+        let mut st = Supertrend::with_atr_ma_type(10, 3.0, MovingAverageType::EMA);
+        for i in 0..25 {
+            let price = 100.0 + (i as f64 * 0.2).sin() * 5.0;
+            let v = st.update_bar(price, price + 2.0, price - 2.0, price, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(st.is_ready());
     }
 
     #[test]

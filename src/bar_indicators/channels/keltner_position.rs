@@ -12,13 +12,25 @@ pub struct KeltnerPosition {
 
 impl KeltnerPosition {
     pub fn new(period: usize, mult: f64) -> Self {
+        Self::with_ma_types(period, mult, MovingAverageType::SMA, MovingAverageType::RMA)
+    }
+
+    /// Create with explicit center MA type and ATR smoothing MA type.
+    ///
+    /// Defaults used by `new`: center=`SMA`, atr=`RMA` (Wilder).
+    pub fn with_ma_types(
+        period: usize,
+        mult: f64,
+        center_ma_type: MovingAverageType,
+        atr_ma_type: MovingAverageType,
+    ) -> Self {
         Self {
             kc: KeltnerChannel::new(
                 period.max(2),
                 mult.max(0.1),
                 KeltnerMode::Classic,
-                MovingAverageType::SMA,
-                MovingAverageType::RMA,
+                center_ma_type,
+                atr_ma_type,
             ),
             value: 0.5,
         }
@@ -51,6 +63,18 @@ impl KeltnerPosition {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_with_ma_types_non_default() {
+        let mut kp = KeltnerPosition::with_ma_types(20, 2.0, MovingAverageType::EMA, MovingAverageType::EMA);
+        assert!(!kp.is_ready());
+        for i in 0..30 {
+            let p = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let v = kp.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(kp.is_ready());
+    }
 
     #[test]
     fn test_keltner_position_creation() {

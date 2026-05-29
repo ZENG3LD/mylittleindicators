@@ -19,16 +19,27 @@ pub struct RsiPercentileBands {
 
 impl RsiPercentileBands {
     pub fn new(rsi_period: usize, window: usize) -> Self {
+        let w = window.clamp(10, 1024);
         Self {
             rsi: Rsi::new(rsi_period.max(1)),
-            window: window.clamp(10, 1024),
-            buf: Vec::with_capacity(window.clamp(10, 1024)),
+            window: w,
+            buf: Vec::with_capacity(w),
             idx: 0,
             filled: false,
             upper: 80.0,
             middle: 50.0,
             lower: 20.0,
         }
+    }
+
+    /// Alias exposing the RSI period parameter explicitly.
+    ///
+    /// # Arguments
+    /// * `rsi_period` - RSI lookback period (minimum 1)
+    /// * `window`     - Rolling window for percentile computation (clamped 10..1024)
+    #[inline]
+    pub fn with_rsi_period(rsi_period: usize, window: usize) -> Self {
+        Self::new(rsi_period, window)
     }
     #[inline]
     pub fn reset(&mut self) {
@@ -85,6 +96,18 @@ mod tests {
         assert!(!rpb.is_ready());
         assert_eq!(rpb.value(), IndicatorValue::Channel3 { upper: 80.0, middle: 50.0, lower: 20.0 });
         assert_eq!(rpb.window(), 50);
+    }
+
+    #[test]
+    fn test_rsi_percentile_bands_with_rsi_period() {
+        let mut rpb = RsiPercentileBands::with_rsi_period(9, 30);
+        assert_eq!(rpb.window(), 30);
+        for i in 1..=60 {
+            let p = 100.0 + (i as f64 * 0.3).sin() * 10.0;
+            let (upper, mid, lower) = rpb.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(upper.is_finite() && mid.is_finite() && lower.is_finite());
+        }
+        assert!(rpb.is_ready());
     }
 
     #[test]

@@ -14,12 +14,19 @@ pub struct EnvelopeBandwidth {
 
 impl EnvelopeBandwidth {
     pub fn new(period: usize, pct: f64) -> Self {
+        Self::with_ma_type(period, pct, MovingAverageType::SMA)
+    }
+
+    /// Create with an explicit MA type for the envelope center line.
+    ///
+    /// Default used by `new`: `SMA`.
+    pub fn with_ma_type(period: usize, pct: f64, ma_type: MovingAverageType) -> Self {
         Self {
             env: EnvelopeChannels::new(
                 period.max(1),
                 pct.max(0.01),
                 EnvelopeMode::Fixed,
-                MovingAverageType::SMA,
+                ma_type,
             ),
             value: 0.0,
         }
@@ -52,6 +59,18 @@ impl EnvelopeBandwidth {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_with_ma_type_non_default() {
+        let mut eb = EnvelopeBandwidth::with_ma_type(20, 2.5, MovingAverageType::EMA);
+        assert!(!eb.is_ready());
+        for i in 0..30 {
+            let p = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let v = eb.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(v >= 0.0);
+        }
+        assert!(eb.is_ready());
+    }
 
     #[test]
     fn test_envelope_bandwidth_creation() {

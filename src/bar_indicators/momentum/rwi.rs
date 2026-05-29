@@ -17,9 +17,18 @@ pub struct Rwi {
 
 impl Rwi {
     pub fn new(period: usize) -> Self {
+        Self::with_atr_type(period, MovingAverageType::RMA)
+    }
+
+    /// Create RWI with configurable ATR smoothing MA type.
+    ///
+    /// # Arguments
+    /// * `period`      - Lookback period (minimum 2)
+    /// * `atr_ma_type` - MA type for internal ATR (default RMA)
+    pub fn with_atr_type(period: usize, atr_ma_type: MovingAverageType) -> Self {
         Self {
             period: period.max(2),
-            atr: Atr::new(period.max(2), MovingAverageType::RMA),
+            atr: Atr::new(period.max(2), atr_ma_type),
             prev_high: None,
             prev_low: None,
             up: 0.0,
@@ -69,6 +78,17 @@ mod tests {
         assert!(!rwi.is_ready());
         assert_eq!(rwi.value(), IndicatorValue::Double(0.0, 0.0));
         assert_eq!(rwi.period(), 14);
+    }
+
+    #[test]
+    fn test_rwi_with_atr_type() {
+        let mut rwi = Rwi::with_atr_type(14, MovingAverageType::EMA);
+        for i in 1..=30 {
+            let p = 100.0 + i as f64;
+            let (up, down) = rwi.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(up.is_finite() && down.is_finite());
+        }
+        assert!(rwi.is_ready());
     }
 
     #[test]

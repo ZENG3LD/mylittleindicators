@@ -1,6 +1,7 @@
 // ADX slope and persistence score
 
 use crate::bar_indicators::momentum::adx::Adx;
+use crate::bar_indicators::average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 
@@ -13,8 +14,13 @@ pub struct AdxSlope {
 
 impl AdxSlope {
     pub fn new(period: usize) -> Self {
+        Self::with_atr_ma_type(period, MovingAverageType::RMA)
+    }
+
+    /// Build with a specific ATR smoothing type threaded into the inner Adx.
+    pub fn with_atr_ma_type(period: usize, atr_ma_type: MovingAverageType) -> Self {
         Self {
-            adx: Adx::new(period.max(2)),
+            adx: Adx::with_atr_ma_type(period.max(2), atr_ma_type),
             prev: 0.0,
             slope: 0.0,
         }
@@ -52,6 +58,17 @@ mod tests {
         let adx = AdxSlope::new(14);
         assert!(!adx.is_ready());
         assert_eq!(adx.value().main(), 0.0);
+    }
+
+    #[test]
+    fn test_adx_slope_with_ema_atr_warmup_finite() {
+        let mut adx = AdxSlope::with_atr_ma_type(14, MovingAverageType::EMA);
+        for i in 0..50 {
+            let price = 100.0 + (i as f64 * 0.3).sin() * 4.0;
+            let v = adx.update_bar(price, price + 1.5, price - 1.5, price, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(adx.is_ready());
     }
 
     #[test]

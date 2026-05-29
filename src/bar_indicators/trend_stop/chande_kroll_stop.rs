@@ -21,12 +21,23 @@ pub struct ChandeKrollStop {
 
 impl ChandeKrollStop {
     pub fn new(atr_period: usize, k: f64, hh_period: usize, ll_period: usize) -> Self {
+        Self::with_atr_ma_type(atr_period, k, hh_period, ll_period, MovingAverageType::RMA)
+    }
+
+    /// Build with a specific ATR smoothing type.
+    pub fn with_atr_ma_type(
+        atr_period: usize,
+        k: f64,
+        hh_period: usize,
+        ll_period: usize,
+        atr_ma_type: MovingAverageType,
+    ) -> Self {
         Self {
             atr_period: atr_period.max(1),
             k: if k > 0.0 { k } else { 1.5 },
             hh_period: hh_period.max(1),
             ll_period: ll_period.max(1),
-            atr: Atr::new(atr_period.max(1), MovingAverageType::RMA),
+            atr: Atr::new(atr_period.max(1), atr_ma_type),
             highs: Vec::with_capacity(512),
             lows: Vec::with_capacity(512),
             long_stop: 0.0,
@@ -94,6 +105,18 @@ mod tests {
         let ind = ChandeKrollStop::new(10, 1.5, 10, 10);
         assert!(!ind.is_ready());
         assert_eq!(ind.value().main(), 0.0);
+    }
+
+    #[test]
+    fn test_chande_kroll_stop_with_ema_atr_warmup_finite() {
+        let mut ind = ChandeKrollStop::with_atr_ma_type(10, 1.5, 10, 10, MovingAverageType::EMA);
+        for i in 0..25 {
+            let price = 100.0 + (i as f64 * 0.2).sin() * 5.0;
+            let (long, short) = ind.update_bar(price, price + 2.0, price - 2.0, price, 1000.0);
+            assert!(long.is_finite());
+            assert!(short.is_finite());
+        }
+        assert!(ind.is_ready());
     }
 
     #[test]

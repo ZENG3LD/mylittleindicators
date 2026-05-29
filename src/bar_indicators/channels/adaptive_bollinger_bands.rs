@@ -97,6 +97,7 @@ pub struct AdaptiveBollingerBands {
     min_multiplier: f64,             // Минимальный множитель
     max_multiplier: f64,             // Максимальный множитель
     source: OhlcvField,              // Источник данных (Close, HL2, HLC3, etc.)
+    adaptive_ma_type: MovingAverageType, // Тип MA для центральной адаптивной линии
 
     // Текущие адаптивные параметры
     current_period: f64,
@@ -163,6 +164,42 @@ impl AdaptiveBollingerBands {
         )
     }
 
+    /// Создать с полной ручной конфигурацией + выбором типов MA/ATR и вспомогательных периодов.
+    ///
+    /// - `adaptive_ma_type`  — тип MA для центральной адаптивной линии (default EMA)
+    /// - `atr_ma_type`       — тип MA внутри ATR (default RMA = Wilder)
+    /// - `volatility_ma_period`  — период MA сглаживания волатильности (default 10)
+    /// - `bandwidth_ma_period`   — период MA анализа ширины канала (default 20)
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_full_config(
+        base_period: usize,
+        min_period: usize,
+        max_period: usize,
+        base_multiplier: f64,
+        min_multiplier: f64,
+        max_multiplier: f64,
+        adaptive_ma_type: MovingAverageType,
+        atr_ma_type: MovingAverageType,
+        volatility_ma_period: usize,
+        bandwidth_ma_period: usize,
+    ) -> Self {
+        assert!(base_period > 0, "Base period must be greater than 0");
+        assert!(min_period > 0 && min_period <= base_period, "Invalid min period");
+        assert!(max_period >= base_period, "Invalid max period");
+        assert!(base_multiplier > 0.0, "Base multiplier must be positive");
+        assert!(min_multiplier > 0.0 && min_multiplier <= base_multiplier, "Invalid min multiplier");
+        assert!(max_multiplier >= base_multiplier, "Invalid max multiplier");
+        assert!(volatility_ma_period > 0, "Volatility MA period must be > 0");
+        assert!(bandwidth_ma_period > 0, "Bandwidth MA period must be > 0");
+
+        Self::with_full_config_internal(
+            base_period, min_period, max_period,
+            base_multiplier, min_multiplier, max_multiplier,
+            adaptive_ma_type, atr_ma_type,
+            volatility_ma_period, bandwidth_ma_period,
+        )
+    }
+
     /// Внутренний конструктор - создаёт экземпляр без валидации (вызывается после проверок)
     fn with_parameters_internal(
         base_period: usize,
@@ -172,13 +209,34 @@ impl AdaptiveBollingerBands {
         min_multiplier: f64,
         max_multiplier: f64
     ) -> Self {
+        Self::with_full_config_internal(
+            base_period, min_period, max_period,
+            base_multiplier, min_multiplier, max_multiplier,
+            MovingAverageType::EMA,
+            MovingAverageType::RMA,
+            10,
+            20,
+        )
+    }
 
+    fn with_full_config_internal(
+        base_period: usize,
+        min_period: usize,
+        max_period: usize,
+        base_multiplier: f64,
+        min_multiplier: f64,
+        max_multiplier: f64,
+        adaptive_ma_type: MovingAverageType,
+        atr_ma_type: MovingAverageType,
+        volatility_ma_period: usize,
+        bandwidth_ma_period: usize,
+    ) -> Self {
         Self {
             // Переиспользуем существующие компоненты
-            adaptive_ma: MovingAverageProvider::new(MovingAverageType::EMA, base_period),
-            atr: Atr::new_wilder(14),
-            volatility_ma: MovingAverageProvider::new(MovingAverageType::SMA, 10),
-            bandwidth_ma: MovingAverageProvider::new(MovingAverageType::SMA, 20),
+            adaptive_ma: MovingAverageProvider::new(adaptive_ma_type, base_period),
+            atr: Atr::new(14, atr_ma_type),
+            volatility_ma: MovingAverageProvider::new(MovingAverageType::SMA, volatility_ma_period),
+            bandwidth_ma: MovingAverageProvider::new(MovingAverageType::SMA, bandwidth_ma_period),
 
             prices: Vec::with_capacity(64),
             std_devs: Vec::with_capacity(32),
@@ -192,6 +250,7 @@ impl AdaptiveBollingerBands {
             min_multiplier,
             max_multiplier,
             source: OhlcvField::Close,
+            adaptive_ma_type,
 
             current_period: base_period as f64,
             current_multiplier: base_multiplier,
@@ -334,7 +393,7 @@ impl AdaptiveBollingerBands {
         // Пересоздаем MA если период изменился более чем на 20%
         let diff: f64 = (new_period as f64 - current_ma_period as f64).abs();
         if diff / current_ma_period as f64 > 0.2 {
-            self.adaptive_ma = MovingAverageProvider::new(MovingAverageType::EMA, new_period);
+            self.adaptive_ma = MovingAverageProvider::new(self.adaptive_ma_type, new_period);
         }
     }
     
@@ -604,6 +663,25 @@ mod tests {
         assert_eq!(abb.parameters().0, 20);
     }
     
+    #[test]
+    fn test_with_full_config_non_default_types() {
+        // richer ctor: EMA→SMA for adaptive_ma, RMA→EMA for atr
+        let mut abb = AdaptiveBollingerBands::with_full_config(
+            20, 10, 40, 2.0, 1.0, 3.0,
+            MovingAverageType::SMA,
+            MovingAverageType::EMA,
+            8, 16,
+        );
+        assert!(!abb.is_ready());
+        for i in 0..30 {
+            let p = 100.0 + i as f64 * 0.5;
+            let r = abb.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(r.upper_band.is_finite());
+            assert!(r.lower_band.is_finite());
+        }
+        assert!(abb.is_ready());
+    }
+
     #[test]
     fn test_adaptive_bollinger_bands_with_parameters() {
         let abb = AdaptiveBollingerBands::with_parameters(14, 7, 28, 2.5, 1.5, 3.5);

@@ -15,14 +15,20 @@ pub struct HysteresisGate {
 }
 
 impl HysteresisGate {
-    /// Creates a new HysteresisGate with RSI thresholds
-    /// Default: lower=30 (oversold), upper=70 (overbought)
+    /// Creates a new HysteresisGate with RSI thresholds.
+    /// Default: lower=30 (oversold), upper=70 (overbought), rsi_period=14.
     pub fn new(lower: f64, upper: f64) -> Self {
+        Self::with_rsi_period(lower, upper, 14)
+    }
+
+    /// Creates a HysteresisGate with configurable RSI period.
+    /// `rsi_period` replaces the baked-in default of 14.
+    pub fn with_rsi_period(lower: f64, upper: f64, rsi_period: usize) -> Self {
         Self {
             lower: lower.clamp(0.0, 50.0),
             upper: upper.clamp(50.0, 100.0),
             state: 0,
-            rsi: Rsi::new(14),
+            rsi: Rsi::new(rsi_period),
         }
     }
 
@@ -109,6 +115,19 @@ mod tests {
         // State should be either 0 or 1 after uptrend
         let state = hg.value().as_signal().unwrap();
         assert!(state >= 0, "Uptrend should not give oversold signal");
+    }
+
+    #[test]
+    fn test_hysteresis_gate_with_rsi_period() {
+        let mut hg = HysteresisGate::with_rsi_period(30.0, 70.0, 7);
+        assert!(!hg.is_ready());
+        let mut price = 100.0;
+        for _ in 0..20 {
+            price += 2.0;
+            hg.update_bar(price - 1.0, price + 0.5, price - 1.5, price, 1000.0);
+        }
+        assert!(hg.is_ready());
+        assert!(hg.value().as_signal().unwrap().abs() <= 1);
     }
 
     #[test]

@@ -12,12 +12,19 @@ pub struct BollingerMetrics {
 
 impl BollingerMetrics {
     pub fn new(period: usize, k: f64) -> Self {
+        Self::with_ma_type(period, k, MovingAverageType::SMA)
+    }
+
+    /// Create with an explicit MA type for the Bollinger center line.
+    ///
+    /// Default used by `new`: `SMA`.
+    pub fn with_ma_type(period: usize, k: f64, ma_type: MovingAverageType) -> Self {
         Self {
             bb: BollingerBands::new(
                 period.max(1),
                 k,
                 BollingerMode::Close,
-                MovingAverageType::SMA,
+                ma_type,
             ),
             percent_b: 0.5,
             bandwidth: 0.0,
@@ -68,6 +75,19 @@ impl BollingerMetrics {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_with_ma_type_non_default() {
+        let mut bm = BollingerMetrics::with_ma_type(20, 2.0, MovingAverageType::EMA);
+        assert!(!bm.is_ready());
+        for i in 0..30 {
+            let p = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let (pct_b, bw) = bm.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(pct_b.is_finite());
+            assert!(bw >= 0.0);
+        }
+        assert!(bm.is_ready());
+    }
 
     #[test]
     fn test_bollinger_metrics_creation() {

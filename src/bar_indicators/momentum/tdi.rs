@@ -46,10 +46,26 @@ impl Tdi {
     /// - `signal_period` — fast EMA on RSI for signal line (default 2)
     /// - `band_period`   — Bollinger Band SMA period on RSI (default 34)
     pub fn new(rsi_period: usize, signal_period: usize, band_period: usize) -> Self {
+        Self::with_signal_ma_type(rsi_period, signal_period, band_period, MovingAverageType::EMA)
+    }
+
+    /// Create TDI with configurable signal MA type.
+    ///
+    /// # Arguments
+    /// * `rsi_period`      - RSI lookback period
+    /// * `signal_period`   - Signal line MA period
+    /// * `band_period`     - Bollinger Band SMA period on RSI
+    /// * `signal_ma_type`  - MA type for the signal line (default EMA)
+    pub fn with_signal_ma_type(
+        rsi_period: usize,
+        signal_period: usize,
+        band_period: usize,
+        signal_ma_type: MovingAverageType,
+    ) -> Self {
         let bp = band_period.max(2);
         Self {
             rsi: Rsi::new(rsi_period.max(1)),
-            signal_ma: MovingAverageProvider::new(MovingAverageType::EMA, signal_period.max(1)),
+            signal_ma: MovingAverageProvider::new(signal_ma_type, signal_period.max(1)),
             band_period: bp,
             band_buf: Vec::with_capacity(bp),
             band_idx: 0,
@@ -149,6 +165,17 @@ mod tests {
         assert!((rsi - 0.5).abs() < 1e-10);
         assert!((sig - 0.5).abs() < 1e-10);
         assert!((basis - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_tdi_with_signal_ma_type() {
+        let mut tdi = Tdi::with_signal_ma_type(13, 2, 34, MovingAverageType::SMA);
+        for i in 1..=50 {
+            let p = 100.0 + i as f64 * 0.5;
+            let (rsi, sig, basis) = tdi.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(rsi.is_finite() && sig.is_finite() && basis.is_finite());
+        }
+        assert!(tdi.is_ready());
     }
 
     #[test]

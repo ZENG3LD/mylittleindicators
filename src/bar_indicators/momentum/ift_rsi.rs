@@ -12,8 +12,16 @@ pub struct IftRsi {
 
 impl IftRsi {
     pub fn new(period: usize) -> Self {
+        Self::with_rsi_period(period)
+    }
+
+    /// Create IFT RSI with explicit RSI period parameter.
+    ///
+    /// # Arguments
+    /// * `rsi_period` - RSI lookback period (minimum 1)
+    pub fn with_rsi_period(rsi_period: usize) -> Self {
         Self {
-            rsi: Rsi::new(period.max(1)),
+            rsi: Rsi::new(rsi_period.max(1)),
             value: 0.0,
         }
     }
@@ -49,6 +57,17 @@ mod tests {
         let ift = IftRsi::new(14);
         assert!(!ift.is_ready());
         assert_eq!(ift.value().main(), 0.0);
+    }
+
+    #[test]
+    fn test_ift_rsi_with_rsi_period() {
+        let mut ift = IftRsi::with_rsi_period(9);
+        for i in 1..=30 {
+            let p = 100.0 + i as f64 * 0.5;
+            let v = ift.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(v.is_finite() && v >= -1.0 && v <= 1.0);
+        }
+        assert!(ift.is_ready());
     }
 
     #[test]

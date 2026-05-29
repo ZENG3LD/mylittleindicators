@@ -15,13 +15,19 @@ pub struct ThresholdGate {
 }
 
 impl ThresholdGate {
-    /// Creates a new ThresholdGate with RSI thresholds
-    /// Default: lower=30 (oversold), upper=70 (overbought)
+    /// Creates a new ThresholdGate with RSI thresholds.
+    /// Default: lower=30 (oversold), upper=70 (overbought), rsi_period=14.
     pub fn new(lower: f64, upper: f64) -> Self {
+        Self::with_rsi_period(lower, upper, 14)
+    }
+
+    /// Creates a ThresholdGate with configurable RSI period.
+    /// `rsi_period` replaces the baked-in default of 14.
+    pub fn with_rsi_period(lower: f64, upper: f64, rsi_period: usize) -> Self {
         Self {
             upper: upper.clamp(50.0, 100.0),
             lower: lower.clamp(0.0, 50.0),
-            rsi: Rsi::new(14),
+            rsi: Rsi::new(rsi_period),
             signal: 0,
         }
     }
@@ -121,6 +127,20 @@ mod tests {
         // Strong downtrend should give oversold signal (-1)
         let signal = tg.value().as_signal().unwrap();
         assert!(signal <= 0, "Strong downtrend should not be overbought");
+    }
+
+    #[test]
+    fn test_threshold_gate_with_rsi_period() {
+        let mut tg = ThresholdGate::with_rsi_period(30.0, 70.0, 7);
+        assert!(!tg.is_ready());
+        let mut price = 100.0;
+        for _ in 0..20 {
+            price += 2.0;
+            tg.update_bar(price - 1.0, price + 0.5, price - 1.5, price, 1000.0);
+        }
+        assert!(tg.is_ready());
+        let sig = tg.value().as_signal().unwrap();
+        assert!(sig >= -1 && sig <= 1);
     }
 
     #[test]

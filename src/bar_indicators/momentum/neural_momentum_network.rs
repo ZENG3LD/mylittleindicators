@@ -178,32 +178,43 @@ impl NeuralMomentumNetwork {
     pub fn new() -> Self {
         Self::with_learning_rate(0.01)
     }
-    
+
     /// Создать с настраиваемой скоростью обучения
     pub fn with_learning_rate(learning_rate: f64) -> Self {
-        assert!(learning_rate > 0.0 && learning_rate <= 1.0, 
+        Self::with_learning_rate_and_atr(learning_rate, 14, MovingAverageType::RMA)
+    }
+
+    /// Создать с настраиваемой скоростью обучения и параметрами внутреннего ATR.
+    ///
+    /// # Arguments
+    /// * `learning_rate` - Скорость обучения (0.0 < lr <= 1.0)
+    /// * `atr_period`    - Период внутреннего ATR (default 14)
+    /// * `atr_ma_type`   - Тип MA внутреннего ATR (default RMA)
+    pub fn with_learning_rate_and_atr(learning_rate: f64, atr_period: usize, atr_ma_type: MovingAverageType) -> Self {
+        assert!(learning_rate > 0.0 && learning_rate <= 1.0,
                 "Learning rate must be between 0.0 and 1.0");
-        
+        assert!(atr_period > 0, "ATR period must be greater than 0");
+
         // Создаем нейроны для каждого слоя
         let mut layer1 = Vec::with_capacity(4);
         layer1.push(Neuron::new(6, ActivationFunction::Tanh, learning_rate));
         layer1.push(Neuron::new(6, ActivationFunction::Sigmoid, learning_rate));
         layer1.push(Neuron::new(6, ActivationFunction::ReLU, learning_rate));
         layer1.push(Neuron::new(6, ActivationFunction::Swish, learning_rate));
-        
+
         let mut layer2 = Vec::with_capacity(2);
         layer2.push(Neuron::new(4, ActivationFunction::Tanh, learning_rate));
         layer2.push(Neuron::new(4, ActivationFunction::Sigmoid, learning_rate));
-        
+
         let output_neuron = Neuron::new(2, ActivationFunction::Tanh, learning_rate);
-        
+
         Self {
             // Переиспользуем MovingAverage для разных целей
             rsi_ma: MovingAverageProvider::new(MovingAverageType::EMA, 14),
             roc_ma: MovingAverageProvider::new(MovingAverageType::EMA, 10),
             momentum_ma: MovingAverageProvider::new(MovingAverageType::EMA, 12),
             volume_ma: MovingAverageProvider::new(MovingAverageType::SMA, 20),
-            atr: Atr::new(14, MovingAverageType::RMA),
+            atr: Atr::new(atr_period, atr_ma_type),
             
             layer1,
             layer2,
@@ -647,6 +658,17 @@ mod tests {
         let nmn = NeuralMomentumNetwork::new();
         assert!(!nmn.is_ready());
         assert_eq!(nmn.learning_rate(), 0.01);
+    }
+
+    #[test]
+    fn test_neural_momentum_network_with_atr_type() {
+        let mut nmn = NeuralMomentumNetwork::with_learning_rate_and_atr(0.01, 10, MovingAverageType::EMA);
+        for i in 0..30 {
+            let p = 100.0 + i as f64 * 0.5;
+            let r = nmn.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(r.momentum_score.is_finite());
+        }
+        assert!(nmn.is_ready());
     }
     
     #[test]

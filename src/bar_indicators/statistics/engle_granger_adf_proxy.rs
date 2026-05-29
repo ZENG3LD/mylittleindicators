@@ -1,11 +1,11 @@
-// Engle–Granger ADF Proxy: OLS residuals of close ~ SMA(ma_period), then AR(1) t-stat on residuals
+// Engle–Granger ADF Proxy: OLS residuals of close ~ MA(ma_period), then AR(1) t-stat on residuals
 
-use crate::bar_indicators::average::sma::Sma;
+use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 
 #[derive(Clone)]
 pub struct EngleGrangerAdfProxy {
     window: usize,
-    sma: Sma,
+    ma: MovingAverageProvider,
     residuals: Vec<f64>,
     idx: usize,
     filled: bool,
@@ -16,10 +16,15 @@ pub struct EngleGrangerAdfProxy {
 
 impl EngleGrangerAdfProxy {
     pub fn new(window: usize, ma_period: usize) -> Self {
+        Self::with_ma_type(window, ma_period, MovingAverageType::SMA)
+    }
+
+    /// Creates a new EngleGrangerAdfProxy with a configurable MA type.
+    pub fn with_ma_type(window: usize, ma_period: usize, ma_type: MovingAverageType) -> Self {
         let w = window.max(32);
         Self {
             window: w,
-            sma: Sma::new(ma_period.max(5)),
+            ma: MovingAverageProvider::new(ma_type, ma_period.max(5)),
             residuals: vec![0.0; w],
             idx: 0,
             filled: false,
@@ -31,7 +36,7 @@ impl EngleGrangerAdfProxy {
 
     #[inline]
     pub fn reset(&mut self) {
-        self.sma.reset();
+        self.ma.reset();
         self.residuals.fill(0.0);
         self.idx = 0;
         self.filled = false;
@@ -53,8 +58,8 @@ impl EngleGrangerAdfProxy {
         close: f64,
         volume: f64,
     ) -> (f64, f64) {
-        // OLS against SMA is effectively residual = close - SMA(close)
-        let m = self.sma.update_bar(open, high, low, close, volume);
+        // OLS against MA is effectively residual = close - MA(close)
+        let m = self.ma.update_bar(open, high, low, close, volume);
         let resid = close - m;
         self.residuals[self.idx] = resid;
         self.idx = (self.idx + 1) % self.window;
@@ -154,5 +159,17 @@ mod tests {
         assert!(!egap.is_ready());
         assert_eq!(egap.phi, 0.0);
         assert_eq!(egap.t_stat, 0.0);
+    }
+
+    #[test]
+    fn test_engle_granger_adf_proxy_with_ema() {
+        let mut egap = EngleGrangerAdfProxy::with_ma_type(50, 20, MovingAverageType::EMA);
+        for i in 0..60 {
+            let price = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let (phi, t_stat) = egap.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+            assert!(phi.is_finite());
+            assert!(t_stat.is_finite());
+        }
+        assert!(egap.is_ready());
     }
 }

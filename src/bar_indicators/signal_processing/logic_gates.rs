@@ -25,10 +25,16 @@ impl Default for AndGate {
 }
 
 impl AndGate {
+    /// Default: rsi_short_period=7, rsi_long_period=21.
     pub fn new() -> Self {
+        Self::with_periods(7, 21)
+    }
+
+    /// Configurable RSI periods. `short_period` < `long_period` recommended.
+    pub fn with_periods(short_period: usize, long_period: usize) -> Self {
         Self {
-            rsi_short: Rsi::new(7),
-            rsi_long: Rsi::new(21),
+            rsi_short: Rsi::new(short_period),
+            rsi_long: Rsi::new(long_period),
             v: false,
         }
     }
@@ -81,10 +87,16 @@ impl Default for OrGate {
 }
 
 impl OrGate {
+    /// Default: rsi_short_period=7, rsi_long_period=21.
     pub fn new() -> Self {
+        Self::with_periods(7, 21)
+    }
+
+    /// Configurable RSI periods. `short_period` < `long_period` recommended.
+    pub fn with_periods(short_period: usize, long_period: usize) -> Self {
         Self {
-            rsi_short: Rsi::new(7),
-            rsi_long: Rsi::new(21),
+            rsi_short: Rsi::new(short_period),
+            rsi_long: Rsi::new(long_period),
             v: false,
         }
     }
@@ -138,10 +150,16 @@ impl Default for XorGate {
 }
 
 impl XorGate {
+    /// Default: rsi_short_period=7, rsi_long_period=21.
     pub fn new() -> Self {
+        Self::with_periods(7, 21)
+    }
+
+    /// Configurable RSI periods. `short_period` < `long_period` recommended.
+    pub fn with_periods(short_period: usize, long_period: usize) -> Self {
         Self {
-            rsi_short: Rsi::new(7),
-            rsi_long: Rsi::new(21),
+            rsi_short: Rsi::new(short_period),
+            rsi_long: Rsi::new(long_period),
             v: false,
         }
     }
@@ -197,10 +215,16 @@ impl Default for SignCombiner {
 }
 
 impl SignCombiner {
+    /// Default: rsi_short_period=7, rsi_long_period=21.
     pub fn new() -> Self {
+        Self::with_periods(7, 21)
+    }
+
+    /// Configurable RSI periods. `short_period` < `long_period` recommended.
+    pub fn with_periods(short_period: usize, long_period: usize) -> Self {
         Self {
-            rsi_short: Rsi::new(7),
-            rsi_long: Rsi::new(21),
+            rsi_short: Rsi::new(short_period),
+            rsi_long: Rsi::new(long_period),
             s: 0,
         }
     }
@@ -247,6 +271,28 @@ impl SignCombiner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_logic_gates_with_periods() {
+        // Verify richer ctor builds, warms up, and produces finite output for all 4 structs
+        let mut and = AndGate::with_periods(5, 14);
+        let mut or = OrGate::with_periods(5, 14);
+        let mut xor = XorGate::with_periods(5, 14);
+        let mut sc = SignCombiner::with_periods(5, 14);
+        let mut price = 100.0;
+        for _ in 0..30 {
+            price += 1.5;
+            and.update_bar(price - 0.5, price + 0.5, price - 0.5, price, 1000.0);
+            or.update_bar(price - 0.5, price + 0.5, price - 0.5, price, 1000.0);
+            xor.update_bar(price - 0.5, price + 0.5, price - 0.5, price, 1000.0);
+            sc.update_bar(price - 0.5, price + 0.5, price - 0.5, price, 1000.0);
+        }
+        assert!(and.is_ready());
+        assert!(or.is_ready());
+        assert!(xor.is_ready());
+        assert!(sc.is_ready());
+        assert!(sc.value().as_signal().unwrap().abs() <= 1);
+    }
 
     #[test]
     fn test_and_gate_legacy() {

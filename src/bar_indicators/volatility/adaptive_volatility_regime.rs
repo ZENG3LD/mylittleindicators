@@ -187,14 +187,18 @@ pub struct AdaptiveVolatilityRegime {
 }
 
 impl AdaptiveVolatilityRegime {
-    /// Создать новую Adaptive Volatility Regime с параметрами по умолчанию
+    /// Создать новую Adaptive Volatility Regime с параметрами по умолчанию.
+    /// ATR smoothed with EMA (original default).
     pub fn new() -> Self {
-        Self::with_parameters(0.1, 50)
+        Self::with_parameters(0.1, 50, MovingAverageType::EMA)
     }
-    
-    /// Создать с настраиваемыми параметрами
-    pub fn with_parameters(learning_rate: f64, adaptation_period: usize) -> Self {
-        assert!(learning_rate > 0.0 && learning_rate <= 1.0, 
+
+    /// Создать с настраиваемыми параметрами.
+    ///
+    /// `atr_ma_type` — smoothing applied to the internal ATR(14).
+    /// Original default: `MovingAverageType::EMA`.
+    pub fn with_parameters(learning_rate: f64, adaptation_period: usize, atr_ma_type: MovingAverageType) -> Self {
+        assert!(learning_rate > 0.0 && learning_rate <= 1.0,
                 "Learning rate must be between 0.0 and 1.0");
         assert!(adaptation_period > 0, "Adaptation period must be positive");
         
@@ -225,7 +229,7 @@ impl AdaptiveVolatilityRegime {
         
         Self {
             // Переиспользуем MovingAverage и ATR для разных целей
-            atr: Atr::new(14, MovingAverageType::RMA),
+            atr: Atr::new(14, atr_ma_type),
             short_vol_ma: MovingAverageProvider::new(MovingAverageType::EMA, 10),
             long_vol_ma: MovingAverageProvider::new(MovingAverageType::EMA, 30),
             range_ma: MovingAverageProvider::new(MovingAverageType::SMA, 20),
@@ -676,6 +680,17 @@ mod tests {
         let avr = AdaptiveVolatilityRegime::new();
         assert!(!avr.is_ready());
         assert_eq!(avr.learning_rate(), 0.1);
+    }
+
+    #[test]
+    fn test_with_parameters_rma_type() {
+        let mut avr = AdaptiveVolatilityRegime::with_parameters(0.1, 50, MovingAverageType::RMA);
+        for i in 0..40 {
+            let price = 100.0 + (i as f64 * 0.1).sin() * 2.0;
+            let result = avr.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+            assert!(result.volatility_score.is_finite());
+        }
+        assert!(avr.is_ready());
     }
     
     #[test]

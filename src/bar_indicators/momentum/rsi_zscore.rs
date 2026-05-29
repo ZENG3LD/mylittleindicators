@@ -17,16 +17,27 @@ pub struct RsiZscore {
 
 impl RsiZscore {
     pub fn new(rsi_period: usize, window: usize) -> Self {
+        let w = window.max(2);
         Self {
             rsi: Rsi::new(rsi_period),
-            window: window.max(2),
-            buf: vec![0.0; window.max(2)],
+            window: w,
+            buf: vec![0.0; w],
             idx: 0,
             filled: false,
             sum: 0.0,
             sumsq: 0.0,
             z: 0.0,
         }
+    }
+
+    /// Alias exposing the RSI period parameter explicitly.
+    ///
+    /// # Arguments
+    /// * `rsi_period` - RSI lookback period
+    /// * `window`     - Rolling z-score window (minimum 2)
+    #[inline]
+    pub fn with_rsi_period(rsi_period: usize, window: usize) -> Self {
+        Self::new(rsi_period, window)
     }
 
     #[inline]
@@ -92,6 +103,18 @@ mod tests {
         assert!(!rz.is_ready());
         assert_eq!(rz.value().main(), 0.0);
         assert_eq!(rz.window(), 20);
+    }
+
+    #[test]
+    fn test_rsi_zscore_with_rsi_period() {
+        let mut rz = RsiZscore::with_rsi_period(9, 15);
+        assert_eq!(rz.window(), 15);
+        for i in 1..=40 {
+            let p = 100.0 + i as f64 * 0.5;
+            let v = rz.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(rz.is_ready());
     }
 
     #[test]

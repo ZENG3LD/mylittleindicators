@@ -140,27 +140,42 @@ pub struct VolatilityBreakoutDetector {
 }
 
 impl VolatilityBreakoutDetector {
-    /// Создать новый Volatility Breakout Detector с параметрами по умолчанию
+    /// Создать новый Volatility Breakout Detector с параметрами по умолчанию.
+    /// Both ATRs smoothed with RMA (Wilder), equivalent to `Atr::new_wilder`.
     pub fn new() -> Self {
         Self::with_parameters(1.2, 1.8, 2.5, 0.7)
     }
-    
-    /// Создать с настраиваемыми параметрами
+
+    /// Создать с настраиваемыми порогами.  ATR smoothed with RMA (Wilder, original default).
     pub fn with_parameters(
         mild_threshold: f64,
         strong_threshold: f64,
         extreme_threshold: f64,
-        squeeze_threshold: f64
+        squeeze_threshold: f64,
+    ) -> Self {
+        Self::with_atr_ma_type(mild_threshold, strong_threshold, extreme_threshold, squeeze_threshold, MovingAverageType::RMA)
+    }
+
+    /// Создать с настраиваемыми порогами и типом сглаживания ATR.
+    ///
+    /// `atr_ma_type` — smoothing applied to both the long ATR(14) and short ATR(5).
+    /// Original default: `MovingAverageType::RMA` (= Wilder).
+    pub fn with_atr_ma_type(
+        mild_threshold: f64,
+        strong_threshold: f64,
+        extreme_threshold: f64,
+        squeeze_threshold: f64,
+        atr_ma_type: MovingAverageType,
     ) -> Self {
         assert!(mild_threshold > 1.0, "Mild threshold must be > 1.0");
         assert!(strong_threshold > mild_threshold, "Strong threshold must be > mild threshold");
         assert!(extreme_threshold > strong_threshold, "Extreme threshold must be > strong threshold");
         assert!(squeeze_threshold > 0.0 && squeeze_threshold < 1.0, "Squeeze threshold must be 0-1");
-        
+
         Self {
             // Переиспользуем существующие компоненты
-            atr: Atr::new_wilder(14),
-            atr_short: Atr::new_wilder(5),
+            atr: Atr::new(14, atr_ma_type),
+            atr_short: Atr::new(5, atr_ma_type),
             volatility_ma: MovingAverageProvider::new(MovingAverageType::EMA, 20),
             momentum_ma: MovingAverageProvider::new(MovingAverageType::EMA, 8),
             squeeze_ma: MovingAverageProvider::new(MovingAverageType::SMA, 10),
@@ -599,6 +614,17 @@ mod tests {
     fn test_volatility_breakout_detector_with_parameters() {
         let vbd = VolatilityBreakoutDetector::with_parameters(1.3, 2.0, 3.0, 0.6);
         assert_eq!(vbd.parameters(), (1.3, 2.0, 3.0, 0.6));
+    }
+
+    #[test]
+    fn test_vbd_with_atr_ma_type_ema() {
+        let mut vbd = VolatilityBreakoutDetector::with_atr_ma_type(1.2, 1.8, 2.5, 0.7, MovingAverageType::EMA);
+        for i in 0..25 {
+            let price = 100.0 + (i as f64 * 0.2).sin() * 3.0;
+            let result = vbd.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+            assert!(result.volatility_ratio.is_finite());
+        }
+        assert!(vbd.is_ready());
     }
     
     #[test]

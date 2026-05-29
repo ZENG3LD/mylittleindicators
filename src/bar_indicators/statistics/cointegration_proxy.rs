@@ -1,12 +1,12 @@
-// Cointegration Proxy: residual stationarity via AR(1) t-stat on (close - SMA(window)) residuals
+// Cointegration Proxy: residual stationarity via AR(1) t-stat on (close - MA(window)) residuals
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use crate::bar_indicators::average::sma::Sma;
+use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 
 #[derive(Clone)]
 pub struct CointegrationProxy {
     window: usize,
-    sma: Sma,
+    ma: MovingAverageProvider,
     residuals: Vec<f64>,
     idx: usize,
     filled: bool,
@@ -16,10 +16,15 @@ pub struct CointegrationProxy {
 
 impl CointegrationProxy {
     pub fn new(window: usize) -> Self {
+        Self::with_ma_type(window, MovingAverageType::SMA)
+    }
+
+    /// Creates a new CointegrationProxy with a configurable MA type.
+    pub fn with_ma_type(window: usize, ma_type: MovingAverageType) -> Self {
         let w = window.max(20);
         Self {
             window: w,
-            sma: Sma::new(w),
+            ma: MovingAverageProvider::new(ma_type, w),
             residuals: vec![0.0; w],
             idx: 0,
             filled: false,
@@ -30,7 +35,7 @@ impl CointegrationProxy {
 
     #[inline]
     pub fn reset(&mut self) {
-        self.sma.reset();
+        self.ma.reset();
         self.residuals.fill(0.0);
         self.idx = 0;
         self.filled = false;
@@ -56,7 +61,7 @@ impl CointegrationProxy {
         close: f64,
         volume: f64,
     ) -> (f64, f64) {
-        let m = self.sma.update_bar(open, high, low, close, volume);
+        let m = self.ma.update_bar(open, high, low, close, volume);
         let r = close - m;
         self.residuals[self.idx] = r;
         self.idx = (self.idx + 1) % self.window;
@@ -153,5 +158,17 @@ mod tests {
         assert!(!cp.is_ready());
         assert_eq!(cp.phi, 0.0);
         assert_eq!(cp.t_stat, 0.0);
+    }
+
+    #[test]
+    fn test_cointegration_proxy_with_ema() {
+        let mut cp = CointegrationProxy::with_ma_type(50, MovingAverageType::EMA);
+        for i in 0..60 {
+            let price = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let (phi, t_stat) = cp.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+            assert!(phi.is_finite());
+            assert!(t_stat.is_finite());
+        }
+        assert!(cp.is_ready());
     }
 }

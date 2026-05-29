@@ -14,11 +14,18 @@ pub struct PriceChannelWidth {
 
 impl PriceChannelWidth {
     pub fn new(period: usize) -> Self {
+        Self::with_ma_type(period, MovingAverageType::SMA)
+    }
+
+    /// Create with an explicit MA type for the price channel middle line.
+    ///
+    /// Default used by `new`: `SMA`.
+    pub fn with_ma_type(period: usize, ma_type: MovingAverageType) -> Self {
         Self {
             pc: PriceChannels::new(
                 period.max(2),
                 PriceChannelMode::Raw,
-                MovingAverageType::SMA,
+                ma_type,
             ),
             value: 0.0,
         }
@@ -46,6 +53,18 @@ impl PriceChannelWidth {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_with_ma_type_non_default() {
+        let mut pcw = PriceChannelWidth::with_ma_type(20, MovingAverageType::EMA);
+        assert!(!pcw.is_ready());
+        for i in 0..30 {
+            let p = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let v = pcw.update_bar(p, p + 2.0, p - 2.0, p, 1000.0);
+            assert!(v >= 0.0);
+        }
+        assert!(pcw.is_ready());
+    }
 
     #[test]
     fn test_price_channel_width_creation() {

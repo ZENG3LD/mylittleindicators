@@ -16,13 +16,23 @@ pub struct Smi {
 
 impl Smi {
     pub fn new(period: usize, signal_period: usize) -> Self {
+        Self::with_signal_ma_type(period, signal_period, MovingAverageType::EMA)
+    }
+
+    /// Create SMI with configurable signal MA type.
+    ///
+    /// # Arguments
+    /// * `period`         - EMA double-smoothing period for price/range
+    /// * `signal_period`  - Signal line MA period
+    /// * `signal_ma_type` - MA type for the signal line (default EMA)
+    pub fn with_signal_ma_type(period: usize, signal_period: usize, signal_ma_type: MovingAverageType) -> Self {
         let e = MovingAverageType::EMA;
         Self {
             ema1_diff: MovingAverageProvider::new(e, period.max(1)),
             ema2_diff: MovingAverageProvider::new(e, period.max(1)),
             ema1_range: MovingAverageProvider::new(e, period.max(1)),
             ema2_range: MovingAverageProvider::new(e, period.max(1)),
-            signal_ma: MovingAverageProvider::new(e, signal_period.max(1)),
+            signal_ma: MovingAverageProvider::new(signal_ma_type, signal_period.max(1)),
             value: 0.0,
             signal: 0.0,
             ready: false,
@@ -183,5 +193,16 @@ mod tests {
             assert!(value.is_finite(), "SMI should always be finite");
             assert!(smi.value_signal().is_finite(), "SMI signal should always be finite");
         }
+    }
+
+    #[test]
+    fn test_smi_with_signal_ma_type() {
+        let mut smi = Smi::with_signal_ma_type(5, 3, MovingAverageType::SMA);
+        for i in 1..=50 {
+            let p = 100.0 + i as f64 * 0.5;
+            let v = smi.update_bar(p, p + 2.0, p - 1.0, p + 0.5, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(smi.is_ready());
     }
 }

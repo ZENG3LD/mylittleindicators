@@ -36,6 +36,24 @@ pub struct Qqe {
 
 impl Qqe {
     pub fn new(period: usize, smooth: usize, threshold_mult: f64) -> Self {
+        Self::with_ma_types(period, smooth, threshold_mult, MovingAverageType::EMA, MovingAverageType::RMA)
+    }
+
+    /// Create QQE with configurable smoothing MA types.
+    ///
+    /// # Arguments
+    /// * `period`          - RSI period
+    /// * `smooth`          - EMA smoothing period for RSI
+    /// * `threshold_mult`  - Band multiplier (default 1.5 when <= 0)
+    /// * `smooth_ma_type`  - MA type for first RSI smoothing (default EMA)
+    /// * `atr_ma_type`     - MA type for ATR-band smoothing (default RMA = Wilder)
+    pub fn with_ma_types(
+        period: usize,
+        smooth: usize,
+        threshold_mult: f64,
+        smooth_ma_type: MovingAverageType,
+        atr_ma_type: MovingAverageType,
+    ) -> Self {
         let p = period.max(1);
         let s = smooth.max(1);
         let tm = if threshold_mult > 0.0 { threshold_mult } else { 1.5 };
@@ -43,8 +61,8 @@ impl Qqe {
         let atr_period = ((s as f64 * 4.236).round() as usize).max(2);
         Self {
             rsi: Rsi::new(p),
-            smoothing: MovingAverageProvider::new(MovingAverageType::EMA, s),
-            atr_smooth: MovingAverageProvider::new(MovingAverageType::RMA, atr_period),
+            smoothing: MovingAverageProvider::new(smooth_ma_type, s),
+            atr_smooth: MovingAverageProvider::new(atr_ma_type, atr_period),
             threshold_mult: tm,
             qqe_value: 0.0,
             smoothed_rsi: 0.0,
@@ -142,6 +160,17 @@ mod tests {
         assert!(!qqe.is_ready());
         assert_eq!(qqe.value().main(), 0.0);
         assert!((qqe.threshold_mult() - 4.236).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_qqe_with_ma_types() {
+        let mut qqe = Qqe::with_ma_types(14, 5, 4.236, MovingAverageType::SMA, MovingAverageType::EMA);
+        for i in 1..=100 {
+            let p = 100.0 + i as f64 * 0.5;
+            let v = qqe.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(qqe.is_ready());
     }
 
     #[test]

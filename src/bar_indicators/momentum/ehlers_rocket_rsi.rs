@@ -115,6 +115,22 @@ impl EhlersRocketRsi {
 
     /// Создать с настраиваемыми параметрами
     pub fn with_parameters(rsi_period: usize, smoothing_factor: f64, momentum_period: usize) -> Self {
+        Self::with_parameters_and_ma(rsi_period, smoothing_factor, momentum_period, MovingAverageType::EMA)
+    }
+
+    /// Создать с настраиваемыми параметрами и типом MA для momentum.
+    ///
+    /// # Arguments
+    /// * `rsi_period`       - RSI lookback period
+    /// * `smoothing_factor` - Price smoothing factor (0..1]
+    /// * `momentum_period`  - Momentum MA period
+    /// * `momentum_ma_type` - MA type for momentum smoothing (default EMA)
+    pub fn with_parameters_and_ma(
+        rsi_period: usize,
+        smoothing_factor: f64,
+        momentum_period: usize,
+        momentum_ma_type: MovingAverageType,
+    ) -> Self {
         assert!(rsi_period > 0, "RSI period must be greater than 0");
         assert!(smoothing_factor > 0.0 && smoothing_factor <= 1.0,
                 "Smoothing factor must be between 0.0 and 1.0");
@@ -124,7 +140,7 @@ impl EhlersRocketRsi {
             source: OhlcvField::Close,
             // Переиспользуем MovingAverage для разных целей
             price_smoother: MovingAverageProvider::new(MovingAverageType::EMA, 3),
-            momentum_ma: MovingAverageProvider::new(MovingAverageType::EMA, momentum_period),
+            momentum_ma: MovingAverageProvider::new(momentum_ma_type, momentum_period),
             velocity_ma: MovingAverageProvider::new(MovingAverageType::SMA, 5),
             
             rsi_period,
@@ -489,6 +505,17 @@ mod tests {
         let rocket_rsi = EhlersRocketRsi::new();
         assert!(!rocket_rsi.is_ready());
         assert_eq!(rocket_rsi.parameters().0, 14);
+    }
+
+    #[test]
+    fn test_rocket_rsi_with_parameters_and_ma() {
+        let mut r = EhlersRocketRsi::with_parameters_and_ma(14, 0.1, 8, MovingAverageType::SMA);
+        for i in 1..=30 {
+            let p = 100.0 + i as f64 * 0.5;
+            let res = r.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(res.rocket_rsi.is_finite());
+        }
+        assert!(r.is_ready());
     }
     
     #[test]

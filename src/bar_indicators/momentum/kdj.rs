@@ -16,9 +16,22 @@ pub struct Kdj {
 
 impl Kdj {
     pub fn new(k_period: usize, d_period: usize) -> Self {
+        Self::with_d_ma_type(k_period, d_period, MovingAverageType::SMA)
+    }
+
+    /// Create KDJ with configurable outer %D smoothing MA type.
+    ///
+    /// The inner `Stochastics` %D smoothing uses SMA by default (unchanged here).
+    /// This controls the outer `d_ma` applied to %K to derive %D for J computation.
+    ///
+    /// # Arguments
+    /// * `k_period`   - Stochastic %K lookback period
+    /// * `d_period`   - %D smoothing period
+    /// * `d_ma_type`  - MA type for outer %D line (default SMA)
+    pub fn with_d_ma_type(k_period: usize, d_period: usize, d_ma_type: MovingAverageType) -> Self {
         Self {
             stoch: Stochastics::new(k_period.max(1), d_period.max(1)),
-            d_ma: MovingAverageProvider::new(MovingAverageType::SMA, d_period.max(1)),
+            d_ma: MovingAverageProvider::new(d_ma_type, d_period.max(1)),
             k: 0.0,
             d: 0.0,
             j: 0.0,
@@ -74,6 +87,17 @@ mod tests {
             assert_eq!(d, 0.0);
             assert_eq!(j, 0.0);
         } else { panic!("Expected Triple"); }
+    }
+
+    #[test]
+    fn test_kdj_with_d_ma_type() {
+        let mut kdj = Kdj::with_d_ma_type(9, 3, MovingAverageType::EMA);
+        for i in 1..=25 {
+            let p = 100.0 + i as f64 * 0.5;
+            let (k, d, j) = kdj.update_bar(p, p + 1.0, p - 0.5, p + 0.3, 1000.0);
+            assert!(k.is_finite() && d.is_finite() && j.is_finite());
+        }
+        assert!(kdj.is_ready());
     }
 
     #[test]

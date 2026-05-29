@@ -6,6 +6,7 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::momentum::adx::Adx;
+use crate::bar_indicators::average::MovingAverageType;
 
 /// Directional Indicator (+DI/-DI)
 ///
@@ -26,10 +27,15 @@ impl DiPlusMinus {
         Self::with_period(14)
     }
 
-    /// Create with custom period
+    /// Create with custom period (RMA ATR default)
     pub fn with_period(period: usize) -> Self {
+        Self::with_atr_ma_type(period, MovingAverageType::RMA)
+    }
+
+    /// Create with custom period and ATR smoothing type.
+    pub fn with_atr_ma_type(period: usize, atr_ma_type: MovingAverageType) -> Self {
         Self {
-            adx: Adx::new(period),
+            adx: Adx::with_atr_ma_type(period, atr_ma_type),
         }
     }
 
@@ -93,6 +99,23 @@ mod tests {
         let di = DiPlusMinus::new();
         assert_eq!(di.period(), 14);
         assert!(!di.is_ready());
+    }
+
+    #[test]
+    fn test_di_plus_minus_with_ema_atr_warmup_finite() {
+        let mut di = DiPlusMinus::with_atr_ma_type(7, MovingAverageType::EMA);
+        for i in 0..50 {
+            let price = 100.0 + (i as f64 * 0.3).sin() * 4.0;
+            di.update_bar(price, price + 1.5, price - 1.5, price, 1000.0);
+        }
+        assert!(di.is_ready());
+        match di.value() {
+            IndicatorValue::Double(p, m) => {
+                assert!(p.is_finite());
+                assert!(m.is_finite());
+            }
+            _ => panic!("expected Double"),
+        }
     }
 
     #[test]

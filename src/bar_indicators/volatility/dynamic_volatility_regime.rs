@@ -112,28 +112,33 @@ pub struct DynamicVolatilityRegime {
 }
 
 impl DynamicVolatilityRegime {
-    /// Создать новый Dynamic Volatility Regime с параметрами по умолчанию
+    /// Создать новый Dynamic Volatility Regime с параметрами по умолчанию.
+    /// ATR smoothed with SMA (original default).
     pub fn new() -> Self {
-        Self::with_parameters(0.1, 0.85, 0.01, 0.05)
+        Self::with_parameters(0.1, 0.85, 0.01, 0.05, MovingAverageType::SMA)
     }
-    
-    /// Создать с настраиваемыми параметрами
+
+    /// Создать с настраиваемыми параметрами.
+    ///
+    /// `atr_ma_type` — smoothing applied to the internal ATR(14).
+    /// Original default: `MovingAverageType::SMA`.
     pub fn with_parameters(
-        garch_alpha: f64, 
-        garch_beta: f64, 
-        garch_omega: f64, 
-        threshold_adaptation_speed: f64
+        garch_alpha: f64,
+        garch_beta: f64,
+        garch_omega: f64,
+        threshold_adaptation_speed: f64,
+        atr_ma_type: MovingAverageType,
     ) -> Self {
         assert!(garch_alpha > 0.0 && garch_alpha < 1.0, "GARCH alpha must be between 0.0 and 1.0");
         assert!(garch_beta > 0.0 && garch_beta < 1.0, "GARCH beta must be between 0.0 and 1.0");
         assert!(garch_alpha + garch_beta < 1.0, "GARCH alpha + beta must be less than 1.0");
         assert!(garch_omega > 0.0, "GARCH omega must be positive");
-        assert!(threshold_adaptation_speed > 0.0 && threshold_adaptation_speed <= 1.0, 
+        assert!(threshold_adaptation_speed > 0.0 && threshold_adaptation_speed <= 1.0,
                 "Threshold adaptation speed must be between 0.0 and 1.0");
-        
+
         Self {
             // Переиспользуем компоненты
-            atr: Atr::new(14, MovingAverageType::SMA),
+            atr: Atr::new(14, atr_ma_type),
             volatility_ma: MovingAverageProvider::new(MovingAverageType::EMA, 10),
             long_term_vol: MovingAverageProvider::new(MovingAverageType::SMA, 50),
             regime_smoother: MovingAverageProvider::new(MovingAverageType::EMA, 5),
@@ -577,8 +582,19 @@ mod tests {
     
     #[test]
     fn test_dynamic_volatility_regime_with_parameters() {
-        let dvr = DynamicVolatilityRegime::with_parameters(0.15, 0.8, 0.02, 0.1);
+        let dvr = DynamicVolatilityRegime::with_parameters(0.15, 0.8, 0.02, 0.1, MovingAverageType::SMA);
         assert_eq!(dvr.garch_parameters(), (0.15, 0.8, 0.02));
+    }
+
+    #[test]
+    fn test_dvr_with_atr_ma_type_ema() {
+        let mut dvr = DynamicVolatilityRegime::with_parameters(0.1, 0.85, 0.01, 0.05, MovingAverageType::EMA);
+        for i in 0..30 {
+            let price = 100.0 + (i as f64 * 0.1).sin() * 2.0;
+            let result = dvr.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+            assert!(result.volatility_score.is_finite());
+        }
+        assert!(dvr.is_ready());
     }
     
     #[test]

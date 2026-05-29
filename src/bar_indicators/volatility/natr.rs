@@ -10,9 +10,15 @@ pub struct Natr {
 }
 
 impl Natr {
+    /// Default ctor — ATR smoothed with RMA (Wilder).
     pub fn new(period: usize) -> Self {
+        Self::with_ma_type(period, MovingAverageType::RMA)
+    }
+
+    /// Custom ATR smoothing type.
+    pub fn with_ma_type(period: usize, atr_ma_type: MovingAverageType) -> Self {
         Self {
-            atr: Atr::new(period.max(1), MovingAverageType::RMA),
+            atr: Atr::new(period.max(1), atr_ma_type),
             value: 0.0,
         }
     }
@@ -69,6 +75,17 @@ mod tests {
             let value = natr.update_bar(price, price + 2.0, price - 2.0, price, 1000.0);
             assert!(value >= 0.0);
         }
+    }
+
+    #[test]
+    fn test_natr_with_ma_type_ema() {
+        let mut natr = Natr::with_ma_type(14, MovingAverageType::EMA);
+        for i in 0..20 {
+            let price = 100.0 + i as f64;
+            let v = natr.update_bar(price, price + 2.0, price - 2.0, price, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(natr.is_ready());
     }
 
     #[test]

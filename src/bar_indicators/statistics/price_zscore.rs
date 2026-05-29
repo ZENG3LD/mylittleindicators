@@ -11,10 +11,15 @@ pub struct PriceZScore {
 
 impl PriceZScore {
     pub fn new(period: usize) -> Self {
+        Self::with_ma_type(period, MovingAverageType::SMA)
+    }
+
+    /// Creates a new PriceZScore with a configurable MA type.
+    pub fn with_ma_type(period: usize, ma_type: MovingAverageType) -> Self {
         let n = period.max(2);
         Self {
-            mean_ma: MovingAverageProvider::new(MovingAverageType::SMA, n),
-            var_ma: MovingAverageProvider::new(MovingAverageType::SMA, n),
+            mean_ma: MovingAverageProvider::new(ma_type, n),
+            var_ma: MovingAverageProvider::new(ma_type, n),
             value: 0.0,
         }
     }
@@ -81,5 +86,16 @@ mod tests {
         pz.reset();
         assert!(!pz.is_ready());
         assert_eq!(pz.value().main(), 0.0);
+    }
+
+    #[test]
+    fn test_price_zscore_with_ema() {
+        let mut pz = PriceZScore::with_ma_type(20, MovingAverageType::EMA);
+        for i in 0..30 {
+            let price = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let z = pz.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+            assert!(z.is_finite());
+        }
+        assert!(pz.is_ready());
     }
 }

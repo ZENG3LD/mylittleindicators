@@ -112,46 +112,88 @@ pub struct MarketRegimeFilter {
 }
 
 impl MarketRegimeFilter {
-    /// Создать новый Market Regime Filter с параметрами по умолчанию
+    /// Создать новый Market Regime Filter с параметрами по умолчанию.
+    /// Defaults: fast_ema=10, slow_ema=30, atr_wilder(14), vol_sma(20), mom_ema(8), stab_sma(15).
     pub fn new() -> Self {
         Self::with_parameters(10, 30, 0.02, 1.5, 0.3)
     }
-    
-    /// Создать с настраиваемыми параметрами
+
+    /// Создать с настраиваемыми параметрами trend/threshold (fast_ma и slow_ma = EMA).
+    /// ATR period + aux MA types/periods use baked defaults. See `with_config` for full control.
     pub fn with_parameters(
         fast_period: usize,
         slow_period: usize,
         trend_threshold: f64,
         volatility_threshold: f64,
-        quiet_threshold: f64
+        quiet_threshold: f64,
+    ) -> Self {
+        Self::with_config(
+            fast_period,
+            slow_period,
+            MovingAverageType::EMA,
+            14,
+            MovingAverageType::SMA,
+            20,
+            MovingAverageType::EMA,
+            8,
+            MovingAverageType::SMA,
+            15,
+            trend_threshold,
+            volatility_threshold,
+            quiet_threshold,
+        )
+    }
+
+    /// Full-config ctor: exposes ATR period, all auxiliary MA types and periods.
+    ///
+    /// Old baked defaults:
+    /// - `atr_period=14` (Wilder smoothing — always Wilder regardless of aux MA types)
+    /// - `volatility_ma_type=SMA`, `volatility_ma_period=20`
+    /// - `momentum_ma_type=EMA`, `momentum_ma_period=8`
+    /// - `stability_ma_type=SMA`, `stability_ma_period=15`
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_config(
+        fast_period: usize,
+        slow_period: usize,
+        trend_ma_type: MovingAverageType,
+        atr_period: usize,
+        volatility_ma_type: MovingAverageType,
+        volatility_ma_period: usize,
+        momentum_ma_type: MovingAverageType,
+        momentum_ma_period: usize,
+        stability_ma_type: MovingAverageType,
+        stability_ma_period: usize,
+        trend_threshold: f64,
+        volatility_threshold: f64,
+        quiet_threshold: f64,
     ) -> Self {
         assert!(fast_period > 0 && slow_period > fast_period, "Invalid MA periods");
         assert!(trend_threshold > 0.0, "Trend threshold must be positive");
         assert!(volatility_threshold > 1.0, "Volatility threshold must be > 1.0");
         assert!(quiet_threshold > 0.0 && quiet_threshold < 1.0, "Invalid quiet threshold");
-        
+
         Self {
-            // Переиспользуем MovingAverage и ATR
-            fast_ma: MovingAverageProvider::new(MovingAverageType::EMA, fast_period),
-            slow_ma: MovingAverageProvider::new(MovingAverageType::EMA, slow_period),
-            atr: Atr::new_wilder(14),
-            volatility_ma: MovingAverageProvider::new(MovingAverageType::SMA, 20),
-            momentum_ma: MovingAverageProvider::new(MovingAverageType::EMA, 8),
-            stability_ma: MovingAverageProvider::new(MovingAverageType::SMA, 15),
-            
+            fast_ma: MovingAverageProvider::new(trend_ma_type, fast_period),
+            slow_ma: MovingAverageProvider::new(trend_ma_type, slow_period),
+            // ATR always uses Wilder smoothing regardless of aux MA types
+            atr: Atr::new_wilder(atr_period),
+            volatility_ma: MovingAverageProvider::new(volatility_ma_type, volatility_ma_period),
+            momentum_ma: MovingAverageProvider::new(momentum_ma_type, momentum_ma_period),
+            stability_ma: MovingAverageProvider::new(stability_ma_type, stability_ma_period),
+
             prices: Vec::with_capacity(64),
             highs: Vec::with_capacity(32),
             lows: Vec::with_capacity(32),
             ranges: Vec::with_capacity(32),
             regime_history: Vec::with_capacity(32),
-            
+
             trend_threshold,
             volatility_threshold,
             quiet_threshold,
-            
+
             current_regime: MarketRegime::Transition,
             regime_start_time: 0,
-            
+
             current_result: MarketRegimeResult::empty(),
             is_ready: false,
             update_count: 0,
@@ -518,6 +560,32 @@ impl MarketRegimeFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_market_regime_filter_with_config() {
+        // Richer ctor: non-default atr_period + EMA-based aux MAs
+        let mut mrf = MarketRegimeFilter::with_config(
+            8, 20,
+            MovingAverageType::EMA,
+            10,                         // atr_period (default 14)
+            MovingAverageType::EMA, 15, // volatility_ma (default SMA/20)
+            MovingAverageType::EMA, 5,  // momentum_ma (default EMA/8)
+            MovingAverageType::EMA, 10, // stability_ma (default SMA/15)
+            0.02, 1.5, 0.3,
+        );
+        assert!(!mrf.is_ready());
+        let mut price = 100.0;
+        for _ in 0..40 {
+            price += 0.5;
+            let result = mrf.update_bar(price, price + 0.2, price - 0.2, price, 1000.0);
+            if mrf.is_ready() {
+                assert!(result.confidence.is_finite());
+                assert!(result.trend_strength.is_finite());
+                assert!(result.volatility_level.is_finite());
+            }
+        }
+        assert!(mrf.is_ready());
+    }
 
     #[test]
     fn test_market_regime_filter_creation() {

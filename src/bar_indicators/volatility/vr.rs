@@ -2,6 +2,7 @@
 // (c) 2024
 
 use super::atr::Atr;
+use crate::bar_indicators::average::moving_average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
@@ -12,10 +13,16 @@ pub struct Vr {
 }
 
 impl Vr {
+    /// Default ctor — both ATRs smoothed with RMA (Wilder).
     pub fn new(fast_period: usize, slow_period: usize) -> Self {
+        Self::with_ma_type(fast_period, slow_period, MovingAverageType::RMA)
+    }
+
+    /// Custom ATR smoothing type (applied to both fast and slow ATR).
+    pub fn with_ma_type(fast_period: usize, slow_period: usize, atr_ma_type: MovingAverageType) -> Self {
         Self {
-            atr_fast: Atr::new(fast_period, crate::bar_indicators::average::moving_average::MovingAverageType::RMA),
-            atr_slow: Atr::new(slow_period, crate::bar_indicators::average::moving_average::MovingAverageType::RMA),
+            atr_fast: Atr::new(fast_period, atr_ma_type),
+            atr_slow: Atr::new(slow_period, atr_ma_type),
             value: 0.0,
         }
     }
@@ -72,6 +79,17 @@ mod tests {
             let value = vr.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
             assert!(value >= 0.0, "VR should be non-negative");
         }
+    }
+
+    #[test]
+    fn test_vr_with_ma_type_ema() {
+        let mut vr = Vr::with_ma_type(7, 14, MovingAverageType::EMA);
+        for i in 0..25 {
+            let price = 100.0 + (i as f64 * 0.2).sin() * 10.0;
+            let v = vr.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+            assert!(v.is_finite());
+        }
+        assert!(vr.is_ready());
     }
 
     #[test]

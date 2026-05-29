@@ -1,5 +1,6 @@
 // DPO Bands on oscillator scale: upper/lower = +/- k * std(DPO)
 
+use crate::bar_indicators::average::moving_average::MovingAverageType;
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::momentum::dpo::DetrendedPriceOscillator;
 #[derive(Clone)]
@@ -22,6 +23,24 @@ impl DpoBands {
             window: window.clamp(5, 512),
             k: if k > 0.0 { k } else { 2.0 },
             buf: Vec::with_capacity(window.clamp(5, 512)),
+            idx: 0,
+            filled: false,
+            upper: 0.0,
+            middle: 0.0,
+            lower: 0.0,
+        }
+    }
+
+    /// Create DpoBands with a specific MA type for the internal DPO.
+    ///
+    /// Default (`new`) uses `SMA`. Use this to switch to EMA, RMA, etc.
+    pub fn with_ma_type(period: usize, window: usize, k: f64, ma_type: MovingAverageType) -> Self {
+        let win = window.clamp(5, 512);
+        Self {
+            dpo: DetrendedPriceOscillator::with_period_and_ma_type(period.max(2), ma_type),
+            window: win,
+            k: if k > 0.0 { k } else { 2.0 },
+            buf: Vec::with_capacity(win),
             idx: 0,
             filled: false,
             upper: 0.0,
@@ -94,6 +113,20 @@ impl DpoBands {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_with_ma_type_non_default() {
+        let mut db = DpoBands::with_ma_type(14, 20, 2.0, MovingAverageType::EMA);
+        assert!(!db.is_ready());
+        for i in 0..50 {
+            let p = 100.0 + (i as f64 * 0.1).sin() * 5.0;
+            let (u, m, l) = db.update_bar(p, p + 1.0, p - 1.0, p, 1000.0);
+            assert!(u.is_finite());
+            assert!(m.is_finite());
+            assert!(l.is_finite());
+        }
+        assert!(db.is_ready());
+    }
 
     #[test]
     fn test_dpo_bands_creation() {

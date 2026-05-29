@@ -1,31 +1,54 @@
-// Weighted Composite: weighted sum of 4 internal SMAs with different periods
-// Self-contained version: uses SMA(5), SMA(10), SMA(20), SMA(50) internally
+// Weighted Composite: weighted sum of 4 internal MAs with different periods
+// Self-contained version: defaults to SMA(5), SMA(10), SMA(20), SMA(50) internally
 // Returns deviation of close from the weighted average
 
-use crate::bar_indicators::average::sma::Sma;
+use crate::bar_indicators::average::{MovingAverageProvider, MovingAverageType};
 use crate::bar_indicators::indicator_value::IndicatorValue;
 
 #[derive(Clone)]
 pub struct WeightedComposite {
     // weights for 4 components
     w: [f64; 4],
-    // internal SMAs with periods 5, 10, 20, 50
-    sma1: Sma,
-    sma2: Sma,
-    sma3: Sma,
-    sma4: Sma,
+    // internal MAs — configurable type and period
+    ma1: MovingAverageProvider,
+    ma2: MovingAverageProvider,
+    ma3: MovingAverageProvider,
+    ma4: MovingAverageProvider,
     norm: bool, // if true, divide by sum(|w|)
     value: f64,
 }
 
 impl WeightedComposite {
+    /// Default: SMA(5), SMA(10), SMA(20), SMA(50).
     pub fn new(w1: f64, w2: f64, w3: f64, w4: f64, normalize: bool) -> Self {
+        Self::with_ma(
+            w1, w2, w3, w4, normalize,
+            MovingAverageType::SMA,
+            5, 10, 20, 50,
+        )
+    }
+
+    /// Richer ctor: shared MA type + configurable periods for all 4 legs.
+    ///
+    /// Old defaults: `ma_type=SMA`, `p1=5, p2=10, p3=20, p4=50`.
+    pub fn with_ma(
+        w1: f64,
+        w2: f64,
+        w3: f64,
+        w4: f64,
+        normalize: bool,
+        ma_type: MovingAverageType,
+        p1: usize,
+        p2: usize,
+        p3: usize,
+        p4: usize,
+    ) -> Self {
         Self {
             w: [w1, w2, w3, w4],
-            sma1: Sma::new(5),
-            sma2: Sma::new(10),
-            sma3: Sma::new(20),
-            sma4: Sma::new(50),
+            ma1: MovingAverageProvider::new(ma_type, p1),
+            ma2: MovingAverageProvider::new(ma_type, p2),
+            ma3: MovingAverageProvider::new(ma_type, p3),
+            ma4: MovingAverageProvider::new(ma_type, p4),
             norm: normalize,
             value: 0.0,
         }
@@ -33,22 +56,22 @@ impl WeightedComposite {
 
     #[inline]
     pub fn reset(&mut self) {
-        self.sma1.reset();
-        self.sma2.reset();
-        self.sma3.reset();
-        self.sma4.reset();
+        self.ma1.reset();
+        self.ma2.reset();
+        self.ma3.reset();
+        self.ma4.reset();
         self.value = 0.0;
     }
 
     #[inline]
     pub fn is_ready(&self) -> bool {
-        self.sma4.is_ready() // longest period determines readiness
+        self.ma4.is_ready() // longest period determines readiness
     }
 
     /// Legacy method - kept for compatibility but no longer used internally
     #[inline]
     pub fn update_inputs(&mut self, _i1: f64, _i2: f64, _i3: f64, _i4: f64) {
-        // No-op: SMAs computed internally
+        // No-op: MAs computed internally
     }
 
     pub fn update_bar(
@@ -59,18 +82,18 @@ impl WeightedComposite {
         close: f64,
         _volume: f64,
     ) -> f64 {
-        // Update all SMAs
-        self.sma1.update_bar(0.0, 0.0, 0.0, close, 0.0);
-        self.sma2.update_bar(0.0, 0.0, 0.0, close, 0.0);
-        self.sma3.update_bar(0.0, 0.0, 0.0, close, 0.0);
-        self.sma4.update_bar(0.0, 0.0, 0.0, close, 0.0);
+        // Update all MAs (all use close price via the 0,0,0,close,0 convention)
+        self.ma1.update_bar(0.0, 0.0, 0.0, close, 0.0);
+        self.ma2.update_bar(0.0, 0.0, 0.0, close, 0.0);
+        self.ma3.update_bar(0.0, 0.0, 0.0, close, 0.0);
+        self.ma4.update_bar(0.0, 0.0, 0.0, close, 0.0);
 
         if self.is_ready() {
             let inputs = [
-                self.sma1.value().main(),
-                self.sma2.value().main(),
-                self.sma3.value().main(),
-                self.sma4.value().main(),
+                self.ma1.value().main(),
+                self.ma2.value().main(),
+                self.ma3.value().main(),
+                self.ma4.value().main(),
             ];
 
             let s: f64 = self.w.iter().zip(inputs.iter()).map(|(w, inp)| w * inp).sum();
@@ -101,7 +124,7 @@ mod tests {
     #[test]
     fn test_weighted_composite_creation() {
         let wc = WeightedComposite::new(1.0, 0.5, 0.25, 0.125, false);
-        assert!(!wc.is_ready()); // Not ready until SMAs filled
+        assert!(!wc.is_ready()); // Not ready until MAs filled
         assert_eq!(wc.value().main(), 0.0);
         assert_eq!(wc.weights(), [1.0, 0.5, 0.25, 0.125]);
     }
@@ -133,5 +156,23 @@ mod tests {
         wc.reset();
         assert!(!wc.is_ready());
         assert_eq!(wc.value().main(), 0.0);
+    }
+
+    #[test]
+    fn test_weighted_composite_with_ma_ema() {
+        // Richer ctor: EMA with non-default periods
+        let mut wc = WeightedComposite::with_ma(
+            1.0, 1.0, 1.0, 1.0, true,
+            MovingAverageType::EMA,
+            3, 7, 14, 28,
+        );
+        assert!(!wc.is_ready());
+        for i in 0..40 {
+            let price = 100.0 + i as f64 * 0.5;
+            wc.update_bar(price, price + 0.5, price - 0.5, price, 1000.0);
+        }
+        assert!(wc.is_ready());
+        let v = wc.value().main();
+        assert!(v.is_finite(), "EMA weighted composite must be finite, got {}", v);
     }
 }
