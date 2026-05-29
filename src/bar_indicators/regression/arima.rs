@@ -2,8 +2,17 @@
 //! AutoRegressive Integrated Moving Average models for time series analysis
 //! ARIMA(p,d,q) - p: AR terms, d: differencing, q: MA terms
 //! ARIMAX - ARIMA with eXogenous variables
+//!
+//! AR coefficients come from a REAL OLS fit (shared `linalg::ols`, full
+//! Gaussian elimination with partial pivoting) rather than the prior
+//! diagonal-only normal-equations hack that ignored regressor correlation. MA
+//! coefficients come from REAL conditional-sum-of-squares (CSS) estimation —
+//! the residuals depend recursively on θ, so θ is fit by minimizing the SSE
+//! with Nelder-Mead — replacing the hardcoded `0.1/(i+1)` heuristic.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::utils::math::linalg::ols;
+use crate::bar_indicators::utils::math::optimize::{minimize, reflect_into, NmConfig};
 
 /// ARIMA Model - AutoRegressive Integrated Moving Average
 #[derive(Clone)]
@@ -79,14 +88,15 @@ impl Arima {
         // 1. Применяем дифференцирование
         self.apply_differencing();
 
-        // 2. Оцениваем AR коэффициенты методом Юла-Уокера (упрощенная версия)
+        // 2. Оцениваем AR коэффициенты полным OLS.
         self.estimate_ar_coefficients();
 
-        // 3. Оцениваем MA коэффициенты (упрощенная версия)
-        self.estimate_ma_coefficients();
-
-        // 4. Вычисляем константу (среднее дифференцированного ряда минус AR вклад)
+        // 3. Константа (среднее·(1−Σφ)) — нужна ДО CSS-оценки MA, т.к. остатки
+        //    MA строятся на AR-фильтрованных инновациях w_t = y_t − c − Σφ·y.
         self.estimate_constant();
+
+        // 4. Оцениваем MA коэффициенты методом CSS (остатки зависят от θ).
+        self.estimate_ma_coefficients();
 
         // 5. Рассчитываем подогнанные значения и остатки
         self.calculate_fitted_values();
@@ -131,91 +141,101 @@ impl Arima {
         self.differenced_series = current_series;
     }
     
-    /// Оценка AR коэффициентов (упрощенный метод наименьших квадратов)
+    /// Оценка AR коэффициентов методом наименьших квадратов (полный OLS).
+    ///
+    /// Regress the differenced series on its own `p` lags via the shared
+    /// `linalg::ols` (proper (XᵀX)⁻¹Xᵀy, not the old diagonal-only shortcut),
+    /// so correlated lags get correct coefficients. No intercept here — the
+    /// level is captured by `constant` in `estimate_constant`.
     fn estimate_ar_coefficients(&mut self) {
         self.ar_coefficients.clear();
-        
-        if self.p == 0 || self.differenced_series.len() < self.p + 1 {
+
+        if self.p == 0 || self.differenced_series.len() < self.p + 2 {
+            // q-only model still needs an (empty) AR vector; leave it empty.
             return;
-        }
-        
-        // Простая регрессия для AR коэффициентов
-        let n = self.differenced_series.len();
-        let mut x_matrix = Vec::new();
-        let mut y_vector = Vec::new();
-        
-        for t in self.p..n {
-            let mut x_row = Vec::new();
-            for lag in 1..=self.p {
-                x_row.push(self.differenced_series[t - lag]);
-            }
-            x_matrix.push(x_row);
-            y_vector.push(self.differenced_series[t]);
-        }
-        
-        // Решаем систему методом наименьших квадратов (упрощенно)
-        if !x_matrix.is_empty() {
-            let coeffs = self.solve_least_squares(&x_matrix, &y_vector);
-            for &coeff in &coeffs {
-                self.ar_coefficients.push(coeff);
-            }
-        }
-    }
-    
-    /// Оценка MA коэффициентов (упрощенная версия)
-    fn estimate_ma_coefficients(&mut self) {
-        self.ma_coefficients.clear();
-        
-        if self.q == 0 {
-            return;
-        }
-        
-        // Упрощенная оценка MA коэффициентов через автокорреляции остатков
-        // В реальной реализации здесь был бы итеративный алгоритм
-        for i in 0..self.q.min(8) {
-            let coeff = 0.1 / (i as f64 + 1.0); // Простая эвристика
-            self.ma_coefficients.push(coeff);
-        }
-    }
-    
-    /// Простой решатель системы линейных уравнений
-    fn solve_least_squares(&self, x_matrix: &[Vec<f64>], y_vector: &[f64]) -> Vec<f64> {
-        if x_matrix.is_empty() || y_vector.is_empty() {
-            return Vec::new();
-        }
-        
-        let n = x_matrix.len();
-        let p = x_matrix[0].len();
-        
-        // X'X матрица
-        let mut xtx = vec![vec![0.0; p]; p];
-        for i in 0..p {
-            for j in 0..p {
-                for row in &x_matrix[..n] {
-                    xtx[i][j] += row[i] * row[j];
-                }
-            }
         }
 
-        // X'y вектор
-        let mut xty = vec![0.0; p];
-        for i in 0..p {
-            for (row, &y) in x_matrix[..n].iter().zip(y_vector[..n].iter()) {
-                xty[i] += row[i] * y;
+        let n = self.differenced_series.len();
+        let rows = n - self.p;
+        let mut xm = Vec::with_capacity(rows * self.p);
+        let mut yv = Vec::with_capacity(rows);
+        for t in self.p..n {
+            for lag in 1..=self.p {
+                xm.push(self.differenced_series[t - lag]);
             }
+            yv.push(self.differenced_series[t]);
         }
-        
-        // Решение системы (упрощенно - только для диагональных элементов)
-        let mut coefficients = Vec::new();
-        for i in 0..p {
-            if xtx[i][i].abs() > 1e-10 {
-                coefficients.push(xty[i] / xtx[i][i]);
+        if let Some(beta) = ols(&xm, &yv, rows, self.p) {
+            self.ar_coefficients = beta;
+        } else {
+            self.ar_coefficients = vec![0.0; self.p];
+        }
+    }
+
+    /// Оценка MA коэффициентов методом условной суммы квадратов (CSS).
+    ///
+    /// For MA(q) the residuals obey ε_t = w_t − Σθ_i ε_{t-i} where
+    /// w_t = (y_t − c − Σφ_j y_{t-j}) is the AR-filtered innovation; ε depends
+    /// recursively on θ, so there is no closed form. We minimize Σε²_t over θ
+    /// with Nelder-Mead (invertibility kept by reflecting each θ into (−1,1)).
+    /// AR coefficients and constant are held fixed at their OLS values.
+    fn estimate_ma_coefficients(&mut self) {
+        self.ma_coefficients.clear();
+        let q = self.q.min(8);
+        if q == 0 {
+            return;
+        }
+
+        // Precompute the AR-filtered series w_t over the usable range.
+        let p = self.p;
+        let start = p.max(q);
+        let series = self.differenced_series.clone();
+        if series.len() <= start + 1 {
+            self.ma_coefficients = vec![0.0; q];
+            return;
+        }
+        let ar = self.ar_coefficients.clone();
+        let c = self.constant;
+
+        let css = |theta: &[f64]| -> f64 {
+            // reflect θ into (−1,1) for invertibility.
+            let th: Vec<f64> = theta.iter().map(|&t| reflect_into(t, -0.999, 0.999)).collect();
+            let mut eps = vec![0.0_f64; series.len()];
+            let mut sse = 0.0;
+            for t in start..series.len() {
+                let mut w = series[t] - c;
+                for (j, &phi) in ar.iter().enumerate() {
+                    w -= phi * series[t - 1 - j];
+                }
+                let mut e = w;
+                for (i, &thi) in th.iter().enumerate() {
+                    e -= thi * eps[t - 1 - i];
+                }
+                eps[t] = e;
+                sse += e * e;
+            }
+            if sse.is_finite() {
+                sse
             } else {
-                coefficients.push(0.0);
+                f64::MAX
             }
-        }
-        
-        coefficients
+        };
+
+        let x0 = vec![0.1_f64; q];
+        let res = minimize(
+            css,
+            &x0,
+            &NmConfig {
+                max_iters: 1500,
+                step: 0.3,
+                ..Default::default()
+            },
+        );
+        self.ma_coefficients = res
+            .x
+            .iter()
+            .map(|&t| reflect_into(t, -0.999, 0.999))
+            .collect();
     }
     
     /// Рассчитать подогнанные значения
@@ -514,7 +534,62 @@ mod tests {
         }
         assert!(ind.is_ready());
     }
-} 
+
+    fn lcg(n: usize, seed: u64) -> Vec<f64> {
+        let mut s = seed;
+        let mut out = Vec::with_capacity(n);
+        for _ in 0..n {
+            s = s
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            out.push(((s >> 33) as f64) / (1u64 << 31) as f64 - 1.0);
+        }
+        out
+    }
+
+    /// Full OLS must recover AR(2) coefficients that the old diagonal-only
+    /// solver could not (the two lags are correlated). d=0 so the series is
+    /// used directly.
+    #[test]
+    fn ar_ols_recovers_correlated_lags() {
+        // AR(2): y_t = 0.5 y_{t-1} + 0.3 y_{t-2} + e_t  (stationary).
+        let e = lcg(500, 13);
+        let mut y = vec![0.0_f64; e.len()];
+        for t in 2..e.len() {
+            y[t] = 0.5 * y[t - 1] + 0.3 * y[t - 2] + e[t];
+        }
+        let mut a = Arima::new(2, 0, 0);
+        for &v in &y {
+            a.update(v);
+        }
+        let (ar, _ma, _c) = a.get_coefficients();
+        assert_eq!(ar.len(), 2);
+        // Recovery within sampling tolerance — the key point is φ₂ is NOT zero,
+        // which the diagonal-only solver would badly underestimate.
+        assert!((ar[0] - 0.5).abs() < 0.12, "φ₁ {} ≈ 0.5", ar[0]);
+        assert!((ar[1] - 0.3).abs() < 0.12, "φ₂ {} ≈ 0.3", ar[1]);
+    }
+
+    /// CSS MA estimation must fit an MA(1) series better (lower residual SSE)
+    /// than the discarded hardcoded θ=0.1/(i+1) guess.
+    #[test]
+    fn ma_css_beats_hardcoded() {
+        // MA(1): y_t = e_t + 0.6 e_{t-1}, mean 0.
+        let e = lcg(500, 21);
+        let mut y = vec![0.0_f64; e.len()];
+        for t in 1..e.len() {
+            y[t] = e[t] + 0.6 * e[t - 1];
+        }
+        let mut a = Arima::new(0, 0, 1);
+        for &v in &y {
+            a.update(v);
+        }
+        let (_ar, ma, _c) = a.get_coefficients();
+        assert_eq!(ma.len(), 1);
+        // CSS should land near the true 0.6 (sign + magnitude), far from 0.1.
+        assert!(ma[0] > 0.3, "MA θ {} should approach true 0.6, not 0.1", ma[0]);
+    }
+}
 
 
 
