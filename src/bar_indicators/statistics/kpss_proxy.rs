@@ -1,6 +1,14 @@
-// KPSS proxy: LM statistic proxy for level stationarity using rolling window
+//! KPSS level-stationarity LM statistic over a rolling window.
+//!
+//! The LM construction (demean → partial sums S_t → Σ S_t² / (n²·LRV)) was
+//! already correct; the only weakness was a fixed lag-1 Newey-West long-run
+//! variance. Now uses the shared data-adaptive Bartlett-kernel estimator
+//! (`newey_west_lrv`, automatic bandwidth). Emits the raw LM statistic; a
+//! regime filter compares it to `kpss_critical_values(false)` (level): LM >
+//! 0.463 ⇒ reject stationarity at 5%.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::utils::math::timeseries::newey_west_lrv;
 
 #[derive(Clone)]
 pub struct KpssProxy {
@@ -48,45 +56,28 @@ impl KpssProxy {
             self.filled = true;
         }
         if self.filled {
-            self.value = self.compute_lm_proxy();
+            self.value = self.compute_lm();
         }
         self.value
     }
 
-    fn compute_lm_proxy(&self) -> f64 {
+    fn compute_lm(&self) -> f64 {
         let n = self.window;
-        let mut mean = 0.0;
-        for i in 0..n {
-            mean += self.buf[i];
-        }
-        mean /= n as f64;
-        // residuals from level (demeaned)
-        let mut eps: Vec<f64> = Vec::with_capacity(n);
-        for i in 0..n {
-            eps.push(self.buf[(self.idx + i) % n] - mean);
-        }
-        // partial sums S_t = sum_{i=1..t} eps_i
+        let mean: f64 = self.buf.iter().sum::<f64>() / n as f64;
+        // Demeaned residuals (level-stationarity → demean only).
+        let eps: Vec<f64> = (0..n).map(|i| self.buf[(self.idx + i) % n] - mean).collect();
+        // Partial sums S_t = Σ_{i=1..t} eps_i, accumulate Σ S_t².
         let mut s = 0.0;
         let mut s2_sum = 0.0;
         for &e in &eps {
             s += e;
             s2_sum += s * s;
         }
-        // long-run variance proxy: variance of eps with simple lag-1 Newey-West like adjustment (cheap)
-        let mut var = 0.0;
-        let mut cov1 = 0.0;
-        let e_mean: f64 = eps.iter().sum::<f64>() / n as f64;
-        for &e in &eps {
-            let d = e - e_mean;
-            var += d * d;
-        }
-        for w in eps.windows(2) {
-            cov1 += (w[1] - e_mean) * (w[0] - e_mean);
-        }
-        var /= n as f64;
-        cov1 /= (n - 1) as f64;
-        let lrvar = (var + 2.0 * cov1.max(0.0)).max(1e-12);
-        (s2_sum / (n as f64 * lrvar)).max(0.0)
+        // Long-run variance via the shared data-adaptive Bartlett estimator
+        // (auto bandwidth), replacing the fixed lag-1 approximation.
+        let lrvar = newey_west_lrv(&eps, None).max(1e-12);
+        // KPSS LM = (1/n²) Σ S_t² / LRV.
+        (s2_sum / (n as f64 * n as f64 * lrvar)).max(0.0)
     }
 }
 
@@ -128,5 +119,41 @@ mod tests {
         }
         kpss.reset();
         assert!(!kpss.is_ready());
+    }
+
+    fn lcg_noise(n: usize, seed: u64) -> Vec<f64> {
+        let mut s = seed;
+        let mut out = Vec::with_capacity(n);
+        for _ in 0..n {
+            s = s
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            out.push(((s >> 33) as f64) / (1u64 << 31) as f64 - 1.0);
+        }
+        out
+    }
+
+    #[test]
+    fn stationary_low_random_walk_high() {
+        // Stationary level → small LM (below 5% crit 0.463).
+        let mut k_stat = KpssProxy::new(80);
+        let mut lvl = 0.0;
+        for &e in &lcg_noise(100, 42) {
+            lvl = 0.2 * lvl + e;
+            k_stat.update_bar(0.0, 0.0, 0.0, 100.0 + lvl, 0.0);
+        }
+        // Random walk → large LM (S_t accumulates → reject stationarity).
+        let mut k_rw = KpssProxy::new(80);
+        let mut p = 100.0;
+        for &e in &lcg_noise(100, 7) {
+            p += e;
+            k_rw.update_bar(0.0, 0.0, 0.0, p, 0.0);
+        }
+        assert!(
+            k_stat.value().main() < k_rw.value().main(),
+            "stationary LM {} should be < random-walk LM {}",
+            k_stat.value().main(),
+            k_rw.value().main()
+        );
     }
 }
