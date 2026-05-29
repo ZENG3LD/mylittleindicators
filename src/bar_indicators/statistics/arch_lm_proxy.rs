@@ -1,6 +1,13 @@
-// ARCH LM proxy: regress r_t^2 on its lags and return R^2 as clustering proxy
+//! ARCH-LM test (Engle 1982): regress squared returns ε²_t on their own lags
+//! ε²_{t-1..t-L}; the auxiliary-regression R² measures volatility clustering.
+//! `value()` returns that R² (a bounded [0,1] regime scalar). The LM statistic
+//! T·R² ~ χ²(L) is exposed via [`ArchLmProxy::lm_components`] for the p-value
+//! wrapper. The OLS fit now goes through the shared `linalg::ols` (full
+//! Gaussian elimination with partial pivoting) instead of a local diagonal
+//! normal-equations inverter.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::utils::math::linalg::ols;
 
 #[derive(Clone)]
 pub struct ArchLmProxy {
@@ -11,6 +18,8 @@ pub struct ArchLmProxy {
     idx: usize,
     filled: bool,
     value: f64,
+    /// Effective sample size of the last auxiliary regression (rows used).
+    n_obs: usize,
 }
 
 impl ArchLmProxy {
@@ -25,6 +34,7 @@ impl ArchLmProxy {
             idx: 0,
             filled: false,
             value: 0.0,
+            n_obs: 0,
         }
     }
 
@@ -35,6 +45,7 @@ impl ArchLmProxy {
         self.filled = false;
         self.returns.fill(0.0);
         self.value = 0.0;
+        self.n_obs = 0;
     }
 
     #[inline]
@@ -44,6 +55,13 @@ impl ArchLmProxy {
 
     pub fn value(&self) -> IndicatorValue {
         IndicatorValue::Single(self.value)
+    }
+
+    /// (R², effective sample size, lags) of the last auxiliary regression.
+    /// The ARCH-LM statistic is `n_obs · R²`, asymptotically χ²(lags).
+    #[inline]
+    pub fn lm_components(&self) -> (f64, usize, usize) {
+        (self.value, self.n_obs, self.lags)
     }
 
     pub fn update_bar(&mut self, _o: f64, _h: f64, _l: f64, c: f64, _v: f64) -> f64 {
@@ -62,134 +80,51 @@ impl ArchLmProxy {
         self.value
     }
 
-    fn compute_r2(&self) -> f64 {
-        // build y = r_t^2 and X = [1, r_{t-1}^2, ..., r_{t-L}^2]
+    fn compute_r2(&mut self) -> f64 {
+        // Auxiliary regression  ε²_t = a₀ + Σ_{j=1..L} a_j·ε²_{t-j} + u_t,
+        // walking the ring buffer oldest→newest. Build flat row-major X.
         let n = self.window;
         let l = self.lags;
-        let mut samples: Vec<(f64, Vec<f64>)> = Vec::with_capacity(n - l - 1);
-        for k in 0..(n - l - 1) {
-            let t = (self.idx + k + l) % n;
-            let y = self.returns[t] * self.returns[t];
-            let mut x = Vec::with_capacity(l + 1);
-            x.push(1.0);
-            for j in 1..=l {
-                let tj = (t + n - j) % n;
-                let r2 = self.returns[tj] * self.returns[tj];
-                x.push(r2);
-            }
-            samples.push((y, x));
-        }
-        if samples.len() < l + 2 {
+        if n <= l + 2 {
+            self.n_obs = 0;
             return 0.0;
         }
-        // OLS normal equations: beta = (X'X)^-1 X'y
-        let p = l + 1; // intercept + lags
-        let mut xtx = vec![vec![0.0; p]; p];
-        let mut xty = vec![0.0; p];
-        let mut ymean = 0.0;
-        let mut tss = 0.0;
-        for (y, x) in &samples {
-            for i in 0..p {
-                xty[i] += x[i] * y;
-                for j in 0..p {
-                    xtx[i][j] += x[i] * x[j];
-                }
+        let rows = n - l - 1;
+        let n_cols = l + 1; // intercept + L lagged squared returns
+        let mut xm = Vec::with_capacity(rows * n_cols);
+        let mut yv = Vec::with_capacity(rows);
+        let sq = |t: usize| self.returns[t] * self.returns[t];
+        for k in 0..rows {
+            let t = (self.idx + k + l) % n;
+            xm.push(1.0);
+            for j in 1..=l {
+                let tj = (t + n - j) % n;
+                xm.push(sq(tj));
             }
-            ymean += *y;
+            yv.push(sq(t));
         }
-        let m = samples.len() as f64;
-        ymean /= m;
-        for (y, _) in &samples {
-            let d = *y - ymean;
-            tss += d * d;
-        }
-        // invert small matrix (p <= 11)
-        let beta = match invert_sym_posdef(&xtx) {
-            Some(inv) => {
-                let mut b = vec![0.0; p];
-                for i in 0..p {
-                    for j in 0..p {
-                        b[i] += inv[i][j] * xty[j];
-                    }
-                }
-                b
-            }
+        self.n_obs = rows;
+        let beta = match ols(&xm, &yv, rows, n_cols) {
+            Some(b) => b,
             None => return 0.0,
         };
-        // compute fitted and RSS
+        // R² = 1 − RSS/TSS.
+        let ymean = yv.iter().sum::<f64>() / rows as f64;
         let mut rss = 0.0;
-        for (y, x) in &samples {
-            let mut yhat = 0.0;
-            for i in 0..p {
-                yhat += beta[i] * x[i];
-            }
-            let e = *y - yhat;
+        let mut tss = 0.0;
+        for r in 0..rows {
+            let row = &xm[r * n_cols..(r + 1) * n_cols];
+            let yhat: f64 = row.iter().zip(beta.iter()).map(|(a, b)| a * b).sum();
+            let e = yv[r] - yhat;
             rss += e * e;
+            let d = yv[r] - ymean;
+            tss += d * d;
         }
         if tss <= 1e-12 {
             return 0.0;
         }
-        (1.0 - (rss / tss)).clamp(0.0, 1.0)
+        (1.0 - rss / tss).clamp(0.0, 1.0)
     }
-}
-
-fn invert_sym_posdef(a: &Vec<Vec<f64>>) -> Option<Vec<Vec<f64>>> {
-    // naive Gauss-Jordan for small p
-    let n = a.len();
-    let mut aug = vec![vec![0.0; 2 * n]; n];
-    for i in 0..n {
-        for j in 0..n {
-            aug[i][j] = a[i][j];
-        }
-        aug[i][n + i] = 1.0;
-    }
-    for i in 0..n {
-        // pivot
-        let mut piv = i;
-        let mut best = aug[piv][i].abs();
-        for (r, row) in aug[(i + 1)..].iter().enumerate().map(|(r, row)| (i + 1 + r, row)) {
-            if row[i].abs() > best {
-                best = row[i].abs();
-                piv = r;
-            }
-        }
-        if best < 1e-18 {
-            return None;
-        }
-        if piv != i {
-            aug.swap(i, piv);
-        }
-        let diag = aug[i][i];
-        for cell in aug[i].iter_mut() {
-            *cell /= diag;
-        }
-        for r in 0..n {
-            if r != i {
-                let f = aug[r][i];
-                if f != 0.0 {
-                    // split to allow simultaneous mut borrow of aug[r] and immut of aug[i]
-                    if r < i {
-                        let (left, right) = aug.split_at_mut(i);
-                        for (ar_c, &ai_c) in left[r].iter_mut().zip(right[0].iter()) {
-                            *ar_c -= f * ai_c;
-                        }
-                    } else {
-                        let (left, right) = aug.split_at_mut(r);
-                        for (ar_c, &ai_c) in right[0].iter_mut().zip(left[i].iter()) {
-                            *ar_c -= f * ai_c;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    let mut inv = vec![vec![0.0; n]; n];
-    for i in 0..n {
-        for j in 0..n {
-            inv[i][j] = aug[i][n + j];
-        }
-    }
-    Some(inv)
 }
 
 #[cfg(test)]
