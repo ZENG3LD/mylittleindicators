@@ -1,4 +1,9 @@
-//! Derivative-free optimization — Nelder-Mead downhill simplex.
+//! MLE / least-squares model fitting via a Nelder-Mead downhill simplex.
+//!
+//! NAMING: this module is `mle_fit`, not `optimize` — it estimates ONE
+//! indicator's own parameters on its own data window (GARCH ω/α/β, ARIMA MA
+//! terms). It is NOT the mlq strategy optimizer (which searches strategy
+//! parameters across a backtest); do not conflate the two.
 //!
 //! GARCH/EGARCH/ARIMA parameter estimation maximizes a Gaussian log-likelihood
 //! that is smooth but nonlinear in the parameters, with no closed form. The

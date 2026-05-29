@@ -17,8 +17,11 @@ pub mod linalg;
 /// indicators so they emit REAL test statistics.
 pub mod timeseries;
 
-/// Derivative-free numerical optimization (Nelder-Mead simplex) for maximum-
-/// likelihood / least-squares fitting where the objective is smooth but
-/// nonlinear in the parameters (GARCH/EGARCH variance recursion, ARIMA MA
-/// terms). Replaces the hardcoded-coefficient heuristics in `regression/`.
-pub mod optimize;
+/// Maximum-likelihood / least-squares model fitting via a derivative-free
+/// Nelder-Mead simplex, for indicators whose parameters have no closed form
+/// and must be estimated numerically (GARCH/EGARCH variance recursion, ARIMA
+/// MA terms). Named `mle_fit` (not `optimize`) to avoid confusion with mlq's
+/// strategy optimizer — this fits ONE indicator's own params on its own
+/// window, it is not strategy parameter search. Replaces the
+/// hardcoded-coefficient heuristics that were in `regression/`.
+pub mod mle_fit;

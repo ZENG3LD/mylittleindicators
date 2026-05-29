@@ -10,7 +10,7 @@
 //! the likelihood it computed — only the variance recursion was real.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use crate::bar_indicators::utils::math::optimize::{minimize, penalty, reflect_into, NmConfig};
+use crate::bar_indicators::utils::math::mle_fit::{minimize, penalty, reflect_into, NmConfig};
 
 /// GARCH Model - Generalized AutoRegressive Conditional Heteroskedasticity
 #[derive(Clone)]
@@ -1020,7 +1020,7 @@ mod tests {
     /// directly (objective + Nelder-Mead), isolated from the mean model.
     #[test]
     fn garch_mle_beats_hardcoded_guess() {
-        use crate::bar_indicators::utils::math::optimize::{minimize, reflect_into, NmConfig};
+        use crate::bar_indicators::utils::math::mle_fit::{minimize, reflect_into, NmConfig};
         // GARCH(1,1) data-generating process with strong persistence.
         let z = lcg(600, 5);
         let mut resid = Vec::with_capacity(z.len());

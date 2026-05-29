@@ -12,7 +12,7 @@
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::bar_indicators::utils::math::linalg::ols;
-use crate::bar_indicators::utils::math::optimize::{minimize, reflect_into, NmConfig};
+use crate::bar_indicators::utils::math::mle_fit::{minimize, reflect_into, NmConfig};
 
 /// ARIMA Model - AutoRegressive Integrated Moving Average
 #[derive(Clone)]
