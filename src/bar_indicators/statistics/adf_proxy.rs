@@ -1,15 +1,26 @@
-// ADF proxy: rolling AR(1) phi and t-like statistic on close returns
+//! Augmented Dickey-Fuller unit-root test over a rolling price-LEVEL window.
+//!
+//! REAL implementation. The prior version fit an AR(1) on LOG-RETURNS (doubly
+//! wrong: ADF tests a unit root in the LEVEL series, and must augment with
+//! lagged differences to whiten residuals). Now delegates to the shared
+//! `timeseries::adf_regression` (real augmented DF, proper t-stat via
+//! (XᵀX)⁻¹, Schwert lag selection, constant deterministic term).
+//!
+//! Emits the raw ADF t-statistic as the main value (regime filter thresholds
+//! it: t < MacKinnon 5% crit ≈ −2.86 ⇒ reject unit root, level is stationary).
+//! `phi` exposed as ρ = 1 + γ for backward compatibility.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::utils::math::timeseries::{adf_regression, AdfTrend};
+use std::collections::VecDeque;
 
 #[derive(Clone)]
 pub struct AdfProxy {
     window: usize,
-    vals: Vec<f64>,
-    idx: usize,
-    filled: bool,
-    last_close: Option<f64>,
+    prices: VecDeque<f64>,
+    /// ρ = 1 + γ (AR(1)-style persistence). Kept for backward-compat callers.
     pub phi: f64,
+    /// The ADF t-statistic on the lagged-level coefficient.
     pub t_stat: f64,
 }
 
@@ -18,10 +29,7 @@ impl AdfProxy {
         let w = window.max(20);
         Self {
             window: w,
-            vals: vec![0.0; w],
-            idx: 0,
-            filled: false,
-            last_close: None,
+            prices: VecDeque::with_capacity(w + 1),
             phi: 0.0,
             t_stat: 0.0,
         }
@@ -29,71 +37,34 @@ impl AdfProxy {
 
     #[inline]
     pub fn reset(&mut self) {
-        self.idx = 0;
-        self.filled = false;
-        self.vals.fill(0.0);
-        self.last_close = None;
+        self.prices.clear();
         self.phi = 0.0;
         self.t_stat = 0.0;
     }
 
     #[inline]
     pub fn is_ready(&self) -> bool {
-        self.filled
+        self.prices.len() >= self.window
     }
 
-    /// Returns t-statistic as main value
+    /// Returns the ADF t-statistic as the main value.
     pub fn value(&self) -> IndicatorValue {
         IndicatorValue::Single(self.t_stat)
     }
 
     pub fn update_bar(&mut self, _o: f64, _h: f64, _l: f64, c: f64, _v: f64) -> (f64, f64) {
-        if let Some(prev) = self.last_close {
-            let r = (c / prev).ln();
-            self.vals[self.idx] = r;
-            self.idx = (self.idx + 1) % self.window;
-            if !self.filled && self.idx == 0 {
-                self.filled = true;
-            }
+        self.prices.push_back(c);
+        while self.prices.len() > self.window {
+            self.prices.pop_front();
         }
-        self.last_close = Some(c);
-        if self.filled {
-            let n = self.window;
-            let mut sx = 0.0;
-            let mut sy = 0.0;
-            let mut sxx = 0.0;
-            let mut sxy = 0.0;
-            let mut se = 0.0;
-            let mut count = 0.0;
-            for i in 1..n {
-                let y = self.vals[(self.idx + i) % n];
-                let x = self.vals[(self.idx + i - 1) % n];
-                sx += x;
-                sy += y;
-                sxx += x * x;
-                sxy += x * y;
-                count += 1.0;
+        if self.is_ready() {
+            let y: Vec<f64> = self.prices.iter().copied().collect();
+            // Constant term (the standard ADF spec for a price level with no
+            // assumed deterministic trend); auto lag selection.
+            if let Some(res) = adf_regression(&y, AdfTrend::Constant, None) {
+                self.t_stat = res.t_stat;
+                self.phi = 1.0 + res.gamma; // ρ = 1 + γ
             }
-            let denom = count * sxx - sx * sx;
-            self.phi = if denom.abs() > 1e-12 {
-                (count * sxy - sx * sy) / denom
-            } else {
-                0.0
-            };
-            // residual variance
-            for i in 1..n {
-                let y = self.vals[(self.idx + i) % n];
-                let x = self.vals[(self.idx + i - 1) % n];
-                let e = y - self.phi * x;
-                se += e * e;
-            }
-            let var = se.max(1e-12) / (count - 1.0).max(1.0);
-            let se_phi = (var / (sxx - sx * sx / count).max(1e-12)).sqrt();
-            self.t_stat = if se_phi > 0.0 {
-                (self.phi - 1.0) / se_phi
-            } else {
-                0.0
-            };
         }
         (self.phi, self.t_stat)
     }
@@ -103,40 +74,69 @@ impl AdfProxy {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_adf_proxy_creation() {
-        let adf = AdfProxy::new(50);
-        assert!(!adf.is_ready());
-        assert_eq!(adf.phi, 0.0);
-        assert_eq!(adf.t_stat, 0.0);
+    fn lcg_noise(n: usize, seed: u64) -> Vec<f64> {
+        let mut s = seed;
+        let mut out = Vec::with_capacity(n);
+        for _ in 0..n {
+            s = s
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            let u = ((s >> 33) as f64) / (1u64 << 31) as f64;
+            out.push(u - 1.0);
+        }
+        out
     }
 
     #[test]
-    fn test_adf_proxy_warmup() {
-        let mut adf = AdfProxy::new(50);
-        for i in 0..60 {
-            let price = 100.0 + (i as f64 * 0.1).sin() * 5.0;
-            adf.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
+    fn creation_and_warmup() {
+        let mut adf = AdfProxy::new(60);
+        assert!(!adf.is_ready());
+        for &e in &lcg_noise(70, 1) {
+            adf.update_bar(0.0, 0.0, 0.0, 100.0 + e, 0.0);
         }
         assert!(adf.is_ready());
+        assert!(adf.t_stat.is_finite() && adf.phi.is_finite());
     }
 
     #[test]
-    fn test_adf_proxy_values() {
-        let mut adf = AdfProxy::new(50);
-        for i in 0..60 {
-            let price = 100.0 + (i as f64 * 0.2).sin() * 10.0;
-            let (phi, t_stat) = adf.update_bar(price, price + 1.0, price - 1.0, price, 1000.0);
-            assert!(phi.is_finite(), "Phi should be finite");
-            assert!(t_stat.is_finite(), "T-stat should be finite");
+    fn stationary_level_rejects() {
+        // Mean-reverting level around 100 → ADF should reject the unit root.
+        let mut adf = AdfProxy::new(120);
+        let noise = lcg_noise(160, 42);
+        let mut level = 0.0;
+        for &e in &noise {
+            level = 0.2 * level + e;
+            adf.update_bar(0.0, 0.0, 0.0, 100.0 + level, 0.0);
         }
+        // 5% MacKinnon crit (constant) ≈ −2.86.
+        assert!(
+            adf.t_stat < -2.86,
+            "stationary level should reject @5%, got {}",
+            adf.t_stat
+        );
     }
 
     #[test]
-    fn test_adf_proxy_reset() {
+    fn random_walk_does_not_reject() {
+        let mut adf = AdfProxy::new(120);
+        let noise = lcg_noise(160, 7);
+        let mut level = 100.0;
+        for &e in &noise {
+            level += e;
+            adf.update_bar(0.0, 0.0, 0.0, level, 0.0);
+        }
+        assert!(
+            adf.t_stat > -2.86,
+            "random walk should not reject @5%, got {}",
+            adf.t_stat
+        );
+    }
+
+    #[test]
+    fn reset_clears() {
         let mut adf = AdfProxy::new(50);
-        for i in 0..60 {
-            adf.update_bar(100.0 + i as f64, 101.0, 99.0, 100.0 + i as f64, 1000.0);
+        for &e in &lcg_noise(60, 3) {
+            adf.update_bar(0.0, 0.0, 0.0, 100.0 + e, 0.0);
         }
         adf.reset();
         assert!(!adf.is_ready());
