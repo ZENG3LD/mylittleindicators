@@ -2,8 +2,15 @@
 //! Generalized AutoRegressive Conditional Heteroskedasticity models
 //! GARCH(p,q) - модель для волатильности с авторегрессией и скользящим средним
 //! EGARCH - Exponential GARCH с асимметричными эффектами
+//!
+//! Parameters are estimated by REAL maximum likelihood: the conditional-Gaussian
+//! log-likelihood is maximized over (ω, α, β) [GARCH] / (ω, α, γ, β) [EGARCH]
+//! with a Nelder-Mead simplex. The prior version hardcoded the ARCH/GARCH
+//! weights to fixed decaying constants (`0.3·0.8ⁱ`, `0.6·0.9ʲ`) and never used
+//! the likelihood it computed — only the variance recursion was real.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
+use crate::bar_indicators::utils::math::optimize::{minimize, penalty, reflect_into, NmConfig};
 
 /// GARCH Model - Generalized AutoRegressive Conditional Heteroskedasticity
 #[derive(Clone)]
@@ -176,54 +183,81 @@ impl Garch {
         }
     }
 
-    /// Оценка GARCH параметров (упрощенная версия)
+    /// Оценка GARCH параметров методом максимального правдоподобия.
+    ///
+    /// Maximizes the conditional-Gaussian log-likelihood
+    ///   ℓ = −½ Σ_t [ ln σ²_t + ε²_t/σ²_t + ln(2π) ]
+    /// over θ = (ω, α₁..αₚ, β₁..βq) with the variance recursion
+    ///   σ²_t = ω + Σα_i ε²_{t-i} + Σβ_j σ²_{t-j},
+    /// subject to ω > 0, α_i ≥ 0, β_j ≥ 0 and Σα + Σβ < 1 (covariance
+    /// stationarity). Nelder-Mead over a reflected box; stationarity enforced
+    /// by a penalty. Initialized from the variance-targeting heuristic.
     fn estimate_garch_parameters(&mut self) {
-        if self.residuals.len() < self.p.max(self.q) + 5 {
+        let p = self.p;
+        let q = self.q;
+        if self.residuals.len() < p.max(q) + 5 {
             return;
         }
-        
-        // Инициализируем коэффициенты
-        self.alpha_coefficients.clear();
-        self.beta_coefficients.clear();
-        
-        // Простая эвристическая оценка параметров
-        // В реальной реализации здесь был бы алгоритм максимального правдоподобия
-        
-        // Оцениваем безусловную дисперсию
-        let unconditional_var: f64 = self.residuals.iter()
-            .map(|&r| r * r)
-            .sum::<f64>() / self.residuals.len() as f64;
-        
-        // Простые начальные значения
-        self.omega = unconditional_var * 0.1;
-        
-        // ARCH коэффициенты (убывающие)
-        let total_arch_weight = 0.3;
-        for i in 0..self.p {
-            let weight = total_arch_weight * (0.8_f64).powi(i as i32);
-            self.alpha_coefficients.push(weight);
+
+        let uncond_var: f64 =
+            self.residuals.iter().map(|&r| r * r).sum::<f64>() / self.residuals.len() as f64;
+        let uncond_var = uncond_var.max(1e-10);
+
+        // Parameter bounds. ω scaled to the data; weights in [0, 0.999].
+        let omega_hi = uncond_var * 5.0;
+        let bound = |k: usize| -> (f64, f64) {
+            if k == 0 {
+                (1e-12, omega_hi)
+            } else {
+                (0.0, 0.999)
+            }
+        };
+        let n_par = 1 + p + q;
+        let residuals = self.residuals.clone();
+
+        // Map raw simplex coords → feasible params via reflection.
+        let to_params = |raw: &[f64]| -> Vec<f64> {
+            (0..n_par)
+                .map(|k| {
+                    let (lo, hi) = bound(k);
+                    reflect_into(raw[k], lo, hi)
+                })
+                .collect()
+        };
+
+        let objective = |raw: &[f64]| -> f64 {
+            let theta = to_params(raw);
+            let persistence: f64 = theta[1..].iter().sum();
+            if persistence >= 0.9999 {
+                return penalty(persistence - 0.9999);
+            }
+            match garch_neg_loglik(&theta, &residuals, p, q, uncond_var) {
+                Some(nll) if nll.is_finite() => nll,
+                _ => penalty(1.0),
+            }
+        };
+
+        // Initial guess: variance targeting — modest ARCH, higher GARCH.
+        let mut x0 = vec![0.0; n_par];
+        x0[0] = uncond_var * 0.1;
+        for i in 0..p {
+            x0[1 + i] = 0.05 / p as f64;
+        }
+        for j in 0..q {
+            x0[1 + p + j] = 0.85 / q as f64;
         }
 
-        // GARCH коэффициенты (убывающие)
-        let total_garch_weight = 0.6;
-        for i in 0..self.q {
-            let weight = total_garch_weight * (0.9_f64).powi(i as i32);
-            self.beta_coefficients.push(weight);
-        }
-        
-        // Нормализация для обеспечения стационарности
-        let total_persistence: f64 = self.alpha_coefficients.iter().sum::<f64>() + 
-                                    self.beta_coefficients.iter().sum::<f64>();
-        
-        if total_persistence >= 0.99 {
-            let scale_factor = 0.95 / total_persistence;
-            for coeff in &mut self.alpha_coefficients {
-                *coeff *= scale_factor;
-            }
-            for coeff in &mut self.beta_coefficients {
-                *coeff *= scale_factor;
-            }
-        }
+        let cfg = NmConfig {
+            max_iters: 1500,
+            step: 0.3,
+            ..Default::default()
+        };
+        let res = minimize(objective, &x0, &cfg);
+        let theta = to_params(&res.x);
+
+        self.omega = theta[0];
+        self.alpha_coefficients = theta[1..=p].to_vec();
+        self.beta_coefficients = theta[1 + p..].to_vec();
     }
     
     /// Рассчитать условную дисперсию
@@ -559,32 +593,78 @@ impl EGarch {
         }
     }
 
-    /// Оценка EGARCH параметров (упрощенная версия)
+    /// Оценка EGARCH параметров методом максимального правдоподобия.
+    ///
+    /// Maximizes the EGARCH(p,q) log-likelihood over
+    /// θ = (ω, α₁..αₚ, γ₁..γₚ, β₁..βq). The log-variance link keeps σ² > 0 for
+    /// any θ, so α/γ are sign-unconstrained; only the GARCH persistence needs
+    /// |Σβ| < 1, enforced via a penalty. The prior version hardcoded all
+    /// coefficients to fixed decaying constants.
     fn estimate_egarch_parameters(&mut self) {
-        self.alpha_coefficients.clear();
-        self.gamma_coefficients.clear();
-        self.beta_coefficients.clear();
-        
-        // Простые начальные значения для EGARCH
-        self.omega = -0.5;
-        
-        // Alpha коэффициенты (эффект размера)
-        for i in 0..self.p {
-            let coeff = 0.2 * (0.8_f64).powi(i as i32);
-            self.alpha_coefficients.push(coeff);
+        let p = self.p;
+        let q = self.q;
+        if self.residuals.len() < p.max(q) + 5 {
+            return;
         }
 
-        // Gamma коэффициенты (асимметричный эффект)
-        for i in 0..self.p {
-            let coeff = -0.1 * (0.9_f64).powi(i as i32); // Отрицательные для leverage effect
-            self.gamma_coefficients.push(coeff);
+        let uncond_var: f64 =
+            (self.residuals.iter().map(|&r| r * r).sum::<f64>() / self.residuals.len() as f64)
+                .max(1e-10);
+        let init_log_var = uncond_var.ln();
+        let residuals = self.residuals.clone();
+
+        // Layout: [ω, α(p), γ(p), β(q)]. β reflected into (−1,1) for stability;
+        // ω, α, γ are free (bounded generously to keep the simplex sane).
+        let n_par = 1 + 2 * p + q;
+        let beta_lo = 1 + 2 * p;
+        let to_params = |raw: &[f64]| -> Vec<f64> {
+            let mut t = raw.to_vec();
+            for k in beta_lo..n_par {
+                t[k] = reflect_into(raw[k], -0.999, 0.999);
+            }
+            // Keep ω/α/γ in a wide reflected box to avoid runaway exp().
+            t[0] = reflect_into(raw[0], -10.0, 5.0);
+            for k in 1..beta_lo {
+                t[k] = reflect_into(raw[k], -2.0, 2.0);
+            }
+            t
+        };
+
+        let objective = |raw: &[f64]| -> f64 {
+            let theta = to_params(raw);
+            let beta_sum: f64 = theta[beta_lo..].iter().sum();
+            if beta_sum.abs() >= 0.9999 {
+                return penalty(beta_sum.abs() - 0.9999);
+            }
+            match egarch_neg_loglik(&theta, &residuals, p, q, init_log_var) {
+                Some(nll) if nll.is_finite() => nll,
+                _ => penalty(1.0),
+            }
+        };
+
+        // Init: ω≈ln(uncond_var)·(1−β), small size effect, mild leverage.
+        let mut x0 = vec![0.0; n_par];
+        x0[0] = init_log_var * 0.1;
+        for i in 0..p {
+            x0[1 + i] = 0.15; // α (size)
+            x0[1 + p + i] = -0.05; // γ (leverage)
+        }
+        for j in 0..q {
+            x0[beta_lo + j] = 0.9 / q as f64; // β (persistence)
         }
 
-        // Beta коэффициенты (персистентность)
-        for i in 0..self.q {
-            let coeff = 0.7 * (0.95_f64).powi(i as i32);
-            self.beta_coefficients.push(coeff);
-        }
+        let cfg = NmConfig {
+            max_iters: 2000,
+            step: 0.3,
+            ..Default::default()
+        };
+        let res = minimize(objective, &x0, &cfg);
+        let theta = to_params(&res.x);
+
+        self.omega = theta[0];
+        self.alpha_coefficients = theta[1..1 + p].to_vec();
+        self.gamma_coefficients = theta[1 + p..1 + 2 * p].to_vec();
+        self.beta_coefficients = theta[beta_lo..].to_vec();
     }
     
     /// Рассчитать логарифм условной дисперсии
@@ -736,6 +816,107 @@ impl EGarch {
     }
 }
 
+/// Negative conditional-Gaussian log-likelihood of a GARCH(p,q) candidate
+/// θ = [ω, α₁..αₚ, β₁..βq] given the mean-model residuals. Returns `None` if a
+/// non-finite / non-positive variance appears (the optimizer treats that as
+/// infeasible). The recursion is seeded with the unconditional variance.
+fn garch_neg_loglik(
+    theta: &[f64],
+    residuals: &[f64],
+    p: usize,
+    q: usize,
+    uncond_var: f64,
+) -> Option<f64> {
+    let omega = theta[0];
+    if omega <= 0.0 {
+        return None;
+    }
+    let alpha = &theta[1..=p];
+    let beta = &theta[1 + p..1 + p + q];
+    let n = residuals.len();
+    let start = p.max(q);
+    if n <= start + 1 {
+        return None;
+    }
+
+    // σ²_t history, seeded with the sample variance for the burn-in lags.
+    let mut var_hist = vec![uncond_var; n];
+    let two_pi_ln = (2.0 * std::f64::consts::PI).ln();
+    let mut nll = 0.0;
+    for t in start..n {
+        let mut v = omega;
+        for (i, &a) in alpha.iter().enumerate() {
+            v += a * residuals[t - 1 - i] * residuals[t - 1 - i];
+        }
+        for (j, &b) in beta.iter().enumerate() {
+            v += b * var_hist[t - 1 - j];
+        }
+        if !v.is_finite() || v <= 0.0 {
+            return None;
+        }
+        var_hist[t] = v;
+        let e = residuals[t];
+        nll += 0.5 * (v.ln() + e * e / v + two_pi_ln);
+    }
+    Some(nll)
+}
+
+/// Negative log-likelihood of an EGARCH(p,q) candidate
+/// θ = [ω, α₁..αₚ, γ₁..γₚ, β₁..βq] on log-variance. EGARCH is unconstrained in
+/// sign (the log keeps σ² > 0 automatically); only |Σβ| < 1 matters and is
+/// enforced by the caller. Recursion: ln σ²_t = ω + Σα_i g(z_{t-i}) + Σβ_j ln σ²_{t-j},
+/// g(z) = α|z| + γz, z = ε/σ.
+fn egarch_neg_loglik(
+    theta: &[f64],
+    residuals: &[f64],
+    p: usize,
+    q: usize,
+    init_log_var: f64,
+) -> Option<f64> {
+    let omega = theta[0];
+    let alpha = &theta[1..1 + p];
+    let gamma = &theta[1 + p..1 + 2 * p];
+    let beta = &theta[1 + 2 * p..1 + 2 * p + q];
+    let n = residuals.len();
+    let start = p.max(q);
+    if n <= start + 1 {
+        return None;
+    }
+
+    let mut logvar = vec![init_log_var; n];
+    let mut z = vec![0.0_f64; n];
+    // Seed standardized residuals for the burn-in region.
+    let seed_sd = (init_log_var.exp()).sqrt().max(1e-12);
+    for (i, zi) in z.iter_mut().enumerate().take(start) {
+        *zi = residuals[i] / seed_sd;
+    }
+
+    let two_pi_ln = (2.0 * std::f64::consts::PI).ln();
+    let mut nll = 0.0;
+    for t in start..n {
+        let mut lv = omega;
+        for i in 0..p {
+            let zt = z[t - 1 - i];
+            lv += alpha[i] * zt.abs() + gamma[i] * zt;
+        }
+        for (j, &b) in beta.iter().enumerate() {
+            lv += b * logvar[t - 1 - j];
+        }
+        if !lv.is_finite() {
+            return None;
+        }
+        logvar[t] = lv;
+        let v = lv.exp();
+        if !v.is_finite() || v <= 0.0 {
+            return None;
+        }
+        let e = residuals[t];
+        z[t] = e / v.sqrt();
+        nll += 0.5 * (lv + e * e / v + two_pi_ln);
+    }
+    Some(nll)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -819,6 +1000,99 @@ mod tests {
         ind.reset();
         assert!(!ind.is_ready());
         assert!(!ind.is_fitted());
+    }
+
+    fn lcg(n: usize, seed: u64) -> Vec<f64> {
+        let mut s = seed;
+        let mut out = Vec::with_capacity(n);
+        for _ in 0..n {
+            s = s
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            out.push(((s >> 33) as f64) / (1u64 << 31) as f64 - 1.0);
+        }
+        out
+    }
+
+    /// MLE must fit a clustered series at least as well as the discarded
+    /// hardcoded guess (α=0.3, β=0.6), and ideally recover something close to
+    /// the true (α=0.1, β=0.85) generating parameters. Tests the estimator
+    /// directly (objective + Nelder-Mead), isolated from the mean model.
+    #[test]
+    fn garch_mle_beats_hardcoded_guess() {
+        use crate::bar_indicators::utils::math::optimize::{minimize, reflect_into, NmConfig};
+        // GARCH(1,1) data-generating process with strong persistence.
+        let z = lcg(600, 5);
+        let mut resid = Vec::with_capacity(z.len());
+        let (omega, a, b) = (0.02_f64, 0.1_f64, 0.85_f64);
+        let mut var: f64 = omega / (1.0 - a - b);
+        let mut prev_e = 0.0;
+        for &zt in &z {
+            var = omega + a * prev_e * prev_e + b * var;
+            let e = var.sqrt() * zt;
+            prev_e = e;
+            resid.push(e);
+        }
+        let uncond: f64 = resid.iter().map(|r| r * r).sum::<f64>() / resid.len() as f64;
+
+        // Hardcoded-guess NLL (the discarded heuristic).
+        let hard = vec![uncond * 0.1, 0.3, 0.6];
+        let nll_hard = garch_neg_loglik(&hard, &resid, 1, 1, uncond).unwrap();
+
+        // Optimize the real objective directly (same recipe as the fitter).
+        let omega_hi = uncond * 5.0;
+        let to_p = |raw: &[f64]| {
+            vec![
+                reflect_into(raw[0], 1e-12, omega_hi),
+                reflect_into(raw[1], 0.0, 0.999),
+                reflect_into(raw[2], 0.0, 0.999),
+            ]
+        };
+        let obj = |raw: &[f64]| {
+            let t = to_p(raw);
+            if t[1] + t[2] >= 0.9999 {
+                return 1e12;
+            }
+            garch_neg_loglik(&t, &resid, 1, 1, uncond).unwrap_or(1e12)
+        };
+        let res = minimize(
+            obj,
+            &[uncond * 0.1, 0.05, 0.85],
+            &NmConfig {
+                max_iters: 2000,
+                step: 0.3,
+                ..Default::default()
+            },
+        );
+        let fit = to_p(&res.x);
+        let nll_fit = garch_neg_loglik(&fit, &resid, 1, 1, uncond).unwrap();
+
+        assert!(
+            nll_fit <= nll_hard + 1e-6,
+            "MLE NLL {nll_fit} should be ≤ hardcoded NLL {nll_hard}"
+        );
+        assert!(fit[1] + fit[2] < 1.0, "persistence must be < 1");
+        // High-persistence DGP → recovered β should dominate α.
+        assert!(
+            fit[2] > fit[1],
+            "β {} should exceed α {} for persistent vol",
+            fit[2],
+            fit[1]
+        );
+    }
+
+    /// The neg-log-likelihood is deterministic and finite on a clean series.
+    #[test]
+    fn garch_nll_deterministic_and_finite() {
+        let resid: Vec<f64> = lcg(120, 9).iter().map(|&e| 0.01 * e).collect();
+        let uncond: f64 = resid.iter().map(|r| r * r).sum::<f64>() / resid.len() as f64;
+        let theta = vec![uncond * 0.1, 0.1, 0.8];
+        let a = garch_neg_loglik(&theta, &resid, 1, 1, uncond).unwrap();
+        let b = garch_neg_loglik(&theta, &resid, 1, 1, uncond).unwrap();
+        assert_eq!(a, b);
+        assert!(a.is_finite());
+        // Infeasible (negative ω) → None.
+        assert!(garch_neg_loglik(&vec![-1.0, 0.1, 0.8], &resid, 1, 1, uncond).is_none());
     }
 }
 
