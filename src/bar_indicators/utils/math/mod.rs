@@ -16,3 +16,9 @@ pub mod linalg;
 /// MacKinnon/Kwiatkowski critical values. Shared by unit-root / stationarity
 /// indicators so they emit REAL test statistics.
 pub mod timeseries;
+
+/// Derivative-free numerical optimization (Nelder-Mead simplex) for maximum-
+/// likelihood / least-squares fitting where the objective is smooth but
+/// nonlinear in the parameters (GARCH/EGARCH variance recursion, ARIMA MA
+/// terms). Replaces the hardcoded-coefficient heuristics in `regression/`.
+pub mod optimize;
