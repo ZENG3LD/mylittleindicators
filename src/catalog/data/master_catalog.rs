@@ -419,6 +419,23 @@ pub fn all_signatures() -> impl Iterator<Item = IndicatorSignature> {
     MASTER_CATALOG.iter_signatures()
 }
 
+/// Configurability-granularity of an indicator — how many independently-iterable
+/// axes (periods, MA-type choices, scalar params, flags, enum selectors, source)
+/// it exposes, computed over its **canonical-max** config (every reachable slot
+/// filled). This is the native entry point an auto-picker / strategy-assembler
+/// calls to decide how wide an indicator's parameter space is BEFORE handing
+/// slices to the optimizer. It measures config granularity, NOT compute cost.
+///
+/// Equivalent to
+/// `config_granularity(&canonical_max_config(id))`; see
+/// [`crate::bar_indicators::granularity`].
+pub fn indicator_granularity(
+    id: crate::bar_indicators::bar_indicator_id::BarIndicatorId,
+) -> crate::bar_indicators::granularity::GranularitySpec {
+    use crate::bar_indicators::granularity::{canonical_max_config, config_granularity};
+    config_granularity(&canonical_max_config(id))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

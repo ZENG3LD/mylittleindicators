@@ -102,7 +102,6 @@ use crate::bar_indicators::volatility::{
 
 // Channels / Adaptive
 use crate::bar_indicators::channels::adaptive_bollinger_bands::AdaptiveBollingerBands;
-use crate::bar_indicators::channels::atr_channels::AtrChannelMode;
 use crate::bar_indicators::channels::adaptive_channels::{
     AdaptationMode, AdaptiveChannels, CenterLineType,
 };
@@ -775,6 +774,14 @@ pub struct IndicatorConfig {
     /// index means what (e.g. Crossover uses [0]=subject, [1]=reference).
     /// Empty for autonomous indicators.
     pub inner_indicators: Vec<IndicatorConfig>,
+    /// Named enum-valued parameters that don't fit the numeric `additional_params`
+    /// or the `MovingAverageType` `ma_types` slots — mode/source selectors whose
+    /// domain is a small string-named set (e.g. "envelope_mode" => "Percent",
+    /// "median_source" => "Hl2", "vov_source" => "LogReturn", "anchor_mode" =>
+    /// "Session"). The factory arm maps the string to its concrete enum, falling
+    /// back to the previously-baked default when the key is absent. Keeps enum
+    /// axes configurable without inventing a typed slot per indicator.
+    pub enum_params: HashMap<String, String>,
 }
 
 impl IndicatorConfig {
@@ -800,6 +807,7 @@ impl IndicatorConfig {
             source: OhlcvField::Close,
             component_configs: HashMap::new(),
             inner_indicators: Vec::new(),
+            enum_params: HashMap::new(),
         }
     }
 
@@ -834,6 +842,12 @@ impl IndicatorConfig {
     /// Sets the OHLCV field to use as input source
     pub fn with_source(mut self, source: OhlcvField) -> Self {
         self.source = source;
+        self
+    }
+    /// Sets a named enum-valued parameter (mode/source selector). Value is the
+    /// string name of the target enum variant; the factory arm maps it.
+    pub fn with_enum(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.enum_params.insert(key.into(), value.into());
         self
     }
 
@@ -925,6 +939,17 @@ impl IndicatorConfig {
                 if let Some(p) = v.period {
                     p.hash(&mut hasher);
                 }
+            }
+        }
+
+        // Named enum params (sorted by key)
+        if !self.enum_params.is_empty() {
+            has_extra = true;
+            let mut entries: Vec<(&String, &String)> = self.enum_params.iter().collect();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            for (k, v) in entries {
+                k.hash(&mut hasher);
+                v.hash(&mut hasher);
             }
         }
 
@@ -2223,8 +2248,9 @@ impl IndicatorInstance {
 
             // Core momentum/volatility
             BarIndicatorId::Rsi => {
+                let ma_type = config.ma_types.get("ma_type").copied().unwrap_or(MovingAverageType::RMA);
                 let inner = Box::new(Self::Rsi(Box::new(
-                    Rsi::with_source(period, MovingAverageType::RMA, config.source),
+                    Rsi::with_source(period, ma_type, config.source),
                 )));
                 Ok(*Self::wrap_oscillator(inner, config))
             }
@@ -2442,8 +2468,14 @@ impl IndicatorInstance {
                 Ok(Self::VwapChannelWidth(Box::new(VwapChannelWidth::new(period, mult))))
             }
             BarIndicatorId::Regchan => {
+                use crate::bar_indicators::channels::regression_channels::RegressionChannelMode;
                 let mult = config.additional_params.get("std_dev").copied().unwrap_or(2.0);
-                Ok(Self::RegressionChannels(Box::new(RegressionChannels::with_source(period, mult, crate::bar_indicators::channels::regression_channels::RegressionChannelMode::Standard, config.source))))
+                let rc_mode = match config.enum_params.get("regression_mode").map(String::as_str) {
+                    Some("Percentage") => RegressionChannelMode::Percentage,
+                    Some("R2Weighted") => RegressionChannelMode::R2Weighted,
+                    _ => RegressionChannelMode::Standard,
+                };
+                Ok(Self::RegressionChannels(Box::new(RegressionChannels::with_source(period, mult, rc_mode, config.source))))
             }
             BarIndicatorId::Regchanwidth => {
                 let mult = config.additional_params.get("std_dev").copied().unwrap_or(2.0);
@@ -2451,7 +2483,16 @@ impl IndicatorInstance {
             }
             BarIndicatorId::Envelope => {
                 let pct = config.additional_params.get("pct").copied().unwrap_or(2.5);
-                Ok(Self::EnvelopeChannels(Box::new(EnvelopeChannels::with_source(period, pct, crate::bar_indicators::channels::envelope_channels::EnvelopeMode::Fixed, MovingAverageType::SMA, config.source))))
+                let env_ma = config.ma_types.get("ma_type").copied().unwrap_or(MovingAverageType::SMA);
+                let env_mode = {
+                    use crate::bar_indicators::channels::envelope_channels::EnvelopeMode;
+                    match config.enum_params.get("envelope_mode").map(String::as_str) {
+                        Some("Adaptive") => EnvelopeMode::Adaptive,
+                        Some("Multiple") => EnvelopeMode::Multiple,
+                        _ => EnvelopeMode::Fixed,
+                    }
+                };
+                Ok(Self::EnvelopeChannels(Box::new(EnvelopeChannels::with_source(period, pct, env_mode, env_ma, config.source))))
             }
             BarIndicatorId::Envbw => {
                 let pct = config.additional_params.get("pct").copied().unwrap_or(2.5);
@@ -2459,8 +2500,20 @@ impl IndicatorInstance {
                 Ok(Self::Envbw(Box::new(EnvelopeBandwidth::with_ma_type(period, pct, ma_type))))
             }
             BarIndicatorId::Stddevchan => {
+                use crate::bar_indicators::channels::standard_deviation_channels::{StandardDeviationMode, RegressionSource};
                 let mult = config.additional_params.get("std_dev").copied().unwrap_or(2.0);
-                Ok(Self::StandardDeviationChannels(Box::new(StandardDeviationChannels::with_source(period, mult, crate::bar_indicators::channels::standard_deviation_channels::StandardDeviationMode::Simple, crate::bar_indicators::channels::standard_deviation_channels::RegressionSource::Close, config.source))))
+                let sd_mode = match config.enum_params.get("std_dev_mode").map(String::as_str) {
+                    Some("Population") => StandardDeviationMode::Population,
+                    Some("Adaptive") => StandardDeviationMode::Adaptive,
+                    _ => StandardDeviationMode::Simple,
+                };
+                let sd_src = match config.enum_params.get("regression_source").map(String::as_str) {
+                    Some("Typical") => RegressionSource::Typical,
+                    Some("Median") => RegressionSource::Median,
+                    Some("Weighted") => RegressionSource::Weighted,
+                    _ => RegressionSource::Close,
+                };
+                Ok(Self::StandardDeviationChannels(Box::new(StandardDeviationChannels::with_source(period, mult, sd_mode, sd_src, config.source))))
             }
             BarIndicatorId::Stddevwidth => {
                 let mult = config.additional_params.get("std_dev").copied().unwrap_or(2.0);
@@ -2501,7 +2554,25 @@ impl IndicatorInstance {
             BarIndicatorId::Cpr => Ok(Self::CentralPivotRange(Box::default())),
             BarIndicatorId::Pivotchan => Ok(Self::Pivotchan(Box::default())),
             // MedianChannels requires period > 2 (asserts inside). Clamp to at least 3.
-            BarIndicatorId::Medchan => Ok(Self::Medchan(Box::new(MedianChannels::with_source(period.max(3), crate::bar_indicators::channels::median_channels::MedianMode::Simple, crate::bar_indicators::channels::median_channels::MedianSource::Close, 1.4826, config.source)))),
+            BarIndicatorId::Medchan => {
+                use crate::bar_indicators::channels::median_channels::{MedianMode, MedianSource};
+                let med_mode = match config.enum_params.get("median_mode").map(String::as_str) {
+                    Some("Quantile") => MedianMode::Quantile,
+                    Some("Adaptive") => MedianMode::Adaptive,
+                    Some("MultiLevel") => MedianMode::MultiLevel,
+                    _ => MedianMode::Simple,
+                };
+                let med_src = match config.enum_params.get("median_source").map(String::as_str) {
+                    Some("Typical") => MedianSource::Typical,
+                    Some("OhlcMedian") => MedianSource::OhlcMedian,
+                    Some("VolumeWeighted") => MedianSource::VolumeWeighted,
+                    Some("TrueMedian") => MedianSource::TrueMedian,
+                    _ => MedianSource::Close,
+                };
+                // mad_multiplier 1.4826 = MAD->σ consistency constant (definitional, not tunable)
+                let mad_mult = config.additional_params.get("mad_multiplier").copied().unwrap_or(1.4826);
+                Ok(Self::Medchan(Box::new(MedianChannels::with_source(period.max(3), med_mode, med_src, mad_mult, config.source))))
+            }
             BarIndicatorId::Medchanpos => Ok(Self::Medchanpos(Box::new(MedianChannelPosition::new(period)))),
             BarIndicatorId::Qrchan => {
                 let bandwidth_mult = config.additional_params.get("bandwidth").copied().unwrap_or(2.0);
@@ -2559,7 +2630,8 @@ impl IndicatorInstance {
             }
             BarIndicatorId::Cci => {
                 let scalar = config.additional_params.get("scalar").copied().unwrap_or(0.015);
-                let inner = Box::new(Self::Cci(Box::new(Cci::new(period, scalar, None))));
+                let cci_ma = config.ma_types.get("ma_type").copied();
+                let inner = Box::new(Self::Cci(Box::new(Cci::new(period, scalar, cci_ma))));
                 Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Stoch => {
@@ -2903,7 +2975,8 @@ impl IndicatorInstance {
             BarIndicatorId::Apo => {
                 let fast = config.periods.first().copied().unwrap_or(12);
                 let slow = config.periods.get(1).copied().unwrap_or(26);
-                let inner = Box::new(Self::Apo(Box::new(Apo::new(fast, slow))));
+                let ma_type = config.ma_types.get("ma_type").copied().unwrap_or(MovingAverageType::EMA);
+                let inner = Box::new(Self::Apo(Box::new(Apo::new_with_ma_type(fast, slow, ma_type))));
                 Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Pmo => {
@@ -3325,12 +3398,14 @@ impl IndicatorInstance {
             }
             BarIndicatorId::Fi => {
                 let ema = config.periods.first().copied().unwrap_or(13);
-                Ok(Self::ForceIndex(Box::new(ForceIndex::with_source(ema, crate::bar_indicators::average::MovingAverageType::EMA, config.source))))
+                let fi_ma = config.ma_types.get("ma_type").copied().unwrap_or(crate::bar_indicators::average::MovingAverageType::EMA);
+                Ok(Self::ForceIndex(Box::new(ForceIndex::with_source(ema, fi_ma, config.source))))
             }
             BarIndicatorId::Cho => {
                 let fast = config.periods.first().copied().unwrap_or(3);
                 let slow = config.periods.get(1).copied().unwrap_or(10);
-                let inner = Box::new(Self::Cho(Box::new(ChaikinOscillator::new(fast, slow))));
+                let ma_type = config.ma_types.get("ma_type").copied().unwrap_or(MovingAverageType::EMA);
+                let inner = Box::new(Self::Cho(Box::new(ChaikinOscillator::new_with_ma_type(fast, slow, ma_type))));
                 Ok(*Self::wrap_oscillator(inner, config))
             }
             BarIndicatorId::Ii => {
@@ -4060,7 +4135,10 @@ impl IndicatorInstance {
             }
             BarIndicatorId::Var => {
                 let p = config.periods.first().copied().unwrap_or(1);
-                // VAR uses [close, volume] so n_vars=2
+                // n_vars FIXED at 2: a BarIndicatorId is single-stream by rule, so the
+                // VAR system here is exactly [close, volume]. True multi-series VAR
+                // (n_vars > 2) is a multi-symbol indicator and lives in events::, not
+                // here — so this is intentionally NOT config-driven.
                 Ok(Self::Var(Box::new(Var::new(p, 2))))
             }
             BarIndicatorId::PolyReg => {
@@ -4480,10 +4558,10 @@ impl IndicatorInstance {
             // VOLATILITY - Additional indicators
             BarIndicatorId::Atrc => {
                 let multiplier = config.additional_params.get("multiplier").copied().unwrap_or(2.0);
-                let _mode = AtrChannelMode::Close;
-                let _ma_type = MovingAverageType::SMA;
-                let _atr_ma_type = MovingAverageType::RMA;
-                Ok(Self::AtrChannels(Box::new(AtrBands::new(period, MovingAverageType::SMA, period, MovingAverageType::RMA, multiplier))))
+                let atr_period = config.periods.get(1).copied().unwrap_or(period);
+                let center_ma = config.ma_types.get("ma_type").copied().unwrap_or(MovingAverageType::SMA);
+                let atr_ma = config.ma_types.get("atr_ma_type").copied().unwrap_or(MovingAverageType::RMA);
+                Ok(Self::AtrChannels(Box::new(AtrBands::new(period, center_ma, atr_period, atr_ma, multiplier))))
             }
             BarIndicatorId::Rbvj => {
                 let annualize_factor = config.additional_params.get("annualize_factor").copied().unwrap_or(252.0);
@@ -4615,8 +4693,15 @@ impl IndicatorInstance {
                 Ok(Self::RangePercentile(Box::new(RangePercentile::new(win))))
             }
             BarIndicatorId::Vov => {
-                let source = VoVSource::AbsReturn;
                 let window = config.periods.first().copied().unwrap_or(20).max(2);
+                let source = match config.enum_params.get("vov_source").map(String::as_str) {
+                    Some("Atr") => {
+                        let atr_p = config.periods.get(1).copied().unwrap_or(14);
+                        let atr_ma = config.ma_types.get("atr_ma_type").copied().unwrap_or(MovingAverageType::RMA);
+                        VoVSource::Atr(atr_p, atr_ma)
+                    }
+                    _ => VoVSource::AbsReturn,
+                };
                 Ok(Self::Vov(Box::new(VolOfVol::new(source, window))))
             }
             BarIndicatorId::Vprb => {
