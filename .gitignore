@@ -24,6 +24,7 @@ docs/
 CLAUDE.md
 .nemo-service.toml
 .claude/
+AUDIT_*.md
 
 # Validator runtime artifacts
 crates/mli-validator/validator_*.log
