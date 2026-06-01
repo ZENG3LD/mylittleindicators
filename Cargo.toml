@@ -1,6 +1,6 @@
 [package]
 name = "mylittleindicators"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 description = "Multi-stream financial indicators library — 556 bar indicators + 21 event primitives across 35 categories. Consumes 27 stream kinds from digdigdig3 exchange connectors: OHLCV bars, ticks, orderbook (snapshot/delta/L3), funding/predicted funding/funding settlement, mark price, index price, open interest, liquidations, ticker, agg trades, long/short ratio, option greeks, volatility index, historical volatility, basis (derived), composite index, settlement events, block trades, insurance fund, risk limit, market warning, and three kline-family variants. Live-verified on 12 exchanges (89% pass-rate on a 150s BTC slice)."
 license = "MIT"
@@ -10,7 +10,7 @@ keywords = ["indicators", "trading", "technical-analysis", "orderbook", "market-
 categories = ["finance", "api-bindings"]
 
 [dependencies]
-digdigdig3 = "=0.3.12"
+digdigdig3 = "=0.3.13"
 async-trait = "0.1"
 once_cell = "1.21"
 # EnumIter derive on BarIndicatorId/EventId — single source of truth for "all
