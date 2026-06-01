@@ -12,7 +12,7 @@ path = "src/bin/indicator_validator.rs"
 
 [dependencies]
 mylittleindicators = { path = "../.." }
-digdigdig3 = "=0.3.14"
+digdigdig3 = "=0.3.15"
 digdigdig3-station = { path = "../../../digdigdig3/crates/digdigdig3-station" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -23,6 +23,3 @@ anyhow = "1"
 futures-util = "0.3"
 rust_decimal = "1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
-
-[patch.crates-io]
-digdigdig3 = { path = "../../../digdigdig3/crates/digdigdig3" }
