@@ -1,68 +1,26 @@
-//! Multi-stream data loading for backtest pipeline.
+//! Stream-kind classification for the backtest data pipeline.
 //!
-//! ## Architecture
+//! `StreamKind` enumerates every historical data stream that can feed indicators
+//! (Bar / Tick / OrderBook / Funding / Liquidation / OpenInterest / … ). It is the
+//! routing key used by the catalog signatures (`signature.input_stream`) and by
+//! downstream consumers (mlq warmup/spec-engine).
 //!
-//! ```text
-//! ExchangeHubFetcher (REST)
-//!   └── hub.rest(exchange) → CoreConnector trait methods
-//!       MarketData: get_klines, get_orderbook, get_recent_trades
-//!       MarketDataPublic: get_funding_rate_history, get_liquidation_history,
-//!                         get_open_interest_history, get_long_short_ratio_history
+//! ## Removed: the live-fetch subsystem
 //!
-//! Subscriber (WS) [mli-collector crate]
-//!   └── hub.ws(exchange, account_type) → WebSocketConnector::event_stream()
-//!       StreamEvent → TimedEvent mapping (30+ variants)
+//! This module previously also held a live-fetch subsystem — `ExchangeHubFetcher`
+//! (backed by digdigdig3 `ExchangeHub`), `EnrichedDataLoader`, the `RestFetcher`
+//! trait, `DataSource`, plus `storage` / `timed_event` / `enriched_history` /
+//! `timeline_merger` helpers. It had **zero consumers**: mlc has its own data
+//! services (dig3 + station directly), mlq uses only `StreamKind`, and
+//! mli-validator fetches via `digdigdig3-station` directly. It was a legacy
+//! attempt to keep connector/station logic inside the OSS indicator crate.
 //!
-//! StorageRoot (накопление)
-//!   └── Binary log per (exchange, symbol, stream_kind)
-//!
-//! EnrichedDataLoader (загрузка)
-//!   └── Merges bars + N streams from any DataSource
-//!
-//! TimelineMerger (sync по timestamp)
-//!   └── merge_sorted, bar_boundaries, align_to_bars
-//! ```
-//!
-//! ## REST-capable StreamKinds (via ExchangeHubFetcher)
-//!
-//! | StreamKind     | Trait method                                     |
-//! |----------------|--------------------------------------------------|
-//! | Bar            | `MarketData::get_klines`                         |
-//! | Tick           | `MarketDataPublic::get_recent_trades`            |
-//! | OrderBook      | `MarketData::get_orderbook`                      |
-//! | Funding        | `MarketDataPublic::get_funding_rate_history`     |
-//! | Liquidation    | `MarketDataPublic::get_liquidation_history`      |
-//! | OpenInterest   | `MarketDataPublic::get_open_interest_history`    |
-//! | LongShortRatio | `MarketDataPublic::get_long_short_ratio_history` |
-//!
-//! ## WS-only StreamKinds (no REST history)
-//!
-//! OrderbookDelta, AggTrade, Ticker, MarkPrice, OptionGreeks, VolatilityIndex,
-//! Basis, IndexPrice, CompositeIndex, InsuranceFund, Settlement, BlockTrade,
-//! OrderbookL3, RiskLimit, PredictedFunding, FundingSettlement, Auction,
-//! MarketWarning, HistoricalVolatility.
-//!
-//! ## Rule: ALL dig3 connections ONLY through ExchangeHub
-//!
-//! No direct `ConnectorFactory`, `BinanceConnector`, or `WebSocketPool` imports.
-//! Entry point is always `ExchangeHub::rest(id)` or `ExchangeHub::ws(id, at)`.
+//! It was removed when mli switched its only dependency from the full
+//! `digdigdig3` (47 connectors + reqwest/tokio/websockets) to the light
+//! `digdigdig3-core` (pure data types). Connector-backed fetching belongs in a
+//! consumer that actually needs it (mli-validator, or any app over
+//! `digdigdig3-station`), NOT in the OSS types/indicators crate.
 
-pub mod data_source;
-pub mod exchange_hub_fetcher;
-pub mod enriched_history;
-pub mod enriched_loader;
-pub mod rest_fetcher;
-pub mod storage;
 pub mod stream_kind;
-pub mod timed_event;
-pub mod timeline_merger;
 
-pub use data_source::DataSource;
-pub use exchange_hub_fetcher::ExchangeHubFetcher;
-pub use enriched_history::EnrichedHistory;
-pub use enriched_loader::EnrichedDataLoader;
-pub use rest_fetcher::RestFetcher;
-pub use storage::StorageRoot;
 pub use stream_kind::StreamKind;
-pub use timed_event::TimedEvent;
-pub use timeline_merger::{merge_sorted, bar_boundaries, align_to_bars};

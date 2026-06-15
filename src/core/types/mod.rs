@@ -12,8 +12,8 @@ pub use calendar::CalendarService;
 pub use time_service::TimeService;
 pub use timeframe::ResearchTimeframe;
 
-// Market data types — source of truth is digdigdig3
-pub use digdigdig3::core::types::{
+// Market data types — source of truth is digdigdig3-core (the light types crate)
+pub use digdigdig3_core::core::types::{
     AggTrade,
     AuctionEvent,
     Basis,
