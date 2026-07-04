@@ -161,6 +161,7 @@ impl UnifiedIndicatorCatalog {
             IndicatorCategory::Position,
             IndicatorCategory::Statistics,
             IndicatorCategory::StatisticalScoring,
+            IndicatorCategory::Overlay,
         ] {
             if let Ok(indicators) = self.get_category_indicators(category) {
                 result.extend(indicators);

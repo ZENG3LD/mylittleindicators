@@ -74,6 +74,7 @@ pub mod funding_advanced;
 pub mod mark_price_advanced;
 pub mod composites;
 pub mod ticker_advanced;
+pub mod overlay;
 
 pub use indicator_value::{IndicatorValue, IndicatorValueKind};
 pub use ohlcv_field::OhlcvField;

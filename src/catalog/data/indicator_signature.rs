@@ -130,6 +130,12 @@ pub enum IndicatorCategory {
     Microstructure,       // Microstructure indicators (block trade, L3)
     RiskFunding,          // Risk, funding, and auction indicators
 
+    /// Opaque host-driven overlays/toggles surfaced in the catalog for
+    /// discoverability only (no `machine_id`/compute path). E.g. OI Delta,
+    /// Funding Rate — the host (mlc) renders these via bespoke Toggle events,
+    /// not via `IndicatorOutput`.
+    Overlay,
+
     // Reserved for future expansion
     Custom,
     Composite,
@@ -180,6 +186,7 @@ impl IndicatorCategory {
             "stress" => Self::Stress,
             "microstructure" => Self::Microstructure,
             "risk_funding" | "riskfunding" => Self::RiskFunding,
+            "overlay" => Self::Overlay,
             "custom" => Self::Custom,
             "composite" => Self::Composite,
             "experimental" => Self::Experimental,
@@ -229,6 +236,7 @@ impl IndicatorCategory {
             Self::Stress => "stress",
             Self::Microstructure => "microstructure",
             Self::RiskFunding => "risk_funding",
+            Self::Overlay => "overlay",
             Self::Custom => "custom",
             Self::Composite => "composite",
             Self::Experimental => "experimental",

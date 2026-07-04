@@ -71,6 +71,7 @@ use crate::bar_indicators::greeks::greeks_catalog;
 use crate::bar_indicators::stress::stress_catalog;
 use crate::bar_indicators::microstructure::microstructure_catalog;
 use crate::bar_indicators::risk_funding::risk_funding_catalog;
+use crate::bar_indicators::overlay::overlay_catalog;
 // Note: zigzag_catalog not exported from zigzag module yet
 
 /// Error type for catalog operations
@@ -204,6 +205,7 @@ impl MasterIndicatorCatalog {
             (IndicatorCategory::Stress, stress_catalog::get_signature, stress_catalog::all_indicator_ids()),
             (IndicatorCategory::Microstructure, microstructure_catalog::get_signature, microstructure_catalog::all_indicator_ids()),
             (IndicatorCategory::RiskFunding, risk_funding_catalog::get_signature, risk_funding_catalog::all_indicator_ids()),
+            (IndicatorCategory::Overlay, overlay_catalog::get_signature, overlay_catalog::all_indicator_ids()),
             // Note: Zigzag catalog will be added when exported from zigzag module
         ];
 
