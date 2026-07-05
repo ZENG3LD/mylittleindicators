@@ -284,8 +284,9 @@ pub enum BarIndicatorId {
     Heikinashi,  // HEIKINASHI
     Wickspike,  // WICKSPIKE (StatisticalWickDetector)
 
-    // Volume (27 indicators)
+    // Volume (28 indicators)
     Cvd,  // CVD — Cumulative Volume Delta (rolling)
+    Volume,  // VOLUME — raw per-bar volume passthrough
     Mfi,  // MFI
     NviPvi,  // NVI_PVI
     Poc,  // POC

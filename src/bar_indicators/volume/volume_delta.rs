@@ -1,9 +1,9 @@
 //! Volume Delta Indicator
-//! Анализирует баланс покупок/продаж
-//! Работает с Bar (OHLCV) и опционально с buy/sell объёмами
+//! Анализирует баланс покупок/продаж по реальным buy/sell объёмам.
+//! Bar OHLCV не несёт информации об агрессоре сделки — обновление доступно
+//! только через `update_with_delta`; `update_bar` — no-op feed.
 
 use crate::bar_indicators::indicator_value::IndicatorValue;
-use crate::types::Bar;
 
 /// Volume Delta индикатор с фиксированным окном
 #[derive(Debug, Clone)]
@@ -47,34 +47,11 @@ impl VolumeDelta {
         self.process_delta(delta)
     }
 
-    /// Обновить индикатор баром (эвристика по price action)
-    pub fn update(&mut self, bar: &Bar) -> f64 {
-        let delta = self.estimate_delta_from_bar(bar);
-        self.process_delta(delta)
-    }
-
-    /// Обновить стандартным update_bar интерфейсом
-    pub fn update_bar(&mut self, open: f64, _high: f64, _low: f64, close: f64, volume: f64) -> f64 {
-        let delta = if close > open {
-            volume // Bullish - покупки
-        } else if close < open {
-            -volume // Bearish - продажи
-        } else {
-            0.0 // Нейтрально
-        };
-        self.process_delta(delta)
-    }
-
-    /// Оценка дельты из бара (эвристика)
-    fn estimate_delta_from_bar(&self, bar: &Bar) -> f64 {
-        let price_delta = bar.close - bar.open;
-        if price_delta > 0.0 {
-            bar.volume // Покупки
-        } else if price_delta < 0.0 {
-            -bar.volume // Продажи
-        } else {
-            0.0 // Нейтрально
-        }
+    /// No-new-information feed: bar OHLCV carries no real aggressor-side
+    /// data, so this cannot fabricate a delta. Returns the current per-bar
+    /// delta unchanged; real updates arrive via [`Self::update_with_delta`].
+    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, _close: f64, _volume: f64) -> f64 {
+        self.current_delta
     }
 
     /// Обработка дельты (общая логика)
@@ -137,9 +114,8 @@ mod tests {
     #[test]
     fn test_volume_delta_warmup() {
         let mut vd = VolumeDelta::new(10);
-        for i in 0..15 {
-            let price = 100.0 + (i as f64 * 0.1).sin() * 5.0;
-            vd.update_bar(price, price + 1.0, price - 1.0, price + 0.5, 1000.0);
+        for _ in 0..15 {
+            vd.update_with_delta(600.0, 400.0);
         }
         assert!(vd.is_ready());
     }
@@ -147,21 +123,20 @@ mod tests {
     #[test]
     fn test_volume_delta_values() {
         let mut vd = VolumeDelta::new(10);
-        // Price going up - should have positive delta
-        let delta = vd.update_bar(100.0, 101.0, 99.0, 101.0, 1000.0);
-        assert!(delta > 0.0, "Rising close should have positive delta");
+        // Real buy pressure - should have positive delta
+        let delta = vd.update_with_delta(700.0, 300.0);
+        assert!(delta > 0.0, "Buy-dominant volume should have positive delta");
 
-        // Price going down - should have negative delta
-        let delta = vd.update_bar(101.0, 102.0, 100.0, 100.0, 1000.0);
-        assert!(delta < 0.0, "Falling close should have negative delta");
+        // Real sell pressure - should have negative delta
+        let delta = vd.update_with_delta(300.0, 700.0);
+        assert!(delta < 0.0, "Sell-dominant volume should have negative delta");
     }
 
     #[test]
     fn test_volume_delta_cumulative() {
         let mut vd = VolumeDelta::new(10);
         for i in 0..10 {
-            let price = 100.0 + i as f64;
-            vd.update_bar(price, price + 1.0, price - 1.0, price + 0.5, 1000.0);
+            vd.update_with_delta(500.0 + i as f64, 500.0);
         }
         let cumulative = vd.cumulative_delta();
         assert!(cumulative.is_finite());
@@ -170,12 +145,22 @@ mod tests {
     #[test]
     fn test_volume_delta_reset() {
         let mut vd = VolumeDelta::new(10);
-        for i in 0..15 {
-            vd.update_bar(100.0 + i as f64, 105.0, 95.0, 101.0, 1000.0);
+        for _ in 0..15 {
+            vd.update_with_delta(600.0, 400.0);
         }
         vd.reset();
         assert!(!vd.is_ready());
         assert_eq!(vd.current_delta(), 0.0);
         assert_eq!(vd.cumulative_delta(), 0.0);
+    }
+
+    #[test]
+    fn update_bar_does_not_fabricate() {
+        let mut vd = VolumeDelta::new(10);
+        vd.update_with_delta(500.0, 0.0);
+        let delta = vd.update_bar(100.0, 102.0, 99.0, 101.0, 999.0);
+        assert!((delta - 500.0).abs() < 1e-9, "bar feed must not mutate delta");
+        let delta = vd.update_bar(101.0, 102.0, 99.0, 100.0, 999.0);
+        assert!((delta - 500.0).abs() < 1e-9, "bar feed must not mutate delta");
     }
 }

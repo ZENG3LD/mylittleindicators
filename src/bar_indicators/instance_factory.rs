@@ -190,6 +190,7 @@ use crate::bar_indicators::trend_stop::volatility_stop::{
     VolatilityStop, VolatilityType,
 };
 use crate::bar_indicators::volume::cumulative_volume_delta::CumulativeVolumeDelta;
+use crate::bar_indicators::volume::volume::Volume;
 use crate::bar_indicators::volume::mfi::Mfi;
 use crate::bar_indicators::volume::nvi_pvi::NegativePositiveVolumeIndex;
 use crate::bar_indicators::volume::rolling_volume_profile::RollingVolumeProfile;
@@ -1674,6 +1675,7 @@ pub enum IndicatorInstance {
     SessionVwap(Box<SessionVwap>),
     /// Rolling Cumulative Volume Delta.
     Cvd(Box<CumulativeVolumeDelta>),
+    Volume(Box<Volume>),
     /// Rolling Volume Profile — POC, VAH, VAL. Output: `Triple`.
     RollingVolumeProfile(Box<RollingVolumeProfile>),
 
@@ -3303,6 +3305,9 @@ impl IndicatorInstance {
             BarIndicatorId::Cvd => {
                 let w = config.periods.first().copied().unwrap_or(50);
                 Ok(Self::Cvd(Box::new(CumulativeVolumeDelta::new(w))))
+            }
+            BarIndicatorId::Volume => {
+                Ok(Self::Volume(Box::new(Volume::new())))
             }
             BarIndicatorId::Rvp => {
                 let w = config.periods.first().copied().unwrap_or(50);
@@ -6872,6 +6877,9 @@ impl IndicatorInstance {
             Self::Cvd(x) => {
                 x.update_bar(open, high, low, close, volume)
             }
+            Self::Volume(x) => {
+                x.update_bar(open, high, low, close, volume)
+            }
             Self::RollingVolumeProfile(x) => {
                 x.update_bar(open, high, low, close, volume)
             }
@@ -7202,6 +7210,33 @@ impl IndicatorInstance {
             Self::CmpAdaptiveThreshold(x) => x.update_bar(open, high, low, close, volume),
             // Catch-all for remaining legacy indicators
             _ => IndicatorValue::Single(0.0),
+        }
+    }
+
+    /// Feed a bar together with the real aggressor-side buy/sell volume split.
+    ///
+    /// This is an additional feed mode alongside [`Self::update_bar`], not a
+    /// replacement: only indicators that actually consume real delta
+    /// (`Cvd`, `Vdelta`) route into their delta-aware update path here.
+    /// Every other variant falls through to the plain OHLCV feed unchanged.
+    pub fn update_bar_with_delta(
+        &mut self,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: f64,
+        buy_volume: f64,
+        sell_volume: f64,
+        timestamp: Option<i64>,
+    ) -> IndicatorValue {
+        match self {
+            Self::Cvd(x) => IndicatorValue::Single(x.update_with_delta(buy_volume, sell_volume)),
+            Self::Vdelta(x) => {
+                x.update_with_delta(buy_volume, sell_volume);
+                x.value()
+            }
+            _ => self.update_bar(open, high, low, close, volume, timestamp),
         }
     }
 
@@ -7615,6 +7650,7 @@ impl IndicatorInstance {
             Self::SwingDetection(ind) => ind.value(),
             Self::SessionVwap(ind) => ind.value(),
             Self::Cvd(ind) => ind.value(),
+            Self::Volume(ind) => ind.value(),
             Self::RollingVolumeProfile(ind) => ind.value(),
             // ========================================
             // MISSING VALUE() HANDLERS - BATCH FIX
@@ -7990,6 +8026,7 @@ impl IndicatorInstance {
             Self::SwingDetection(ind) => ind.is_ready(),
             Self::SessionVwap(ind) => ind.is_ready(),
             Self::Cvd(ind) => ind.is_ready(),
+            Self::Volume(ind) => ind.is_ready(),
             Self::RollingVolumeProfile(ind) => ind.is_ready(),
             Self::GannHilo(ind) => ind.is_ready(),
             Self::Gapo(ind) => ind.is_ready(),
@@ -8563,6 +8600,7 @@ impl IndicatorInstance {
             Self::SwingDetection(ind) => ind.reset(),
             Self::SessionVwap(ind) => ind.reset(),
             Self::Cvd(ind) => ind.reset(),
+            Self::Volume(ind) => ind.reset(),
             Self::RollingVolumeProfile(ind) => ind.reset(),
             Self::GannHilo(ind) => ind.reset(),
             Self::Gapo(ind) => ind.reset(),

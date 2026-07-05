@@ -251,6 +251,7 @@ pub fn role_kind_for(id: BarIndicatorId) -> RoleKind {
         | BarIndicatorId::Rvol
         | BarIndicatorId::Vdelta
         | BarIndicatorId::Cvd
+        | BarIndicatorId::Volume
         | BarIndicatorId::Vo
         | BarIndicatorId::Vpin
         | BarIndicatorId::Vroc

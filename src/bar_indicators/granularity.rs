@@ -421,6 +421,7 @@ pub fn canonical_max_config(id: BarIndicatorId) -> IndicatorConfig {
             .with_param("session_duration", 1440.0),
         BarIndicatorId::SessionVwap => IndicatorConfig::new(id, name, vec![]),
         BarIndicatorId::Cvd => IndicatorConfig::new(id, name, vec![14]),
+        BarIndicatorId::Volume => IndicatorConfig::new(id, name, vec![]),
         BarIndicatorId::Rvp => IndicatorConfig::new(id, name, vec![14])
             .with_param("bucket_size", 0.01)
             .with_param("value_area_pct", 0.7),

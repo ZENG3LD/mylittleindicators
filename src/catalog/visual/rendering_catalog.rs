@@ -2360,6 +2360,16 @@ fn register_volume_indicators(catalog: &mut HashMap<BarIndicatorId, RenderingMet
             .build()
     );
 
+    // Volume — bottom-glued histogram in the main pane
+    catalog.insert(BarIndicatorId::Volume,
+        RenderingMetadata::builder("VOLUME")
+            .overlay()
+            .output(OutputSpec::histogram("volume", "Volume", COLOR_BLUE_GRAY, ValueExtractor::Main))
+            .histogram_style(HistogramStyle::FromBottom)
+            .precision(0)
+            .build()
+    );
+
     // Volume Flow Indicator
     catalog.insert(BarIndicatorId::Vfi,
         RenderingMetadata::builder("VFI")

@@ -458,20 +458,20 @@ pub fn signature_session_vwap() -> IndicatorSignature {
         .build()
 }
 
-/// Cumulative Volume Delta (rolling)
+/// Cumulative Volume Delta (real aggressor-side buy/sell delta)
 pub fn signature_cvd() -> IndicatorSignature {
     IndicatorSignature::builder("CVD", CATEGORY)
         .name("Cumulative Volume Delta")
-        .description("Rolling sum of synthetic buy/sell delta estimated from candle direction")
+        .description("Running sum of real aggressor-side buy/sell volume delta; fed via update_bar_with_delta")
         .add_constraint(ParamConstraint::period(10, 500, 50))
-        .metadata("estimate", "close > open → +volume; close < open → −volume")
+        .metadata("feed", "requires real buy/sell volume split — update_bar alone cannot compute delta")
         .machine_id(BarIndicatorId::Cvd)
         .role_kind(IndicatorRoleKind::Volume)
         .output_kind(IndicatorValueKind::Single)
         .validated()
         .alias("Cvd")
         .alias("cvd")
-        .alias("CUMULATIVEVOLUMEDELTMA")
+        .alias("CUMULATIVEVOLUMEDELTA")
         .alias("CumulativeVolumeDelta")
         .alias("cumulative_volume_delta")
         .source_type(SourceType::VolumeOnly)
@@ -632,6 +632,23 @@ pub fn signature_large_trade_filter() -> IndicatorSignature {
         .build()
 }
 
+/// Volume — raw per-bar traded volume passthrough
+pub fn signature_volume() -> IndicatorSignature {
+    IndicatorSignature::builder("VOLUME", CATEGORY)
+        .name("Volume")
+        .description("Raw per-bar traded volume, rendered as a bottom-glued histogram in the main pane")
+        .machine_id(BarIndicatorId::Volume)
+        .role_kind(IndicatorRoleKind::Volume)
+        .output_kind(IndicatorValueKind::Single)
+        .validated()
+        // Note: "VOLUME" is already the main ID, no need for alias
+        .alias("Volume")
+        .alias("volume")
+        .alias("vol")
+        .source_type(SourceType::VolumeOnly)
+        .build()
+}
+
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -640,6 +657,7 @@ pub fn signature_large_trade_filter() -> IndicatorSignature {
 /// Base catalog with main IDs only (used for initialization)
 const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("CVD", signature_cvd as fn() -> IndicatorSignature),
+    ("VOLUME", signature_volume as fn() -> IndicatorSignature),
     ("MFI", signature_mfi as fn() -> IndicatorSignature),
     ("NVI_PVI", signature_nvi_pvi as fn() -> IndicatorSignature),
     ("POC", signature_poc_detector as fn() -> IndicatorSignature),

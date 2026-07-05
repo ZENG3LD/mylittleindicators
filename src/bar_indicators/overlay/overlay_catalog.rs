@@ -1,28 +1,31 @@
 //! overlay_catalog.rs: Catalog entries for opaque host-driven overlays
 //!
-//! These four signatures (Volume Profile, OI Delta, Funding Rate, CVD) exist
+//! These three signatures (Volume Profile, OI Delta, Funding Rate) exist
 //! **only** for discoverability in the unified indicator catalog (the "+"-add
 //! indicator picker). They are NOT computed through `IndicatorInstance` /
 //! `BarIndicatorId` — the host (mlc) drives them via bespoke
-//! `ChartOutEvent::Toggle{Vp,OpenInterest,FundingRate,Cvd}Overlay` handlers and
+//! `ChartOutEvent::Toggle{Vp,OpenInterest,FundingRate}Overlay` handlers and
 //! renders them with dedicated subpane/overlay renderers, not via
 //! `IndicatorOutput`. Accordingly every signature here has `machine_id: None`
 //! (no factory-backed compute path) and zero parameter constraints — the
 //! catalog only needs to carry id/name/category for the picker UI.
 //!
-//! Two of the four requested names — `volume_profile` and `cvd` — collide
-//! with pre-existing REAL compute indicators already registered under the
-//! `Volume` category (`VPROFILE` aliases `volume_profile`; `CVD`'s alias list
-//! includes `"cvd"`). Registering a second signature under either exact
+//! `volume_profile` collides with a pre-existing REAL compute indicator
+//! already registered under the `Volume` category (`VPROFILE` aliases
+//! `volume_profile`). Registering a second signature under that exact
 //! string would make `MasterIndicatorCatalog::get_signature` return
 //! `CatalogError::Ambiguous`, breaking every existing consumer (mlq codegen,
-//! live validator) that resolves `"volume_profile"` / `"cvd"` today.
+//! live validator) that resolves `"volume_profile"` today.
 //!
-//! Fix: every id in this module carries an `overlay_` prefix, so none of the
-//! four can ever collide with a compute-indicator id or alias:
-//! `overlay_volume_profile`, `overlay_oi_delta`, `overlay_funding_rate`,
-//! `overlay_cvd`. The pre-existing `volume_profile` / `cvd` compute
-//! indicators are untouched.
+//! Fix: every id in this module carries an `overlay_` prefix, so it can
+//! never collide with a compute-indicator id or alias:
+//! `overlay_volume_profile`, `overlay_oi_delta`, `overlay_funding_rate`.
+//! The pre-existing `volume_profile` compute indicator is untouched.
+//!
+//! There is no `overlay_cvd` placeholder — CVD is a real compute indicator
+//! (`BarIndicatorId::Cvd`, catalog id `"CVD"`) fed real aggressor-side
+//! buy/sell volume via `IndicatorInstance::update_bar_with_delta`, not a
+//! host-driven opaque overlay.
 
 use crate::catalog::{IndicatorSignature, IndicatorCategory};
 
@@ -68,17 +71,6 @@ pub fn signature_funding_rate() -> IndicatorSignature {
         .build()
 }
 
-/// CVD — opaque overlay: catalog discoverability only; the host consumes
-/// this via a bespoke Toggle event, not via IndicatorOutput.
-pub fn signature_cvd() -> IndicatorSignature {
-    IndicatorSignature::builder("overlay_cvd", CATEGORY)
-        .name("CVD")
-        .description("Cumulative volume delta overlay — host-rendered, not computed via IndicatorOutput")
-        .metadata("kind", "opaque_overlay")
-        .metadata("icon", "LineChart")
-        .build()
-}
-
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -89,7 +81,6 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("overlay_volume_profile", signature_volume_profile as fn() -> IndicatorSignature),
     ("overlay_oi_delta", signature_oi_delta as fn() -> IndicatorSignature),
     ("overlay_funding_rate", signature_funding_rate as fn() -> IndicatorSignature),
-    ("overlay_cvd", signature_cvd as fn() -> IndicatorSignature),
 ];
 
 // ============================================================================
@@ -140,14 +131,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_cvd_signature() {
-        let sig = get_signature("overlay_cvd").unwrap();
-        assert_eq!(sig.id, "overlay_cvd");
-        assert_eq!(sig.category, CATEGORY);
-        assert!(sig.machine_id.is_none(), "opaque overlay must not have a machine_id");
-    }
-
-    #[test]
     fn test_all_signatures_valid() {
         for id in all_indicator_ids() {
             let sig = get_signature(id).unwrap();
@@ -158,6 +141,6 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 4);
+        assert_eq!(count(), 3);
     }
 }
