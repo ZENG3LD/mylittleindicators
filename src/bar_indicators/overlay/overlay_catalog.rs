@@ -1,14 +1,16 @@
 //! overlay_catalog.rs: Catalog entries for opaque host-driven overlays
 //!
-//! These three signatures (Volume Profile, OI Delta, Funding Rate) exist
-//! **only** for discoverability in the unified indicator catalog (the "+"-add
-//! indicator picker). They are NOT computed through `IndicatorInstance` /
+//! These six signatures (Volume Profile, TPO Profile, OI Delta, Funding
+//! Rate, DOM Heatmap, Liquidation Heatmap) exist **only** for
+//! discoverability in the unified indicator catalog (the "+"-add indicator
+//! picker). They are NOT computed through `IndicatorInstance` /
 //! `BarIndicatorId` — the host (mlc) drives them via bespoke
-//! `ChartOutEvent::Toggle{Vp,OpenInterest,FundingRate}Overlay` handlers and
-//! renders them with dedicated subpane/overlay renderers, not via
-//! `IndicatorOutput`. Accordingly every signature here has `machine_id: None`
-//! (no factory-backed compute path) and zero parameter constraints — the
-//! catalog only needs to carry id/name/category for the picker UI.
+//! `ChartOutEvent::Toggle{Vp,TpoProfile,OpenInterest,FundingRate,DomHeatmap,LiquidationHeatmap}Overlay`
+//! handlers and renders them with dedicated overlay/subpane renderers, not
+//! via `IndicatorOutput`. Accordingly every signature here has
+//! `machine_id: None` (no factory-backed compute path) and zero parameter
+//! constraints — the catalog only needs to carry id/name/category for the
+//! picker UI.
 //!
 //! `volume_profile` collides with a pre-existing REAL compute indicator
 //! already registered under the `Volume` category (`VPROFILE` aliases
@@ -19,8 +21,26 @@
 //!
 //! Fix: every id in this module carries an `overlay_` prefix, so it can
 //! never collide with a compute-indicator id or alias:
-//! `overlay_volume_profile`, `overlay_oi_delta`, `overlay_funding_rate`.
-//! The pre-existing `volume_profile` compute indicator is untouched.
+//! `overlay_volume_profile`, `overlay_tpo_profile`, `overlay_oi_delta`,
+//! `overlay_funding_rate`, `overlay_dom_heatmap`,
+//! `overlay_liquidation_heatmap`. The pre-existing `volume_profile` compute
+//! indicator is untouched.
+//!
+//! `overlay_dom_heatmap` / `overlay_liquidation_heatmap` (chart-type →
+//! overlay migration, mirrors Bookmap/ATAS/Coinglass — DOM/liquidation heat
+//! layers are overlays on any chart type, not their own chart types) were
+//! previously `chart_type` registry entries (`mlc-core`
+//! `chart_type::registry`, ids `"dom_heatmap"`/`"liquidation_heatmap"`).
+//! The host still owns the same ring-buffer state (`DomHeatmapBuffer`/
+//! `LiquidationHeatmapBuffer` on the bubble) and the same draw functions
+//! (`draw_dom_heatmap`/`draw_liquidation_heatmap`) — only the trigger moved
+//! from a chart-type switch to an overlay toggle.
+//!
+//! `overlay_tpo_profile` (canon-fix batch, item D) is a NEW overlay (not a
+//! chart-type migration) — a block-histogram time-at-price profile computed
+//! from the visible bar range, distinct from the letter-based TPO Market
+//! Profile chart type (`chart_type` id `"tpo"`, which stays a full chart
+//! type driven by session-scoped letter buckets, not this overlay).
 //!
 //! There is no `overlay_cvd` placeholder — CVD is a real compute indicator
 //! (`BarIndicatorId::Cvd`, catalog id `"CVD"`) fed real aggressor-side
@@ -49,6 +69,21 @@ pub fn signature_volume_profile() -> IndicatorSignature {
         .build()
 }
 
+/// TPO Profile — opaque overlay: catalog discoverability only; the host
+/// consumes this via a bespoke Toggle event, not via IndicatorOutput.
+///
+/// Block-histogram time-at-price profile computed from the visible bar
+/// range (canon-fix batch, item D) — no letters, distinct from the
+/// letter-based TPO Market Profile chart type (`chart_type` id `"tpo"`).
+pub fn signature_tpo_profile() -> IndicatorSignature {
+    IndicatorSignature::builder("overlay_tpo_profile", CATEGORY)
+        .name("TPO Profile")
+        .description("TPO time-at-price block profile overlay — host-rendered, not computed via IndicatorOutput")
+        .metadata("kind", "opaque_overlay")
+        .metadata("icon", "Histogram")
+        .build()
+}
+
 /// OI Delta — opaque overlay: catalog discoverability only; the host consumes
 /// this via a bespoke Toggle event, not via IndicatorOutput.
 pub fn signature_oi_delta() -> IndicatorSignature {
@@ -71,6 +106,38 @@ pub fn signature_funding_rate() -> IndicatorSignature {
         .build()
 }
 
+/// DOM Heatmap — opaque overlay: catalog discoverability only; the host
+/// consumes this via a bespoke Toggle event, not via IndicatorOutput.
+///
+/// Bookmap-style time-by-price depth heatmap. Chart-type → overlay
+/// migration (was `chart_type` id `"dom_heatmap"`) — draws under the main
+/// series on any chart type, driven by a live OrderBook + Trade
+/// subscription instead of a chart-type switch.
+pub fn signature_dom_heatmap() -> IndicatorSignature {
+    IndicatorSignature::builder("overlay_dom_heatmap", CATEGORY)
+        .name("DOM Heatmap")
+        .description("Depth-of-market heatmap overlay — host-rendered, not computed via IndicatorOutput")
+        .metadata("kind", "opaque_overlay")
+        .metadata("icon", "Histogram")
+        .build()
+}
+
+/// Liquidation Heatmap — opaque overlay: catalog discoverability only; the
+/// host consumes this via a bespoke Toggle event, not via IndicatorOutput.
+///
+/// Hyblock/CoinGlass-style time-by-price liquidation heatmap. Chart-type →
+/// overlay migration (was `chart_type` id `"liquidation_heatmap"`) — draws
+/// under the main series on any chart type, driven by a live Liquidation
+/// subscription instead of a chart-type switch.
+pub fn signature_liquidation_heatmap() -> IndicatorSignature {
+    IndicatorSignature::builder("overlay_liquidation_heatmap", CATEGORY)
+        .name("Liquidation Heatmap")
+        .description("Liquidation heatmap overlay — host-rendered, not computed via IndicatorOutput")
+        .metadata("kind", "opaque_overlay")
+        .metadata("icon", "Activity")
+        .build()
+}
+
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -79,8 +146,11 @@ pub fn signature_funding_rate() -> IndicatorSignature {
 /// Base catalog with main IDs only (used for initialization).
 const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("overlay_volume_profile", signature_volume_profile as fn() -> IndicatorSignature),
+    ("overlay_tpo_profile", signature_tpo_profile as fn() -> IndicatorSignature),
     ("overlay_oi_delta", signature_oi_delta as fn() -> IndicatorSignature),
     ("overlay_funding_rate", signature_funding_rate as fn() -> IndicatorSignature),
+    ("overlay_dom_heatmap", signature_dom_heatmap as fn() -> IndicatorSignature),
+    ("overlay_liquidation_heatmap", signature_liquidation_heatmap as fn() -> IndicatorSignature),
 ];
 
 // ============================================================================
@@ -115,6 +185,14 @@ mod tests {
     }
 
     #[test]
+    fn test_get_tpo_profile_signature() {
+        let sig = get_signature("overlay_tpo_profile").unwrap();
+        assert_eq!(sig.id, "overlay_tpo_profile");
+        assert_eq!(sig.category, CATEGORY);
+        assert!(sig.machine_id.is_none(), "opaque overlay must not have a machine_id");
+    }
+
+    #[test]
     fn test_get_oi_delta_signature() {
         let sig = get_signature("overlay_oi_delta").unwrap();
         assert_eq!(sig.id, "overlay_oi_delta");
@@ -131,6 +209,22 @@ mod tests {
     }
 
     #[test]
+    fn test_get_dom_heatmap_signature() {
+        let sig = get_signature("overlay_dom_heatmap").unwrap();
+        assert_eq!(sig.id, "overlay_dom_heatmap");
+        assert_eq!(sig.category, CATEGORY);
+        assert!(sig.machine_id.is_none(), "opaque overlay must not have a machine_id");
+    }
+
+    #[test]
+    fn test_get_liquidation_heatmap_signature() {
+        let sig = get_signature("overlay_liquidation_heatmap").unwrap();
+        assert_eq!(sig.id, "overlay_liquidation_heatmap");
+        assert_eq!(sig.category, CATEGORY);
+        assert!(sig.machine_id.is_none(), "opaque overlay must not have a machine_id");
+    }
+
+    #[test]
     fn test_all_signatures_valid() {
         for id in all_indicator_ids() {
             let sig = get_signature(id).unwrap();
@@ -141,6 +235,6 @@ mod tests {
 
     #[test]
     fn test_count() {
-        assert_eq!(count(), 3);
+        assert_eq!(count(), 6);
     }
 }
