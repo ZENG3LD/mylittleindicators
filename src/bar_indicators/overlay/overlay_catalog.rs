@@ -46,9 +46,24 @@
 //! (`BarIndicatorId::Cvd`, catalog id `"CVD"`) fed real aggressor-side
 //! buy/sell volume via `IndicatorInstance::update_bar_with_delta`, not a
 //! host-driven opaque overlay.
+//!
+//! ## Data streams are DECLARED, not hardcoded by the host (2026-08-02)
+//!
+//! An overlay that is a real indicator names the stream it consumes
+//! through the ordinary `input_stream` / `aux_streams` contract every
+//! other indicator uses (`signature.accepts(kind)`), so the bubble hosting
+//! it raises that feed from the catalog instead of anything matching on
+//! its id. `overlay_liquidation_heatmap` declares `Liquidation`.
+//!
+//! Overlay INDICATORS are one per data source, deliberately: the reference
+//! UI (TapeSurf) folds its heatmap sources into a single widget with a
+//! source dropdown; we keep them separate so each carries its own params,
+//! its own stream declaration and its own legend row inside the indicator
+//! system.
 
 use crate::catalog::{IndicatorSignature, IndicatorCategory};
 use crate::catalog::constraints::ParamConstraint;
+use crate::data_loader::stream_kind::StreamKind;
 
 /// Category for all indicators in this module.
 pub const CATEGORY: IndicatorCategory = IndicatorCategory::Overlay;
@@ -147,6 +162,7 @@ pub fn signature_liquidation_heatmap() -> IndicatorSignature {
         .description("Liquidation heatmap overlay — host-rendered, not computed via IndicatorOutput")
         .metadata("kind", "opaque_overlay")
         .metadata("icon", "Activity")
+        .input_stream(StreamKind::Liquidation)
         .add_constraint(ParamConstraint::threshold("sensitivity", 0.1, 10.0, 1.0))
         .build()
 }

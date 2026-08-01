@@ -17,7 +17,11 @@ env/
 *.db-wal
 *.sqlite
 *.sqlite3
-data/
+# Anchored: an unanchored `data/` also matched `src/catalog/data/`, ten
+# tracked source files. They survived only because they predate the rule —
+# any NEW file added there was invisible to `git add` and would have been
+# dropped from the published crate.
+/data/
 
 # Agent artifacts (internal, not public)
 docs/

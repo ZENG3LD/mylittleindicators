@@ -403,6 +403,20 @@ impl IndicatorSignature {
         IndicatorSignatureBuilder::new(id, category)
     }
 
+    /// Whether this indicator consumes `kind` — either as its primary
+    /// [`input_stream`](Self::input_stream) or as one of its
+    /// [`aux_streams`](Self::aux_streams).
+    ///
+    /// This is the dispatch predicate for a live consumer: a host holding a
+    /// stream event asks each instantiated signature whether it wants the
+    /// event, instead of hard-coding a per-indicator match. It is also the
+    /// predicate a data owner uses to decide which feeds it must subscribe
+    /// to on behalf of the indicators it hosts.
+    #[must_use]
+    pub fn accepts(&self, kind: StreamKind) -> bool {
+        self.input_stream == kind || self.aux_streams.contains(&kind)
+    }
+
     /// Validate provided parameters
     ///
     /// ## Errors
