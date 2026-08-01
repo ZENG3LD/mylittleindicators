@@ -122,19 +122,35 @@ pub fn signature_funding_rate() -> IndicatorSignature {
         .build()
 }
 
-/// DOM Heatmap — opaque overlay: catalog discoverability only; the host
-/// consumes this via a bespoke Toggle event, not via IndicatorOutput.
+/// DOM Heatmap — resting order-book depth as a time-by-price layer under
+/// the candles (Bookmap / TapeSurf "Order Book heatmap", refs
+/// `tapesurf-refs/01,02,10,11,12`).
 ///
-/// Bookmap-style time-by-price depth heatmap. Chart-type → overlay
-/// migration (was `chart_type` id `"dom_heatmap"`) — draws under the main
-/// series on any chart type, driven by a live OrderBook + Trade
-/// subscription instead of a chart-type switch.
+/// A real `IndicatorInstance`, not one of the opaque host-toggled entries:
+/// it declares `StreamKind::OrderBook` so the bubble hosting it raises the
+/// book feed, and its parameters reach the Indicator Settings modal.
+///
+/// The heat grid is keyed to the chart's BARS, not to a clock of its own —
+/// that is what makes it an overlay rather than a second chart. The
+/// reference does the same: its timeframe buttons re-grain the heat
+/// together with the series.
+///
+/// - `sensitivity` — gain on the on-screen depth normaliser (their
+///   SENSITIVITY slider): higher brightens thin liquidity.
+/// - `opacity` — fill alpha at full depth; the heat paints under the
+///   candles, so this is what keeps them readable.
+/// - `row_ticks` — instrument ticks folded into one heat row (their GROUP
+///   stepper): sets the vertical grain and how much history the ring holds.
 pub fn signature_dom_heatmap() -> IndicatorSignature {
     IndicatorSignature::builder("overlay_dom_heatmap", CATEGORY)
         .name("DOM Heatmap")
-        .description("Depth-of-market heatmap overlay — host-rendered, not computed via IndicatorOutput")
+        .description("Order-book depth heatmap overlay — host-rendered, not computed via IndicatorOutput")
         .metadata("kind", "opaque_overlay")
         .metadata("icon", "Histogram")
+        .input_stream(StreamKind::OrderBook)
+        .add_constraint(ParamConstraint::threshold("sensitivity", 0.1, 10.0, 1.0))
+        .add_constraint(ParamConstraint::threshold("opacity", 0.1, 1.0, 0.55))
+        .add_constraint(ParamConstraint::threshold("row_ticks", 1.0, 200.0, 10.0))
         .build()
 }
 
