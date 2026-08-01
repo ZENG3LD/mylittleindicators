@@ -48,6 +48,7 @@
 //! host-driven opaque overlay.
 
 use crate::catalog::{IndicatorSignature, IndicatorCategory};
+use crate::catalog::constraints::ParamConstraint;
 
 /// Category for all indicators in this module.
 pub const CATEGORY: IndicatorCategory = IndicatorCategory::Overlay;
@@ -129,12 +130,24 @@ pub fn signature_dom_heatmap() -> IndicatorSignature {
 /// overlay migration (was `chart_type` id `"liquidation_heatmap"`) — draws
 /// under the main series on any chart type, driven by a live Liquidation
 /// subscription instead of a chart-type switch.
+///
+/// Unlike its 5 opaque-overlay siblings, this one carries ONE parameter
+/// constraint (wave 1, 2026-08-01): `sensitivity` (F64, default 1.0,
+/// 0.1..=10.0) — a gain applied to the heat normalizer at render time
+/// (`draw_liquidation_heatmap` divides `max_volume_seen` by it), mirroring
+/// TapeSurf's "gain" slider. It rides the same `IndicatorBridge::
+/// extract_params` path every real compute indicator's params use — this
+/// signature is the ONLY opaque overlay promoted to a real
+/// `IndicatorInstance` on the host side (mlc `overlay_toggle_for_catalog_id`
+/// no longer intercepts `overlay_liquidation_heatmap` in the picker
+/// add-flow), so its param actually reaches the Indicator Settings modal.
 pub fn signature_liquidation_heatmap() -> IndicatorSignature {
     IndicatorSignature::builder("overlay_liquidation_heatmap", CATEGORY)
         .name("Liquidation Heatmap")
         .description("Liquidation heatmap overlay — host-rendered, not computed via IndicatorOutput")
         .metadata("kind", "opaque_overlay")
         .metadata("icon", "Activity")
+        .add_constraint(ParamConstraint::threshold("sensitivity", 0.1, 10.0, 1.0))
         .build()
 }
 
