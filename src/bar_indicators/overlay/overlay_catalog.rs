@@ -135,12 +135,33 @@ pub fn signature_funding_rate() -> IndicatorSignature {
 /// reference does the same: its timeframe buttons re-grain the heat
 /// together with the series.
 ///
+/// Every knob that decides how the layer reads is a parameter, not a
+/// constant — the picture is tuned against the reference by hand, so the
+/// tuning has to live where it can be turned.
+///
+/// GRID (changing either rebuilds the buffer — they are geometry):
+/// - `row_ticks` — instrument ticks folded into one heat row (their GROUP
+///   stepper): the vertical grain.
+/// - `band_pct` — half-width of the price band kept around the book's mid,
+///   in percent. Exchanges stream depth far past anything a chart shows;
+///   a narrow band spends the ring on rows that are actually looked at and
+///   buys history instead.
+///
+/// INK:
 /// - `sensitivity` — gain on the on-screen depth normaliser (their
 ///   SENSITIVITY slider): higher brightens thin liquidity.
+/// - `contrast` — exponent of the depth→alpha curve. Below 1 lifts the weak
+///   cells (everything glows); above 1 sinks them, which is how the
+///   reference reads — a dark field with the walls standing out.
 /// - `opacity` — fill alpha at full depth; the heat paints under the
 ///   candles, so this is what keeps them readable.
-/// - `row_ticks` — instrument ticks folded into one heat row (their GROUP
-///   stepper): sets the vertical grain and how much history the ring holds.
+/// - `wall_x` — a cell at this multiple of the visible mean is a WALL and is
+///   painted solid with dark digits, the way the reference marks its
+///   outliers. Raise it until only the real walls light up.
+///
+/// DIGITS:
+/// - `show_values` — per-cell size numbers on/off.
+/// - `value_size` — scale on the auto-fitted font.
 pub fn signature_dom_heatmap() -> IndicatorSignature {
     IndicatorSignature::builder("overlay_dom_heatmap", CATEGORY)
         .name("DOM Heatmap")
@@ -148,9 +169,14 @@ pub fn signature_dom_heatmap() -> IndicatorSignature {
         .metadata("kind", "opaque_overlay")
         .metadata("icon", "Histogram")
         .input_stream(StreamKind::OrderBook)
+        .add_constraint(ParamConstraint::threshold("row_ticks", 1.0, 200.0, 4.0))
+        .add_constraint(ParamConstraint::threshold("band_pct", 0.05, 5.0, 0.6))
         .add_constraint(ParamConstraint::threshold("sensitivity", 0.1, 10.0, 1.0))
+        .add_constraint(ParamConstraint::threshold("contrast", 0.4, 4.0, 1.7))
         .add_constraint(ParamConstraint::threshold("opacity", 0.1, 1.0, 0.55))
-        .add_constraint(ParamConstraint::threshold("row_ticks", 1.0, 200.0, 10.0))
+        .add_constraint(ParamConstraint::threshold("wall_x", 1.5, 25.0, 5.0))
+        .add_constraint(ParamConstraint::flag("show_values", true))
+        .add_constraint(ParamConstraint::threshold("value_size", 0.5, 2.0, 1.0))
         .build()
 }
 
