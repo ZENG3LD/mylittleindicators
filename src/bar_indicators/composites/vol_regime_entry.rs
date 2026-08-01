@@ -184,11 +184,11 @@ mod tests {
     use super::*;
 
     fn make_vi(value: f64) -> VolatilityIndex {
-        VolatilityIndex { value, timestamp: 1000 }
+        VolatilityIndex { value, timestamp: 1000, ..Default::default() }
     }
 
     fn make_mp(mark_price: f64) -> MarkPrice {
-        MarkPrice { mark_price, index_price: None, funding_rate: None, timestamp: 1000 }
+        MarkPrice { mark_price, index_price: None, funding_rate: None, timestamp: 1000, ..Default::default() }
     }
 
     #[test]

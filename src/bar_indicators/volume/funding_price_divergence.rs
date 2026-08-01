@@ -143,6 +143,7 @@ mod tests {
             rate,
             next_funding_time: None,
             timestamp: 0,
+            ..Default::default()
         }
     }
 

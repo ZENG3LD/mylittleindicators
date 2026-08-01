@@ -82,6 +82,7 @@ mod tests {
             index_price: None,
             funding_rate: None,
             timestamp: 0,
+            ..Default::default()
         }
     }
 

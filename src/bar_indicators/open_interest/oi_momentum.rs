@@ -76,6 +76,7 @@ mod tests {
             open_interest: oi,
             open_interest_value: None,
             timestamp: 0,
+            ..Default::default()
         }
     }
 

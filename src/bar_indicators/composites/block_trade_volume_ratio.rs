@@ -148,7 +148,7 @@ mod tests {
     }
 
     fn make_agg(price: f64, quantity: f64, ts: i64) -> AggTrade {
-        AggTrade { aggregate_id: 1, price, quantity, first_trade_id: 1, last_trade_id: 1, is_buy: true, timestamp: ts }
+        AggTrade { aggregate_id: 1, price, quantity, first_trade_id: 1, last_trade_id: 1, is_buy: true, timestamp: ts, ..Default::default() }
     }
 
     #[test]

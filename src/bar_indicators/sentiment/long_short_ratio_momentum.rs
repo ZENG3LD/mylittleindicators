@@ -79,6 +79,7 @@ mod tests {
                 None
             },
             timestamp: 0,
+            ..Default::default()
         }
     }
 

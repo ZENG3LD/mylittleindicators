@@ -141,7 +141,7 @@ mod tests {
     use super::*;
 
     fn make_ip(price: f64) -> IndexPrice {
-        IndexPrice { price, timestamp: 1000 }
+        IndexPrice { price, timestamp: 1000, ..Default::default() }
     }
 
     fn make_ci(price: f64) -> CompositeIndex {

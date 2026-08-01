@@ -230,15 +230,15 @@ mod tests {
     use super::*;
 
     fn make_liq_long(ts: i64) -> Liquidation {
-        Liquidation { symbol: String::new(), side: TradeSide::Buy, price: 30000.0, quantity: 0.1, timestamp: ts, value: None }
+        Liquidation { symbol: String::new(), side: TradeSide::Buy, price: 30000.0, quantity: 0.1, timestamp: ts, value: None, ..Default::default() }
     }
 
     fn make_agg(ts: i64, price: f64, qty: f64) -> AggTrade {
-        AggTrade { aggregate_id: 1, price, quantity: qty, first_trade_id: 1, last_trade_id: 1, is_buy: true, timestamp: ts }
+        AggTrade { aggregate_id: 1, price, quantity: qty, first_trade_id: 1, last_trade_id: 1, is_buy: true, timestamp: ts, ..Default::default() }
     }
 
     fn make_mp(ts: i64, mark_price: f64) -> MarkPrice {
-        MarkPrice { mark_price, index_price: None, funding_rate: None, timestamp: ts }
+        MarkPrice { mark_price, index_price: None, funding_rate: None, timestamp: ts, ..Default::default() }
     }
 
     #[test]

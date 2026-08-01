@@ -240,15 +240,15 @@ mod tests {
     use crate::core::types::TradeSide;
 
     fn make_vi(value: f64) -> VolatilityIndex {
-        VolatilityIndex { value, timestamp: 1000 }
+        VolatilityIndex { value, timestamp: 1000, ..Default::default() }
     }
 
     fn make_liq(ts: i64) -> Liquidation {
-        Liquidation { symbol: String::new(), side: TradeSide::Buy, price: 30000.0, quantity: 0.1, timestamp: ts, value: None }
+        Liquidation { symbol: String::new(), side: TradeSide::Buy, price: 30000.0, quantity: 0.1, timestamp: ts, value: None, ..Default::default() }
     }
 
     fn make_fr(rate: f64) -> FundingRate {
-        FundingRate { rate, next_funding_time: None, timestamp: 1000 }
+        FundingRate { rate, next_funding_time: None, timestamp: 1000, ..Default::default() }
     }
 
     fn make_ins(balance: f64, ts: i64) -> InsuranceFund {

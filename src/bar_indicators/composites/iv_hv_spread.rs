@@ -110,7 +110,7 @@ mod tests {
     }
 
     fn make_vi(value: f64) -> VolatilityIndex {
-        VolatilityIndex { value, timestamp: 1000 }
+        VolatilityIndex { value, timestamp: 1000, ..Default::default() }
     }
 
     #[test]

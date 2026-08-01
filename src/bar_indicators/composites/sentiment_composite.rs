@@ -175,6 +175,7 @@ mod tests {
             short_ratio: 1.0 - long_ratio,
             ratio: if long_ratio > 0.0 { Some(long_ratio / (1.0 - long_ratio).max(1e-9)) } else { None },
             timestamp: 1000,
+            ..Default::default()
         }
     }
 
@@ -187,11 +188,12 @@ mod tests {
             last_trade_id: 1,
             is_buy,
             timestamp: ts,
+            ..Default::default()
         }
     }
 
     fn make_fr(rate: f64) -> FundingRate {
-        FundingRate { rate, next_funding_time: None, timestamp: 1000 }
+        FundingRate { rate, next_funding_time: None, timestamp: 1000, ..Default::default() }
     }
 
     #[test]

@@ -91,7 +91,7 @@ mod tests {
     use super::*;
 
     fn make_basis(v: f64) -> Basis {
-        Basis { basis: v, timestamp: 0 }
+        Basis { basis: v, timestamp: 0, ..Default::default() }
     }
 
     #[test]

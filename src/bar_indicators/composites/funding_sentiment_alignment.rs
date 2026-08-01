@@ -130,7 +130,7 @@ mod tests {
     use super::*;
 
     fn make_fr(rate: f64) -> FundingRate {
-        FundingRate { rate, next_funding_time: None, timestamp: 1000 }
+        FundingRate { rate, next_funding_time: None, timestamp: 1000, ..Default::default() }
     }
 
     fn make_lsr(long_ratio: f64) -> LongShortRatio {
@@ -141,6 +141,7 @@ mod tests {
             short_ratio: 1.0 - long_ratio,
             ratio: Some(long_ratio / (1.0 - long_ratio + 1e-9)),
             timestamp: 1000,
+            ..Default::default()
         }
     }
 

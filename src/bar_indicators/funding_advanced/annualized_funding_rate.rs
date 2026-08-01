@@ -74,6 +74,7 @@ mod tests {
             rate,
             next_funding_time: None,
             timestamp: 1000,
+            ..Default::default()
         }
     }
 

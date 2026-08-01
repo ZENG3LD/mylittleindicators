@@ -76,7 +76,7 @@ mod tests {
     use super::*;
 
     fn make_ip(price: f64) -> IndexPrice {
-        IndexPrice { price, timestamp: 0 }
+        IndexPrice { price, timestamp: 0, ..Default::default() }
     }
 
     #[test]

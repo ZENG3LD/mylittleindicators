@@ -150,7 +150,7 @@ mod tests {
     use crate::core::types::TradeSide;
 
     fn liq(ts: i64, price: f64, qty: f64) -> Liquidation {
-        Liquidation { symbol: String::new(), side: TradeSide::Buy, price, quantity: qty, timestamp: ts, value: None }
+        Liquidation { symbol: String::new(), side: TradeSide::Buy, price, quantity: qty, timestamp: ts, value: None, ..Default::default() }
     }
 
     #[test]

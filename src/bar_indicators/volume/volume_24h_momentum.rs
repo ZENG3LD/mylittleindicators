@@ -106,6 +106,7 @@ mod tests {
             price_change_24h: None,
             price_change_percent_24h: None,
             timestamp: 1000,
+            ..Default::default()
         }
     }
 

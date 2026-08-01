@@ -180,7 +180,7 @@ mod tests {
     use super::*;
 
     fn liq(ts: i64, side: TradeSide, price: f64, qty: f64) -> Liquidation {
-        Liquidation { symbol: String::new(), side, price, quantity: qty, timestamp: ts, value: None }
+        Liquidation { symbol: String::new(), side, price, quantity: qty, timestamp: ts, value: None, ..Default::default() }
     }
 
     fn mp(ts: i64, price: f64) -> MarkPrice {
@@ -189,6 +189,7 @@ mod tests {
             index_price: None,
             funding_rate: None,
             timestamp: ts,
+            ..Default::default()
         }
     }
 

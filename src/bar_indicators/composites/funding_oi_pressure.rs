@@ -130,11 +130,11 @@ mod tests {
     use super::*;
 
     fn make_fr(rate: f64) -> FundingRate {
-        FundingRate { rate, next_funding_time: None, timestamp: 1000 }
+        FundingRate { rate, next_funding_time: None, timestamp: 1000, ..Default::default() }
     }
 
     fn make_oi(open_interest: f64, ts: i64) -> OpenInterest {
-        OpenInterest { open_interest, open_interest_value: None, timestamp: ts }
+        OpenInterest { open_interest, open_interest_value: None, timestamp: ts, ..Default::default() }
     }
 
     #[test]

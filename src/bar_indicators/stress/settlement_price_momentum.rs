@@ -77,6 +77,7 @@ mod tests {
             settlement_price: price,
             settlement_time: 0,
             timestamp: 0,
+            ..Default::default()
         }
     }
 

@@ -91,6 +91,7 @@ mod tests {
             last_trade_id: 0,
             is_buy: true,
             timestamp: 0,
+            ..Default::default()
         }
     }
 

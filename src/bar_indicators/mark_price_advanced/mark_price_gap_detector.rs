@@ -120,6 +120,7 @@ mod tests {
             index_price: None,
             funding_rate: None,
             timestamp: 1000,
+            ..Default::default()
         }
     }
 

@@ -106,6 +106,7 @@ mod tests {
             settlement_price: price,
             settlement_time: 0,
             timestamp: 0,
+            ..Default::default()
         }
     }
 
@@ -115,6 +116,7 @@ mod tests {
             index_price: None,
             funding_rate: None,
             timestamp: 0,
+            ..Default::default()
         }
     }
 

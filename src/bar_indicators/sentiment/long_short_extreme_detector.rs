@@ -71,6 +71,7 @@ mod tests {
             short_ratio: 1.0 - long_ratio,
             ratio: None,
             timestamp: 0,
+            ..Default::default()
         }
     }
 

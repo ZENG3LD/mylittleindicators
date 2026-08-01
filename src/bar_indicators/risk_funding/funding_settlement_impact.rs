@@ -161,6 +161,7 @@ mod tests {
             index_price: None,
             funding_rate: None,
             timestamp: ts,
+            ..Default::default()
         }
     }
 
