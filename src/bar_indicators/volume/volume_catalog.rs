@@ -743,8 +743,16 @@ mod tests {
         }
     }
 
+    /// Guards against an accidental add/remove in `BASE_CATALOG`. The
+    /// expected number is 25 since `32b303a` promoted VOLUME to a
+    /// first-class catalog entry (the commit grew the list and left this
+    /// assertion at 24). Bump it deliberately when the catalog changes —
+    /// that is the whole point of pinning an exact count.
     #[test]
     fn test_count() {
-        assert_eq!(count(), 24);
+        assert_eq!(count(), 25);
+        let ids = all_indicator_ids();
+        let unique: std::collections::HashSet<_> = ids.iter().collect();
+        assert_eq!(unique.len(), ids.len(), "duplicate id in BASE_CATALOG");
     }
 }
