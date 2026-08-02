@@ -239,6 +239,60 @@ pub fn signature_liquidation_heatmap() -> IndicatorSignature {
         .build()
 }
 
+/// Projected Liquidations — opaque overlay: the price rows where leveraged
+/// positions are LIKELY to be force-closed, modelled from open interest.
+///
+/// Sibling of `overlay_liquidation_heatmap` and deliberately a separate
+/// indicator: one shows what happened, this one shows what is still loaded.
+/// They answer different questions, carry different parameters and can be
+/// read alone or together.
+///
+/// No exchange publishes other traders' positions — every reference tool
+/// that draws these bands (CoinGlass, Hyblock) derives them the same way:
+/// open interest that APPEARED at a price is new leveraged exposure, it dies
+/// at `P × (1 ∓ 1/L ± MMR)`, and a row is spent the first time price trades
+/// through it. Consuming `StreamKind::OpenInterest` is therefore the whole
+/// data dependency.
+///
+/// The leverage distribution is five weights rather than a preset because it
+/// IS the model: a venue's clientele is not a constant, and the owner must
+/// be able to say "this market is 100× retail" or "this one is 10× funds"
+/// without a rebuild.
+pub fn signature_liquidation_projection() -> IndicatorSignature {
+    IndicatorSignature::builder("overlay_liquidation_projection", CATEGORY)
+        .name("Projected Liquidations")
+        .description("Modelled liquidation levels from open interest — host-rendered, not computed via IndicatorOutput")
+        .metadata("kind", "opaque_overlay")
+        .metadata("icon", "Activity")
+        .input_stream(StreamKind::OpenInterest)
+        // Assumed leverage distribution. Weights are normalised, so these
+        // are shares, not probabilities that must sum to one.
+        .add_constraint(ParamConstraint::threshold("lev_5", 0.0, 1.0, 0.10))
+        .add_constraint(ParamConstraint::threshold("lev_10", 0.0, 1.0, 0.25))
+        .add_constraint(ParamConstraint::threshold("lev_25", 0.0, 1.0, 0.30))
+        .add_constraint(ParamConstraint::threshold("lev_50", 0.0, 1.0, 0.25))
+        .add_constraint(ParamConstraint::threshold("lev_100", 0.0, 1.0, 0.10))
+        // Maintenance margin rate in PERCENT (0.4 = 0.4 %). Tiered by
+        // notional on every venue; this takes one value rather than
+        // pretending to know which tier a modelled position sits in.
+        .add_constraint(ParamConstraint::threshold("mmr", 0.0, 5.0, 0.4))
+        // Share of new exposure assumed long. 0.5 is balanced; move it when
+        // the funding rate says the book is one-sided.
+        .add_constraint(ParamConstraint::threshold("long_share", 0.0, 1.0, 0.5))
+        // Band height as a percent of price — the grouping that turns a
+        // thousand hairlines into a readable cluster.
+        .add_constraint(ParamConstraint::threshold("row_pct", 0.005, 2.0, 0.05))
+        // Rows below this notional are dropped before drawing.
+        .add_constraint(ParamConstraint::threshold("min_usd", 0.0, 50_000_000.0, 0.0))
+        .add_constraint(ParamConstraint::threshold("sensitivity", 0.1, 10.0, 1.0))
+        .add_constraint(ParamConstraint::threshold("opacity", 0.02, 1.0, 0.5))
+        // Bands price already traded through, dimmed. Off leaves only
+        // standing liquidity — the trading question; on shows where the
+        // pressure was already spent.
+        .add_constraint(ParamConstraint::flag("show_consumed", true))
+        .build()
+}
+
 // ============================================================================
 // Catalog HashMap
 // ============================================================================
@@ -252,6 +306,7 @@ const BASE_CATALOG: &[(&str, fn() -> IndicatorSignature)] = &[
     ("overlay_funding_rate", signature_funding_rate as fn() -> IndicatorSignature),
     ("overlay_dom_heatmap", signature_dom_heatmap as fn() -> IndicatorSignature),
     ("overlay_liquidation_heatmap", signature_liquidation_heatmap as fn() -> IndicatorSignature),
+    ("overlay_liquidation_projection", signature_liquidation_projection as fn() -> IndicatorSignature),
 ];
 
 // ============================================================================
