@@ -227,6 +227,10 @@ pub fn signature_liquidation_heatmap() -> IndicatorSignature {
         .add_constraint(ParamConstraint::flag("show_levels", true))
         .add_constraint(ParamConstraint::flag("show_dots", true))
         .add_constraint(ParamConstraint::threshold("dot_scale", 0.2, 4.0, 1.0))
+        // Half-reach of a print's price line, in BARS, at the largest print
+        // in view — a forced close draws as a level that got taken out, not
+        // as a point, and the reach is how big it was.
+        .add_constraint(ParamConstraint::threshold("span_bars", 0.5, 40.0, 6.0))
         .add_constraint(ParamConstraint::threshold("opacity", 0.05, 1.0, 0.55))
         // Every venue the workspace already streams, folded into one tape.
         // Default ON: liquidations are sparse enough that one venue is a
