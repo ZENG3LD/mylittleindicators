@@ -113,6 +113,10 @@ pub fn signature_oi_delta() -> IndicatorSignature {
         // Declared, not hardcoded by the host: the bubble raises the feed a
         // live instance names, the same contract every other indicator uses.
         .input_stream(StreamKind::OpenInterest)
+        // Tint the area between the line and zero — green above, red below —
+        // for reading sign at a glance. Off leaves the plain single-colour
+        // line, which is the quieter default on a busy chart.
+        .add_constraint(ParamConstraint::flag("zones", false))
         .description("Open interest delta sub-pane below the price plot — host-rendered, not computed via IndicatorOutput")
         .metadata("kind", "opaque_subpane")
         .metadata("icon", "Activity")
@@ -125,6 +129,10 @@ pub fn signature_funding_rate() -> IndicatorSignature {
     IndicatorSignature::builder("overlay_funding_rate", CATEGORY)
         .name("Funding Rate")
         .input_stream(StreamKind::Funding)
+        // Tint the area between the line and zero — green above, red below —
+        // for reading sign at a glance. Off leaves the plain single-colour
+        // line, which is the quieter default on a busy chart.
+        .add_constraint(ParamConstraint::flag("zones", false))
         .description("Funding rate strip along the bottom of the chart — host-rendered, not computed via IndicatorOutput")
         .metadata("kind", "opaque_subpane")
         .metadata("icon", "LineChart")
