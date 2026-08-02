@@ -68,14 +68,10 @@ use crate::data_loader::stream_kind::StreamKind;
 /// Category for all indicators in this module.
 pub const CATEGORY: IndicatorCategory = IndicatorCategory::Overlay;
 
-/// Entries that are drawn in their OWN pane, not over the price plot.
-///
-/// They live in this file because they share the opaque host-toggled shape
-/// with the real overlays — no compute path, the host renders them from a
-/// bespoke event — but where a layer APPEARS is what the catalog groups and
-/// labels by, and calling a sub-pane an overlay told the user something
-/// untrue (owner, 2026-08-03).
-pub const SUBPANE_CATEGORY: IndicatorCategory = IndicatorCategory::Subpane;
+// Overlay vs sub-pane is the VISUALISATION SPACE, not a category (owner,
+// 2026-08-03): every entry here stays in the one catalog category, and each
+// signature declares where it paints through `metadata("kind")` —
+// `opaque_overlay` = on the price plot, `opaque_subpane` = its own pane.
 
 // ============================================================================
 // Individual indicator signatures — opaque overlay: catalog discoverability
@@ -112,8 +108,11 @@ pub fn signature_tpo_profile() -> IndicatorSignature {
 /// OI Delta — opaque overlay: catalog discoverability only; the host consumes
 /// this via a bespoke Toggle event, not via IndicatorOutput.
 pub fn signature_oi_delta() -> IndicatorSignature {
-    IndicatorSignature::builder("overlay_oi_delta", SUBPANE_CATEGORY)
+    IndicatorSignature::builder("overlay_oi_delta", CATEGORY)
         .name("OI Delta")
+        // Declared, not hardcoded by the host: the bubble raises the feed a
+        // live instance names, the same contract every other indicator uses.
+        .input_stream(StreamKind::OpenInterest)
         .description("Open interest delta sub-pane below the price plot — host-rendered, not computed via IndicatorOutput")
         .metadata("kind", "opaque_subpane")
         .metadata("icon", "Activity")
@@ -123,8 +122,9 @@ pub fn signature_oi_delta() -> IndicatorSignature {
 /// Funding Rate — opaque overlay: catalog discoverability only; the host
 /// consumes this via a bespoke Toggle event, not via IndicatorOutput.
 pub fn signature_funding_rate() -> IndicatorSignature {
-    IndicatorSignature::builder("overlay_funding_rate", SUBPANE_CATEGORY)
+    IndicatorSignature::builder("overlay_funding_rate", CATEGORY)
         .name("Funding Rate")
+        .input_stream(StreamKind::Funding)
         .description("Funding rate strip along the bottom of the chart — host-rendered, not computed via IndicatorOutput")
         .metadata("kind", "opaque_subpane")
         .metadata("icon", "LineChart")
@@ -347,8 +347,8 @@ pub fn get_signature(id: &str) -> Option<IndicatorSignature> {
     BASE_CATALOG.iter().find(|(base_id, _)| *base_id == id).map(|(_, f)| f())
 }
 
-/// IDs this file registers under [`SUBPANE_CATEGORY`] rather than
-/// [`CATEGORY`] — see that constant for why they live here at all.
+/// Entries whose `kind` is `opaque_subpane` — they paint in a pane of their
+/// own instead of on the price plot. Same catalog category as the rest.
 const SUBPANE_IDS: &[&str] = &["overlay_oi_delta", "overlay_funding_rate"];
 
 /// Get all indicator IDs in this file, both categories.
@@ -401,7 +401,8 @@ mod tests {
         assert_eq!(sig.id, "overlay_oi_delta");
         // Sub-pane, not an overlay: it draws in its own pane below the price
         // plot, and the category is what the catalog UI groups by.
-        assert_eq!(sig.category, SUBPANE_CATEGORY);
+        assert_eq!(sig.category, CATEGORY);
+        assert_eq!(sig.metadata.get("kind").map(String::as_str), Some("opaque_subpane"));
         assert!(sig.machine_id.is_none(), "opaque sub-pane must not have a machine_id");
     }
 
@@ -410,7 +411,8 @@ mod tests {
         let sig = get_signature("overlay_funding_rate").unwrap();
         assert_eq!(sig.id, "overlay_funding_rate");
         // Strip along the bottom of the chart — same reasoning as OI Delta.
-        assert_eq!(sig.category, SUBPANE_CATEGORY);
+        assert_eq!(sig.category, CATEGORY);
+        assert_eq!(sig.metadata.get("kind").map(String::as_str), Some("opaque_subpane"));
         assert!(sig.machine_id.is_none(), "opaque sub-pane must not have a machine_id");
     }
 
@@ -438,11 +440,11 @@ mod tests {
         }
     }
 
-    /// The two id lists must PARTITION the file: every entry belongs to
-    /// exactly one category, and each entry's own signature must agree with
-    /// the list it is registered under. `master_catalog` registers the two
-    /// lists separately, so a drift here would file an entry under a
-    /// category its signature denies.
+    /// The two id lists must PARTITION the file. They do NOT split by
+    /// category — every entry stays in the one catalog category — they split
+    /// by VISUALISATION SPACE, which each signature declares through
+    /// `metadata("kind")`. A drift would tell the host to paint a sub-pane on
+    /// the price plot or vice versa.
     #[test]
     fn overlay_and_subpane_ids_partition_the_catalog() {
         let overlays = overlay_indicator_ids();
@@ -450,10 +452,14 @@ mod tests {
         assert_eq!(overlays.len() + subpanes.len(), all_indicator_ids().len());
         for id in &overlays {
             assert!(!subpanes.contains(id), "{id} is in both lists");
-            assert_eq!(get_signature(id).unwrap().category, CATEGORY, "{id}");
+            let sig = get_signature(id).unwrap();
+            assert_eq!(sig.category, CATEGORY, "{id}");
+            assert_eq!(sig.metadata.get("kind").map(String::as_str), Some("opaque_overlay"), "{id}");
         }
         for id in &subpanes {
-            assert_eq!(get_signature(id).unwrap().category, SUBPANE_CATEGORY, "{id}");
+            let sig = get_signature(id).unwrap();
+            assert_eq!(sig.category, CATEGORY, "{id}");
+            assert_eq!(sig.metadata.get("kind").map(String::as_str), Some("opaque_subpane"), "{id}");
         }
     }
 
