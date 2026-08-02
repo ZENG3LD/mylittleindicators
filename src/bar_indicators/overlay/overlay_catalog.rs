@@ -285,11 +285,20 @@ pub fn signature_liquidation_projection() -> IndicatorSignature {
         // Rows below this notional are dropped before drawing.
         .add_constraint(ParamConstraint::threshold("min_usd", 0.0, 50_000_000.0, 0.0))
         .add_constraint(ParamConstraint::threshold("sensitivity", 0.1, 10.0, 1.0))
-        .add_constraint(ParamConstraint::threshold("opacity", 0.02, 1.0, 0.5))
+        // Deliberately low: the layer draws HUNDREDS of bands over the whole
+        // window, and at the realized layer's opacity a busy chart filled in
+        // solid (owner report 2026-08-02 — "грязно и некрасиво ... слишком
+        // жирно"). Background heat has to lose to the series.
+        .add_constraint(ParamConstraint::threshold("opacity", 0.02, 1.0, 0.3))
         // Bands price already traded through, dimmed. Off leaves only
         // standing liquidity — the trading question; on shows where the
         // pressure was already spent.
         .add_constraint(ParamConstraint::flag("show_consumed", true))
+        // Every venue that serves open-interest history, folded into one
+        // model. Default ON for the same reason the liquidation fold is:
+        // price is one market, and a projection built from a single venue
+        // understates every level by whatever share the others hold.
+        .add_constraint(ParamConstraint::flag("aggregate", true))
         .build()
 }
 
