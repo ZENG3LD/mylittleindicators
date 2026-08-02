@@ -290,6 +290,17 @@ pub fn signature_liquidation_projection() -> IndicatorSignature {
         // solid (owner report 2026-08-02 — "грязно и некрасиво ... слишком
         // жирно"). Background heat has to lose to the series.
         .add_constraint(ParamConstraint::threshold("opacity", 0.02, 1.0, 0.3))
+        // Bar-widths a STANDING band may run past the newest bar, into the
+        // empty right-hand margin. 0 stops every band at the last bar. This
+        // is display length only — no bar exists out there and the model
+        // makes no claim about it.
+        .add_constraint(ParamConstraint::threshold("future_bars", 0.0, 300.0, 0.0))
+        // Dissolve the FUTURE extension toward its tip. Acts only on what
+        // `future_bars` draws, so it does nothing at 0 — that extension is
+        // the one place the layer draws where no bar exists, and letting it
+        // fall away says "the model reaching", while the elapsed part of the
+        // band keeps full weight because it is the actual claim.
+        .add_constraint(ParamConstraint::flag("fade", false))
         // Bands price already traded through, dimmed. Off leaves only
         // standing liquidity — the trading question; on shows where the
         // pressure was already spent.
