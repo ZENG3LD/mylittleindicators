@@ -218,6 +218,20 @@ pub fn signature_liquidation_heatmap() -> IndicatorSignature {
         .metadata("icon", "Activity")
         .input_stream(StreamKind::Liquidation)
         .add_constraint(ParamConstraint::threshold("sensitivity", 0.1, 10.0, 1.0))
+        // Price grouping for levels, in PERCENT of price — a fraction rather
+        // than a tick count, so the grouping means the same thing on a
+        // 60,000 instrument as on a 0.6 one.
+        .add_constraint(ParamConstraint::threshold("row_pct", 0.001, 1.0, 0.02))
+        // Notional a price row must collect before it counts as a level.
+        .add_constraint(ParamConstraint::threshold("min_usd", 0.0, 5_000_000.0, 25_000.0))
+        .add_constraint(ParamConstraint::flag("show_levels", true))
+        .add_constraint(ParamConstraint::flag("show_dots", true))
+        .add_constraint(ParamConstraint::threshold("dot_scale", 0.2, 4.0, 1.0))
+        .add_constraint(ParamConstraint::threshold("opacity", 0.05, 1.0, 0.55))
+        // Every venue the workspace already streams, folded into one tape.
+        // Default ON: liquidations are sparse enough that one venue is a
+        // misleading sample, and folding opens no channel of its own.
+        .add_constraint(ParamConstraint::flag("aggregate", true))
         .build()
 }
 
