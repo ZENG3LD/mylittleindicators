@@ -150,6 +150,11 @@ pub fn signature_funding_rate() -> IndicatorSignature {
 /// INK:
 /// - `sensitivity` — gain on the on-screen depth normaliser (their
 ///   SENSITIVITY slider): higher brightens thin liquidity.
+/// - `norm_pct` — which percentile of the visible depths IS that
+///   normaliser. At 100 the biggest wall in view sets the scale and every
+///   ordinary level sinks under the alpha cut, so the field looks empty
+///   until price comes close enough for a level to grow — which reads as
+///   the layer loading in late rather than being there all along.
 /// - `contrast` — exponent of the depth→alpha curve. Below 1 lifts the weak
 ///   cells (everything glows); above 1 sinks them, which is how the
 ///   reference reads — a dark field with the walls standing out.
@@ -172,8 +177,9 @@ pub fn signature_dom_heatmap() -> IndicatorSignature {
         .add_constraint(ParamConstraint::threshold("row_ticks", 1.0, 200.0, 4.0))
         .add_constraint(ParamConstraint::threshold("band_pct", 0.05, 5.0, 0.6))
         .add_constraint(ParamConstraint::threshold("sensitivity", 0.1, 10.0, 1.0))
+        .add_constraint(ParamConstraint::threshold("norm_pct", 10.0, 100.0, 90.0))
         .add_constraint(ParamConstraint::threshold("contrast", 0.4, 4.0, 1.7))
-        .add_constraint(ParamConstraint::threshold("opacity", 0.1, 1.0, 0.55))
+        .add_constraint(ParamConstraint::threshold("opacity", 0.1, 1.0, 0.38))
         .add_constraint(ParamConstraint::threshold("wall_x", 1.5, 25.0, 5.0))
         .add_constraint(ParamConstraint::flag("show_values", true))
         .add_constraint(ParamConstraint::threshold("value_size", 0.5, 2.0, 1.0))
