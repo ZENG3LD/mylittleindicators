@@ -183,6 +183,12 @@ pub fn signature_dom_heatmap() -> IndicatorSignature {
         .add_constraint(ParamConstraint::threshold("wall_x", 1.5, 25.0, 5.0))
         .add_constraint(ParamConstraint::flag("show_values", true))
         .add_constraint(ParamConstraint::threshold("value_size", 0.5, 2.0, 1.0))
+        // Source: one venue (the host bubble's) or every venue whose book the
+        // workspace is already streaming, folded per price row. Aggregation
+        // never opens a stream of its own — it reads the books the DOM
+        // ladders opened, so turning it on costs nothing when nothing else is
+        // subscribed and it degenerates to the single-venue picture.
+        .add_constraint(ParamConstraint::flag("aggregate", false))
         .build()
 }
 
