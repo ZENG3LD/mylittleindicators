@@ -130,11 +130,21 @@ pub enum IndicatorCategory {
     Microstructure,       // Microstructure indicators (block trade, L3)
     RiskFunding,          // Risk, funding, and auction indicators
 
-    /// Opaque host-driven overlays/toggles surfaced in the catalog for
-    /// discoverability only (no `machine_id`/compute path). E.g. OI Delta,
-    /// Funding Rate — the host (mlc) renders these via bespoke Toggle events,
-    /// not via `IndicatorOutput`.
+    /// Opaque host-driven layers drawn ON the price plot, surfaced in the
+    /// catalog for discoverability only (no `machine_id`/compute path). The
+    /// host (mlc) renders these via bespoke Toggle events, not via
+    /// `IndicatorOutput`. E.g. Volume Profile, DOM Heatmap, Liquidation
+    /// Heatmap.
     Overlay,
+
+    /// Same opaque host-driven shape as [`Self::Overlay`], but the host draws
+    /// these in their OWN pane below the price plot rather than over it —
+    /// OI Delta is a sub-pane and Funding Rate is a strip along the bottom.
+    ///
+    /// Split out because the category is what the catalog UI groups and
+    /// labels by, so filing a sub-pane under "Overlays" told the user
+    /// something untrue about where it would appear.
+    Subpane,
 
     // Reserved for future expansion
     Custom,
@@ -187,6 +197,7 @@ impl IndicatorCategory {
             "microstructure" => Self::Microstructure,
             "risk_funding" | "riskfunding" => Self::RiskFunding,
             "overlay" => Self::Overlay,
+            "subpane" => Self::Subpane,
             "custom" => Self::Custom,
             "composite" => Self::Composite,
             "experimental" => Self::Experimental,
@@ -237,6 +248,7 @@ impl IndicatorCategory {
             Self::Microstructure => "microstructure",
             Self::RiskFunding => "risk_funding",
             Self::Overlay => "overlay",
+            Self::Subpane => "subpane",
             Self::Custom => "custom",
             Self::Composite => "composite",
             Self::Experimental => "experimental",

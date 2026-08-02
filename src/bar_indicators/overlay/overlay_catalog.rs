@@ -68,6 +68,15 @@ use crate::data_loader::stream_kind::StreamKind;
 /// Category for all indicators in this module.
 pub const CATEGORY: IndicatorCategory = IndicatorCategory::Overlay;
 
+/// Entries that are drawn in their OWN pane, not over the price plot.
+///
+/// They live in this file because they share the opaque host-toggled shape
+/// with the real overlays — no compute path, the host renders them from a
+/// bespoke event — but where a layer APPEARS is what the catalog groups and
+/// labels by, and calling a sub-pane an overlay told the user something
+/// untrue (owner, 2026-08-03).
+pub const SUBPANE_CATEGORY: IndicatorCategory = IndicatorCategory::Subpane;
+
 // ============================================================================
 // Individual indicator signatures — opaque overlay: catalog discoverability
 // only; the host consumes this via a bespoke Toggle event, not via
@@ -103,10 +112,10 @@ pub fn signature_tpo_profile() -> IndicatorSignature {
 /// OI Delta — opaque overlay: catalog discoverability only; the host consumes
 /// this via a bespoke Toggle event, not via IndicatorOutput.
 pub fn signature_oi_delta() -> IndicatorSignature {
-    IndicatorSignature::builder("overlay_oi_delta", CATEGORY)
+    IndicatorSignature::builder("overlay_oi_delta", SUBPANE_CATEGORY)
         .name("OI Delta")
-        .description("Open interest delta overlay — host-rendered, not computed via IndicatorOutput")
-        .metadata("kind", "opaque_overlay")
+        .description("Open interest delta sub-pane below the price plot — host-rendered, not computed via IndicatorOutput")
+        .metadata("kind", "opaque_subpane")
         .metadata("icon", "Activity")
         .build()
 }
@@ -114,10 +123,10 @@ pub fn signature_oi_delta() -> IndicatorSignature {
 /// Funding Rate — opaque overlay: catalog discoverability only; the host
 /// consumes this via a bespoke Toggle event, not via IndicatorOutput.
 pub fn signature_funding_rate() -> IndicatorSignature {
-    IndicatorSignature::builder("overlay_funding_rate", CATEGORY)
+    IndicatorSignature::builder("overlay_funding_rate", SUBPANE_CATEGORY)
         .name("Funding Rate")
-        .description("Funding rate overlay — host-rendered, not computed via IndicatorOutput")
-        .metadata("kind", "opaque_overlay")
+        .description("Funding rate strip along the bottom of the chart — host-rendered, not computed via IndicatorOutput")
+        .metadata("kind", "opaque_subpane")
         .metadata("icon", "LineChart")
         .build()
 }
@@ -338,9 +347,27 @@ pub fn get_signature(id: &str) -> Option<IndicatorSignature> {
     BASE_CATALOG.iter().find(|(base_id, _)| *base_id == id).map(|(_, f)| f())
 }
 
-/// Get all indicator IDs in this category.
+/// IDs this file registers under [`SUBPANE_CATEGORY`] rather than
+/// [`CATEGORY`] — see that constant for why they live here at all.
+const SUBPANE_IDS: &[&str] = &["overlay_oi_delta", "overlay_funding_rate"];
+
+/// Get all indicator IDs in this file, both categories.
 pub fn all_indicator_ids() -> Vec<&'static str> {
     BASE_CATALOG.iter().map(|(id, _)| *id).collect()
+}
+
+/// IDs drawn ON the price plot.
+pub fn overlay_indicator_ids() -> Vec<&'static str> {
+    BASE_CATALOG
+        .iter()
+        .map(|(id, _)| *id)
+        .filter(|id| !SUBPANE_IDS.contains(id))
+        .collect()
+}
+
+/// IDs drawn in their own pane below the price plot.
+pub fn subpane_indicator_ids() -> Vec<&'static str> {
+    SUBPANE_IDS.to_vec()
 }
 
 /// Get count of indicators.
@@ -372,16 +399,19 @@ mod tests {
     fn test_get_oi_delta_signature() {
         let sig = get_signature("overlay_oi_delta").unwrap();
         assert_eq!(sig.id, "overlay_oi_delta");
-        assert_eq!(sig.category, CATEGORY);
-        assert!(sig.machine_id.is_none(), "opaque overlay must not have a machine_id");
+        // Sub-pane, not an overlay: it draws in its own pane below the price
+        // plot, and the category is what the catalog UI groups by.
+        assert_eq!(sig.category, SUBPANE_CATEGORY);
+        assert!(sig.machine_id.is_none(), "opaque sub-pane must not have a machine_id");
     }
 
     #[test]
     fn test_get_funding_rate_signature() {
         let sig = get_signature("overlay_funding_rate").unwrap();
         assert_eq!(sig.id, "overlay_funding_rate");
-        assert_eq!(sig.category, CATEGORY);
-        assert!(sig.machine_id.is_none(), "opaque overlay must not have a machine_id");
+        // Strip along the bottom of the chart — same reasoning as OI Delta.
+        assert_eq!(sig.category, SUBPANE_CATEGORY);
+        assert!(sig.machine_id.is_none(), "opaque sub-pane must not have a machine_id");
     }
 
     #[test]
@@ -405,12 +435,34 @@ mod tests {
         for id in all_indicator_ids() {
             let sig = get_signature(id).unwrap();
             assert_eq!(sig.id, id);
-            assert_eq!(sig.category, CATEGORY);
         }
     }
 
+    /// The two id lists must PARTITION the file: every entry belongs to
+    /// exactly one category, and each entry's own signature must agree with
+    /// the list it is registered under. `master_catalog` registers the two
+    /// lists separately, so a drift here would file an entry under a
+    /// category its signature denies.
+    #[test]
+    fn overlay_and_subpane_ids_partition_the_catalog() {
+        let overlays = overlay_indicator_ids();
+        let subpanes = subpane_indicator_ids();
+        assert_eq!(overlays.len() + subpanes.len(), all_indicator_ids().len());
+        for id in &overlays {
+            assert!(!subpanes.contains(id), "{id} is in both lists");
+            assert_eq!(get_signature(id).unwrap().category, CATEGORY, "{id}");
+        }
+        for id in &subpanes {
+            assert_eq!(get_signature(id).unwrap().category, SUBPANE_CATEGORY, "{id}");
+        }
+    }
+
+    /// Five on-chart layers (volume profile, TPO, DOM heat, liquidation
+    /// heat, projected liquidations) plus the two sub-panes.
     #[test]
     fn test_count() {
-        assert_eq!(count(), 6);
+        assert_eq!(count(), 7);
+        assert_eq!(overlay_indicator_ids().len(), 5);
+        assert_eq!(subpane_indicator_ids().len(), 2);
     }
 }

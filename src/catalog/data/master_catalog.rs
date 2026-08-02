@@ -205,7 +205,11 @@ impl MasterIndicatorCatalog {
             (IndicatorCategory::Stress, stress_catalog::get_signature, stress_catalog::all_indicator_ids()),
             (IndicatorCategory::Microstructure, microstructure_catalog::get_signature, microstructure_catalog::all_indicator_ids()),
             (IndicatorCategory::RiskFunding, risk_funding_catalog::get_signature, risk_funding_catalog::all_indicator_ids()),
-            (IndicatorCategory::Overlay, overlay_catalog::get_signature, overlay_catalog::all_indicator_ids()),
+            // One file, two categories: the opaque host-toggled entries share
+            // a shape but not a place on the chart, and the category is what
+            // the catalog UI groups by.
+            (IndicatorCategory::Overlay, overlay_catalog::get_signature, overlay_catalog::overlay_indicator_ids()),
+            (IndicatorCategory::Subpane, overlay_catalog::get_signature, overlay_catalog::subpane_indicator_ids()),
             // Note: Zigzag catalog will be added when exported from zigzag module
         ];
 
