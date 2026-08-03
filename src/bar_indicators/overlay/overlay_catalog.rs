@@ -79,14 +79,50 @@ pub const CATEGORY: IndicatorCategory = IndicatorCategory::Overlay;
 // IndicatorOutput. `machine_id` is intentionally `None`.
 // ============================================================================
 
-/// Volume Profile — opaque overlay: catalog discoverability only; the host
-/// consumes this via a bespoke Toggle event, not via IndicatorOutput.
+/// Volume Profile — traded volume per price row, over a window the `mode`
+/// chooses.
+///
+/// Host-rendered (`machine_id: None`): the profile is built from the bars
+/// already on the chart, not from an `IndicatorOutput`.
+///
+/// WINDOW:
+/// - `mode` — which bars are profiled. Visible Range re-reads on every pan
+///   and zoom (what most charts show), Session profiles the current trading
+///   day, Composite merges the recent sessions into one shape. The mode
+///   existed in the host from the beginning and had NO control: its only
+///   switch sat in a settings submenu deleted in July 2026, so the layer was
+///   stuck on Visible Range with no way to say otherwise.
+/// - `rows` — price buckets the window is divided into: the vertical grain.
+///
+/// READING:
+/// - `value_area` — percent of volume inside the value area, i.e. what VAH
+///   and VAL enclose. 70 is the convention, not a law.
+/// - `width_pct` — how much of the chart width the histogram may take.
+/// - `opacity` — the profile sits UNDER the candles; this is what keeps them
+///   readable.
+/// - `side` — which edge it grows from. Left when the right edge is busy
+///   with the live price and its labels.
+/// - `show_poc` · `show_value_area` · `show_labels` — the point of control
+///   line, the value-area band, and the price labels, each independently.
 pub fn signature_volume_profile() -> IndicatorSignature {
     IndicatorSignature::builder("overlay_volume_profile", CATEGORY)
         .name("Volume Profile")
         .description("Volume profile overlay — host-rendered, not computed via IndicatorOutput")
         .metadata("kind", "opaque_overlay")
         .metadata("icon", "Histogram")
+        .add_constraint(ParamConstraint::choice(
+            "mode",
+            &["Visible Range", "Session", "Composite"],
+            "Visible Range",
+        ))
+        .add_constraint(ParamConstraint::threshold("rows", 6.0, 200.0, 24.0))
+        .add_constraint(ParamConstraint::threshold("value_area", 50.0, 95.0, 70.0))
+        .add_constraint(ParamConstraint::threshold("width_pct", 5.0, 50.0, 18.0))
+        .add_constraint(ParamConstraint::threshold("opacity", 0.05, 1.0, 1.0))
+        .add_constraint(ParamConstraint::choice("side", &["Right", "Left"], "Right"))
+        .add_constraint(ParamConstraint::flag("show_poc", true))
+        .add_constraint(ParamConstraint::flag("show_value_area", true))
+        .add_constraint(ParamConstraint::flag("show_labels", true))
         .build()
 }
 
@@ -96,12 +132,29 @@ pub fn signature_volume_profile() -> IndicatorSignature {
 /// Block-histogram time-at-price profile computed from the visible bar
 /// range (canon-fix batch, item D) — no letters, distinct from the
 /// letter-based TPO Market Profile chart type (`chart_type` id `"tpo"`).
+/// Same knobs as Volume Profile where they mean the same thing, and one
+/// difference that matters: `rows` is a TARGET, not a count. The row step is
+/// snapped to a round price increment, so asking for 60 rows over a given
+/// price range yields about 60 — a profile whose rows land on prices a
+/// trader recognises beats one that lands exactly on a requested count.
+///
+/// It has no `mode`: time-at-price is read over what is on screen. A session
+/// profile of touches is the letter-based TPO chart type, which is a
+/// different thing with its own periods.
 pub fn signature_tpo_profile() -> IndicatorSignature {
     IndicatorSignature::builder("overlay_tpo_profile", CATEGORY)
         .name("TPO Profile")
         .description("TPO time-at-price block profile overlay — host-rendered, not computed via IndicatorOutput")
         .metadata("kind", "opaque_overlay")
         .metadata("icon", "Histogram")
+        .add_constraint(ParamConstraint::threshold("rows", 20.0, 200.0, 60.0))
+        .add_constraint(ParamConstraint::threshold("value_area", 50.0, 95.0, 70.0))
+        .add_constraint(ParamConstraint::threshold("width_pct", 5.0, 50.0, 18.0))
+        .add_constraint(ParamConstraint::threshold("opacity", 0.05, 1.0, 1.0))
+        .add_constraint(ParamConstraint::choice("side", &["Right", "Left"], "Right"))
+        .add_constraint(ParamConstraint::flag("show_poc", true))
+        .add_constraint(ParamConstraint::flag("show_value_area", true))
+        .add_constraint(ParamConstraint::flag("show_labels", true))
         .build()
 }
 

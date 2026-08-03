@@ -53,6 +53,16 @@ pub struct ParamConstraint {
 
     /// Whether this parameter must be provided
     pub required: bool,
+
+    /// The allowed values, for a parameter that is an ENUMERATION rather
+    /// than a range. Empty for every other kind.
+    ///
+    /// Until this existed the only enumerated parameter mli could declare
+    /// was `MaType`, so anything else with a fixed set of choices had to be
+    /// a bare `String` — which reaches a host as a free-text box, or is
+    /// dropped for want of anything to draw. A Volume Profile's mode is
+    /// three values, not a sentence.
+    pub options: Vec<String>,
 }
 
 impl ParamConstraint {
@@ -65,6 +75,7 @@ impl ParamConstraint {
             max: None,
             default: None,
             required: false,
+            options: Vec::new(),
         }
     }
 
@@ -300,6 +311,22 @@ impl ParamConstraint {
     /// let venues = ParamConstraint::venue_set("venues");
     /// assert_eq!(venues.name, "venues");
     /// ```
+    /// Create an enumerated-string constraint — a parameter whose value is
+    /// one of a fixed, named set.
+    ///
+    /// ## Example
+    /// ```rust
+    /// use zengeld_chart_indicators::catalog::constraints::ParamConstraint;
+    /// let mode = ParamConstraint::choice("mode", &["Visible Range", "Session"], "Session");
+    /// assert_eq!(mode.options.len(), 2);
+    /// ```
+    pub fn choice(name: impl Into<String>, options: &[&str], default: &str) -> Self {
+        let mut c = Self::new(name, ParamType::String)
+            .with_default(ParamValue::String(default.to_string()));
+        c.options = options.iter().map(|s| s.to_string()).collect();
+        c
+    }
+
     pub fn venue_set(name: impl Into<String>) -> Self {
         Self::new(name, ParamType::StringList)
             .with_default(ParamValue::StringList(Vec::new()))
