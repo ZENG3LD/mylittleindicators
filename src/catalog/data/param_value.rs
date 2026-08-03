@@ -34,6 +34,7 @@ impl ParameterValue {
             ParameterValue::USize(_) => ParamType::USize,
             ParameterValue::U8(_) => ParamType::U8,
             ParameterValue::Source(_) => ParamType::Source,
+            ParameterValue::StringList(_) => ParamType::StringList,
         }
     }
 }
@@ -71,6 +72,11 @@ pub enum ParamType {
 
     /// OHLCV field selector (Open, High, Low, Close, Volume, HL2, HLC3, OHLC4)
     Source,
+
+    /// A set of names, chosen from a list the HOST enumerates — the venue
+    /// set of an aggregating overlay. Not a grid axis (see
+    /// [`ParameterValue::StringList`]).
+    StringList,
 }
 
 impl fmt::Display for ParamType {
@@ -85,6 +91,7 @@ impl fmt::Display for ParamType {
             ParamType::MaType => write!(f, "MovingAverageType"),
             ParamType::String => write!(f, "String"),
             ParamType::Source => write!(f, "OhlcvField"),
+            ParamType::StringList => write!(f, "Vec<String>"),
         }
     }
 }

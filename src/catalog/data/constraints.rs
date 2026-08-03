@@ -275,6 +275,35 @@ impl ParamConstraint {
         Self::new(name, ParamType::Source)
             .with_default(ParamValue::Source(default))
     }
+
+    /// Create a venue-set constraint — the exchanges an AGGREGATING overlay
+    /// folds into one picture.
+    ///
+    /// The catalog declares that the parameter EXISTS and is set-valued; it
+    /// does not enumerate the venues, because which ones can serve this
+    /// indicator is not a property of the indicator — it is a property of
+    /// the host's connectors, and it changes as they gain and lose
+    /// endpoints. The host derives the offered list from the signature's own
+    /// `input_stream`: a Liquidation overlay is offered the venues that
+    /// publish forced closes, an OpenInterest one the venues that serve OI
+    /// history. That is the same declaration the bubble already uses to
+    /// raise the feed, so the picker and the subscription can never disagree
+    /// about what this layer eats.
+    ///
+    /// The DEFAULT is the empty set, which reads as "every venue that
+    /// serves the stream" rather than "none" — narrowing is the owner's
+    /// deliberate act, and a fresh instance should aggregate what it can.
+    ///
+    /// ## Example
+    /// ```rust
+    /// use zengeld_chart_indicators::catalog::constraints::ParamConstraint;
+    /// let venues = ParamConstraint::venue_set("venues");
+    /// assert_eq!(venues.name, "venues");
+    /// ```
+    pub fn venue_set(name: impl Into<String>) -> Self {
+        Self::new(name, ParamType::StringList)
+            .with_default(ParamValue::StringList(Vec::new()))
+    }
 }
 
 impl fmt::Display for ParamConstraint {

@@ -34,6 +34,15 @@ pub enum ParameterValue {
     /// OHLCV field selector (Open, High, Low, Close, Volume, HL2, HLC3, OHLC4)
     /// Used for source field selection in indicators
     Source(OhlcvField),
+    /// An ordered SET of names — today, the venues an aggregating overlay
+    /// folds (`ParamConstraint::venue_set`).
+    ///
+    /// A set is not a grid axis: `ParameterGrid` never enumerates one, so
+    /// this variant carries a chosen value and never a range. It exists so a
+    /// multi-select stays a typed value instead of a delimiter-joined
+    /// `String` that every consumer has to re-parse — the same reason
+    /// `Source` is an enum rather than the text `"close"`.
+    StringList(Vec<String>),
 }
 
 impl ParameterValue {
@@ -114,6 +123,19 @@ impl ParameterValue {
         }
     }
 
+    /// The chosen names, for a set-valued parameter.
+    ///
+    /// An EMPTY list is a legal value and does not mean "unset": for a venue
+    /// set it means "every venue that serves this indicator's declared
+    /// stream", which is what an aggregating overlay does before the owner
+    /// narrows it.
+    pub fn as_string_list(&self) -> Option<&[String]> {
+        match self {
+            ParameterValue::StringList(v) => Some(v.as_slice()),
+            _ => None,
+        }
+    }
+
     // Note: param_type() method is added via param_value.rs re-export
     // to avoid circular dependencies. See param_value.rs for implementation.
 }
@@ -130,6 +152,7 @@ impl fmt::Display for ParameterValue {
             ParameterValue::USize(v) => write!(f, "{}", v),
             ParameterValue::U8(v) => write!(f, "{}", v),
             ParameterValue::Source(v) => write!(f, "{}", v.as_str()),
+            ParameterValue::StringList(v) => write!(f, "{}", v.join(", ")),
         }
     }
 }

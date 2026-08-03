@@ -200,12 +200,10 @@ pub fn signature_dom_heatmap() -> IndicatorSignature {
         .add_constraint(ParamConstraint::threshold("wall_x", 1.5, 25.0, 5.0))
         .add_constraint(ParamConstraint::flag("show_values", true))
         .add_constraint(ParamConstraint::threshold("value_size", 0.5, 2.0, 1.0))
-        // Source: one venue (the host bubble's) or every venue whose book the
-        // workspace is already streaming, folded per price row. Aggregation
-        // never opens a stream of its own — it reads the books the DOM
-        // ladders opened, so turning it on costs nothing when nothing else is
-        // subscribed and it degenerates to the single-venue picture.
-        .add_constraint(ParamConstraint::flag("aggregate", false))
+        // Source: one venue (the host bubble's) or the venue set below,
+        // folded per price row.
+        .add_constraint(ParamConstraint::flag("aggregate", true))
+        .add_constraint(ParamConstraint::venue_set("venues"))
         .build()
 }
 
@@ -249,10 +247,10 @@ pub fn signature_liquidation_heatmap() -> IndicatorSignature {
         // as a point, and the reach is how big it was.
         .add_constraint(ParamConstraint::threshold("span_bars", 0.5, 40.0, 6.0))
         .add_constraint(ParamConstraint::threshold("opacity", 0.05, 1.0, 0.55))
-        // Every venue the workspace already streams, folded into one tape.
-        // Default ON: liquidations are sparse enough that one venue is a
-        // misleading sample, and folding opens no channel of its own.
+        // Folded into one tape. Default ON: liquidations are sparse enough
+        // that one venue is a misleading sample.
         .add_constraint(ParamConstraint::flag("aggregate", true))
+        .add_constraint(ParamConstraint::venue_set("venues"))
         .build()
 }
 
@@ -322,11 +320,12 @@ pub fn signature_liquidation_projection() -> IndicatorSignature {
         // standing liquidity — the trading question; on shows where the
         // pressure was already spent.
         .add_constraint(ParamConstraint::flag("show_consumed", true))
-        // Every venue that serves open-interest history, folded into one
-        // model. Default ON for the same reason the liquidation fold is:
-        // price is one market, and a projection built from a single venue
-        // understates every level by whatever share the others hold.
+        // Folded into one model. Default ON for the same reason the
+        // liquidation fold is: price is one market, and a projection built
+        // from a single venue understates every level by whatever share the
+        // others hold.
         .add_constraint(ParamConstraint::flag("aggregate", true))
+        .add_constraint(ParamConstraint::venue_set("venues"))
         .build()
 }
 
@@ -468,6 +467,24 @@ mod tests {
             let sig = get_signature(id).unwrap();
             assert_eq!(sig.category, CATEGORY, "{id}");
             assert_eq!(sig.metadata.get("kind").map(String::as_str), Some("opaque_subpane"), "{id}");
+        }
+    }
+
+    /// `aggregate` and `venues` are ONE contract in two parts: the flag says
+    /// whether this layer folds venues at all, the set says WHICH. A layer
+    /// carrying the flag alone can only fold a list somebody hardcoded
+    /// elsewhere, and that is precisely the state this pair replaced —
+    /// three overlays, three different hidden venue lists, one flag name.
+    #[test]
+    fn aggregating_layers_declare_their_venue_set() {
+        for id in all_indicator_ids() {
+            let sig = get_signature(id).unwrap();
+            let has = |n: &str| sig.constraints.get(n).is_some();
+            assert_eq!(
+                has("aggregate"),
+                has("venues"),
+                "{id}: `aggregate` and `venues` must be declared together",
+            );
         }
     }
 
