@@ -123,6 +123,14 @@ pub fn signature_volume_profile() -> IndicatorSignature {
         .add_constraint(ParamConstraint::flag("show_poc", true))
         .add_constraint(ParamConstraint::flag("show_value_area", true))
         .add_constraint(ParamConstraint::flag("show_labels", true))
+        // Fold the same symbol's bars from other venues into one profile.
+        // Volume is the quantity where a single venue is plainly a SAMPLE:
+        // the price level that mattered is the level where the market
+        // traded, and no one venue is the market. Default OFF, unlike the
+        // liquidation folds — this one opens a kline subscription per venue,
+        // and a chart should not start paying for five of them uninvited.
+        .add_constraint(ParamConstraint::flag("aggregate", false))
+        .add_constraint(ParamConstraint::venue_set("venues"))
         .build()
 }
 
@@ -155,6 +163,11 @@ pub fn signature_tpo_profile() -> IndicatorSignature {
         .add_constraint(ParamConstraint::flag("show_poc", true))
         .add_constraint(ParamConstraint::flag("show_value_area", true))
         .add_constraint(ParamConstraint::flag("show_labels", true))
+        // Time-at-price folds the same way volume does: a level held across
+        // every venue for an hour is a different fact from one venue idling
+        // there. Default OFF for the same reason — a subscription per venue.
+        .add_constraint(ParamConstraint::flag("aggregate", false))
+        .add_constraint(ParamConstraint::venue_set("venues"))
         .build()
 }
 
