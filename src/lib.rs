@@ -19,6 +19,10 @@ pub mod events;
 // Catalog system (signatures, constraints, param values, indicator key)
 pub mod catalog;
 
+// Elliott Wave Analysis — declarative half (pattern catalogue, grammar,
+// ratio bands, fib targets) cloned from the proprietary EWA engine.
+pub mod ewa;
+
 // Legacy re-export: old MLQ path `mlq_indicators::indicator_key::IndicatorKey`.
 pub use catalog::indicator_key;
 
