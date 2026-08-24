@@ -41,7 +41,13 @@ pub mod events_catalog;
 
 pub use bos_event_detector::BosEventDetector;
 pub use fvg_event_detector::FvgEventDetector;
-pub use candle_pattern::{CandlePatternDetector, CandlePatternKind};
+// The two free functions (`detect_at`, `scan`) are deliberately NOT
+// re-exported flat: `events::scan` names no subject, and this module will
+// carry more than one family that can be scanned. They are reached as
+// `candle_pattern::scan` / `candle_pattern::detect_at`.
+pub use candle_pattern::{
+    CandlePatternDetector, CandlePatternHit, CandlePatternKind, PatternBias,
+};
 pub use statistical_wick_detector::StatisticalWickDetector;
 pub use confluence::Confluence;
 pub use cross_asset_beta::CrossAssetBeta;

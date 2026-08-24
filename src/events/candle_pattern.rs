@@ -92,9 +92,255 @@ pub enum CandlePatternKind {
     DownsideGapThreeMethods,
 }
 
+/// Directional lean a pattern carries by definition, independent of any
+/// specific instance's measured direction.
+///
+/// Derived from the "— bullish."/"— bearish."/"— indecision." tag on each
+/// `CandlePatternKind` variant's own doc comment (the source of truth this
+/// enum is built from — see `CandlePatternKind::bias`). Not to be confused
+/// with the `Direction` a `detect_pattern` call returns for one concrete
+/// window: `bias` is a catalogue fact ("what does this shape mean"),
+/// `Direction` is a per-instance measurement ("which way did this window go").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatternBias {
+    Bullish,
+    Bearish,
+    /// The shape itself carries no directional lean — either because the
+    /// variant's own doc says "indecision" (Doji, LongLeggedDoji,
+    /// SpinningTop), or because it names a generic momentum shape whose
+    /// direction is decided per-instance by open/close, not by the pattern
+    /// definition (`Marubozu`, whose doc reads "strong momentum (generic)"
+    /// — `WhiteMarubozu`/`BlackMarubozu` are the directional variants).
+    Indecision,
+}
+
 impl CandlePatternKind {
+    /// All 34 canonical variants, in catalogue (declaration) order.
+    ///
+    /// `fn all() -> &'static [_]`, not a `pub const ALL: [_; 34]` array,
+    /// to match the existing catalogue-listing convention in this crate
+    /// (`SignalCategory::all()` in `core/signal/kind.rs`) rather than
+    /// inventing a second shape for the same idea.
+    pub fn all() -> &'static [CandlePatternKind] {
+        &[
+            CandlePatternKind::Doji,
+            CandlePatternKind::GravestoneDoji,
+            CandlePatternKind::DragonflyDoji,
+            CandlePatternKind::LongLeggedDoji,
+            CandlePatternKind::Hammer,
+            CandlePatternKind::InvertedHammer,
+            CandlePatternKind::ShootingStar,
+            CandlePatternKind::HangingMan,
+            CandlePatternKind::Marubozu,
+            CandlePatternKind::WhiteMarubozu,
+            CandlePatternKind::BlackMarubozu,
+            CandlePatternKind::SpinningTop,
+            CandlePatternKind::BullishEngulfing,
+            CandlePatternKind::BearishEngulfing,
+            CandlePatternKind::BullishHarami,
+            CandlePatternKind::BearishHarami,
+            CandlePatternKind::PiercingPattern,
+            CandlePatternKind::DarkCloudCover,
+            CandlePatternKind::TweezerTop,
+            CandlePatternKind::TweezerBottom,
+            CandlePatternKind::MorningStar,
+            CandlePatternKind::EveningStar,
+            CandlePatternKind::MorningDojiStar,
+            CandlePatternKind::EveningDojiStar,
+            CandlePatternKind::ThreeWhiteSoldiers,
+            CandlePatternKind::ThreeBlackCrows,
+            CandlePatternKind::ThreeInsideUp,
+            CandlePatternKind::ThreeInsideDown,
+            CandlePatternKind::ThreeOutsideUp,
+            CandlePatternKind::ThreeOutsideDown,
+            CandlePatternKind::RisingThreeMethods,
+            CandlePatternKind::FallingThreeMethods,
+            CandlePatternKind::UpsideGapTwoCrows,
+            CandlePatternKind::DownsideGapThreeMethods,
+        ]
+    }
+
+    /// Stable snake_case wire identifier.
+    ///
+    /// Persisted in saved chart drawings — a hand-written table, never
+    /// derived from `label()` at runtime, so a display-name rewording (a
+    /// UI/copy decision) can never silently invalidate every drawing that
+    /// already references this pattern by id.
+    pub fn id(self) -> &'static str {
+        match self {
+            CandlePatternKind::Doji => "doji",
+            CandlePatternKind::GravestoneDoji => "gravestone_doji",
+            CandlePatternKind::DragonflyDoji => "dragonfly_doji",
+            CandlePatternKind::LongLeggedDoji => "long_legged_doji",
+            CandlePatternKind::Hammer => "hammer",
+            CandlePatternKind::InvertedHammer => "inverted_hammer",
+            CandlePatternKind::ShootingStar => "shooting_star",
+            CandlePatternKind::HangingMan => "hanging_man",
+            CandlePatternKind::Marubozu => "marubozu",
+            CandlePatternKind::WhiteMarubozu => "white_marubozu",
+            CandlePatternKind::BlackMarubozu => "black_marubozu",
+            CandlePatternKind::SpinningTop => "spinning_top",
+            CandlePatternKind::BullishEngulfing => "bullish_engulfing",
+            CandlePatternKind::BearishEngulfing => "bearish_engulfing",
+            CandlePatternKind::BullishHarami => "bullish_harami",
+            CandlePatternKind::BearishHarami => "bearish_harami",
+            CandlePatternKind::PiercingPattern => "piercing_pattern",
+            CandlePatternKind::DarkCloudCover => "dark_cloud_cover",
+            CandlePatternKind::TweezerTop => "tweezer_top",
+            CandlePatternKind::TweezerBottom => "tweezer_bottom",
+            CandlePatternKind::MorningStar => "morning_star",
+            CandlePatternKind::EveningStar => "evening_star",
+            CandlePatternKind::MorningDojiStar => "morning_doji_star",
+            CandlePatternKind::EveningDojiStar => "evening_doji_star",
+            CandlePatternKind::ThreeWhiteSoldiers => "three_white_soldiers",
+            CandlePatternKind::ThreeBlackCrows => "three_black_crows",
+            CandlePatternKind::ThreeInsideUp => "three_inside_up",
+            CandlePatternKind::ThreeInsideDown => "three_inside_down",
+            CandlePatternKind::ThreeOutsideUp => "three_outside_up",
+            CandlePatternKind::ThreeOutsideDown => "three_outside_down",
+            CandlePatternKind::RisingThreeMethods => "rising_three_methods",
+            CandlePatternKind::FallingThreeMethods => "falling_three_methods",
+            CandlePatternKind::UpsideGapTwoCrows => "upside_gap_two_crows",
+            CandlePatternKind::DownsideGapThreeMethods => "downside_gap_three_methods",
+        }
+    }
+
+    /// Inverse of `id()`. `None` for any string that is not a current wire
+    /// id — e.g. a drawing saved by a catalogue version that no longer
+    /// exists, rather than guessing the closest match.
+    pub fn from_id(id: &str) -> Option<Self> {
+        Some(match id {
+            "doji" => CandlePatternKind::Doji,
+            "gravestone_doji" => CandlePatternKind::GravestoneDoji,
+            "dragonfly_doji" => CandlePatternKind::DragonflyDoji,
+            "long_legged_doji" => CandlePatternKind::LongLeggedDoji,
+            "hammer" => CandlePatternKind::Hammer,
+            "inverted_hammer" => CandlePatternKind::InvertedHammer,
+            "shooting_star" => CandlePatternKind::ShootingStar,
+            "hanging_man" => CandlePatternKind::HangingMan,
+            "marubozu" => CandlePatternKind::Marubozu,
+            "white_marubozu" => CandlePatternKind::WhiteMarubozu,
+            "black_marubozu" => CandlePatternKind::BlackMarubozu,
+            "spinning_top" => CandlePatternKind::SpinningTop,
+            "bullish_engulfing" => CandlePatternKind::BullishEngulfing,
+            "bearish_engulfing" => CandlePatternKind::BearishEngulfing,
+            "bullish_harami" => CandlePatternKind::BullishHarami,
+            "bearish_harami" => CandlePatternKind::BearishHarami,
+            "piercing_pattern" => CandlePatternKind::PiercingPattern,
+            "dark_cloud_cover" => CandlePatternKind::DarkCloudCover,
+            "tweezer_top" => CandlePatternKind::TweezerTop,
+            "tweezer_bottom" => CandlePatternKind::TweezerBottom,
+            "morning_star" => CandlePatternKind::MorningStar,
+            "evening_star" => CandlePatternKind::EveningStar,
+            "morning_doji_star" => CandlePatternKind::MorningDojiStar,
+            "evening_doji_star" => CandlePatternKind::EveningDojiStar,
+            "three_white_soldiers" => CandlePatternKind::ThreeWhiteSoldiers,
+            "three_black_crows" => CandlePatternKind::ThreeBlackCrows,
+            "three_inside_up" => CandlePatternKind::ThreeInsideUp,
+            "three_inside_down" => CandlePatternKind::ThreeInsideDown,
+            "three_outside_up" => CandlePatternKind::ThreeOutsideUp,
+            "three_outside_down" => CandlePatternKind::ThreeOutsideDown,
+            "rising_three_methods" => CandlePatternKind::RisingThreeMethods,
+            "falling_three_methods" => CandlePatternKind::FallingThreeMethods,
+            "upside_gap_two_crows" => CandlePatternKind::UpsideGapTwoCrows,
+            "downside_gap_three_methods" => CandlePatternKind::DownsideGapThreeMethods,
+            _ => return None,
+        })
+    }
+
+    /// English display name for a pattern picker UI.
+    pub fn label(self) -> &'static str {
+        match self {
+            CandlePatternKind::Doji => "Doji",
+            CandlePatternKind::GravestoneDoji => "Gravestone Doji",
+            CandlePatternKind::DragonflyDoji => "Dragonfly Doji",
+            CandlePatternKind::LongLeggedDoji => "Long-Legged Doji",
+            CandlePatternKind::Hammer => "Hammer",
+            CandlePatternKind::InvertedHammer => "Inverted Hammer",
+            CandlePatternKind::ShootingStar => "Shooting Star",
+            CandlePatternKind::HangingMan => "Hanging Man",
+            CandlePatternKind::Marubozu => "Marubozu",
+            CandlePatternKind::WhiteMarubozu => "White Marubozu",
+            CandlePatternKind::BlackMarubozu => "Black Marubozu",
+            CandlePatternKind::SpinningTop => "Spinning Top",
+            CandlePatternKind::BullishEngulfing => "Bullish Engulfing",
+            CandlePatternKind::BearishEngulfing => "Bearish Engulfing",
+            CandlePatternKind::BullishHarami => "Bullish Harami",
+            CandlePatternKind::BearishHarami => "Bearish Harami",
+            CandlePatternKind::PiercingPattern => "Piercing Pattern",
+            CandlePatternKind::DarkCloudCover => "Dark Cloud Cover",
+            CandlePatternKind::TweezerTop => "Tweezer Top",
+            CandlePatternKind::TweezerBottom => "Tweezer Bottom",
+            CandlePatternKind::MorningStar => "Morning Star",
+            CandlePatternKind::EveningStar => "Evening Star",
+            CandlePatternKind::MorningDojiStar => "Morning Doji Star",
+            CandlePatternKind::EveningDojiStar => "Evening Doji Star",
+            CandlePatternKind::ThreeWhiteSoldiers => "Three White Soldiers",
+            CandlePatternKind::ThreeBlackCrows => "Three Black Crows",
+            CandlePatternKind::ThreeInsideUp => "Three Inside Up",
+            CandlePatternKind::ThreeInsideDown => "Three Inside Down",
+            CandlePatternKind::ThreeOutsideUp => "Three Outside Up",
+            CandlePatternKind::ThreeOutsideDown => "Three Outside Down",
+            CandlePatternKind::RisingThreeMethods => "Rising Three Methods",
+            CandlePatternKind::FallingThreeMethods => "Falling Three Methods",
+            CandlePatternKind::UpsideGapTwoCrows => "Upside Gap Two Crows",
+            CandlePatternKind::DownsideGapThreeMethods => "Downside Gap Three Methods",
+        }
+    }
+
+    /// Directional lean this pattern shape carries by definition — see
+    /// `PatternBias`. Read off the "— bullish."/"— bearish."/"— indecision."
+    /// tag on each variant's own doc comment above; do not hand-edit this
+    /// table without updating that source-of-truth comment too.
+    pub fn bias(self) -> PatternBias {
+        match self {
+            CandlePatternKind::Doji
+            | CandlePatternKind::LongLeggedDoji
+            | CandlePatternKind::SpinningTop
+            | CandlePatternKind::Marubozu => PatternBias::Indecision,
+
+            CandlePatternKind::DragonflyDoji
+            | CandlePatternKind::Hammer
+            | CandlePatternKind::InvertedHammer
+            | CandlePatternKind::WhiteMarubozu
+            | CandlePatternKind::BullishEngulfing
+            | CandlePatternKind::BullishHarami
+            | CandlePatternKind::PiercingPattern
+            | CandlePatternKind::TweezerBottom
+            | CandlePatternKind::MorningStar
+            | CandlePatternKind::MorningDojiStar
+            | CandlePatternKind::ThreeWhiteSoldiers
+            | CandlePatternKind::ThreeInsideUp
+            | CandlePatternKind::ThreeOutsideUp
+            | CandlePatternKind::RisingThreeMethods => PatternBias::Bullish,
+
+            CandlePatternKind::GravestoneDoji
+            | CandlePatternKind::ShootingStar
+            | CandlePatternKind::HangingMan
+            | CandlePatternKind::BlackMarubozu
+            | CandlePatternKind::BearishEngulfing
+            | CandlePatternKind::BearishHarami
+            | CandlePatternKind::DarkCloudCover
+            | CandlePatternKind::TweezerTop
+            | CandlePatternKind::EveningStar
+            | CandlePatternKind::EveningDojiStar
+            | CandlePatternKind::ThreeBlackCrows
+            | CandlePatternKind::ThreeInsideDown
+            | CandlePatternKind::ThreeOutsideDown
+            | CandlePatternKind::FallingThreeMethods
+            | CandlePatternKind::UpsideGapTwoCrows
+            | CandlePatternKind::DownsideGapThreeMethods => PatternBias::Bearish,
+        }
+    }
+
     /// Bars needed to detect this pattern.
-    fn bars_needed(self) -> usize {
+    ///
+    /// Public: this is exactly the catalogue fact a consumer needs to size
+    /// a window for `detect_at`, or a completion-index bound for `scan`.
+    /// No separate `bar_group` accessor — `bars_needed()` (1/2/3/5) already
+    /// IS the catalogue's grouping key; a second accessor for the same fact
+    /// would be a duplicate, not a new piece of metadata.
+    pub fn bars_needed(self) -> usize {
         match self {
             CandlePatternKind::Doji
             | CandlePatternKind::GravestoneDoji
@@ -186,7 +432,10 @@ impl CandlePatternDetector {
         if self.bars.len() < need {
             return None;
         }
-        detect_pattern(self.kind, &self.bars)
+        // `make_contiguous` returns `&mut [_]`; Rust reborrows it as `&[_]`
+        // at the call site, so `detect_pattern` stays a single slice-taking
+        // fn shared verbatim by both the streaming and stateless callers.
+        detect_pattern(self.kind, self.bars.make_contiguous())
     }
 
     /// Feed bar, return `IndicatorValue::Signal(+1/-1/0)`.
@@ -219,7 +468,7 @@ impl CandlePatternDetector {
 
 fn detect_pattern(
     kind: CandlePatternKind,
-    bars: &VecDeque<(f64, f64, f64, f64)>,
+    bars: &[(f64, f64, f64, f64)],
 ) -> Option<(SignalKind, Direction)> {
     let sig = SignalKind::Pattern(PatternSub::Candle);
     match kind {
@@ -284,6 +533,105 @@ fn detect_pattern(
             check_downside_gap_three_methods(bars, sig)
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Stateless window query
+// ---------------------------------------------------------------------------
+
+/// Evaluate `kind` against one fixed OHLC window without a streaming
+/// `CandlePatternDetector`.
+///
+/// Free function, not `CandlePatternKind::detect_at(self, window)`: the call
+/// site reads `detect_at(kind, &window)`, mirroring `detect_pattern`'s own
+/// `(kind, bars)` argument order, so a reader who already knows the dispatch
+/// fn recognises the query fn immediately. An associated fn would flip that
+/// to `kind.detect_at(&window)`, reading as if `window` were secondary to
+/// `kind` — backwards, since `window` is the data and `kind` merely selects
+/// which comparison runs over it.
+///
+/// `window` must be exactly `kind.bars_needed()` bars long, oldest first.
+/// A mismatched length returns `None` rather than trimming from whichever
+/// end happens to be convenient — a silent trim is how a 3-bar Morning Star
+/// gets judged on the wrong three bars. Delegates to the same `detect_pattern`
+/// the streaming detector calls; no pattern logic is duplicated here.
+pub fn detect_at(
+    kind: CandlePatternKind,
+    window: &[(f64, f64, f64, f64)],
+) -> Option<(SignalKind, Direction)> {
+    if window.len() != kind.bars_needed() {
+        return None;
+    }
+    detect_pattern(kind, window)
+}
+
+// ---------------------------------------------------------------------------
+// Range scan
+// ---------------------------------------------------------------------------
+
+/// One completed pattern match found by `scan`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CandlePatternHit {
+    pub kind: CandlePatternKind,
+    /// Index of the FIRST bar of the pattern.
+    pub start: usize,
+    /// Index of the LAST bar (the bar the pattern completes on) — inclusive.
+    pub end: usize,
+    pub direction: Direction,
+}
+
+/// Scans `bars` for completions of any of `kinds` whose completion index
+/// (`CandlePatternHit::end`) falls in `range`.
+///
+/// `range` bounds which completion bars are EXAMINED, not which bars may be
+/// READ — a 5-bar pattern completing at `range.start` legitimately reads
+/// four bars before the range. A completion index whose full window would
+/// read before bar 0 is skipped outright (never clamped-and-shrunk into a
+/// short window and never padded): `detect_pattern`'s helpers index a fixed
+/// number of bars unconditionally, so handing them a short window would be
+/// an out-of-bounds panic, not a degraded answer.
+///
+/// An empty `kinds` returns an empty result — asking for nothing is not
+/// shorthand for "all 34"; use `CandlePatternKind::all()` explicitly for that.
+///
+/// Results are sorted by `end` (chronological), then by `kinds`' own order
+/// for hits sharing the same `end` — so precedence among same-bar
+/// completions is controlled by the caller's `kinds` ordering, not by
+/// `CandlePatternKind`'s enum declaration order.
+pub fn scan(
+    kinds: &[CandlePatternKind],
+    bars: &[(f64, f64, f64, f64)],
+    range: std::ops::Range<usize>,
+) -> Vec<CandlePatternHit> {
+    if kinds.is_empty() {
+        return Vec::new();
+    }
+    let scan_end = range.end.min(bars.len());
+    let mut hits: Vec<(usize, usize, CandlePatternHit)> = Vec::new();
+    for end in range.start..scan_end {
+        for (order, &kind) in kinds.iter().enumerate() {
+            let need = kind.bars_needed();
+            let start = match end.checked_add(1).and_then(|e| e.checked_sub(need)) {
+                Some(s) => s,
+                None => continue, // window would read before bar 0 — skip
+            };
+            let window = &bars[start..=end];
+            if let Some((_, direction)) = detect_pattern(kind, window) {
+                hits.push((
+                    end,
+                    order,
+                    CandlePatternHit {
+                        kind,
+                        start,
+                        end,
+                        direction,
+                    },
+                ));
+            }
+        }
+    }
+    hits.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+    hits.into_iter().map(|(_, _, hit)| hit).collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -898,7 +1246,7 @@ fn check_upside_gap_two_crows(
 // ---------------------------------------------------------------------------
 
 fn check_rising_three_methods(
-    bars: &VecDeque<(f64, f64, f64, f64)>,
+    bars: &[(f64, f64, f64, f64)],
     sig: SignalKind,
 ) -> Option<(SignalKind, Direction)> {
     // bars[0] = oldest, bars[4] = newest
@@ -930,7 +1278,7 @@ fn check_rising_three_methods(
 }
 
 fn check_falling_three_methods(
-    bars: &VecDeque<(f64, f64, f64, f64)>,
+    bars: &[(f64, f64, f64, f64)],
     sig: SignalKind,
 ) -> Option<(SignalKind, Direction)> {
     let (fo, fh, fl, fc) = bars[0];
@@ -959,7 +1307,7 @@ fn check_falling_three_methods(
 }
 
 fn check_downside_gap_three_methods(
-    bars: &VecDeque<(f64, f64, f64, f64)>,
+    bars: &[(f64, f64, f64, f64)],
     sig: SignalKind,
 ) -> Option<(SignalKind, Direction)> {
     // Classic: two bearish candles with a gap down between them + bearish follow-through
@@ -1135,5 +1483,230 @@ mod tests {
         d.reset();
         assert!(!d.is_ready());
         assert_eq!(d.value(), IndicatorValue::Signal(0));
+    }
+
+    // ---- catalogue metadata ----
+
+    #[test]
+    fn from_id_round_trips_for_all_variants() {
+        for &kind in CandlePatternKind::all() {
+            assert_eq!(
+                CandlePatternKind::from_id(kind.id()),
+                Some(kind),
+                "from_id(id()) must round-trip for {kind:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn all_34_ids_are_distinct() {
+        let all = CandlePatternKind::all();
+        assert_eq!(all.len(), 34, "catalogue must list exactly 34 patterns");
+        let mut ids: Vec<&str> = all.iter().map(|k| k.id()).collect();
+        let before = ids.len();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), before, "duplicate id() among CandlePatternKind::all()");
+    }
+
+    #[test]
+    fn from_id_rejects_unknown_string() {
+        assert_eq!(CandlePatternKind::from_id("not_a_pattern"), None);
+    }
+
+    #[test]
+    fn bias_partitions_all_34_variants() {
+        // Regression guard on the hand-written bias table: every variant
+        // must land in exactly one bucket, and the bucket sizes are a fact
+        // about the doc-comment source data (14 bullish / 16 bearish / 4
+        // indecision), not something to silently drift.
+        let mut bullish = 0;
+        let mut bearish = 0;
+        let mut indecision = 0;
+        for &kind in CandlePatternKind::all() {
+            match kind.bias() {
+                PatternBias::Bullish => bullish += 1,
+                PatternBias::Bearish => bearish += 1,
+                PatternBias::Indecision => indecision += 1,
+            }
+        }
+        assert_eq!((bullish, bearish, indecision), (14, 16, 4));
+        assert_eq!(CandlePatternKind::Doji.bias(), PatternBias::Indecision);
+        assert_eq!(CandlePatternKind::LongLeggedDoji.bias(), PatternBias::Indecision);
+        assert_eq!(CandlePatternKind::SpinningTop.bias(), PatternBias::Indecision);
+        assert_eq!(CandlePatternKind::Marubozu.bias(), PatternBias::Indecision);
+        assert_eq!(CandlePatternKind::WhiteMarubozu.bias(), PatternBias::Bullish);
+        assert_eq!(CandlePatternKind::BlackMarubozu.bias(), PatternBias::Bearish);
+    }
+
+    // ---- stateless detect_at vs streaming detector ----
+
+    #[test]
+    fn streaming_and_stateless_detect_agree() {
+        // bars 0..3: MorningStar setup (from morning_star_detected).
+        // bars 3..5: BullishEngulfing setup (from bullish_engulfing_detected).
+        // bars 5..7: Doji, then Hammer (single-bar patterns, from their own tests).
+        let bars: [(f64, f64, f64, f64); 7] = [
+            (110.0, 111.0, 99.0, 100.0),
+            (97.0, 98.0, 96.0, 97.5),
+            (99.0, 112.0, 98.0, 107.0),
+            (105.0, 106.0, 99.0, 100.0),
+            (99.0, 110.0, 98.0, 108.0),
+            (100.0, 102.0, 98.0, 100.0),
+            (100.0, 101.0, 90.0, 101.0),
+        ];
+
+        for &kind in &[
+            CandlePatternKind::Doji,
+            CandlePatternKind::Hammer,
+            CandlePatternKind::BullishEngulfing,
+            CandlePatternKind::MorningStar,
+        ] {
+            let mut det = CandlePatternDetector::new(kind);
+            let need = kind.bars_needed();
+            for (i, &(o, h, l, c)) in bars.iter().enumerate() {
+                let streamed = det.detect_from_values(o, h, l, c);
+                let stateless = if i + 1 >= need {
+                    detect_at(kind, &bars[i + 1 - need..=i])
+                } else {
+                    None
+                };
+                assert_eq!(
+                    streamed, stateless,
+                    "kind={kind:?} idx={i}: streaming and stateless must agree"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn detect_at_rejects_wrong_length_window() {
+        // MorningStar needs exactly 3 bars; 2 or 4 must return None rather
+        // than guessing which bar to drop.
+        let bars: [(f64, f64, f64, f64); 4] = [
+            (110.0, 111.0, 99.0, 100.0),
+            (97.0, 98.0, 96.0, 97.5),
+            (99.0, 112.0, 98.0, 107.0),
+            (100.0, 101.0, 99.0, 100.5),
+        ];
+        assert_eq!(detect_at(CandlePatternKind::MorningStar, &bars[0..2]), None);
+        assert_eq!(detect_at(CandlePatternKind::MorningStar, &bars[0..4]), None);
+        assert!(detect_at(CandlePatternKind::MorningStar, &bars[0..3]).is_some());
+    }
+
+    // ---- scan ----
+
+    #[test]
+    fn scan_finds_doji_at_exact_bar() {
+        let bars = [(100.0, 102.0, 98.0, 100.0)];
+        let hits = scan(&[CandlePatternKind::Doji], &bars, 0..1);
+        assert_eq!(
+            hits,
+            vec![CandlePatternHit {
+                kind: CandlePatternKind::Doji,
+                start: 0,
+                end: 0,
+                direction: Direction::Up,
+            }]
+        );
+    }
+
+    #[test]
+    fn scan_finds_bullish_engulfing_at_completion_bar() {
+        let bars = [
+            (105.0, 106.0, 99.0, 100.0), // prev: bearish
+            (99.0, 110.0, 98.0, 108.0),  // curr: engulfs prev
+        ];
+        let hits = scan(&[CandlePatternKind::BullishEngulfing], &bars, 1..2);
+        assert_eq!(
+            hits,
+            vec![CandlePatternHit {
+                kind: CandlePatternKind::BullishEngulfing,
+                start: 0,
+                end: 1,
+                direction: Direction::Up,
+            }]
+        );
+    }
+
+    #[test]
+    fn scan_finds_morning_star_at_completion_bar() {
+        let bars = [
+            (110.0, 111.0, 99.0, 100.0),
+            (97.0, 98.0, 96.0, 97.5),
+            (99.0, 112.0, 98.0, 107.0),
+        ];
+        let hits = scan(&[CandlePatternKind::MorningStar], &bars, 2..3);
+        assert_eq!(
+            hits,
+            vec![CandlePatternHit {
+                kind: CandlePatternKind::MorningStar,
+                start: 0,
+                end: 2,
+                direction: Direction::Up,
+            }]
+        );
+    }
+
+    #[test]
+    fn scan_finds_rising_three_methods_at_completion_bar() {
+        let bars = [
+            (100.0, 110.0, 100.0, 108.0),
+            (106.0, 109.0, 103.0, 104.0),
+            (104.0, 107.0, 102.0, 103.0),
+            (103.0, 108.0, 101.0, 105.0),
+            (106.0, 120.0, 105.0, 119.0),
+        ];
+        let hits = scan(&[CandlePatternKind::RisingThreeMethods], &bars, 4..5);
+        assert_eq!(
+            hits,
+            vec![CandlePatternHit {
+                kind: CandlePatternKind::RisingThreeMethods,
+                start: 0,
+                end: 4,
+                direction: Direction::Up,
+            }]
+        );
+    }
+
+    #[test]
+    fn scan_empty_kinds_returns_empty() {
+        let bars = [(100.0, 102.0, 98.0, 100.0)];
+        let hits = scan(&[], &bars, 0..1);
+        assert!(hits.is_empty(), "empty kinds must mean \"scan for nothing\", not \"scan for all\"");
+    }
+
+    #[test]
+    fn scan_skips_completions_whose_window_does_not_fit() {
+        // MorningStar needs 3 bars; asking for completions at index 0 or 1
+        // has no full window before them and must be skipped, not padded.
+        let bars = [
+            (110.0, 111.0, 99.0, 100.0),
+            (97.0, 98.0, 96.0, 97.5),
+            (99.0, 112.0, 98.0, 107.0),
+        ];
+        let hits = scan(&[CandlePatternKind::MorningStar], &bars, 0..2);
+        assert!(hits.is_empty());
+    }
+
+    #[test]
+    fn scan_sorts_by_end_then_by_kinds_order() {
+        // Doji at bar 0, Hammer at bar 1 — two different single-bar
+        // patterns completing in order; result must come out end-ascending
+        // regardless of the order `kinds` lists them in.
+        let bars = [
+            (100.0, 102.0, 98.0, 100.0),  // Doji (body 0 / range 4)
+            (100.0, 102.5, 90.0, 102.0),  // Hammer only — body 2 / range 12.5 clears DOJI_BODY_RATIO
+        ];
+        let hits = scan(
+            &[CandlePatternKind::Hammer, CandlePatternKind::Doji],
+            &bars,
+            0..2,
+        );
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].end, 0);
+        assert_eq!(hits[0].kind, CandlePatternKind::Doji);
+        assert_eq!(hits[1].end, 1);
+        assert_eq!(hits[1].kind, CandlePatternKind::Hammer);
     }
 }
