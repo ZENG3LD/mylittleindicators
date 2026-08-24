@@ -23,6 +23,11 @@ pub mod catalog;
 // ratio bands, fib targets) cloned from the proprietary EWA engine.
 pub mod ewa;
 
+// Smart money concepts — swings, market structure (BOS/CHoCH), fair value
+// gaps, order/breaker blocks, displacement legs, liquidity sweeps, equal
+// highs/lows, dealing range, and the AMD assembly.
+pub mod smc;
+
 // Legacy re-export: old MLQ path `mlq_indicators::indicator_key::IndicatorKey`.
 pub use catalog::indicator_key;
 

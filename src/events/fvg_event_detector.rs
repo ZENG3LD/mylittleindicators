@@ -1,8 +1,19 @@
 //! Fair Value Gap (FVG) event detector.
 //!
-//! Detects 3-bar imbalance pattern:
-//! - Bullish FVG: `low[middle] > high[older]` AND `low[middle] > high[newer]`
-//! - Bearish FVG: `high[middle] < low[older]` AND `high[middle] < low[newer]`
+//! Detects the 3-bar imbalance pattern between the FIRST and THIRD bars of
+//! the triplet. The middle (displacement) candle's own high/low take no
+//! part in the test:
+//! - Bullish FVG: `low[newer] > high[older]`, zone `[high[older], low[newer]]`
+//! - Bearish FVG: `high[newer] < low[older]`, zone `[high[newer], low[older]]`
+//!
+//! Corrected 2026-08-25 — the prior condition tested
+//! `low[middle] > high[older] && low[middle] > high[newer]`, which
+//! describes a bar gapped away from BOTH neighbours (an island), not a fair
+//! value gap. See Appendix A, `docs/mlc/plans/markup-engines-2026-08-25.md`.
+//!
+//! `fvg_direction` is the shared predicate this streaming detector and
+//! `smc::zones::fair_value_gaps` both call, so the two can never disagree
+//! about what a FVG is again.
 //!
 //! Output: `Option<(SignalKind::Structure(StructureSub::FVG), Direction)>`
 //! - `Direction::Up` for bullish FVG, `Direction::Down` for bearish.
@@ -11,6 +22,21 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::core::signal::kind::StructureSub;
 use crate::core::signal::{Direction, SignalKind};
 use std::collections::VecDeque;
+
+/// Pure fair-value-gap predicate shared by `FvgEventDetector` and
+/// `smc::zones::fair_value_gaps`. Bullish requires the newer bar's low
+/// above the older bar's high; bearish requires the newer bar's high below
+/// the older bar's low — the middle (displacement) candle plays no part.
+pub(crate) fn fvg_direction(
+    older_high: f64,
+    older_low: f64,
+    newer_high: f64,
+    newer_low: f64,
+) -> (bool, bool) {
+    let bull = newer_low > older_high;
+    let bear = newer_high < older_low;
+    (bull, bear)
+}
 
 /// Fair Value Gap event detector.
 ///
@@ -43,13 +69,9 @@ impl FvgEventDetector {
         }
 
         let (h0, l0) = self.bars[0]; // older
-        let (h1, l1) = self.bars[1]; // middle
-        let (h2, l2) = self.bars[2]; // newer
+        let (h2, l2) = self.bars[2]; // newer — self.bars[1] (middle) plays no part in the test
 
-        // Bull FVG: low[middle] > high[older] && low[middle] > high[newer]
-        let bull = l1 > h0 && l1 > h2;
-        // Bear FVG: high[middle] < low[older] && high[middle] < low[newer]
-        let bear = h1 < l0 && h1 < l2;
+        let (bull, bear) = fvg_direction(h0, l0, h2, l2);
 
         if bull {
             self.last_signal = 1;
@@ -72,11 +94,10 @@ impl FvgEventDetector {
     pub fn update_triplet(
         &mut self,
         _o0: f64, h0: f64, l0: f64, _c0: f64,
-        _o1: f64, h1: f64, l1: f64, _c1: f64,
+        _o1: f64, _h1: f64, _l1: f64, _c1: f64,
         _o2: f64, h2: f64, l2: f64, _c2: f64,
     ) -> (bool, bool) {
-        let bull = l1 > h0 && l1 > h2;
-        let bear = h1 < l0 && h1 < l2;
+        let (bull, bear) = fvg_direction(h0, l0, h2, l2);
         self.last_signal = if bull { 1 } else if bear { -1 } else { 0 };
         (bull, bear)
     }
@@ -117,12 +138,12 @@ mod tests {
     #[test]
     fn bull_fvg_detected() {
         let mut det = FvgEventDetector::new();
-        // Bar 0: high=100, low=98
-        // Bar 1: high=108, low=105  — low[1]=105 > high[0]=100 ✓
-        // Bar 2: high=102, low=100  — low[1]=105 > high[2]=102 ✓
+        // Bar 0 (older): high=100, low=98
+        // Bar 1 (middle/displacement): high=108, low=105 — plays no part in the test
+        // Bar 2 (newer): high=112, low=103 — low[newer]=103 > high[older]=100 ✓
         det.detect_from_values(100.0, 98.0);
         det.detect_from_values(108.0, 105.0);
-        let result = det.detect_from_values(102.0, 100.0);
+        let result = det.detect_from_values(112.0, 103.0);
         assert_eq!(
             result,
             Some((SignalKind::Structure(StructureSub::FVG), Direction::Up)),
@@ -133,12 +154,12 @@ mod tests {
     #[test]
     fn bear_fvg_detected() {
         let mut det = FvgEventDetector::new();
-        // Bar 0: high=102, low=100
-        // Bar 1: high=95,  low=90   — high[1]=95 < low[0]=100 ✓
-        // Bar 2: high=100, low=98   — high[1]=95 < low[2]=98  ✓
+        // Bar 0 (older): high=102, low=100
+        // Bar 1 (middle/displacement): high=95, low=90 — plays no part in the test
+        // Bar 2 (newer): high=97, low=90 — high[newer]=97 < low[older]=100 ✓
         det.detect_from_values(102.0, 100.0);
         det.detect_from_values(95.0, 90.0);
-        let result = det.detect_from_values(100.0, 98.0);
+        let result = det.detect_from_values(97.0, 90.0);
         assert_eq!(
             result,
             Some((SignalKind::Structure(StructureSub::FVG), Direction::Down)),
