@@ -67,9 +67,18 @@ pub fn fair_value_gaps(bars: &[SmcBar], _cfg: &SmcConfig) -> Vec<FvgZone> {
 
 /// The last opposing-close candle before a displacement leg that broke
 /// structure, per Appendix A's "Order block". Never emitted without the
-/// structure break behind it: only `structure::structure` events whose
-/// bar coincides with the end of a matching `displacement_legs` leg
-/// produce an order block.
+/// structure break behind it: a `structure::structure` event counts only
+/// when it falls INSIDE a same-direction `displacement_legs` leg.
+///
+/// The leg is matched by SPAN, not by its last bar. Requiring the break
+/// bar to equal `leg.end_index` was the original reading and it made order
+/// blocks essentially unfindable: a break is the bar whose CLOSE cleared
+/// the swing, which normally happens partway through the impulse, while
+/// `end_index` is wherever the same-direction run happens to stop. Measured
+/// on BTCUSDT 1D over 89 bars: 5 displacement legs, 3 structure breaks, 0
+/// order blocks — not one break landed on a leg's final bar. Containment is
+/// also the definition traders use ("the candle before the impulse that
+/// broke structure"), which says nothing about where the impulse ends.
 ///
 /// `breaker_at` is filled by a forward scan for the first bar whose close
 /// crosses decisively through the block — a state transition on this same
@@ -80,10 +89,11 @@ pub fn order_blocks(bars: &[SmcBar], cfg: &SmcConfig) -> Vec<OrderBlock> {
     let mut out = Vec::new();
 
     for event in &breaks {
-        let Some(leg) = legs
-            .iter()
-            .find(|leg| leg.end_index == event.index && leg.direction == event.direction)
-        else {
+        let Some(leg) = legs.iter().find(|leg| {
+            leg.direction == event.direction
+                && leg.start_index <= event.index
+                && event.index <= leg.end_index
+        }) else {
             continue;
         };
         if leg.start_index == 0 {
@@ -94,6 +104,14 @@ pub fn order_blocks(bars: &[SmcBar], cfg: &SmcConfig) -> Vec<OrderBlock> {
         else {
             continue;
         };
+
+        // One leg can contain more than one structure event (a long impulse
+        // clearing two swings), and every one of them resolves back to the
+        // SAME opposing candle. Keep the first — the earliest break is the
+        // one that made the block — instead of emitting the same zone twice.
+        if out.iter().any(|b: &OrderBlock| b.index == ob_index) {
+            continue;
+        }
 
         let candle = bars[ob_index];
         let (low, high) = order_block_zone(candle, cfg.order_block_zone);
@@ -280,6 +298,42 @@ mod tests {
         assert_eq!(ob.direction, Direction::Up);
         assert_eq!(ob.broke_structure_at, 12);
         assert_eq!(ob.breaker_at, Some(13), "close below the block's low at bar 13 must flip it to a breaker");
+    }
+
+    #[test]
+    fn structure_break_inside_the_leg_still_makes_an_order_block() {
+        // The break bar is bar 11 (close 27 > H2=26) and the up run keeps
+        // going to bar 12 — the ordinary case on real data, and the one the
+        // old `leg.end_index == event.index` reading dropped on the floor.
+        let mut bars = order_block_fixture();
+        bars[11] = bar(24.0, 28.0, 24.0, 27.0);   // BOS here, mid-leg
+        bars[12] = bar(30.0, 155.0, 30.0, 150.0); // run continues past it
+        let cfg = SmcConfig { swing_n: 1, atr_period: 3, ..SmcConfig::default() };
+
+        let blocks = order_blocks(&bars, &cfg);
+        let ob = blocks
+            .iter()
+            .find(|b| b.index == 9)
+            .expect("a break inside the leg must still resolve the order block at bar 9");
+        assert_eq!(ob.direction, Direction::Up);
+        assert_eq!(ob.broke_structure_at, 11, "the break that made it, not the leg's last bar");
+    }
+
+    #[test]
+    fn one_leg_clearing_two_swings_emits_one_order_block() {
+        // Both bar 11 and bar 12 close past a swing inside the SAME leg;
+        // both resolve back to the same opposing candle at bar 9, and the
+        // zone must not be emitted twice.
+        let mut bars = order_block_fixture();
+        bars[11] = bar(24.0, 28.0, 24.0, 27.0);
+        let cfg = SmcConfig { swing_n: 1, atr_period: 3, ..SmcConfig::default() };
+
+        let blocks = order_blocks(&bars, &cfg);
+        assert_eq!(
+            blocks.iter().filter(|b| b.index == 9).count(),
+            1,
+            "one opposing candle, one order block, however many swings the leg cleared"
+        );
     }
 
     #[test]
