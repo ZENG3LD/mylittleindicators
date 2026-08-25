@@ -28,6 +28,11 @@ pub mod ewa;
 // highs/lows, dealing range, and the AMD assembly.
 pub mod smc;
 
+// Order-flow markup — price/series divergence (e.g. cumulative volume
+// delta) between consecutive swing extremes, built on smc's swings and
+// events::divergence's comparison predicate.
+pub mod orderflow;
+
 // Legacy re-export: old MLQ path `mlq_indicators::indicator_key::IndicatorKey`.
 pub use catalog::indicator_key;
 

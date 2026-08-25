@@ -35,6 +35,58 @@ impl Default for DivergenceKind {
     }
 }
 
+/// The four-way price/series comparison every divergence detector in this
+/// crate reduces to — shared by the streaming `Divergence` detector
+/// (`detect_from_values`, fixed bar-distance comparison) and
+/// `orderflow::delta_divergences` (consecutive-swing comparison).
+///
+/// The second series is deliberately NOT named `oscillator`: callers other
+/// than the streaming detector pass series that are not oscillators at all
+/// (e.g. cumulative volume delta) — only that it is any per-bar series
+/// compared against price at the same two points.
+///
+/// - Regular bullish: price makes a lower low, series makes a higher low.
+/// - Regular bearish: price makes a higher high, series makes a lower high.
+/// - Hidden bullish: price makes a higher low, series makes a lower low
+///   (continuation).
+/// - Hidden bearish: price makes a lower high, series makes a higher high.
+///
+/// Returns `None` when price and series move the same way (no divergence)
+/// or either leg is flat (no slope to classify).
+pub fn divergence_signal(
+    price_now: f64,
+    price_then: f64,
+    series_now: f64,
+    series_then: f64,
+    kind: DivergenceKind,
+) -> Option<Direction> {
+    let price_up = price_now > price_then;
+    let price_down = price_now < price_then;
+    let series_up = series_now > series_then;
+    let series_down = series_now < series_then;
+
+    match kind {
+        DivergenceKind::Regular => {
+            if price_down && series_up {
+                Some(Direction::Up)
+            } else if price_up && series_down {
+                Some(Direction::Down)
+            } else {
+                None
+            }
+        }
+        DivergenceKind::Hidden => {
+            if price_up && series_down {
+                Some(Direction::Up)
+            } else if price_down && series_up {
+                Some(Direction::Down)
+            } else {
+                None
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Divergence {
     oscillator: Box<IndicatorInstance>,
@@ -98,40 +150,16 @@ impl Divergence {
 
         let signal = if self.oscillator.is_ready() && self.prices.len() >= self.lookback + 1 {
             let n = self.prices.len();
-            let p_now = self.prices[n - 1];
-            let p_then = self.prices[n - 1 - self.lookback];
-            let o_now = self.osc_values[n - 1];
-            let o_then = self.osc_values[n - 1 - self.lookback];
-
-            let price_up = p_now > p_then;
-            let price_down = p_now < p_then;
-            let osc_up = o_now > o_then;
-            let osc_down = o_now < o_then;
-
-            match self.kind {
-                DivergenceKind::Regular => {
-                    if price_down && osc_up {
-                        1 // bullish regular
-                    } else if price_up && osc_down {
-                        -1 // bearish regular
-                    } else {
-                        0
-                    }
-                }
-                DivergenceKind::Hidden => {
-                    if price_up && osc_down {
-                        // Hidden bullish in uptrend: price HL, osc LL — wait,
-                        // textbook hidden: price higher low, osc lower low.
-                        // In rolling-window comparison: if current price is
-                        // higher than past AND oscillator current lower than past
-                        // → continuation signal in uptrend.
-                        1
-                    } else if price_down && osc_up {
-                        -1
-                    } else {
-                        0
-                    }
-                }
+            match divergence_signal(
+                self.prices[n - 1],
+                self.prices[n - 1 - self.lookback],
+                self.osc_values[n - 1],
+                self.osc_values[n - 1 - self.lookback],
+                self.kind,
+            ) {
+                Some(Direction::Up) => 1,
+                Some(Direction::Down) => -1,
+                _ => 0,
             }
         } else {
             0
@@ -206,46 +234,19 @@ impl Divergence {
         }
 
         let n = self.prices.len();
-        let p_now = self.prices[n - 1];
-        let p_then = self.prices[n - 1 - self.lookback];
-        let o_now = self.osc_values[n - 1];
-        let o_then = self.osc_values[n - 1 - self.lookback];
-
-        let price_up = p_now > p_then;
-        let price_down = p_now < p_then;
-        let osc_up = o_now > o_then;
-        let osc_down = o_now < o_then;
-
-        let signal = match self.kind {
-            DivergenceKind::Regular => {
-                if price_down && osc_up {
-                    1i8
-                } else if price_up && osc_down {
-                    -1
-                } else {
-                    0
-                }
-            }
-            DivergenceKind::Hidden => {
-                if price_up && osc_down {
-                    1
-                } else if price_down && osc_up {
-                    -1
-                } else {
-                    0
-                }
-            }
-        };
+        let direction = divergence_signal(
+            self.prices[n - 1],
+            self.prices[n - 1 - self.lookback],
+            self.osc_values[n - 1],
+            self.osc_values[n - 1 - self.lookback],
+            self.kind,
+        )?;
 
         let sub = match self.kind {
             DivergenceKind::Regular => DivergenceSub::Regular,
             DivergenceKind::Hidden => DivergenceSub::Hidden,
         };
-        match signal {
-            1 => Some((SignalKind::Divergence(sub), Direction::Up)),
-            -1 => Some((SignalKind::Divergence(sub), Direction::Down)),
-            _ => None,
-        }
+        Some((SignalKind::Divergence(sub), direction))
     }
 }
 
@@ -378,6 +379,41 @@ mod tests {
         d.reset();
         assert!(!d.is_ready());
         assert_eq!(d.value(), IndicatorValue::Signal(0));
+    }
+
+    #[test]
+    fn detect_from_values_matches_extracted_predicate() {
+        // Fixed lookback=2 comparison: prices/series chosen so bars 2..4 each
+        // produce a divergence, so the equivalence check below is not vacuous.
+        let lookback = 2;
+        let mut d = Divergence::new(rsi(14), lookback, DivergenceKind::Regular);
+        let prices = [10.0, 8.0, 6.0, 9.0, 12.0];
+        let series = [1.0, 3.0, 5.0, 2.0, 1.0];
+
+        let mut saw_hit = false;
+        for i in 0..prices.len() {
+            let got = d.detect_from_values(prices[i], series[i]);
+            if i < lookback {
+                assert_eq!(got, None, "no comparison possible yet at bar {i}");
+                continue;
+            }
+            let expected_dir = divergence_signal(
+                prices[i],
+                prices[i - lookback],
+                series[i],
+                series[i - lookback],
+                DivergenceKind::Regular,
+            );
+            match (got, expected_dir) {
+                (Some((_, dir)), Some(exp)) => {
+                    assert_eq!(dir, exp, "streaming detector and extracted predicate disagree at bar {i}");
+                    saw_hit = true;
+                }
+                (None, None) => {}
+                (g, e) => panic!("mismatch at bar {i}: streaming={g:?} predicate={e:?}"),
+            }
+        }
+        assert!(saw_hit, "test data must exercise at least one divergence for the equivalence check to mean anything");
     }
 
     #[test]
