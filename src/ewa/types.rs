@@ -47,6 +47,14 @@ pub enum EwaPatternKind {
     Crab,
     Shark,
     ThreeDrives,
+    /// Alternate Bat (Carney).
+    AltBat,
+    /// Deep Crab (Carney).
+    DeepCrab,
+    /// 5-0 (Suri Duddella; grouped alongside Carney's XABCD harmonics in
+    /// published scanner sets, not one of Carney's own patterns). Its own
+    /// six named pivots are `0, X, A, B, C, D`.
+    FiveZero,
 }
 
 /// Direction a price segment moves between two pivots.

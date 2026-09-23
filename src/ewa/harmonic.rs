@@ -9,10 +9,13 @@
 //! concept — this module supplies only the table, no new vocabulary.
 //!
 //! The tables below are Scott Carney's published ratio definitions
-//! ("Harmonic Trading", Carney) for `Gartley`, `Bat`, `Butterfly`, `Crab`,
-//! `Shark`, `Cypher` and the generic `Abcd`/`ThreeDrives` shapes — not this
-//! module's own judgement. `Xabcd` is the unclassified five-point container
-//! and deliberately carries no table (see [`targets_for`]).
+//! ("Harmonic Trading", Carney) for `Gartley`, `Bat`, `AltBat`, `Butterfly`,
+//! `Crab`, `DeepCrab`, `Shark`, `Cypher` and the generic `Abcd`/`ThreeDrives`
+//! shapes — not this module's own judgement. `FiveZero` (the "5-0" pattern)
+//! is Suri Duddella's, not Carney's own, but is grouped here per the same
+//! published-ratio-table posture since it is commonly scanned alongside the
+//! Carney set. `Xabcd` is the unclassified five-point container and
+//! deliberately carries no table (see [`targets_for`]).
 //!
 //! Every table entry obeys one structural invariant: the measured leg starts
 //! exactly where its reference leg ends (`leg.0 == reference.1`). That is
@@ -113,6 +116,24 @@ const SHARK: &[HarmonicLeg] = &[
     HarmonicLeg { leg: ("C", "D"), reference: ("X", "C"), band: RatioBand::new(0.886, 1.13) },
 ];
 
+/// Alternate Bat (Carney): `AB = 0.382 XA` exact; `BC = 0.382-0.886 AB`;
+/// `CD = 2.0-3.618 BC`; `AD = 1.13 XA` exact.
+const ALT_BAT: &[HarmonicLeg] = &[
+    HarmonicLeg { leg: ("A", "B"), reference: ("X", "A"), band: exact(0.382) },
+    HarmonicLeg { leg: ("B", "C"), reference: ("A", "B"), band: RatioBand::new(0.382, 0.886) },
+    HarmonicLeg { leg: ("C", "D"), reference: ("B", "C"), band: RatioBand::new(2.0, 3.618) },
+    HarmonicLeg { leg: ("A", "D"), reference: ("X", "A"), band: exact(1.13) },
+];
+
+/// Deep Crab (Carney): `AB = 0.886 XA` exact; `BC = 0.382-0.886 AB`;
+/// `CD = 2.24-3.618 BC`; `AD = 1.618 XA` exact.
+const DEEP_CRAB: &[HarmonicLeg] = &[
+    HarmonicLeg { leg: ("A", "B"), reference: ("X", "A"), band: exact(0.886) },
+    HarmonicLeg { leg: ("B", "C"), reference: ("A", "B"), band: RatioBand::new(0.382, 0.886) },
+    HarmonicLeg { leg: ("C", "D"), reference: ("B", "C"), band: RatioBand::new(2.24, 3.618) },
+    HarmonicLeg { leg: ("A", "D"), reference: ("X", "A"), band: exact(1.618) },
+];
+
 /// Cypher (Carney): `AB = 0.382-0.618 XA`; `AC = 1.272-1.414 XA`;
 /// `CD = 0.786 XC` exact.
 const CYPHER: &[HarmonicLeg] = &[
@@ -139,6 +160,18 @@ const THREE_DRIVES: &[HarmonicLeg] = &[
     HarmonicLeg { leg: ("B", "3"), reference: ("2", "B"), band: RatioBand::new(1.272, 1.618) },
 ];
 
+/// 5-0 (Duddella, grouped here per the module doc's note above): 6 points
+/// `0-X-A-B-C-D`. `AB = 1.13-1.618 XA`; `BC = 1.618-2.24 AB`;
+/// `CD = 0.5 BC` exact — the "reciprocal AB=CD" 50% retracement that names
+/// the pattern. The leading `0` point anchors the 6-pivot window (matching
+/// the shape's own published point count) but carries no ratio constraint
+/// of its own in this table.
+const FIVE_ZERO: &[HarmonicLeg] = &[
+    HarmonicLeg { leg: ("A", "B"), reference: ("X", "A"), band: RatioBand::new(1.13, 1.618) },
+    HarmonicLeg { leg: ("B", "C"), reference: ("A", "B"), band: RatioBand::new(1.618, 2.24) },
+    HarmonicLeg { leg: ("C", "D"), reference: ("B", "C"), band: exact(0.5) },
+];
+
 /// The target ratio table for `kind`, or an empty slice if `kind` has no
 /// fixed harmonic table.
 ///
@@ -154,12 +187,15 @@ pub fn targets_for(kind: EwaPatternKind) -> &'static [HarmonicLeg] {
     match kind {
         EwaPatternKind::Gartley => GARTLEY,
         EwaPatternKind::Bat => BAT,
+        EwaPatternKind::AltBat => ALT_BAT,
         EwaPatternKind::Butterfly => BUTTERFLY,
         EwaPatternKind::Crab => CRAB,
+        EwaPatternKind::DeepCrab => DEEP_CRAB,
         EwaPatternKind::Shark => SHARK,
         EwaPatternKind::Cypher => CYPHER,
         EwaPatternKind::Abcd => ABCD,
         EwaPatternKind::ThreeDrives => THREE_DRIVES,
+        EwaPatternKind::FiveZero => FIVE_ZERO,
         _ => &[],
     }
 }
@@ -172,12 +208,15 @@ mod tests {
     const HARMONIC_KINDS: &[EwaPatternKind] = &[
         EwaPatternKind::Gartley,
         EwaPatternKind::Bat,
+        EwaPatternKind::AltBat,
         EwaPatternKind::Butterfly,
         EwaPatternKind::Crab,
+        EwaPatternKind::DeepCrab,
         EwaPatternKind::Shark,
         EwaPatternKind::Cypher,
         EwaPatternKind::Abcd,
         EwaPatternKind::ThreeDrives,
+        EwaPatternKind::FiveZero,
     ];
 
     #[test]
@@ -233,9 +272,14 @@ mod tests {
             (EwaPatternKind::Gartley, ("A", "B"), 0.618),
             (EwaPatternKind::Gartley, ("A", "D"), 0.786),
             (EwaPatternKind::Bat, ("A", "D"), 0.886),
+            (EwaPatternKind::AltBat, ("A", "B"), 0.382),
+            (EwaPatternKind::AltBat, ("A", "D"), 1.13),
             (EwaPatternKind::Butterfly, ("A", "B"), 0.786),
             (EwaPatternKind::Crab, ("A", "D"), 1.618),
+            (EwaPatternKind::DeepCrab, ("A", "B"), 0.886),
+            (EwaPatternKind::DeepCrab, ("A", "D"), 1.618),
             (EwaPatternKind::Cypher, ("C", "D"), 0.786),
+            (EwaPatternKind::FiveZero, ("C", "D"), 0.5),
         ];
 
         for &(kind, leg, nominal) in cases {

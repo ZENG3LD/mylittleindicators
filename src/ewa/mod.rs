@@ -6,7 +6,8 @@
 //! geometry predicates (`rules`), the Fibonacci retracement / extension
 //! targets (`ratios`), and the harmonic pattern target ratio tables
 //! (`harmonic`) — what each `EwaPatternKind` harmonic shape (Gartley, Bat,
-//! Butterfly, Crab, Shark, Cypher, Abcd, ThreeDrives) actually means.
+//! AltBat, Butterfly, Crab, DeepCrab, Shark, Cypher, Abcd, ThreeDrives,
+//! FiveZero) actually means.
 //!
 //! A lighter, independent COMPUTE half lives alongside it (`swing`, `scan`)
 //! — pivot/segment extraction and single-degree candidate enumeration over
