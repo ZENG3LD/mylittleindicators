@@ -1,10 +1,21 @@
-//! CandlePatternDetector — unified canon for all 34 candlestick patterns.
+//! CandlePatternDetector — unified canon for 39 candlestick patterns (the
+//! original 34, plus 5 gap kinds).
 //!
 //! Replaces 13 individual pattern files, `AdvancedPatternRecognition`, and
 //! `CandlePatterns` (momentum). All algorithms ported from `AdvancedPatternRecognition`.
 //!
 //! Maps to `OperatorClass::CandlePattern`. Output: `IndicatorValue::Signal(i8)`.
 //! +1 = bullish, -1 = bearish, 0 = no pattern.
+//!
+//! Gaps (`CommonGap`/`BreakawayGap`/`RunawayGap`/`ExhaustionGap`/
+//! `IslandGap`) join this same vocabulary rather than a second parallel
+//! one — each slots into the existing `bars_needed()`/`category`-shaped
+//! `detect_pattern` dispatch the same way all 34 original kinds do. Every
+//! gap kind is bidirectional (a gap can go either way depending on the
+//! instance's own data), matching the one existing generic precedent in
+//! this file (`Marubozu` — see its own "generic" doc tag): `bias()` reads
+//! `PatternBias::Indecision` for all 5, and `Direction` is decided
+//! per-instance by `detect_pattern`, never by the catalogue.
 
 use std::collections::VecDeque;
 
@@ -12,7 +23,8 @@ use crate::bar_indicators::indicator_value::IndicatorValue;
 use crate::core::signal::direction::Direction;
 use crate::core::signal::kind::{PatternSub, SignalKind};
 
-/// Candlestick pattern variant — 34 canonical patterns.
+/// Candlestick pattern variant — 39 canonical patterns (the original 34,
+/// plus 5 gap kinds).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CandlePatternKind {
     // ---- 1-bar ----
@@ -90,6 +102,24 @@ pub enum CandlePatternKind {
     UpsideGapTwoCrows,
     /// Gap down + three bearish candles — bearish continuation.
     DownsideGapThreeMethods,
+
+    // ---- gaps ----
+    /// Small gap in a quiet range, no strong follow-through — fills
+    /// quickly, direction decided per-instance (generic).
+    CommonGap,
+    /// Gap breaking cleanly away from a quiet consolidation base with a
+    /// strong-bodied candle — direction decided per-instance (generic).
+    BreakawayGap,
+    /// Gap continuing an already-established trend — direction decided
+    /// per-instance (generic).
+    RunawayGap,
+    /// Gap extending an established trend but closing weak within its own
+    /// bar — a reversal warning; direction decided per-instance (generic).
+    ExhaustionGap,
+    /// Gap one way isolating a small run of bars, then an opposing gap
+    /// closing back past the level before the first gap — a reversal;
+    /// direction decided per-instance (generic).
+    IslandGap,
 }
 
 /// Directional lean a pattern carries by definition, independent of any
@@ -115,9 +145,10 @@ pub enum PatternBias {
 }
 
 impl CandlePatternKind {
-    /// All 34 canonical variants, in catalogue (declaration) order.
+    /// All 39 canonical variants (the original 34, plus 5 gap kinds), in
+    /// catalogue (declaration) order.
     ///
-    /// `fn all() -> &'static [_]`, not a `pub const ALL: [_; 34]` array,
+    /// `fn all() -> &'static [_]`, not a `pub const ALL: [_; 39]` array,
     /// to match the existing catalogue-listing convention in this crate
     /// (`SignalCategory::all()` in `core/signal/kind.rs`) rather than
     /// inventing a second shape for the same idea.
@@ -157,6 +188,11 @@ impl CandlePatternKind {
             CandlePatternKind::FallingThreeMethods,
             CandlePatternKind::UpsideGapTwoCrows,
             CandlePatternKind::DownsideGapThreeMethods,
+            CandlePatternKind::CommonGap,
+            CandlePatternKind::BreakawayGap,
+            CandlePatternKind::RunawayGap,
+            CandlePatternKind::ExhaustionGap,
+            CandlePatternKind::IslandGap,
         ]
     }
 
@@ -202,6 +238,11 @@ impl CandlePatternKind {
             CandlePatternKind::FallingThreeMethods => "falling_three_methods",
             CandlePatternKind::UpsideGapTwoCrows => "upside_gap_two_crows",
             CandlePatternKind::DownsideGapThreeMethods => "downside_gap_three_methods",
+            CandlePatternKind::CommonGap => "common_gap",
+            CandlePatternKind::BreakawayGap => "breakaway_gap",
+            CandlePatternKind::RunawayGap => "runaway_gap",
+            CandlePatternKind::ExhaustionGap => "exhaustion_gap",
+            CandlePatternKind::IslandGap => "island_gap",
         }
     }
 
@@ -244,6 +285,11 @@ impl CandlePatternKind {
             "falling_three_methods" => CandlePatternKind::FallingThreeMethods,
             "upside_gap_two_crows" => CandlePatternKind::UpsideGapTwoCrows,
             "downside_gap_three_methods" => CandlePatternKind::DownsideGapThreeMethods,
+            "common_gap" => CandlePatternKind::CommonGap,
+            "breakaway_gap" => CandlePatternKind::BreakawayGap,
+            "runaway_gap" => CandlePatternKind::RunawayGap,
+            "exhaustion_gap" => CandlePatternKind::ExhaustionGap,
+            "island_gap" => CandlePatternKind::IslandGap,
             _ => return None,
         })
     }
@@ -285,6 +331,11 @@ impl CandlePatternKind {
             CandlePatternKind::FallingThreeMethods => "Falling Three Methods",
             CandlePatternKind::UpsideGapTwoCrows => "Upside Gap Two Crows",
             CandlePatternKind::DownsideGapThreeMethods => "Downside Gap Three Methods",
+            CandlePatternKind::CommonGap => "Common Gap",
+            CandlePatternKind::BreakawayGap => "Breakaway Gap",
+            CandlePatternKind::RunawayGap => "Runaway Gap",
+            CandlePatternKind::ExhaustionGap => "Exhaustion Gap",
+            CandlePatternKind::IslandGap => "Island Gap",
         }
     }
 
@@ -297,7 +348,12 @@ impl CandlePatternKind {
             CandlePatternKind::Doji
             | CandlePatternKind::LongLeggedDoji
             | CandlePatternKind::SpinningTop
-            | CandlePatternKind::Marubozu => PatternBias::Indecision,
+            | CandlePatternKind::Marubozu
+            | CandlePatternKind::CommonGap
+            | CandlePatternKind::BreakawayGap
+            | CandlePatternKind::RunawayGap
+            | CandlePatternKind::ExhaustionGap
+            | CandlePatternKind::IslandGap => PatternBias::Indecision,
 
             CandlePatternKind::DragonflyDoji
             | CandlePatternKind::Hammer
@@ -362,7 +418,8 @@ impl CandlePatternKind {
             | CandlePatternKind::PiercingPattern
             | CandlePatternKind::DarkCloudCover
             | CandlePatternKind::TweezerTop
-            | CandlePatternKind::TweezerBottom => 2,
+            | CandlePatternKind::TweezerBottom
+            | CandlePatternKind::CommonGap => 2,
 
             CandlePatternKind::MorningStar
             | CandlePatternKind::EveningStar
@@ -374,16 +431,20 @@ impl CandlePatternKind {
             | CandlePatternKind::ThreeInsideDown
             | CandlePatternKind::ThreeOutsideUp
             | CandlePatternKind::ThreeOutsideDown
-            | CandlePatternKind::UpsideGapTwoCrows => 3,
+            | CandlePatternKind::UpsideGapTwoCrows
+            | CandlePatternKind::BreakawayGap
+            | CandlePatternKind::RunawayGap
+            | CandlePatternKind::ExhaustionGap => 3,
 
             CandlePatternKind::RisingThreeMethods
             | CandlePatternKind::FallingThreeMethods
-            | CandlePatternKind::DownsideGapThreeMethods => 5,
+            | CandlePatternKind::DownsideGapThreeMethods
+            | CandlePatternKind::IslandGap => 5,
         }
     }
 }
 
-/// Detects any of 34 candlestick patterns from OHLC values.
+/// Detects any of 39 candlestick patterns from OHLC values.
 ///
 /// Keeps a rolling `bars` buffer of at most 5 bars.
 #[derive(Debug, Clone)]
@@ -532,6 +593,12 @@ fn detect_pattern(
         CandlePatternKind::DownsideGapThreeMethods => {
             check_downside_gap_three_methods(bars, sig)
         }
+        // gaps
+        CandlePatternKind::CommonGap => check_common_gap(bars[0], bars[1], sig),
+        CandlePatternKind::BreakawayGap => check_breakaway_gap(bars[0], bars[1], bars[2], sig),
+        CandlePatternKind::RunawayGap => check_runaway_gap(bars[0], bars[1], bars[2], sig),
+        CandlePatternKind::ExhaustionGap => check_exhaustion_gap(bars[0], bars[1], bars[2], sig),
+        CandlePatternKind::IslandGap => check_island_gap(bars, sig),
     }
 }
 
@@ -592,7 +659,7 @@ pub struct CandlePatternHit {
 /// an out-of-bounds panic, not a degraded answer.
 ///
 /// An empty `kinds` returns an empty result — asking for nothing is not
-/// shorthand for "all 34"; use `CandlePatternKind::all()` explicitly for that.
+/// shorthand for "all 39"; use `CandlePatternKind::all()` explicitly for that.
 ///
 /// Results are sorted by `end` (chronological), then by `kinds`' own order
 /// for hits sharing the same `end` — so precedence among same-bar
@@ -1324,6 +1391,160 @@ fn check_downside_gap_three_methods(
 }
 
 // ---------------------------------------------------------------------------
+// Gap helpers
+// ---------------------------------------------------------------------------
+
+const GAP_COMMON_MAX_RANGE_RATIO: f64 = 1.0;
+const GAP_BREAKOUT_BODY_RATIO: f64 = SOLDIERS_MIN_BODY;
+const GAP_EXHAUSTION_WEAK_BODY_RATIO: f64 = 0.5;
+
+/// True price gap up — no overlap between `prev`'s range and `curr`'s.
+/// Stricter than a bare "opened above prior close" test (what
+/// `UpsideGapTwoCrows`/`DownsideGapThreeMethods` use for their own,
+/// already-fixed shapes) — the 5 kinds below are all built around a real
+/// price gap as their defining feature, so they share one precise
+/// definition rather than five slightly different ones.
+#[inline]
+fn gap_up(prev: (f64, f64, f64, f64), curr: (f64, f64, f64, f64)) -> bool {
+    curr.2 > prev.1
+}
+
+/// True price gap down — mirror of [`gap_up`].
+#[inline]
+fn gap_down(prev: (f64, f64, f64, f64), curr: (f64, f64, f64, f64)) -> bool {
+    curr.1 < prev.2
+}
+
+fn check_common_gap(
+    prev: (f64, f64, f64, f64),
+    curr: (f64, f64, f64, f64),
+    sig: SignalKind,
+) -> Option<(SignalKind, Direction)> {
+    let (_, ph, pl, _) = prev;
+    let (_, ch, cl, _) = curr;
+    let avg_range = ((ph - pl) + (ch - cl)) / 2.0;
+    if avg_range < f64::EPSILON {
+        return None;
+    }
+    // A "common" gap is unremarkable by definition — small relative to the
+    // surrounding bars' own range, unlike the breakout/trend gaps below.
+    if gap_up(prev, curr) && (cl - ph) / avg_range <= GAP_COMMON_MAX_RANGE_RATIO {
+        Some((sig, Direction::Up))
+    } else if gap_down(prev, curr) && (pl - ch) / avg_range <= GAP_COMMON_MAX_RANGE_RATIO {
+        Some((sig, Direction::Down))
+    } else {
+        None
+    }
+}
+
+fn check_breakaway_gap(
+    base1: (f64, f64, f64, f64),
+    base2: (f64, f64, f64, f64),
+    curr: (f64, f64, f64, f64),
+    sig: SignalKind,
+) -> Option<(SignalKind, Direction)> {
+    let (_, b1h, b1l, _) = base1;
+    let (_, b2h, b2l, _) = base2;
+    let (co, ch, cl, cc) = curr;
+    // base1/base2 must overlap — a quiet base, not already trending away
+    // from itself (that would be a runaway gap, not a breakaway one).
+    if b1h < b2l || b2h < b1l {
+        return None;
+    }
+    let curr_range = ch - cl;
+    if curr_range < f64::EPSILON {
+        return None;
+    }
+    // Strong-bodied breakout candle — conviction, not a stray print.
+    if (cc - co).abs() / curr_range < GAP_BREAKOUT_BODY_RATIO {
+        return None;
+    }
+    let base_high = b1h.max(b2h);
+    let base_low = b1l.min(b2l);
+    if cc > co && cl > base_high {
+        Some((sig, Direction::Up))
+    } else if cc < co && ch < base_low {
+        Some((sig, Direction::Down))
+    } else {
+        None
+    }
+}
+
+fn check_runaway_gap(
+    earlier: (f64, f64, f64, f64),
+    prev: (f64, f64, f64, f64),
+    curr: (f64, f64, f64, f64),
+    sig: SignalKind,
+) -> Option<(SignalKind, Direction)> {
+    let (_, _, _, ec) = earlier;
+    let (po, _, _, pc) = prev;
+    // `prev` already trends the same way `earlier` -> `prev` did, then
+    // `curr` gaps further in that SAME direction — a mid-trend
+    // "measuring" gap, not a reversal-warning one (see exhaustion below).
+    if pc > po && pc > ec && gap_up(prev, curr) {
+        Some((sig, Direction::Up))
+    } else if pc < po && pc < ec && gap_down(prev, curr) {
+        Some((sig, Direction::Down))
+    } else {
+        None
+    }
+}
+
+fn check_exhaustion_gap(
+    earlier: (f64, f64, f64, f64),
+    prev: (f64, f64, f64, f64),
+    curr: (f64, f64, f64, f64),
+    sig: SignalKind,
+) -> Option<(SignalKind, Direction)> {
+    let (_, _, _, ec) = earlier;
+    let (po, _, _, pc) = prev;
+    let (co, ch, cl, cc) = curr;
+    let curr_range = ch - cl;
+    if curr_range < f64::EPSILON {
+        return None;
+    }
+    // Same established-trend setup as a runaway gap, but `curr` closes
+    // weak within its own range despite gapping further — the trend
+    // running out of steam. Direction is the REVERSAL call (opposite the
+    // trend that just exhausted), matching how EveningStar/ShootingStar
+    // already assign a bearish Direction after an up move in this file.
+    if pc > po && pc > ec && gap_up(prev, curr) && (cc <= co || (cc - cl) / curr_range < GAP_EXHAUSTION_WEAK_BODY_RATIO)
+    {
+        Some((sig, Direction::Down))
+    } else if pc < po
+        && pc < ec
+        && gap_down(prev, curr)
+        && (cc >= co || (ch - cc) / curr_range < GAP_EXHAUSTION_WEAK_BODY_RATIO)
+    {
+        Some((sig, Direction::Up))
+    } else {
+        None
+    }
+}
+
+fn check_island_gap(bars: &[(f64, f64, f64, f64)], sig: SignalKind) -> Option<(SignalKind, Direction)> {
+    // bars[0] = before, bars[1..4] = the isolated island, bars[4] = after.
+    let before_high = bars[0].1;
+    let before_low = bars[0].2;
+    let island_high = bars[1].1.max(bars[2].1).max(bars[3].1);
+    let island_low = bars[1].2.min(bars[2].2).min(bars[3].2);
+    let (_, after_high, after_low, _) = bars[4];
+
+    // Gapped up into the island, then a gap back down that re-crosses the
+    // level before the island started — the island is now cut off on both
+    // sides and the move has round-tripped: bearish reversal.
+    if island_low > before_high && after_high < island_low && after_low < before_high {
+        return Some((sig, Direction::Down));
+    }
+    // Mirror: gapped down into the island, then a gap back up re-crossing
+    // the pre-island level — bullish reversal.
+    if island_high < before_low && after_low > island_high && after_high > before_low {
+        return Some((sig, Direction::Up));
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1499,9 +1720,9 @@ mod tests {
     }
 
     #[test]
-    fn all_34_ids_are_distinct() {
+    fn all_39_ids_are_distinct() {
         let all = CandlePatternKind::all();
-        assert_eq!(all.len(), 34, "catalogue must list exactly 34 patterns");
+        assert_eq!(all.len(), 39, "catalogue must list exactly 39 patterns (34 original + 5 gap kinds)");
         let mut ids: Vec<&str> = all.iter().map(|k| k.id()).collect();
         let before = ids.len();
         ids.sort_unstable();
@@ -1515,11 +1736,12 @@ mod tests {
     }
 
     #[test]
-    fn bias_partitions_all_34_variants() {
+    fn bias_partitions_all_39_variants() {
         // Regression guard on the hand-written bias table: every variant
         // must land in exactly one bucket, and the bucket sizes are a fact
-        // about the doc-comment source data (14 bullish / 16 bearish / 4
-        // indecision), not something to silently drift.
+        // about the doc-comment source data (14 bullish / 16 bearish / 9
+        // indecision — the original 4 plus the 5 bidirectional gap kinds),
+        // not something to silently drift.
         let mut bullish = 0;
         let mut bearish = 0;
         let mut indecision = 0;
@@ -1530,13 +1752,73 @@ mod tests {
                 PatternBias::Indecision => indecision += 1,
             }
         }
-        assert_eq!((bullish, bearish, indecision), (14, 16, 4));
+        assert_eq!((bullish, bearish, indecision), (14, 16, 9));
         assert_eq!(CandlePatternKind::Doji.bias(), PatternBias::Indecision);
         assert_eq!(CandlePatternKind::LongLeggedDoji.bias(), PatternBias::Indecision);
         assert_eq!(CandlePatternKind::SpinningTop.bias(), PatternBias::Indecision);
         assert_eq!(CandlePatternKind::Marubozu.bias(), PatternBias::Indecision);
         assert_eq!(CandlePatternKind::WhiteMarubozu.bias(), PatternBias::Bullish);
         assert_eq!(CandlePatternKind::BlackMarubozu.bias(), PatternBias::Bearish);
+        assert_eq!(CandlePatternKind::CommonGap.bias(), PatternBias::Indecision);
+        assert_eq!(CandlePatternKind::BreakawayGap.bias(), PatternBias::Indecision);
+        assert_eq!(CandlePatternKind::RunawayGap.bias(), PatternBias::Indecision);
+        assert_eq!(CandlePatternKind::ExhaustionGap.bias(), PatternBias::Indecision);
+        assert_eq!(CandlePatternKind::IslandGap.bias(), PatternBias::Indecision);
+    }
+
+    /// Regression guard: the original 34 ids, in their original
+    /// declaration order, hand-copied from `id()` BEFORE the 5 gap kinds
+    /// were appended. Proves the append-only nature of this change — none
+    /// of the original 34 was reordered, renamed, or removed; the new
+    /// kinds only ever occupy positions 34..39.
+    const ORIGINAL_34_IDS: [&str; 34] = [
+        "doji",
+        "gravestone_doji",
+        "dragonfly_doji",
+        "long_legged_doji",
+        "hammer",
+        "inverted_hammer",
+        "shooting_star",
+        "hanging_man",
+        "marubozu",
+        "white_marubozu",
+        "black_marubozu",
+        "spinning_top",
+        "bullish_engulfing",
+        "bearish_engulfing",
+        "bullish_harami",
+        "bearish_harami",
+        "piercing_pattern",
+        "dark_cloud_cover",
+        "tweezer_top",
+        "tweezer_bottom",
+        "morning_star",
+        "evening_star",
+        "morning_doji_star",
+        "evening_doji_star",
+        "three_white_soldiers",
+        "three_black_crows",
+        "three_inside_up",
+        "three_inside_down",
+        "three_outside_up",
+        "three_outside_down",
+        "rising_three_methods",
+        "falling_three_methods",
+        "upside_gap_two_crows",
+        "downside_gap_three_methods",
+    ];
+
+    #[test]
+    fn original_34_kinds_are_unchanged_and_gaps_are_appended() {
+        let all = CandlePatternKind::all();
+        assert_eq!(all.len(), 39);
+        let ids: Vec<&str> = all.iter().map(|k| k.id()).collect();
+        assert_eq!(&ids[..34], &ORIGINAL_34_IDS, "the original 34 ids must stay in their original order");
+        assert_eq!(
+            &ids[34..],
+            &["common_gap", "breakaway_gap", "runaway_gap", "exhaustion_gap", "island_gap"],
+            "the 5 gap kinds must be appended after the original 34, in declaration order"
+        );
     }
 
     // ---- stateless detect_at vs streaming detector ----
@@ -1708,5 +1990,129 @@ mod tests {
         assert_eq!(hits[0].kind, CandlePatternKind::Doji);
         assert_eq!(hits[1].end, 1);
         assert_eq!(hits[1].kind, CandlePatternKind::Hammer);
+    }
+
+    // ---- gaps ----
+
+    #[test]
+    fn common_gap_detected() {
+        let mut d = CandlePatternDetector::new(CandlePatternKind::CommonGap);
+        signal(&mut d, 100.0, 102.0, 98.0, 100.0);
+        // curr.low (102.5) > prev.high (102) — a genuine, small gap.
+        let s = signal(&mut d, 103.0, 105.0, 102.5, 104.0);
+        assert_eq!(s, 1, "CommonGap must fire +1 for a small gap up");
+    }
+
+    #[test]
+    fn breakaway_gap_detected() {
+        let mut d = CandlePatternDetector::new(CandlePatternKind::BreakawayGap);
+        // base1/base2 overlap — a quiet consolidation.
+        signal(&mut d, 100.0, 102.0, 98.0, 100.0);
+        signal(&mut d, 99.0, 101.0, 97.0, 99.0);
+        // curr gaps cleanly above the base (base_high=102) with a strong body.
+        let s = signal(&mut d, 105.0, 115.0, 104.0, 114.0);
+        assert_eq!(s, 1, "BreakawayGap must fire +1 breaking above a quiet base");
+    }
+
+    #[test]
+    fn runaway_gap_detected() {
+        let mut d = CandlePatternDetector::new(CandlePatternKind::RunawayGap);
+        // earlier -> prev already trending up (close 92 -> 99).
+        signal(&mut d, 90.0, 95.0, 88.0, 92.0);
+        signal(&mut d, 93.0, 100.0, 92.0, 99.0);
+        // curr gaps up further, continuing the trend.
+        let s = signal(&mut d, 101.0, 108.0, 100.5, 107.0);
+        assert_eq!(s, 1, "RunawayGap must fire +1 continuing an established up-trend");
+    }
+
+    #[test]
+    fn exhaustion_gap_detected() {
+        let mut d = CandlePatternDetector::new(CandlePatternKind::ExhaustionGap);
+        // Same established up-trend setup as RunawayGap above.
+        signal(&mut d, 90.0, 95.0, 88.0, 92.0);
+        signal(&mut d, 93.0, 100.0, 92.0, 99.0);
+        // curr gaps up but closes near the bottom of its own range — weak.
+        let s = signal(&mut d, 101.0, 108.0, 100.5, 101.2);
+        assert_eq!(s, -1, "ExhaustionGap must fire -1 (reversal warning) after a weak-close gap-up");
+    }
+
+    #[test]
+    fn island_gap_detected() {
+        let mut d = CandlePatternDetector::new(CandlePatternKind::IslandGap);
+        // before: high 102.
+        signal(&mut d, 100.0, 102.0, 98.0, 100.0);
+        // island: 3 bars gapped up from `before` (low 104 > 102), never
+        // trading back down into `before`'s range.
+        signal(&mut d, 105.0, 108.0, 104.0, 107.0);
+        signal(&mut d, 107.0, 110.0, 106.0, 109.0);
+        signal(&mut d, 108.0, 111.0, 105.0, 106.0);
+        // after: gaps back down below the island's own low (104) and
+        // re-crosses back below `before`'s high (102) — closing the island.
+        let s = signal(&mut d, 100.0, 101.0, 90.0, 95.0);
+        assert_eq!(s, -1, "IslandGap must fire -1 for an up-then-down island reversal");
+    }
+
+    #[test]
+    fn scan_finds_common_gap_at_completion_bar() {
+        let bars = [
+            (100.0, 102.0, 98.0, 100.0),
+            (103.0, 105.0, 102.5, 104.0),
+        ];
+        let hits = scan(&[CandlePatternKind::CommonGap], &bars, 1..2);
+        assert_eq!(
+            hits,
+            vec![CandlePatternHit {
+                kind: CandlePatternKind::CommonGap,
+                start: 0,
+                end: 1,
+                direction: Direction::Up,
+            }]
+        );
+    }
+
+    /// Regression guard for the 34 pre-existing kinds' own detection
+    /// LOGIC (as opposed to `original_34_kinds_are_unchanged_and_gaps_are_
+    /// appended`'s catalogue-shape guard above): re-runs a representative
+    /// spread across the 1/2/3/5-bar groups through `detect_at` on a fixed
+    /// fixture and checks each against its own previously-established
+    /// expectation — none of the gap work touched any of these detection
+    /// functions, so every one of these must still agree exactly.
+    #[test]
+    fn original_kinds_detection_is_unchanged_on_a_fixed_fixture() {
+        assert_eq!(
+            detect_at(CandlePatternKind::Doji, &[(100.0, 102.0, 98.0, 100.0)]),
+            Some((SignalKind::Pattern(PatternSub::Candle), Direction::Up))
+        );
+        assert_eq!(
+            detect_at(CandlePatternKind::Hammer, &[(100.0, 101.0, 90.0, 101.0)]),
+            Some((SignalKind::Pattern(PatternSub::Candle), Direction::Up))
+        );
+        assert_eq!(
+            detect_at(
+                CandlePatternKind::BullishEngulfing,
+                &[(105.0, 106.0, 99.0, 100.0), (99.0, 110.0, 98.0, 108.0)],
+            ),
+            Some((SignalKind::Pattern(PatternSub::Candle), Direction::Up))
+        );
+        assert_eq!(
+            detect_at(
+                CandlePatternKind::MorningStar,
+                &[(110.0, 111.0, 99.0, 100.0), (97.0, 98.0, 96.0, 97.5), (99.0, 112.0, 98.0, 107.0)],
+            ),
+            Some((SignalKind::Pattern(PatternSub::Candle), Direction::Up))
+        );
+        assert_eq!(
+            detect_at(
+                CandlePatternKind::RisingThreeMethods,
+                &[
+                    (100.0, 110.0, 100.0, 108.0),
+                    (106.0, 109.0, 103.0, 104.0),
+                    (104.0, 107.0, 102.0, 103.0),
+                    (103.0, 108.0, 101.0, 105.0),
+                    (106.0, 120.0, 105.0, 119.0),
+                ],
+            ),
+            Some((SignalKind::Pattern(PatternSub::Candle), Direction::Up))
+        );
     }
 }
