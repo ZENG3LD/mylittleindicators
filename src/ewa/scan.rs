@@ -2,15 +2,17 @@
 //!
 //! Windows the pivot/segment sequence `ewa::swing` extracts by REQUIRED
 //! SEGMENT COUNT per pattern family (3 segments / 4 pivots for the
-//! simple-correction family — zigzag, flat; 5 segments / 6 pivots for
-//! impulse, diagonal, triangle), one forward pass per family — mirroring
-//! the proprietary `CpuEwaScanner::scan_from`'s algorithm SHAPE
-//! (`mylittlequant/crates/mli/src/ewa/scanner.rs`), a fresh, independent
-//! OSS implementation, not a port. Deliberately excluded: the
-//! probabilistic ranker/priors/reinterpretation apparatus, the harmonic
-//! XABCD family (a later phase), and W-X-Y double/triple-combo composition
-//! (a later extension) — this module answers "does this shape exist here,
-//! and how well does it fit," never "is this a good trading edge."
+//! simple-correction family — zigzag, flat, and the harmonic `Abcd` shape;
+//! 4 segments / 5 pivots for the XABCD harmonic family — Gartley, Bat,
+//! Butterfly, Crab, Shark, Cypher; 5 segments / 6 pivots for impulse,
+//! diagonal, triangle, and the harmonic `ThreeDrives` shape), one forward
+//! pass per family — mirroring the proprietary `CpuEwaScanner::scan_from`'s
+//! algorithm SHAPE (`mylittlequant/crates/mli/src/ewa/scanner.rs`), a
+//! fresh, independent OSS implementation, not a port. Deliberately
+//! excluded: the probabilistic ranker/priors/reinterpretation apparatus,
+//! and W-X-Y double/triple-combo composition (a later extension) — this
+//! module answers "does this shape exist here, and how well does it fit,"
+//! never "is this a good trading edge."
 //!
 //! Validation reuses the EXISTING predicate library `ewa::rules` — the
 //! SAME module `elliott::guard` (mlc) already imports to judge a
@@ -20,16 +22,33 @@
 //! via `ewa::ratios::ratio_to_targets` against the SAME retracement /
 //! extension target tables `ewa::ratios` already declares.
 //!
+//! The 8 harmonic kinds (`Gartley`/`Bat`/`Butterfly`/`Crab`/`Shark`/
+//! `Cypher`/`Abcd`/`ThreeDrives`) are scored differently, over the SAME
+//! pivot/segment/window machinery: each leg of `ewa::harmonic::
+//! targets_for(kind)`'s published Carney ratio table is a HARD requirement
+//! (`ewa::harmonic::ratio_matches`, already carrying
+//! `DEFAULT_HARMONIC_TOLERANCE`) — a harmonic pattern IS its ratio table,
+//! unlike an Elliott wave's softer fib preference, so a leg landing outside
+//! its band drops the candidate outright rather than merely lowering
+//! `score`. `score` instead measures how close each satisfied leg sits to
+//! its band's center, for ranking only. `EwaPatternKind::Xabcd` (the
+//! unclassified five-point container) is deliberately never scanned here —
+//! `ewa::harmonic::targets_for` returns an empty table for it by design, so
+//! it is simply absent from `scan_waves`'s harmonic match arms, the same
+//! "unclassified is not a scan target" reasoning the manual `XabcdPattern`
+//! tool (mlc) already encodes.
+//!
 //! Phase 1 (MVP) kind coverage — single-degree families only, no
 //! composition: `Impulse`; the 4 diagonal kinds (`Leading`/`Ending` ×
-//! `Contracting`/`Expanding`); `Zigzag`; `Flat`; `Triangle`. A requested
-//! kind outside this set produces no hits — a documented subset of the
-//! full 23-kind taxonomy, not a silent refusal; harmonic and combo
-//! families extend this module in later phases without touching
-//! `scan_waves`'s signature.
+//! `Contracting`/`Expanding`); `Zigzag`; `Flat`; `Triangle`; the 8 harmonic
+//! kinds above. A requested kind outside this set produces no hits — a
+//! documented subset of the full 23-kind taxonomy, not a silent refusal;
+//! W-X-Y combo families extend this module in a later phase without
+//! touching `scan_waves`'s signature.
 
 use std::ops::Range;
 
+use super::harmonic;
 use super::ratios::{EXTENSION_TARGETS, RETRACEMENT_TARGETS, ratio_to_targets};
 use super::rules::{self, FLAT_B_A, ZIGZAG_B_A};
 use super::swing::{EwaSwingPivot, EwaSwingSegment};
@@ -116,6 +135,31 @@ pub fn scan_waves(
             EwaPatternKind::Triangle => {
                 scan_triangle(scan_pivots, &scan_segments, &by_start, &completion_range, truncated, &mut hits)
             }
+            EwaPatternKind::Gartley
+            | EwaPatternKind::Bat
+            | EwaPatternKind::Butterfly
+            | EwaPatternKind::Crab
+            | EwaPatternKind::Shark
+            | EwaPatternKind::Cypher => scan_harmonic_xabcd(
+                kind,
+                scan_pivots,
+                &scan_segments,
+                &by_start,
+                &completion_range,
+                truncated,
+                &mut hits,
+            ),
+            EwaPatternKind::Abcd => {
+                scan_harmonic_abcd(scan_pivots, &scan_segments, &by_start, &completion_range, truncated, &mut hits)
+            }
+            EwaPatternKind::ThreeDrives => scan_harmonic_three_drives(
+                scan_pivots,
+                &scan_segments,
+                &by_start,
+                &completion_range,
+                truncated,
+                &mut hits,
+            ),
             _ => {}
         }
     }
@@ -154,6 +198,15 @@ fn window3(by_start: &[Option<usize>], start: usize) -> Option<[usize; 3]> {
         (*by_start.get(start)?)?,
         (*by_start.get(start + 1)?)?,
         (*by_start.get(start + 2)?)?,
+    ])
+}
+
+fn window4(by_start: &[Option<usize>], start: usize) -> Option<[usize; 4]> {
+    Some([
+        (*by_start.get(start)?)?,
+        (*by_start.get(start + 1)?)?,
+        (*by_start.get(start + 2)?)?,
+        (*by_start.get(start + 3)?)?,
     ])
 }
 
@@ -552,6 +605,198 @@ fn score_triangle(
     Some(finalize(EwaPatternKind::Triangle, start, 6, pivots, &ratios, truncated))
 }
 
+// ---------------------------------------------------------------------------
+// Harmonic (XABCD 5 pivots/4 segments; Abcd 4 pivots/3 segments; ThreeDrives
+// 6 pivots/5 segments) — scored against `ewa::harmonic::targets_for`, not
+// the Elliott fib-target lists above.
+// ---------------------------------------------------------------------------
+
+/// Pivot-name -> in-window position for the 6 XABCD harmonic kinds
+/// (Gartley, Bat, Butterfly, Crab, Shark, Cypher): `X, A, B, C, D`.
+fn xabcd_position(name: &str) -> Option<usize> {
+    match name {
+        "X" => Some(0),
+        "A" => Some(1),
+        "B" => Some(2),
+        "C" => Some(3),
+        "D" => Some(4),
+        _ => None,
+    }
+}
+
+/// Pivot-name -> in-window position for the harmonic `Abcd` shape:
+/// `A, B, C, D` (no `X` — the generic four-point pattern).
+fn abcd_position(name: &str) -> Option<usize> {
+    match name {
+        "A" => Some(0),
+        "B" => Some(1),
+        "C" => Some(2),
+        "D" => Some(3),
+        _ => None,
+    }
+}
+
+/// Pivot-name -> in-window position for `ThreeDrives`: `X, 1, A, 2, B, 3`.
+fn three_drives_position(name: &str) -> Option<usize> {
+    match name {
+        "X" => Some(0),
+        "1" => Some(1),
+        "A" => Some(2),
+        "2" => Some(3),
+        "B" => Some(4),
+        "3" => Some(5),
+        _ => None,
+    }
+}
+
+/// Fit quality for one satisfied harmonic leg — 1.0 exactly at the band's
+/// center, falling linearly to 0.0 at either edge. Distinct from
+/// `soft_ratio_score` (which measures distance to one of a LIST of discrete
+/// fib targets): a harmonic leg's target is a continuous band, not a
+/// nearest-of-several-constants match, so it earns its own small scoring
+/// step rather than being forced through `EwaRatio`/`ratio_to_targets`.
+fn harmonic_leg_fit(ratio: f64, band: &rules::RatioBand) -> f64 {
+    let center = (band.min + band.max) / 2.0;
+    let half_width = ((band.max - band.min) / 2.0).max(f64::EPSILON);
+    (1.0 - ((ratio - center).abs() / half_width).min(1.0)).max(0.0)
+}
+
+/// Scores one harmonic candidate: every leg in `harmonic::targets_for(kind)`
+/// must satisfy `harmonic::ratio_matches` (HARD — see module doc) or the
+/// whole candidate is dropped; `score` is the mean per-leg fit quality.
+/// `position_of` maps a table leg's pivot NAME (`"X"`, `"A"`, …) to its
+/// position within the `pivot_count`-pivot window starting at `start`.
+fn score_harmonic(
+    kind: EwaPatternKind,
+    start: usize,
+    pivot_count: usize,
+    pivots: &[EwaSwingPivot],
+    position_of: fn(&str) -> Option<usize>,
+    truncated: bool,
+) -> Option<EwaWaveHit> {
+    let table = harmonic::targets_for(kind);
+    if table.is_empty() {
+        return None;
+    }
+
+    let price_at = |name: &str| -> Option<f64> {
+        let pos = position_of(name)?;
+        pivots.get(start + pos).map(|pivot| pivot.price)
+    };
+
+    let mut fit_sum = 0.0;
+    for entry in table {
+        let leg_start = price_at(entry.leg.0)?;
+        let leg_end = price_at(entry.leg.1)?;
+        let ref_start = price_at(entry.reference.0)?;
+        let ref_end = price_at(entry.reference.1)?;
+        let ratio = rules::ratio(leg_end - leg_start, ref_end - ref_start)?;
+        if !harmonic::ratio_matches(ratio, entry) {
+            return None;
+        }
+        fit_sum += harmonic_leg_fit(ratio, &entry.band);
+    }
+
+    let score = (fit_sum / table.len() as f64).clamp(0.0, 1.0);
+    let pivots_out = (0..pivot_count).map(|i| pivots[start + i].index).collect();
+    Some(EwaWaveHit { kind, pivots: pivots_out, score, truncated_family: truncated })
+}
+
+/// Every consecutive segment pair in `segs` must alternate direction — the
+/// structural alternation `ewa::harmonic`'s own module doc calls out as a
+/// HARD rule, checked defensively here even though `by_start` already only
+/// links consecutive, opposite-kind pivots (same defensive posture
+/// `score_triangle` takes for its own leg run).
+fn alternates(segs: &[&EwaSwingSegment]) -> bool {
+    segs.windows(2).all(|pair| pair[0].direction != pair[1].direction)
+}
+
+fn scan_harmonic_xabcd(
+    kind: EwaPatternKind,
+    pivots: &[EwaSwingPivot],
+    segments: &[&EwaSwingSegment],
+    by_start: &[Option<usize>],
+    completion_range: &Range<usize>,
+    truncated: bool,
+    out: &mut Vec<EwaWaveHit>,
+) {
+    if pivots.len() < 5 {
+        return;
+    }
+    for start in 0..=(pivots.len() - 5) {
+        let Some(seg_idx) = window4(by_start, start) else { continue };
+        if !completion_range.contains(&pivots[start + 4].index) {
+            continue;
+        }
+        let segs = [segments[seg_idx[0]], segments[seg_idx[1]], segments[seg_idx[2]], segments[seg_idx[3]]];
+        if !alternates(&segs) {
+            continue;
+        }
+        if let Some(hit) = score_harmonic(kind, start, 5, pivots, xabcd_position, truncated) {
+            out.push(hit);
+        }
+    }
+}
+
+fn scan_harmonic_abcd(
+    pivots: &[EwaSwingPivot],
+    segments: &[&EwaSwingSegment],
+    by_start: &[Option<usize>],
+    completion_range: &Range<usize>,
+    truncated: bool,
+    out: &mut Vec<EwaWaveHit>,
+) {
+    if pivots.len() < 4 {
+        return;
+    }
+    for start in 0..=(pivots.len() - 4) {
+        let Some(seg_idx) = window3(by_start, start) else { continue };
+        if !completion_range.contains(&pivots[start + 3].index) {
+            continue;
+        }
+        let segs = [segments[seg_idx[0]], segments[seg_idx[1]], segments[seg_idx[2]]];
+        if !alternates(&segs) {
+            continue;
+        }
+        if let Some(hit) = score_harmonic(EwaPatternKind::Abcd, start, 4, pivots, abcd_position, truncated) {
+            out.push(hit);
+        }
+    }
+}
+
+fn scan_harmonic_three_drives(
+    pivots: &[EwaSwingPivot],
+    segments: &[&EwaSwingSegment],
+    by_start: &[Option<usize>],
+    completion_range: &Range<usize>,
+    truncated: bool,
+    out: &mut Vec<EwaWaveHit>,
+) {
+    if pivots.len() < 6 {
+        return;
+    }
+    for start in 0..=(pivots.len() - 6) {
+        let Some(seg_idx) = window5(by_start, start) else { continue };
+        if !completion_range.contains(&pivots[start + 5].index) {
+            continue;
+        }
+        let segs = [
+            segments[seg_idx[0]],
+            segments[seg_idx[1]],
+            segments[seg_idx[2]],
+            segments[seg_idx[3]],
+            segments[seg_idx[4]],
+        ];
+        if !alternates(&segs) {
+            continue;
+        }
+        if let Some(hit) = score_harmonic(EwaPatternKind::ThreeDrives, start, 6, pivots, three_drives_position, truncated)
+        {
+            out.push(hit);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -742,6 +987,178 @@ mod tests {
         );
     }
 
+    // ---- harmonic kinds (Phase 3) ----
+
+    /// `AB = 0.618 XA` exact (Gartley's own AB target). `BC = 0.6796 AB` and
+    /// `CD = 1.4 BC` are both solved/chosen with real margin inside their
+    /// own [0.382,0.886]/[1.13,1.618] bands (never AT an edge — an
+    /// edge-exact nominal, e.g. `CD = 1.618 BC`, is one hand-rounded decimal
+    /// away from tipping outside an INCLUSIVE band under float rounding) so
+    /// that `AD` lands on Gartley's own `exact(0.786)` target with margin
+    /// to spare: X=1000, A=1100 (XA=100); AB=61.8; BC=42.0; CD=58.8;
+    /// AD=78.6 (ratio 0.786 exactly).
+    #[test]
+    fn textbook_gartley_is_found_at_expected_pivots() {
+        let kinds = [PivotKind::Low, PivotKind::High, PivotKind::Low, PivotKind::High, PivotKind::Low];
+        let prices = [1000.0, 1100.0, 1038.2, 1080.2, 1021.4];
+        let bars = wave_bars(&kinds, &prices, 3, 0.2);
+
+        let pivots = extract_pivots(&bars, 2);
+        let segments = build_segments(&bars, &pivots);
+        let hits = scan_waves(&pivots, &segments, &[EwaPatternKind::Gartley], 0..bars.len());
+
+        let hit = find_hit(&hits, EwaPatternKind::Gartley).expect("textbook Gartley must be found");
+        assert_eq!(hit.pivots.len(), 5);
+    }
+
+    /// `AB = 0.45 XA` (mid Bat's [0.382,0.50] band), `CD = 2.5 BC` (mid
+    /// [1.618,2.618], real margin from both edges), `BC` solved so `AD`
+    /// lands on Bat's own `exact(0.886)`: X=1000, A=1100 (XA=100); AB=45.0;
+    /// BC=29.066667 (ratio 0.6459, margin from either BC-band edge);
+    /// CD=72.666667; AD=88.6 (ratio 0.886 exactly).
+    #[test]
+    fn textbook_bat_is_found_at_expected_pivots() {
+        let kinds = [PivotKind::Low, PivotKind::High, PivotKind::Low, PivotKind::High, PivotKind::Low];
+        let prices = [1000.0, 1100.0, 1055.0, 1084.066667, 1011.4];
+        let bars = wave_bars(&kinds, &prices, 3, 0.2);
+
+        let pivots = extract_pivots(&bars, 2);
+        let segments = build_segments(&bars, &pivots);
+        let hits = scan_waves(&pivots, &segments, &[EwaPatternKind::Bat], 0..bars.len());
+
+        let hit = find_hit(&hits, EwaPatternKind::Bat).expect("textbook Bat must be found");
+        assert_eq!(hit.pivots.len(), 5);
+    }
+
+    /// `AB = 0.786 XA` exact (Butterfly's own AB target), `CD = 2.0 BC`
+    /// (inside [1.618,2.24]), `BC` solved so `AD` lands at 1.4 XA (inside
+    /// Butterfly's [1.27,1.618] AD band).
+    #[test]
+    fn textbook_butterfly_is_found_at_expected_pivots() {
+        let kinds = [PivotKind::Low, PivotKind::High, PivotKind::Low, PivotKind::High, PivotKind::Low];
+        let prices = [1000.0, 1100.0, 1021.4, 1082.8, 960.0];
+        let bars = wave_bars(&kinds, &prices, 3, 0.2);
+
+        let pivots = extract_pivots(&bars, 2);
+        let segments = build_segments(&bars, &pivots);
+        let hits = scan_waves(&pivots, &segments, &[EwaPatternKind::Butterfly], 0..bars.len());
+
+        let hit = find_hit(&hits, EwaPatternKind::Butterfly).expect("textbook Butterfly must be found");
+        assert_eq!(hit.pivots.len(), 5);
+    }
+
+    /// `AB = 0.59 XA` (near the top of [0.382,0.618], real margin left),
+    /// `BC = 0.75 AB` (mid [0.382,0.886]), `CD` solved so `AD` lands on
+    /// Crab's own `exact(1.618)`: X=1000, A=1100 (XA=100); AB=59.0; BC=44.25
+    /// (ratio 0.75); CD=147.05 (ratio ≈3.322, inside [2.618,3.618] with
+    /// margin from both edges); AD=161.8 (ratio 1.618 exactly).
+    #[test]
+    fn textbook_crab_is_found_at_expected_pivots() {
+        let kinds = [PivotKind::Low, PivotKind::High, PivotKind::Low, PivotKind::High, PivotKind::Low];
+        let prices = [1000.0, 1100.0, 1041.0, 1085.25, 938.2];
+        let bars = wave_bars(&kinds, &prices, 3, 0.2);
+
+        let pivots = extract_pivots(&bars, 2);
+        let segments = build_segments(&bars, &pivots);
+        let hits = scan_waves(&pivots, &segments, &[EwaPatternKind::Crab], 0..bars.len());
+
+        let hit = find_hit(&hits, EwaPatternKind::Crab).expect("textbook Crab must be found");
+        assert_eq!(hit.pivots.len(), 5);
+    }
+
+    /// `AB = 0.5 XA` (inside [0.382,0.618]), `AC = 1.272 XA` (inside
+    /// [1.13,1.618]), `CD = 1.0 XC` (inside [0.886,1.13]) — Shark has no
+    /// `(A, D)`-over-`(X, A)` leg, so this fixture needs no solved value.
+    #[test]
+    fn textbook_shark_is_found_at_expected_pivots() {
+        let kinds = [PivotKind::Low, PivotKind::High, PivotKind::Low, PivotKind::High, PivotKind::Low];
+        let prices = [1000.0, 1100.0, 1050.0, 1227.2, 1000.0];
+        let bars = wave_bars(&kinds, &prices, 3, 0.2);
+
+        let pivots = extract_pivots(&bars, 2);
+        let segments = build_segments(&bars, &pivots);
+        let hits = scan_waves(&pivots, &segments, &[EwaPatternKind::Shark], 0..bars.len());
+
+        let hit = find_hit(&hits, EwaPatternKind::Shark).expect("textbook Shark must be found");
+        assert_eq!(hit.pivots.len(), 5);
+    }
+
+    /// `AB = 0.5 XA` (inside [0.382,0.618]), `AC = 1.35 XA` (inside
+    /// [1.272,1.414]), `CD = 0.786 XC` exact (Cypher's own CD target).
+    #[test]
+    fn textbook_cypher_is_found_at_expected_pivots() {
+        let kinds = [PivotKind::Low, PivotKind::High, PivotKind::Low, PivotKind::High, PivotKind::Low];
+        let prices = [1000.0, 1100.0, 1050.0, 1235.0, 1050.29];
+        let bars = wave_bars(&kinds, &prices, 3, 0.2);
+
+        let pivots = extract_pivots(&bars, 2);
+        let segments = build_segments(&bars, &pivots);
+        let hits = scan_waves(&pivots, &segments, &[EwaPatternKind::Cypher], 0..bars.len());
+
+        let hit = find_hit(&hits, EwaPatternKind::Cypher).expect("textbook Cypher must be found");
+        assert_eq!(hit.pivots.len(), 5);
+    }
+
+    /// `BC = 0.7 AB` (inside [0.618,0.786]), `CD = 1.4 BC` (inside
+    /// [1.272,1.618]) — the harmonic `Abcd` shape (no `X`).
+    #[test]
+    fn textbook_harmonic_abcd_is_found_at_expected_pivots() {
+        let kinds = [PivotKind::Low, PivotKind::High, PivotKind::Low, PivotKind::High];
+        let prices = [1000.0, 1100.0, 1030.0, 1128.0];
+        let bars = wave_bars(&kinds, &prices, 3, 0.2);
+
+        let pivots = extract_pivots(&bars, 2);
+        let segments = build_segments(&bars, &pivots);
+        let hits = scan_waves(&pivots, &segments, &[EwaPatternKind::Abcd], 0..bars.len());
+
+        let hit = find_hit(&hits, EwaPatternKind::Abcd).expect("textbook harmonic Abcd must be found");
+        assert_eq!(hit.pivots.len(), 4);
+    }
+
+    /// Each retracement `0.7` of the drive it follows, each drive after the
+    /// first `1.4` of the retracement it follows — both inside
+    /// `ThreeDrives`' own `[0.618,0.786]`/`[1.272,1.618]` bands.
+    #[test]
+    fn textbook_three_drives_is_found_at_expected_pivots() {
+        let kinds = [
+            PivotKind::Low,
+            PivotKind::High,
+            PivotKind::Low,
+            PivotKind::High,
+            PivotKind::Low,
+            PivotKind::High,
+        ];
+        let prices = [1000.0, 1100.0, 1030.0, 1128.0, 1059.4, 1155.44];
+        let bars = wave_bars(&kinds, &prices, 3, 0.2);
+
+        let pivots = extract_pivots(&bars, 2);
+        let segments = build_segments(&bars, &pivots);
+        let hits = scan_waves(&pivots, &segments, &[EwaPatternKind::ThreeDrives], 0..bars.len());
+
+        let hit = find_hit(&hits, EwaPatternKind::ThreeDrives).expect("textbook ThreeDrives must be found");
+        assert_eq!(hit.pivots.len(), 6);
+    }
+
+    #[test]
+    fn harmonic_leg_outside_tolerance_is_dropped_not_penalized() {
+        // Same XABCD shape as the Gartley fixture above, but AB (measured
+        // against the X-A reference) is 0.7 — far outside Gartley's own
+        // exact(0.618) band — so this is a near-miss, not a fib-exact
+        // structure, and must be rejected outright.
+        let kinds = [PivotKind::Low, PivotKind::High, PivotKind::Low, PivotKind::High, PivotKind::Low];
+        let prices = [1000.0, 1100.0, 1030.0, 1075.0, 1015.0];
+        let bars = wave_bars(&kinds, &prices, 3, 0.2);
+
+        let pivots = extract_pivots(&bars, 2);
+        let segments = build_segments(&bars, &pivots);
+        let hits = scan_waves(&pivots, &segments, &[EwaPatternKind::Gartley], 0..bars.len());
+
+        assert!(
+            find_hit(&hits, EwaPatternKind::Gartley).is_none(),
+            "a leg ratio clearly outside its harmonic band must be a HARD drop, not a scored-down hit: {hits:?}"
+        );
+    }
+
     #[test]
     fn perf_smoke_10_000_bars_stays_bounded() {
         let bars: Vec<(f64, f64, f64, f64)> = (0..10_000)
@@ -762,13 +1179,21 @@ mod tests {
             EwaPatternKind::Zigzag,
             EwaPatternKind::Flat,
             EwaPatternKind::Triangle,
+            EwaPatternKind::Gartley,
+            EwaPatternKind::Bat,
+            EwaPatternKind::Butterfly,
+            EwaPatternKind::Crab,
+            EwaPatternKind::Shark,
+            EwaPatternKind::Cypher,
+            EwaPatternKind::Abcd,
+            EwaPatternKind::ThreeDrives,
         ];
         let hits = scan_waves(&pivots, &segments, &kinds, 0..bars.len());
         let elapsed = start_time.elapsed();
 
         assert!(
             elapsed.as_millis() < 1000,
-            "EWA scan over 10,000 bars took {elapsed:?}, expected comfortably under 1s in release"
+            "EWA scan over 10,000 bars (Elliott + harmonic kinds) took {elapsed:?}, expected comfortably under 1s in release"
         );
         // Sanity: a wavy 10,000-bar series should produce at least a
         // handful of pivots and typically some hits, though the assertion
