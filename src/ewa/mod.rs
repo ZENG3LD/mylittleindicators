@@ -42,7 +42,7 @@ pub use grammar::{
 };
 pub use harmonic::{DEFAULT_HARMONIC_TOLERANCE, HarmonicLeg, ratio_matches, targets_for, widen_band};
 pub use primitives::{EwaPrimitiveFamily, EwaPrimitiveSpec, EwaSubdivision, all_ewa_primitives};
-pub use scan::{EwaWaveHit, MAX_PIVOTS_PER_SCAN, scan_waves};
+pub use scan::{EwaWaveHit, MAX_PIVOTS_PER_SCAN, scan_waves, scan_waves_with_harmonic_tolerance};
 pub use swing::{EwaSwingPivot, EwaSwingSegment, PivotKind, build_segments, extract_pivots};
 pub use types::{
     EwaFibRelation, EwaFibRelationKind, EwaPatternKind, EwaRatio, EwaSegment, EwaSegmentDirection,

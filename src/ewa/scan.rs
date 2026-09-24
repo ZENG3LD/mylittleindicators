@@ -94,11 +94,34 @@ pub struct EwaWaveHit {
 ///
 /// An empty `kinds` returns an empty result — asking for nothing is not
 /// shorthand for "every supported kind."
+///
+/// Thin call-through to [`scan_waves_with_harmonic_tolerance`] at
+/// `harmonic_tolerance_delta = 0.0` — today's exact-band behaviour,
+/// byte-identical to every existing caller.
 pub fn scan_waves(
     pivots: &[EwaSwingPivot],
     segments: &[EwaSwingSegment],
     kinds: &[EwaPatternKind],
     completion_range: Range<usize>,
+) -> Vec<EwaWaveHit> {
+    scan_waves_with_harmonic_tolerance(pivots, segments, kinds, completion_range, 0.0)
+}
+
+/// Same contract as [`scan_waves`], plus `harmonic_tolerance_delta`: widens
+/// (or, negative, narrows) every harmonic leg's target band via
+/// `ewa::harmonic::widen_band` before `score_harmonic`'s hard band check —
+/// the SAME widening `XabcdPattern`'s own per-drawing `harmonic_tolerance`
+/// field already applies on the mlc side, so a caller can make
+/// `score_harmonic`'s band check as loose or tight as a per-drawing
+/// `tolerance` setting demands. `0.0` reproduces `ewa::harmonic::targets_for`'s
+/// own unwidened bands exactly. Inert for the non-harmonic kinds this same
+/// call also enumerates (Elliott's `soft_ratio_score` path never reads it).
+pub fn scan_waves_with_harmonic_tolerance(
+    pivots: &[EwaSwingPivot],
+    segments: &[EwaSwingSegment],
+    kinds: &[EwaPatternKind],
+    completion_range: Range<usize>,
+    harmonic_tolerance_delta: f64,
 ) -> Vec<EwaWaveHit> {
     if kinds.is_empty() || pivots.len() < 4 {
         return Vec::new();
@@ -150,17 +173,25 @@ pub fn scan_waves(
                 &scan_segments,
                 &by_start,
                 &completion_range,
+                harmonic_tolerance_delta,
                 truncated,
                 &mut hits,
             ),
-            EwaPatternKind::Abcd => {
-                scan_harmonic_abcd(scan_pivots, &scan_segments, &by_start, &completion_range, truncated, &mut hits)
-            }
+            EwaPatternKind::Abcd => scan_harmonic_abcd(
+                scan_pivots,
+                &scan_segments,
+                &by_start,
+                &completion_range,
+                harmonic_tolerance_delta,
+                truncated,
+                &mut hits,
+            ),
             EwaPatternKind::ThreeDrives => scan_harmonic_three_drives(
                 scan_pivots,
                 &scan_segments,
                 &by_start,
                 &completion_range,
+                harmonic_tolerance_delta,
                 truncated,
                 &mut hits,
             ),
@@ -169,6 +200,7 @@ pub fn scan_waves(
                 &scan_segments,
                 &by_start,
                 &completion_range,
+                harmonic_tolerance_delta,
                 truncated,
                 &mut hits,
             ),
@@ -688,16 +720,22 @@ fn harmonic_leg_fit(ratio: f64, band: &rules::RatioBand) -> f64 {
 }
 
 /// Scores one harmonic candidate: every leg in `harmonic::targets_for(kind)`
-/// must satisfy `harmonic::ratio_matches` (HARD — see module doc) or the
-/// whole candidate is dropped; `score` is the mean per-leg fit quality.
-/// `position_of` maps a table leg's pivot NAME (`"X"`, `"A"`, …) to its
-/// position within the `pivot_count`-pivot window starting at `start`.
+/// must satisfy `harmonic::ratio_matches` (HARD — see module doc), evaluated
+/// against `entry.band` widened by `harmonic_tolerance_delta` (`0.0`
+/// reproduces the table's own unwidened bands exactly), or the whole
+/// candidate is dropped; `score` is the mean per-leg fit quality, measured
+/// against the table's own UNWIDENED band center/half-width (see
+/// `harmonic_leg_fit`) so a wider tolerance never inflates a near-miss's
+/// score, only whether it survives the hard drop at all. `position_of` maps
+/// a table leg's pivot NAME (`"X"`, `"A"`, …) to its position within the
+/// `pivot_count`-pivot window starting at `start`.
 fn score_harmonic(
     kind: EwaPatternKind,
     start: usize,
     pivot_count: usize,
     pivots: &[EwaSwingPivot],
     position_of: fn(&str) -> Option<usize>,
+    harmonic_tolerance_delta: f64,
     truncated: bool,
 ) -> Option<EwaWaveHit> {
     let table = harmonic::targets_for(kind);
@@ -717,7 +755,8 @@ fn score_harmonic(
         let ref_start = price_at(entry.reference.0)?;
         let ref_end = price_at(entry.reference.1)?;
         let ratio = rules::ratio(leg_end - leg_start, ref_end - ref_start)?;
-        if !harmonic::ratio_matches(ratio, entry) {
+        let widened = harmonic::HarmonicLeg { band: harmonic::widen_band(entry.band, harmonic_tolerance_delta), ..*entry };
+        if !harmonic::ratio_matches(ratio, &widened) {
             return None;
         }
         fit_sum += harmonic_leg_fit(ratio, &entry.band);
@@ -743,6 +782,7 @@ fn scan_harmonic_xabcd(
     segments: &[&EwaSwingSegment],
     by_start: &[Option<usize>],
     completion_range: &Range<usize>,
+    harmonic_tolerance_delta: f64,
     truncated: bool,
     out: &mut Vec<EwaWaveHit>,
 ) {
@@ -758,7 +798,7 @@ fn scan_harmonic_xabcd(
         if !alternates(&segs) {
             continue;
         }
-        if let Some(hit) = score_harmonic(kind, start, 5, pivots, xabcd_position, truncated) {
+        if let Some(hit) = score_harmonic(kind, start, 5, pivots, xabcd_position, harmonic_tolerance_delta, truncated) {
             out.push(hit);
         }
     }
@@ -769,6 +809,7 @@ fn scan_harmonic_abcd(
     segments: &[&EwaSwingSegment],
     by_start: &[Option<usize>],
     completion_range: &Range<usize>,
+    harmonic_tolerance_delta: f64,
     truncated: bool,
     out: &mut Vec<EwaWaveHit>,
 ) {
@@ -784,7 +825,9 @@ fn scan_harmonic_abcd(
         if !alternates(&segs) {
             continue;
         }
-        if let Some(hit) = score_harmonic(EwaPatternKind::Abcd, start, 4, pivots, abcd_position, truncated) {
+        if let Some(hit) =
+            score_harmonic(EwaPatternKind::Abcd, start, 4, pivots, abcd_position, harmonic_tolerance_delta, truncated)
+        {
             out.push(hit);
         }
     }
@@ -795,6 +838,7 @@ fn scan_harmonic_three_drives(
     segments: &[&EwaSwingSegment],
     by_start: &[Option<usize>],
     completion_range: &Range<usize>,
+    harmonic_tolerance_delta: f64,
     truncated: bool,
     out: &mut Vec<EwaWaveHit>,
 ) {
@@ -816,8 +860,15 @@ fn scan_harmonic_three_drives(
         if !alternates(&segs) {
             continue;
         }
-        if let Some(hit) = score_harmonic(EwaPatternKind::ThreeDrives, start, 6, pivots, three_drives_position, truncated)
-        {
+        if let Some(hit) = score_harmonic(
+            EwaPatternKind::ThreeDrives,
+            start,
+            6,
+            pivots,
+            three_drives_position,
+            harmonic_tolerance_delta,
+            truncated,
+        ) {
             out.push(hit);
         }
     }
@@ -828,6 +879,7 @@ fn scan_harmonic_five_zero(
     segments: &[&EwaSwingSegment],
     by_start: &[Option<usize>],
     completion_range: &Range<usize>,
+    harmonic_tolerance_delta: f64,
     truncated: bool,
     out: &mut Vec<EwaWaveHit>,
 ) {
@@ -849,7 +901,15 @@ fn scan_harmonic_five_zero(
         if !alternates(&segs) {
             continue;
         }
-        if let Some(hit) = score_harmonic(EwaPatternKind::FiveZero, start, 6, pivots, five_zero_position, truncated) {
+        if let Some(hit) = score_harmonic(
+            EwaPatternKind::FiveZero,
+            start,
+            6,
+            pivots,
+            five_zero_position,
+            harmonic_tolerance_delta,
+            truncated,
+        ) {
             out.push(hit);
         }
     }
@@ -1309,6 +1369,64 @@ mod tests {
         assert!(
             find_hit(&hits, EwaPatternKind::Gartley).is_none(),
             "a leg ratio clearly outside its harmonic band must be a HARD drop, not a scored-down hit: {hits:?}"
+        );
+    }
+
+    /// `AB = 0.628 XA` — just outside Gartley's own `exact(0.618)` band
+    /// (`[0.613, 0.623]`, `DEFAULT_HARMONIC_TOLERANCE = 0.005`) but inside a
+    /// `0.02`-widened one (`[0.598, 0.643]`). `AD` stays exactly on its own
+    /// `exact(0.786)` target (independent of `B`) so only the `AB` leg gates
+    /// this fixture: X=1000, A=1100 (XA=100); AB=62.8 (B=1037.2); BC=43.96
+    /// (ratio 0.7 of AB, C=1081.16); CD=59.76 (ratio ≈1.359 of BC, inside
+    /// [1.13,1.618]); AD=78.6 (D=1021.4, ratio 0.786 exactly).
+    #[test]
+    fn wider_harmonic_tolerance_finds_a_near_miss_the_default_rejects() {
+        let kinds = [PivotKind::Low, PivotKind::High, PivotKind::Low, PivotKind::High, PivotKind::Low];
+        let prices = [1000.0, 1100.0, 1037.2, 1081.16, 1021.4];
+        let bars = wave_bars(&kinds, &prices, 3, 0.2);
+
+        let pivots = extract_pivots(&bars, 2);
+        let segments = build_segments(&bars, &pivots);
+
+        let default_hits = scan_waves(&pivots, &segments, &[EwaPatternKind::Gartley], 0..bars.len());
+        assert!(
+            find_hit(&default_hits, EwaPatternKind::Gartley).is_none(),
+            "AB ratio 0.628 sits outside Gartley's default exact(0.618) band and must be dropped at delta 0.0: {default_hits:?}"
+        );
+
+        let widened_hits =
+            scan_waves_with_harmonic_tolerance(&pivots, &segments, &[EwaPatternKind::Gartley], 0..bars.len(), 0.02);
+        let hit = find_hit(&widened_hits, EwaPatternKind::Gartley)
+            .expect("a 0.02-widened tolerance must find the near-miss Gartley the default rejects");
+        assert_eq!(hit.pivots.len(), 5);
+    }
+
+    /// `AB = 0.622 XA` — inside Gartley's own default `exact(0.618)` band
+    /// (`[0.613, 0.623]`, margin `0.001` from the top edge) but outside a
+    /// `-0.002`-narrowed one (`[0.615, 0.621]`). Same construction as the
+    /// widened-tolerance fixture above: X=1000, A=1100 (XA=100); AB=62.2
+    /// (B=1037.8); BC=43.54 (ratio 0.7 of AB, C=1081.34); CD=59.94 (ratio
+    /// ≈1.3766 of BC, inside [1.13,1.618]); AD=78.6 (D=1021.4, ratio 0.786
+    /// exactly — its own narrowed band `[0.783, 0.789]` still contains it).
+    #[test]
+    fn narrower_harmonic_tolerance_rejects_a_match_the_default_accepts() {
+        let kinds = [PivotKind::Low, PivotKind::High, PivotKind::Low, PivotKind::High, PivotKind::Low];
+        let prices = [1000.0, 1100.0, 1037.8, 1081.34, 1021.4];
+        let bars = wave_bars(&kinds, &prices, 3, 0.2);
+
+        let pivots = extract_pivots(&bars, 2);
+        let segments = build_segments(&bars, &pivots);
+
+        let default_hits = scan_waves(&pivots, &segments, &[EwaPatternKind::Gartley], 0..bars.len());
+        let hit = find_hit(&default_hits, EwaPatternKind::Gartley)
+            .expect("AB ratio 0.622 sits inside Gartley's default exact(0.618) band and must be found at delta 0.0");
+        assert_eq!(hit.pivots.len(), 5);
+
+        let narrowed_hits =
+            scan_waves_with_harmonic_tolerance(&pivots, &segments, &[EwaPatternKind::Gartley], 0..bars.len(), -0.002);
+        assert!(
+            find_hit(&narrowed_hits, EwaPatternKind::Gartley).is_none(),
+            "a -0.002-narrowed tolerance must reject the AB=0.622 Gartley the default accepts: {narrowed_hits:?}"
         );
     }
 
