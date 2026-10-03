@@ -1,5 +1,7 @@
 # mylittleindicators
 
+Pull requests are not accepted. Please open an Issue.
+
 Multi-stream financial indicators library for Rust. **559 bar indicators + 21 event primitives** across 35 categories. Consumes the full surface of [`digdigdig3`](https://github.com/ZENG3LD/digdigdig3) exchange connectors — OHLCV bars, ticks, orderbook (snapshot + delta), funding, mark price, open interest, liquidations, ticker, agg trades, plus 12+ extended stream types (option greeks, basis, index price, settlement, block trades, L3, etc.).
 
 ## What's inside
