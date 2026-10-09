@@ -1,0 +1,17 @@
+# Proc-macro crate for the MLI contract engine. NON-OSS (publish = false) — lives
+# only in the private fork. Owns `contract_universe!`, which generates the
+# box-free `ContractFactory`, the `id -> contract` catalog projections, and the
+# per-family box-free slot-runtime enums from ONE declarative member list.
+[package]
+name = "mli-contract-macros"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }
