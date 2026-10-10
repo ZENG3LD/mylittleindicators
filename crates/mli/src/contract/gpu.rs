@@ -487,6 +487,26 @@ pub enum CubeFormula {
     LargeTickMom = 935,
     /// Event frame (time window): size-weighted directional momentum over `a` ms. UNTESTED on GPU.
     SizeWtMom = 936,
+    /// Composite (smoother chain): Ppo line / signal / histogram. UNTESTED on GPU.
+    PpoCols = 1000,
+    /// Composite (smoother chain): Pvo line / signal / histogram. UNTESTED on GPU.
+    PvoCols = 1001,
+    /// Composite (smoother chain): Trix line / signal. UNTESTED on GPU.
+    TrixCols = 1002,
+    /// Composite (smoother chain): True strength index line / signal / histogram. UNTESTED on GPU.
+    TsiCols = 1003,
+    /// Composite (smoother chain): Know sure thing kst / signal. UNTESTED on GPU.
+    KstCols = 1004,
+    /// Composite (smoother chain): Price momentum oscillator pmo / signal. UNTESTED on GPU.
+    PmoCols = 1005,
+    /// Composite (smoother chain): Klinger volume oscillator line / signal. UNTESTED on GPU.
+    KvoCols = 1006,
+    /// Composite (smoother chain): RSI smoothed by a smoother slot. UNTESTED on GPU.
+    RsiOmaCols = 1007,
+    /// Composite (smoother chain): Detrended price oscillator. UNTESTED on GPU.
+    DpoCols = 1008,
+    /// Composite (smoother chain): Elder ray bull / bear. UNTESTED on GPU.
+    ElderRayCols = 1009,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -564,6 +584,13 @@ pub struct CubeParams {
     pub smoother2: CubeSmoother,
     /// Period of the second smoother. Default is `period`.
     pub smooth_period2: u32,
+    /// Third smoother (signal legs of the composite oscillators). Default `Sma`.
+    pub smoother3: CubeSmoother,
+    /// Period of the third smoother. Default is `period`.
+    pub smooth_period3: u32,
+    /// Extra integer parameters of composite formulas (e.g. KST ROC periods in `0..4` and
+    /// smoother periods in `4..8`). Default zeros.
+    pub ext: [u32; 8],
 }
 
 impl CubeParams {
@@ -587,6 +614,9 @@ impl CubeParams {
             smooth_period: period,
             smoother2: CubeSmoother::Sma,
             smooth_period2: period,
+            smoother3: CubeSmoother::Sma,
+            smooth_period3: period,
+            ext: [0; 8],
         }
     }
 }
@@ -642,6 +672,14 @@ impl CubeFormula {
             CubeFormula::Vortex => 2,
             CubeFormula::Fractals => 2,
             CubeFormula::TradeRun => 2,
+            CubeFormula::PpoCols => 3,
+            CubeFormula::PvoCols => 3,
+            CubeFormula::TrixCols => 2,
+            CubeFormula::TsiCols => 3,
+            CubeFormula::KstCols => 2,
+            CubeFormula::PmoCols => 2,
+            CubeFormula::KvoCols => 2,
+            CubeFormula::ElderRayCols => 2,
             CubeFormula::LiqVolImbalance => 3,
             CubeFormula::LiqCascade | CubeFormula::OiChangeRateEv => 2,
             CubeFormula::StartEndMonth
@@ -899,6 +937,16 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Ppo), Some(CubeFormula::PpoCols));
+        assert_eq!(formula_of(IndicatorId::Pvo), Some(CubeFormula::PvoCols));
+        assert_eq!(formula_of(IndicatorId::Trix), Some(CubeFormula::TrixCols));
+        assert_eq!(formula_of(IndicatorId::Tsi), Some(CubeFormula::TsiCols));
+        assert_eq!(formula_of(IndicatorId::Kst), Some(CubeFormula::KstCols));
+        assert_eq!(formula_of(IndicatorId::Pmo), Some(CubeFormula::PmoCols));
+        assert_eq!(formula_of(IndicatorId::Kvo), Some(CubeFormula::KvoCols));
+        assert_eq!(formula_of(IndicatorId::Rsioma), Some(CubeFormula::RsiOmaCols));
+        assert_eq!(formula_of(IndicatorId::Dpo), Some(CubeFormula::DpoCols));
+        assert_eq!(formula_of(IndicatorId::ElderRay), Some(CubeFormula::ElderRayCols));
         assert_eq!(formula_of(IndicatorId::LiquidationRate), Some(CubeFormula::LiqRate));
         assert_eq!(formula_of(IndicatorId::LiquidationCooldown), Some(CubeFormula::LiqCooldown));
         assert_eq!(formula_of(IndicatorId::LiquidationVolumeVelocity), Some(CubeFormula::LiqVolVelocity));

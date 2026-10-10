@@ -4248,6 +4248,9 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     if formula.code() >= 400 && formula.code() < 500 && formula.output_count() == 1 {
         return launch_cube_smoothed_gx(formula, samples, params);
     }
+    if formula.code() >= 1000 && formula.code() < 1100 {
+        return super::kernels_comp::launch_cube_comp(formula, samples, params).swap_remove(0);
+    }
     if formula.code() >= 830 && formula.code() < 850 {
         return super::kernels_post::launch_cube_barsig(formula, samples, params).swap_remove(0);
     }
@@ -4567,6 +4570,9 @@ pub fn launch_cube_columns(
     if formula.code() >= 600 && formula.code() < 700 {
         return super::kernels_post::launch_cube_post_columns(formula, samples, params);
     }
+    if formula.code() >= 1000 && formula.code() < 1100 {
+        return super::kernels_comp::launch_cube_comp(formula, samples, params);
+    }
     if formula.code() >= 830 && formula.code() < 850 {
         return super::kernels_post::launch_cube_barsig(formula, samples, params);
     }
@@ -4741,6 +4747,58 @@ pub fn launch_cube_timed(
     let bytes = client.read_one_unchecked(output);
     f32::from_bytes(&bytes).to_vec()
 }
+
+/// Run one smoother over an arbitrary series on the device (the smoother passes of the smoothed
+/// formulas, exposed for the composite oscillators). The first `skip` samples are not seen and
+/// their output is 0; `a` / `b` are the ALMA offset and sigma. UNTESTED on GPU.
+pub(crate) fn smooth_series(
+    series: &[f32],
+    smoother: super::gpu::CubeSmoother,
+    period: u32,
+    skip: u32,
+    a: f32,
+    b: f32,
+) -> Vec<f32> {
+    let n = series.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let src = client.create_from_slice(f32::as_bytes(series));
+    let dst = client.empty(n * core::mem::size_of::<f32>());
+    let which = smoother.code();
+    unsafe {
+        if which >= 6u32 {
+            smooth_map_r::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(src, n),
+                BufferArg::from_raw_parts(dst.clone(), n),
+                which,
+                period,
+                skip,
+                a,
+                b,
+            );
+        } else {
+            smooth_map_q::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(src, n),
+                BufferArg::from_raw_parts(dst.clone(), n),
+                which,
+                period,
+                skip,
+            );
+        }
+    }
+    let bytes = client.read_one_unchecked(dst);
+    f32::from_bytes(&bytes).to_vec()
+}
+
 
 // ---------------------------------------------------------------------------
 // gx entries: formulas 200..=299. UNTESTED on GPU (no GPU on the authoring box).
@@ -6724,6 +6782,84 @@ mod tests {
             lo.push(l);
         }
         assert_cols(&run_cols(CubeFormula::RsiPctBands, &bars, p), &[&up, &mid, &lo]);
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): smoother-chain composites 1000..=1009.
+    #[test]
+    fn lane_matches_cpu_comp_batch() {
+        use crate::indicators::momentum::dpo::DetrendedPriceOscillator;
+        use crate::indicators::momentum::elder_ray::ElderRay;
+        use crate::indicators::momentum::kst::KnowSureThing;
+        use crate::indicators::momentum::pmo::Pmo;
+        use crate::indicators::momentum::ppo::Ppo;
+        use crate::indicators::momentum::rsioma::RsiOma;
+        use crate::indicators::momentum::trix::Trix;
+        use crate::indicators::momentum::tsi::TrueStrengthIndex;
+        use crate::indicators::volume::kvo::Kvo;
+        use crate::indicators::volume::pvo::Pvo;
+
+        let bars = bars(160);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let vol: Vec<f64> = bars.iter().map(|b| b.volume).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(5);
+        p.smoother = CubeSmoother::Ema;
+        p.smoother2 = CubeSmoother::Ema;
+        p.smoother3 = CubeSmoother::Ema;
+        p.fast = 5;
+        p.slow = 12;
+        p.signal = 4;
+
+        let mut m = Ppo::from_smoother(SmootherId::Ema, 5, 12, 4);
+        chk(&run_cols(CubeFormula::PpoCols, &bars, p), close.iter().map(|c| { m.feed(*c); vec![m.line(), m.signal(), m.histogram()] }).collect());
+
+        let mut m = Pvo::from_smoothers(SmootherId::Ema, 5, SmootherId::Ema, 12, SmootherId::Ema, 4);
+        chk(&run_cols(CubeFormula::PvoCols, &bars, p), vol.iter().map(|c| { m.feed(*c); vec![m.line(), m.signal(), m.histogram()] }).collect());
+
+        let mut m = Trix::from_smoother(SmootherId::Ema, 5, 4);
+        chk(&run_cols(CubeFormula::TrixCols, &bars, p), close.iter().map(|c| { m.feed(*c); vec![m.line(), m.signal()] }).collect());
+
+        let mut m = TrueStrengthIndex::from_smoother(SmootherId::Ema, 5, 12, 4);
+        chk(&run_cols(CubeFormula::TsiCols, &bars, p), close.iter().map(|c| { m.feed(*c); vec![m.line(), m.signal(), m.histogram()] }).collect());
+
+        let mut kp = p;
+        kp.ext = [4, 6, 8, 10, 3, 3, 3, 4];
+        let mut m = KnowSureThing::from_smoothers([4, 6, 8, 10], [3, 3, 3, 4], 4, [SmootherId::Ema; 4], SmootherId::Ema);
+        chk(&run_cols(CubeFormula::KstCols, &bars, kp), close.iter().map(|c| { m.feed(*c); vec![m.kst(), m.signal()] }).collect());
+
+        let mut pp = p;
+        pp.smooth_period = 5;
+        pp.smooth_period2 = 6;
+        pp.smooth_period3 = 4;
+        let mut m = Pmo::from_smoothers(1, 5, 6, 4, SmootherId::Ema);
+        chk(&run_cols(CubeFormula::PmoCols, &bars, pp), close.iter().map(|c| { m.feed(*c); vec![m.pmo(), m.signal()] }).collect());
+
+        let mut m = Kvo::from_smoothers(SmootherId::Ema, 5, 12, 4);
+        chk(&run_cols(CubeFormula::KvoCols, &bars, p), lanes.iter().map(|l| { m.feed(l); vec![m.line(), m.signal()] }).collect());
+
+        let mut rp = CubeParams::period(6);
+        rp.smoother = CubeSmoother::Ema;
+        rp.smooth_period = 5;
+        let mut m = RsiOma::from_smoother(6, 5, SmootherId::Ema);
+        assert_close(&run(CubeFormula::RsiOmaCols, &bars, rp), &cpu(&close, |v| m.feed(v)));
+
+        let dp = CubeParams::period(10);
+        let mut m = DetrendedPriceOscillator::from_smoother(SmootherId::Sma, 10);
+        assert_close(&run(CubeFormula::DpoCols, &bars, dp), &cpu(&close, |v| m.feed(v)));
+
+        let mut ep = CubeParams::period(7);
+        ep.smoother = CubeSmoother::Ema;
+        ep.smooth_period = 7;
+        let mut m = ElderRay::from_smoother(7, SmootherId::Ema);
+        chk(&run_cols(CubeFormula::ElderRayCols, &bars, ep), lanes.iter().map(|l| { let (a, b) = m.feed(l); vec![a, b] }).collect());
     }
 
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.

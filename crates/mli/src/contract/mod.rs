@@ -706,6 +706,10 @@ pub mod kernels_post;
 #[cfg(feature = "gpu")]
 pub mod kernels_cal;
 
+/// Smoother-chain composites, codes 1000..=1099. UNTESTED on GPU.
+#[cfg(feature = "gpu")]
+pub mod kernels_comp;
+
 /// Event-frame formulas, codes 900..=999. UNTESTED on GPU.
 #[cfg(feature = "gpu")]
 pub mod kernels_ev;
