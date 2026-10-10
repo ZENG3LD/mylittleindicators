@@ -5396,6 +5396,172 @@ fn bar_scan(
                 }
                 v0 = r;
             }
+        } else if formula == 1336u32 {
+            // divergence (lanes: o = host-resolved inner oscillator, h = host-resolved ATR, c = close):
+            // period = swing lookback (>= 2), p2 = compare_swings (2..4), flag bits 1 regular / 2 hidden /
+            // 4 strength / 8 use ATR. Swings (abs idx, price, osc) x4 per side live in scr[0..26].
+            // out: v0 = osc line, v1 = signal (+-2 regular, +-1 hidden), v2 = strength
+            let lb = period as usize;
+            let cs = p2 as usize;
+            let det_reg = (flag & 1u32) != 0u32;
+            let det_hid = (flag & 2u32) != 0u32;
+            let with_str = (flag & 4u32) != 0u32;
+            let use_atr = (flag & 8u32) != 0u32;
+            if t == 0usize {
+                for q in 0..26usize {
+                    scr[q] = 0.0f32;
+                }
+            }
+            let mut sig = 0.0f32;
+            let mut stg = 0.0f32;
+            if t + 1usize >= 2usize * lb + 1usize && t >= 2usize * lb {
+                let abs_idx = t - lb;
+                let center = c[abs_idx];
+                let cosc = o[abs_idx];
+                for sd in 0..2usize {
+                    let mut is_sw = true;
+                    for q in (t - 2usize * lb)..(t + 1usize) {
+                        if q != abs_idx {
+                            if sd == 0usize {
+                                if c[q] >= center {
+                                    is_sw = false;
+                                }
+                            } else if c[q] <= center {
+                                is_sw = false;
+                            }
+                        }
+                    }
+                    if is_sw {
+                        let base = sd * 13usize;
+                        let mut cn = scr[base + 12usize] as usize;
+                        if cn >= 4usize {
+                            for q in 0..9usize {
+                                scr[base + q] = scr[base + q + 3usize];
+                            }
+                            cn = 3usize;
+                        }
+                        scr[base + 3usize * cn] = abs_idx as f32;
+                        scr[base + 3usize * cn + 1usize] = center;
+                        scr[base + 3usize * cn + 2usize] = cosc;
+                        cn = cn + 1usize;
+                        scr[base + 12usize] = cn as f32;
+                        let free = sd == 0usize || sig == 0.0f32;
+                        let mut ns = 0.0f32;
+                        let mut s0 = 0usize;
+                        let mut s1 = 0usize;
+                        if cs <= 2usize {
+                            if cn >= 2usize {
+                                s0 = base + 3usize * (cn - 2usize);
+                                s1 = base + 3usize * (cn - 1usize);
+                                if free {
+                                    if sd == 0usize {
+                                        if det_reg && scr[s1 + 1usize] > scr[s0 + 1usize] && scr[s1 + 2usize] < scr[s0 + 2usize] {
+                                            ns = -2.0f32;
+                                        } else if det_hid && scr[s1 + 1usize] < scr[s0 + 1usize] && scr[s1 + 2usize] > scr[s0 + 2usize] {
+                                            ns = -1.0f32;
+                                        }
+                                    } else if det_reg && scr[s1 + 1usize] < scr[s0 + 1usize] && scr[s1 + 2usize] > scr[s0 + 2usize] {
+                                        ns = 2.0f32;
+                                    } else if det_hid && scr[s1 + 1usize] > scr[s0 + 1usize] && scr[s1 + 2usize] < scr[s0 + 2usize] {
+                                        ns = 1.0f32;
+                                    }
+                                }
+                            }
+                        } else if det_reg && free && cn >= cs {
+                            // slope of the last `cs` swings (x = 0..cs)
+                            let nf = cs as f32;
+                            let mut sx = 0.0f32;
+                            let mut sx2 = 0.0f32;
+                            let mut syp = 0.0f32;
+                            let mut sxyp = 0.0f32;
+                            let mut syo = 0.0f32;
+                            let mut sxyo = 0.0f32;
+                            for q in 0..cs {
+                                let sw = base + 3usize * (cn - cs + q);
+                                let xf = q as f32;
+                                sx = sx + xf;
+                                sx2 = sx2 + xf * xf;
+                                syp = syp + scr[sw + 1usize];
+                                sxyp = sxyp + xf * scr[sw + 1usize];
+                                syo = syo + scr[sw + 2usize];
+                                sxyo = sxyo + xf * scr[sw + 2usize];
+                            }
+                            let den = nf * sx2 - sx * sx;
+                            let mut sl_p = 0.0f32;
+                            let mut sl_o = 0.0f32;
+                            if den.abs() >= 1.0e-12f32 {
+                                sl_p = (nf * sxyp - sx * syp) / den;
+                                sl_o = (nf * sxyo - sx * syo) / den;
+                            }
+                            if sl_p < 0.0f32 && sl_o > 0.0f32 {
+                                ns = 2.0f32;
+                            } else if sl_p > 0.0f32 && sl_o < 0.0f32 {
+                                ns = -2.0f32;
+                            }
+                            if cn >= 2usize {
+                                s0 = base + 3usize * (cn - 2usize);
+                                s1 = base + 3usize * (cn - 1usize);
+                            }
+                        }
+                        if ns != 0.0f32 {
+                            sig = ns;
+                            if with_str && cn >= 2usize {
+                                // strength of the last two swings
+                                let i0 = scr[s0] as usize;
+                                let i1 = scr[s1] as usize;
+                                let cnt = t + 1usize;
+                                let mut blen = cnt;
+                                if blen > 512usize {
+                                    blen = 512usize;
+                                }
+                                let oldest = cnt - blen;
+                                if i0 >= oldest && i1 >= oldest && i0 <= i1 {
+                                    let mut pmax = c[i0];
+                                    let mut pmin = c[i0];
+                                    let mut omax = o[i0];
+                                    let mut omin = o[i0];
+                                    let mut psum = 0.0f32;
+                                    for q in i0..(i1 + 1usize) {
+                                        pmax = pmax.max(c[q]);
+                                        pmin = pmin.min(c[q]);
+                                        omax = omax.max(o[q]);
+                                        omin = omin.min(o[q]);
+                                        psum = psum + c[q];
+                                    }
+                                    let pmean = psum / ((i1 + 1usize - i0) as f32);
+                                    let prng = pmax - pmin;
+                                    let orng = omax - omin;
+                                    let dosc = (scr[s1 + 2usize] - scr[s0 + 2usize]).abs();
+                                    let dpr = (scr[s1 + 1usize] - scr[s0 + 1usize]).abs();
+                                    let mut onorm = 0.0f32;
+                                    if orng > 1.0e-9f32 {
+                                        onorm = dosc / orng;
+                                    }
+                                    let mut pnorm = 0.0f32;
+                                    if prng > 1.0e-9f32 {
+                                        pnorm = dpr / prng;
+                                    }
+                                    let mut ang = 0.0f32;
+                                    if pnorm > 1.0e-9f32 {
+                                        ang = (onorm / pnorm).min(1.0f32);
+                                    }
+                                    let mut sq = 0.0f32;
+                                    if use_atr && h[t] > 1.0e-9f32 {
+                                        sq = ((scr[s1 + 1usize] - pmean).abs() / h[t]).min(1.0f32);
+                                    }
+                                    let dist = (i1 - i0) as f32;
+                                    let dz = (dist - 10.0f32) / 5.0f32;
+                                    let ds = (0.0f32 - dz * dz).exp();
+                                    stg = (0.4f32 * ang + 0.3f32 * sq + 0.3f32 * ds).max(0.0f32).min(1.0f32);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            v0 = o[t];
+            v1 = sig;
+            v2 = stg;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -5868,6 +6034,20 @@ fn launch_cube_bar_x(
         let k = flat[0..n].to_vec();
         let d = smooth_series(&k, params.smoother, params.signal.max(1), 0, params.a, params.b);
         return vec![k, d];
+    }
+    if formula == CubeFormula::DivergenceBar {
+        // period = swing lookback, fast = inner oscillator period, slow = oscillator kind (0 Rsi, 1 Cmo, 2 Psl,
+        // 3 Bias), signal = ATR period, smoother = ATR smoother, ext[0] = compare_swings, flag bits 1 regular /
+        // 2 hidden / 4 strength / 8 use ATR
+        let osc = osc_series(samples, params, params.slow, params.fast);
+        let atr = if params.flag & 8 != 0 {
+            super::kernels_comp::atr_series(samples, params, params.smoother, params.signal.max(1), 0)
+        } else {
+            vec![0.0; n]
+        };
+        let p = CubeParams { period: params.period.max(2), fast: (params.ext[0].max(2)).min(4), ..params };
+        let flat = bar_run(formula.code(), [&osc, &atr, &l, &c, &v], p, params.flag);
+        return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec(), flat[2 * n..3 * n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

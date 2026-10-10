@@ -233,7 +233,7 @@ mli_contract_macros::contract_universe! {
         DirDetect:       Field       : _ +cube(dir_detect)             => crate::indicators::signal_logic::direction_detector::DirectionDetector,
         NbarPivot:       Field       : _ +cube(nbar_pivot_sig)             => crate::indicators::structure::pivot::Pivot,
         VolEvent:        Fields      : _ +cube(vol_event_sig)             => crate::indicators::volume::volume_event::VolumeEventDetector,
-        Divergence:      Fields      : _             => crate::indicators::divergence::divergence::Divergence { line signal strength },
+        Divergence:      Fields      : _ +cube(comp_divergence_bar) => crate::indicators::divergence::divergence::Divergence { line signal strength },
         Confluence:      Fields      : _ +cube(comp_confluence_bar) => crate::indicators::composites::confluence::Confluence,
         OscVolWeight:    Fields      : _ +cube(comp_oscvolw_bar) => crate::indicators::composites::oscillator_with_volume_weight::OscillatorWithVolumeWeight { line signal strength },
         RelPosition:     Fields      : _ +cube(rel_position_sig)             => crate::indicators::regime::relative_position::RelativePosition,

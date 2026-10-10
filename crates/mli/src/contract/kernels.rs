@@ -10076,6 +10076,45 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Divergence (1336).
+    #[test]
+    fn lane_matches_cpu_bar_batch50() {
+        use crate::indicators::divergence::divergence::Divergence;
+        use crate::engine::contract_engine::{OscillatorSlotOrder as O, SmootherId};
+        use crate::indicators::average::moving_average::PeriodConfig as P;
+        use crate::indicators::volatility::atr::Atr;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let run = |lb: u32, cs: u32, flag: u32, period: u32| -> Vec<Vec<f32>> {
+            let mut p = CubeParams::period(lb);
+            p.fast = period;
+            p.slow = 0;
+            p.signal = 10;
+            p.smoother = CubeSmoother::Rma;
+            p.ext[0] = cs;
+            p.flag = flag;
+            run_cols(CubeFormula::DivergenceBar, &bars, p)
+        };
+        for (lb, cs, reg, hid, st, atr_on) in [(3usize, 2usize, true, true, true, true), (4, 2, true, false, true, false), (3, 3, true, true, true, true), (2, 4, true, false, false, false)] {
+            let flag = (reg as u32) | ((hid as u32) << 1) | ((st as u32) << 2) | ((atr_on as u32) << 3);
+            let atr = if atr_on { Some(Atr::from_smoother(10, SmootherId::Rma)) } else { None };
+            let mut m = Divergence::with_compare_swings(O::Rsi(P { period: 8 }).into_slot(), lb, reg, hid, st, atr, cs);
+            chk(&run(lb as u32, cs as u32, flag, 8), bars.iter().map(|b| { m.feed(&[b.open, b.high, b.low, b.close, b.volume]); vec![m.line(), m.signal(), m.strength()] }).collect());
+        }
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

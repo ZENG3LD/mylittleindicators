@@ -789,6 +789,8 @@ pub enum CubeFormula {
     MarketMicroBk = 1404,
     /// Composite: candle pattern. UNTESTED on GPU.
     CandlePatternBar = 1335,
+    /// Composite: divergence. UNTESTED on GPU.
+    DivergenceBar = 1336,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1301,6 +1303,7 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::DivergenceBar => 3,
             CubeFormula::XmilBar => 5,
             CubeFormula::OscVolWeightBar => 3,
             CubeFormula::FuzzyBar => 5,
@@ -1654,6 +1657,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Rc), Some(CubeFormula::RcBar));
         assert_eq!(formula_of(IndicatorId::ChaosOsc), Some(CubeFormula::ChaosOscBar));
         assert_eq!(formula_of(IndicatorId::CandlePattern), Some(CubeFormula::CandlePatternBar));
+        assert_eq!(formula_of(IndicatorId::Divergence), Some(CubeFormula::DivergenceBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
