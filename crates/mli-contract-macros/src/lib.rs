@@ -228,6 +228,18 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "envbw" => "Envbw",
         "ac" => "Ac",
         "williams_mfi" => "WilliamsMfi",
+        "vfi" => "Vfi",
+        "vzo" => "Vzo",
+        "intraday_pct" => "IntradayPct",
+        "intraday_ratio" => "IntradayRatio",
+        "donchian_pos" => "DonchianPos",
+        "donchian_width" => "DonchianWidth",
+        "price_channel_osc" => "PriceChannelOsc",
+        "price_channel_width" => "PriceChannelWidth",
+        "er_full" => "ErFull",
+        "er_ring" => "ErRing",
+        "r_squared" => "RSquared",
+        "vwap_distance" => "VwapDistance",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

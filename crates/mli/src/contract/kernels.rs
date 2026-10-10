@@ -2506,6 +2506,384 @@ fn bar_map_h(
     bar_scan_h(high, low, volume, output, formula);
 }
 
+/// Bar formulas 74 through 79. High, low, close, volume only.
+/// 74 Vfi, 75 Vzo, 76 intraday intensity percent, 77 intraday intensity ratio,
+/// 78 Donchian position, 79 Donchian width. `period` is the window.
+#[cube]
+fn bar_scan_i(
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    period: u32,
+    formula: u32,
+) {
+    let n = high.len();
+    let mut p = period as usize;
+    if p < 1 {
+        p = 1;
+    }
+    if formula == 74u32 {
+        let pf = p as f32;
+        let mut sum_flow = 0.0f32;
+        let mut sum_vol = 0.0f32;
+        for i in 0..n {
+            let tp = (high[i] + low[i] + close[i]) / 3.0f32;
+            sum_flow = sum_flow + (tp * volume[i] - sum_flow / pf);
+            sum_vol = sum_vol + (volume[i] - sum_vol / pf);
+            let mut av = sum_vol;
+            if av < 0.0f32 {
+                av = -av;
+            }
+            if av > 1.0e-12f32 {
+                output[i] = sum_flow / sum_vol;
+            } else {
+                output[i] = 0.0f32;
+            }
+        }
+    } else if formula == 75u32 {
+        if p < 2 {
+            p = 2;
+        }
+        if p > 1024 {
+            p = 1024;
+        }
+        for i in 0..n {
+            let mut cnt = i + 1;
+            if cnt > p {
+                cnt = p;
+            }
+            let start = i + 1 - cnt;
+            let mut sp = 0.0f32;
+            let mut sn = 0.0f32;
+            for k in 0..cnt {
+                let idx = start + k;
+                let mut upf = 1.0f32;
+                if idx > 0 {
+                    if close[idx] < close[idx - 1] {
+                        upf = 0.0f32;
+                    }
+                }
+                if upf > 0.5f32 {
+                    sp = sp + volume[idx];
+                } else {
+                    sn = sn + volume[idx];
+                }
+            }
+            let mut denom = sp + sn;
+            if denom < 0.0f32 {
+                denom = -denom;
+            }
+            if denom < 1.0e-9f32 {
+                denom = 1.0e-9f32;
+            }
+            output[i] = 100.0f32 * (sp - sn) / denom;
+        }
+    } else if formula == 76u32 {
+        for i in 0..n {
+            let mut denom = high[i] - low[i];
+            if denom < 0.0f32 {
+                denom = -denom;
+            }
+            if denom < 1.0e-9f32 {
+                denom = 1.0e-9f32;
+            }
+            output[i] = ((2.0f32 * close[i] - high[i] - low[i]) / denom) * volume[i];
+        }
+    } else if formula == 77u32 {
+        let alpha = 1.0f32 / (p as f32);
+        let mut acc = 0.0f32;
+        for i in 0..n {
+            let mut denom = high[i] - low[i];
+            if denom < 0.0f32 {
+                denom = -denom;
+            }
+            if denom < 1.0e-9f32 {
+                denom = 1.0e-9f32;
+            }
+            let iip = ((2.0f32 * close[i] - high[i] - low[i]) / denom) * volume[i];
+            acc = (1.0f32 - alpha) * acc + alpha * iip;
+            if acc > 1.0e9f32 {
+                acc = 1.0e9f32;
+            }
+            if acc < -1.0e9f32 {
+                acc = -1.0e9f32;
+            }
+            output[i] = acc;
+        }
+    } else if formula == 78u32 || formula == 79u32 {
+        if p < 2 {
+            p = 2;
+        }
+        for i in 0..n {
+            let mut res = 0.0f32;
+            if formula == 78u32 {
+                res = 0.5f32;
+            }
+            if i + 1 >= p {
+                let start = i + 1 - p;
+                let mut hh = high[start];
+                let mut ll = low[start];
+                for k in 0..p {
+                    if high[start + k] > hh {
+                        hh = high[start + k];
+                    }
+                    if low[start + k] < ll {
+                        ll = low[start + k];
+                    }
+                }
+                let mut width = hh - ll;
+                if formula == 79u32 {
+                    res = width;
+                } else {
+                    if width < 0.0f32 {
+                        width = 0.0f32;
+                    }
+                    if width > 0.0f32 {
+                        res = (close[i] - ll) / width;
+                    }
+                }
+            }
+            output[i] = res;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_i(
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    period: u32,
+    formula: u32,
+) {
+    bar_scan_i(high, low, close, volume, output, period, formula);
+}
+
+/// Bar formulas 80 through 85. 80 price channel oscillator, 81 price channel
+/// width, 82 efficiency ratio over the full history, 83 efficiency ratio over a
+/// ring window, 84 R-squared (ring-slot x axis, as the feed), 85 VWAP distance.
+#[cube]
+fn bar_scan_j(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    formula: u32,
+) {
+    let n = open.len();
+    let mut p = period as usize;
+    if p < 1 {
+        p = 1;
+    }
+    if formula == 80u32 || formula == 81u32 {
+        if p < 2 {
+            p = 2;
+        }
+        if p > 512 {
+            p = 512;
+        }
+        for i in 0..n {
+            let mut cnt = i + 1;
+            if cnt > p {
+                cnt = p;
+            }
+            let start = i + 1 - cnt;
+            let mut hh = high[start];
+            let mut ll = low[start];
+            for k in 0..cnt {
+                if high[start + k] > hh {
+                    hh = high[start + k];
+                }
+                if low[start + k] < ll {
+                    ll = low[start + k];
+                }
+            }
+            if formula == 81u32 {
+                output[i] = hh - ll;
+            } else {
+                let mut pos = 0.5f32;
+                if i + 1 >= p {
+                    if hh != ll {
+                        pos = (close[i] - ll) / (hh - ll);
+                        if pos < 0.0f32 {
+                            pos = 0.0f32;
+                        }
+                        if pos > 1.0f32 {
+                            pos = 1.0f32;
+                        }
+                    }
+                }
+                output[i] = 2.0f32 * pos - 1.0f32;
+            }
+        }
+    } else if formula == 82u32 {
+        let mut sum = 0.0f32;
+        let first = fld(open, high, low, close, volume, 0, lane);
+        let mut prev = first;
+        for i in 0..n {
+            let x = fld(open, high, low, close, volume, i, lane);
+            if i == 0 {
+                output[i] = 0.0f32;
+            } else {
+                let mut d = x - prev;
+                if d < 0.0f32 {
+                    d = -d;
+                }
+                sum = sum + d;
+                let mut net = x - first;
+                if net < 0.0f32 {
+                    net = -net;
+                }
+                if sum == 0.0f32 {
+                    output[i] = 0.0f32;
+                } else {
+                    output[i] = net / sum;
+                }
+            }
+            prev = x;
+        }
+    } else if formula == 83u32 {
+        if p < 2 {
+            p = 2;
+        }
+        for i in 0..n {
+            if i == 0 {
+                output[i] = 0.0f32;
+            } else {
+                let mut cnt = i + 1;
+                if cnt > p {
+                    cnt = p;
+                }
+                let start = i + 1 - cnt;
+                let mut sum = 0.0f32;
+                for k in 1..cnt {
+                    let mut d = fld(open, high, low, close, volume, start + k, lane)
+                        - fld(open, high, low, close, volume, start + k - 1, lane);
+                    if d < 0.0f32 {
+                        d = -d;
+                    }
+                    sum = sum + d;
+                }
+                let mut net = fld(open, high, low, close, volume, i, lane)
+                    - fld(open, high, low, close, volume, start, lane);
+                if net < 0.0f32 {
+                    net = -net;
+                }
+                if sum == 0.0f32 {
+                    output[i] = 0.0f32;
+                } else {
+                    output[i] = net / sum;
+                }
+            }
+        }
+    } else if formula == 84u32 {
+        if p < 5 {
+            p = 5;
+        }
+        if p > 1024 {
+            p = 1024;
+        }
+        let wf = p as f32;
+        let mx = (wf - 1.0f32) / 2.0f32;
+        let mut sxx = 0.0f32;
+        for j in 0..p {
+            let dx = (j as f32) - mx;
+            sxx = sxx + dx * dx;
+        }
+        let mut r = 0usize;
+        let mut last = 0.0f32;
+        for i in 0..n {
+            if i + 1 >= p {
+                let mut my = 0.0f32;
+                for j in 0..p {
+                    let mut t = i;
+                    if j <= r {
+                        t = i - (r - j);
+                    } else {
+                        t = i - (r + p - j);
+                    }
+                    my = my + fld(open, high, low, close, volume, t, lane);
+                }
+                my = my / wf;
+                let mut syy = 0.0f32;
+                let mut sxy = 0.0f32;
+                for j in 0..p {
+                    let mut t = i;
+                    if j <= r {
+                        t = i - (r - j);
+                    } else {
+                        t = i - (r + p - j);
+                    }
+                    let dy = fld(open, high, low, close, volume, t, lane) - my;
+                    syy = syy + dy * dy;
+                    sxy = sxy + ((j as f32) - mx) * dy;
+                }
+                if wf * wf * sxx * syy > 1.0e-12f32 {
+                    last = sxy * sxy / (sxx * syy);
+                } else {
+                    last = 0.0f32;
+                }
+            }
+            output[i] = last;
+            r = r + 1;
+            if r == p {
+                r = 0;
+            }
+        }
+    } else if formula == 85u32 {
+        let mut y = 0.0f32;
+        for i in 0..n {
+            let mut cnt = i + 1;
+            if cnt > p {
+                cnt = p;
+            }
+            let start = i + 1 - cnt;
+            let mut sp = 0.0f32;
+            let mut sv = 0.0f32;
+            for k in 0..cnt {
+                let typical = (high[start + k] + low[start + k] + close[start + k]) / 3.0f32;
+                sp = sp + typical * volume[start + k];
+                sv = sv + volume[start + k];
+            }
+            if sv > 0.0f32 {
+                y = sp / sv;
+            }
+            let mut ay = y;
+            if ay < 0.0f32 {
+                ay = -ay;
+            }
+            if ay > 1.0e-12f32 {
+                output[i] = (close[i] - y) / y;
+            } else {
+                output[i] = 0.0f32;
+            }
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_j(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    formula: u32,
+) {
+    bar_scan_j(open, high, low, close, volume, output, lane, period, formula);
+}
+
 #[cube(launch_unchecked)]
 fn lane_map(
     open: &[f32],
@@ -2670,7 +3048,35 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     let cubes = (n as u32).div_ceil(dim);
     let book_len = c.bid_px.len();
     unsafe {
-        if formula.code() >= 72 {
+        if formula.code() >= 80 {
+            bar_map_j::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(open_b, n),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(volume_b, n),
+                BufferArg::from_raw_parts(output.clone(), n),
+                params.lane.code(),
+                params.period,
+                formula.code(),
+            );
+        } else if formula.code() >= 74 {
+            bar_map_i::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(volume_b, n),
+                BufferArg::from_raw_parts(output.clone(), n),
+                params.period,
+                formula.code(),
+            );
+        } else if formula.code() >= 72 {
             bar_map_h::launch_unchecked(
                 &client,
                 CubeCount::new_1d(1),
@@ -2838,6 +3244,18 @@ mod tests {
     use super::*;
     use crate::engine::ohlcv_field::OhlcvField;
     use crate::indicators::accumulation::accumulation_distribution::AccumulationDistribution;
+    use crate::indicators::channels::price_channel_oscillator::PriceChannelOscillator;
+    use crate::indicators::channels::price_channel_width::PriceChannelWidth;
+    use crate::indicators::ratio::efficiency_ratio::EfficiencyRatioFullHistory;
+    use crate::indicators::ratio::efficiency_ratio_ring::EfficiencyRatioRingWindow;
+    use crate::indicators::regression::r_squared::RSquared;
+    use crate::indicators::levels::vwap_distance::VwapDistance;
+    use crate::indicators::volume::vfi::Vfi;
+    use crate::indicators::volume::vzo::Vzo;
+    use crate::indicators::accumulation::intraday_intensity_percent::IntradayIntensityPercent;
+    use crate::indicators::accumulation::intraday_intensity_ratio::IntradayIntensityRatio;
+    use crate::indicators::channels::donchian_position::DonchianPosition;
+    use crate::indicators::channels::donchian_width::DonchianWidth;
     use crate::indicators::average::alma::Alma;
     use crate::indicators::average::dema::Dema;
     use crate::indicators::average::ema::Ema;
@@ -4014,6 +4432,103 @@ mod tests {
         assert_close(
             &run(CubeFormula::WilliamsMfi, &bars, CubeParams::period(1)),
             &cpu_wmfi,
+        );
+
+        // UNTESTED on GPU (no GPU on the authoring box): batch I, codes 74..=79.
+        let mut vfi = Vfi::new(wper);
+        let cpu_vfi: Vec<f64> = bars
+            .iter()
+            .map(|b| vfi.feed(&[b.high, b.low, b.close, b.volume]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::Vfi, &bars, CubeParams::period(wper as u32)),
+            &cpu_vfi,
+        );
+        let mut vzo = Vzo::new(wper);
+        let cpu_vzo: Vec<f64> = bars.iter().map(|b| vzo.feed(&[b.close, b.volume])).collect();
+        assert_close(
+            &run(CubeFormula::Vzo, &bars, CubeParams::period(wper as u32)),
+            &cpu_vzo,
+        );
+        let mut iip = IntradayIntensityPercent::new();
+        let cpu_iip: Vec<f64> = bars
+            .iter()
+            .map(|b| iip.feed(&[b.high, b.low, b.close, b.volume]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::IntradayPct, &bars, CubeParams::period(1)),
+            &cpu_iip,
+        );
+        let mut iir = IntradayIntensityRatio::new(wper);
+        let cpu_iir: Vec<f64> = bars
+            .iter()
+            .map(|b| iir.feed(&[b.high, b.low, b.close, b.volume]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::IntradayRatio, &bars, CubeParams::period(wper as u32)),
+            &cpu_iir,
+        );
+        let mut dcpos = DonchianPosition::new(wper);
+        let cpu_dcpos: Vec<f64> = bars
+            .iter()
+            .map(|b| dcpos.feed(&[b.high, b.low, b.close]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::DonchianPos, &bars, CubeParams::period(wper as u32)),
+            &cpu_dcpos,
+        );
+        let mut dcw = DonchianWidth::new(wper);
+        let cpu_dcw: Vec<f64> = bars.iter().map(|b| dcw.feed(&[b.high, b.low])).collect();
+        assert_close(
+            &run(CubeFormula::DonchianWidth, &bars, CubeParams::period(wper as u32)),
+            &cpu_dcw,
+        );
+
+        // UNTESTED on GPU (no GPU on the authoring box): batch J, codes 80..=85.
+        let mut pcho = PriceChannelOscillator::new(wper);
+        let cpu_pcho: Vec<f64> = bars
+            .iter()
+            .map(|b| pcho.feed(&[b.high, b.low, b.close]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::PriceChannelOsc, &bars, CubeParams::period(wper as u32)),
+            &cpu_pcho,
+        );
+        let mut pchw = PriceChannelWidth::new(wper);
+        let cpu_pchw: Vec<f64> = bars
+            .iter()
+            .map(|b| pchw.feed(&[b.high, b.low]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::PriceChannelWidth, &bars, CubeParams::period(wper as u32)),
+            &cpu_pchw,
+        );
+        let mut er_full = EfficiencyRatioFullHistory::new(wper);
+        let cpu_er_full: Vec<f64> = bars.iter().map(|b| er_full.feed(b.close)).collect();
+        assert_close(
+            &run(CubeFormula::ErFull, &bars, CubeParams::period(wper as u32)),
+            &cpu_er_full,
+        );
+        let mut er_ring = EfficiencyRatioRingWindow::new(wper);
+        let cpu_er_ring: Vec<f64> = bars.iter().map(|b| er_ring.feed(b.close)).collect();
+        assert_close(
+            &run(CubeFormula::ErRing, &bars, CubeParams::period(wper as u32)),
+            &cpu_er_ring,
+        );
+        let mut r2 = RSquared::new(wper);
+        let cpu_r2: Vec<f64> = bars.iter().map(|b| r2.feed(b.close)).collect();
+        assert_close(
+            &run(CubeFormula::RSquared, &bars, CubeParams::period(wper as u32)),
+            &cpu_r2,
+        );
+        let mut vdist = VwapDistance::new(wper);
+        let cpu_vdist: Vec<f64> = bars
+            .iter()
+            .map(|b| vdist.feed(&[b.high, b.low, b.close, b.volume]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::VwapDistance, &bars, CubeParams::period(wper as u32)),
+            &cpu_vdist,
         );
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());

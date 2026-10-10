@@ -207,6 +207,30 @@ pub enum CubeFormula {
     Ac = 72,
     /// Williams market facilitation index. `(high - low) / volume`, or 0 when volume is not positive.
     WilliamsMfi = 73,
+    /// Volume flow indicator. Wilder-style decayed sums of typical-price flow and volume, `sum_flow / sum_vol`. Zero when the volume sum is ~0.
+    Vfi = 74,
+    /// Volume zone oscillator. `100 * (up_vol - down_vol) / max(|sum|, 1e-9)` over the last `period` bars; the first bar counts as up. `period` is clamped to 2..=1024.
+    Vzo = 75,
+    /// Intraday intensity percent of this bar: `((2c - h - l) / max(|h - l|, 1e-9)) * volume`.
+    IntradayPct = 76,
+    /// Intraday intensity ratio. Seed-0 EMA (alpha `1 / period`) of the intraday intensity, clamped to +-1e9.
+    IntradayRatio = 77,
+    /// Donchian position of the close in the high/low channel. `0.5` until `period` bars (at least 2) or when the width is 0.
+    DonchianPos = 78,
+    /// Donchian width, `highest high - lowest low`. Zero until `period` bars (at least 2).
+    DonchianWidth = 79,
+    /// Price channel oscillator `2 * pos - 1`. `pos` is the close inside the partial-window high/low channel (`period` clamped to 2..=512). `0.5` until the window is full or when the channel is flat.
+    PriceChannelOsc = 80,
+    /// Price channel width: partial-window highest high minus lowest low (`period` clamped to 2..=512).
+    PriceChannelWidth = 81,
+    /// Efficiency ratio over the whole history: `|x - x0| / sum|dx|`. Zero on the first sample and when the path length is 0. Period is ignored.
+    ErFull = 82,
+    /// Efficiency ratio over a ring window of `period` samples (at least 2), partial from bar 0. Zero on the first sample.
+    ErRing = 83,
+    /// R-squared of the lane against the ring-slot index (as `RSquared::feed`, slots follow the ring, not time). Zero until `period` samples. `period` clamped to 5..=1024.
+    RSquared = 84,
+    /// `(close - rolling VWAP) / VWAP` with the same rolling VWAP as [`CubeFormula::Vwap`]. Zero when the VWAP is ~0.
+    VwapDistance = 85,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -376,6 +400,18 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Envbw), Some(CubeFormula::Envbw));
         assert_eq!(formula_of(IndicatorId::Ac), Some(CubeFormula::Ac));
         assert_eq!(formula_of(IndicatorId::WilliamsMfi), Some(CubeFormula::WilliamsMfi));
+        assert_eq!(formula_of(IndicatorId::Vfi), Some(CubeFormula::Vfi));
+        assert_eq!(formula_of(IndicatorId::Vzo), Some(CubeFormula::Vzo));
+        assert_eq!(formula_of(IndicatorId::Iip), Some(CubeFormula::IntradayPct));
+        assert_eq!(formula_of(IndicatorId::Iir), Some(CubeFormula::IntradayRatio));
+        assert_eq!(formula_of(IndicatorId::Dcpos), Some(CubeFormula::DonchianPos));
+        assert_eq!(formula_of(IndicatorId::Dcwidth), Some(CubeFormula::DonchianWidth));
+        assert_eq!(formula_of(IndicatorId::Pchosc), Some(CubeFormula::PriceChannelOsc));
+        assert_eq!(formula_of(IndicatorId::Pchwidth), Some(CubeFormula::PriceChannelWidth));
+        assert_eq!(formula_of(IndicatorId::Er), Some(CubeFormula::ErFull));
+        assert_eq!(formula_of(IndicatorId::ErRing), Some(CubeFormula::ErRing));
+        assert_eq!(formula_of(IndicatorId::RSquared), Some(CubeFormula::RSquared));
+        assert_eq!(formula_of(IndicatorId::VwapDist), Some(CubeFormula::VwapDistance));
     }
 
     #[cfg(feature = "gpu-shader")]
