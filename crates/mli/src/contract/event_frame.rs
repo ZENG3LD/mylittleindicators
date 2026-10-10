@@ -432,3 +432,67 @@ impl GpuEventFrame {
         Self::from_rows(&r)
     }
 }
+
+/// One input stream of a merged (as-of joined) frame: `width` values per event.
+#[derive(Debug, Clone, Default)]
+pub struct MergedStream {
+    pub width: usize,
+    pub events: Vec<(i64, Vec<f64>)>,
+}
+
+impl MergedStream {
+    /// Build from any slice: `ts` gives the event time in ms, `vals` its `width` values.
+    pub fn from_fn<T>(
+        items: &[T],
+        width: usize,
+        ts: impl Fn(&T) -> i64,
+        vals: impl Fn(&T) -> Vec<f64>,
+    ) -> Self {
+        MergedStream {
+            width,
+            events: items.iter().map(|t| (ts(t), vals(t))).collect(),
+        }
+    }
+
+    /// One value per event, e.g. `MergedStream::scalar(&funding, |f| f.timestamp, |f| f.rate)`.
+    pub fn scalar<T>(items: &[T], ts: impl Fn(&T) -> i64, v: impl Fn(&T) -> f64) -> Self {
+        Self::from_fn(items, 1, ts, |t| vec![v(t)])
+    }
+}
+
+impl GpuEventFrame {
+    /// As-of join of several streams on the host, the layout of the multi-stream rows (codes
+    /// 1070..). One frame row per input event, ordered by time (ties: stream order, then input
+    /// order). Stream `s` owns `width_s` consecutive columns, assigned in stream order (at most
+    /// [`EVENT_COLS`] in total); they hold that stream's LATEST values (`0.0` before its first
+    /// event). `side` is the 1-based index of the stream that produced the row, so a kernel
+    /// knows which consumer fired. `ts` is ms from the first row. Per-formula slot order is
+    /// documented on the formulas (it is the `Multi[..]` order of the manifest row).
+    pub fn merged(streams: &[MergedStream]) -> Self {
+        let mut offs = Vec::with_capacity(streams.len());
+        let mut tot = 0usize;
+        for s in streams {
+            offs.push(tot);
+            tot += s.width;
+        }
+        assert!(tot <= EVENT_COLS, "merged frame holds at most {EVENT_COLS} columns");
+        let mut ev: Vec<(i64, usize, usize)> = Vec::new();
+        for (si, s) in streams.iter().enumerate() {
+            for (k, e) in s.events.iter().enumerate() {
+                ev.push((e.0, si, k));
+            }
+        }
+        ev.sort_by(|a, b| (a.0, a.1, a.2).cmp(&(b.0, b.1, b.2)));
+        let mut cur = [0.0f64; EVENT_COLS];
+        let rows: Vec<([f64; EVENT_COLS], f32, i64)> = ev
+            .iter()
+            .map(|&(t, si, k)| {
+                for (c, v) in streams[si].events[k].1.iter().enumerate().take(streams[si].width) {
+                    cur[offs[si] + c] = *v;
+                }
+                (cur, (si + 1) as f32, t)
+            })
+            .collect();
+        Self::from_rows(&rows)
+    }
+}

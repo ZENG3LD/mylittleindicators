@@ -693,7 +693,7 @@ pub use gpu_sample::{GpuColumns, GpuLevel, GpuSample, GpuTimes};
 
 pub mod event_frame;
 pub mod book_frame;
-pub use event_frame::{GpuEventFrame, EVENT_COLS};
+pub use event_frame::{GpuEventFrame, MergedStream, EVENT_COLS};
 
 #[cfg(feature = "gpu")]
 pub mod kernels;

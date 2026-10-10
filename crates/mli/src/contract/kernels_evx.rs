@@ -53,6 +53,11 @@ fn evx_scan(
     let n = side.len();
     let mut h0 = 0.0f32;
     let mut h1 = 0.0f32;
+    let mut h2 = 0.0f32;
+    let mut h3 = 0.0f32;
+    let mut pa = 0.0f32;
+    let mut pb = 0.0f32;
+    let mut cs = 0.0f32;
     for i in 0..n {
         let mut v0 = 0.0f32;
         let mut v1 = 0.0f32;
@@ -599,6 +604,158 @@ fn evx_scan(
                 } else if x[i] < p5 {
                     v0 = -1.0f32;
                 }
+            }
+        } else if formula == 1070u32 {
+            // funding drift: slot 1 predicted rate (x0) minus slot 2 funding rate (x1)
+            v0 = x[i] - x[n + i];
+        } else if formula == 1071u32 {
+            // funding x OI pressure `[funding, oi_delta, pressure]`: slot 1 funding (x0),
+            // slot 2 open interest (x1); delta of the last two OI events
+            if side[i] == 2.0f32 {
+                pb = h1;
+                h1 = x[n + i];
+                pa = pa + 1.0f32;
+                if pa >= 2.0f32 {
+                    h2 = h1 - pb;
+                }
+            }
+            v0 = x[i];
+            v1 = h2;
+            v2 = x[i] * h2;
+        } else if formula == 1072u32 {
+            // funding vs price momentum divergence `[funding_slope, price_slope, signal]`:
+            // slot 1 funding (x0), slot 2 price (x1); `period` funding EMA period, `b` price
+            // EMA period; the signal needs both counts at their periods
+            let mut fp = period as f32;
+            if fp < 1.0f32 {
+                fp = 1.0f32;
+            }
+            let mut pp = b;
+            if pp < 1.0f32 {
+                pp = 1.0f32;
+            }
+            if side[i] == 1.0f32 {
+                let prev = h0;
+                if pa == 0.0f32 {
+                    h0 = x[i];
+                } else {
+                    h0 = h0 + (2.0f32 / (fp + 1.0f32)) * (x[i] - h0);
+                }
+                pa = pa + 1.0f32;
+                h1 = h0 - prev;
+            } else {
+                let mut prev = h2;
+                if pb == 0.0f32 {
+                    h2 = x[n + i];
+                    prev = h2;
+                } else {
+                    h2 = h2 + (2.0f32 / (pp + 1.0f32)) * (x[n + i] - h2);
+                }
+                pb = pb + 1.0f32;
+                cs = h2 - prev;
+            }
+            v0 = h1;
+            v1 = cs;
+            if pa >= fp && pb >= pp {
+                if h1 > 0.0f32 && cs < 0.0f32 {
+                    v2 = 1.0f32;
+                } else if h1 < 0.0f32 && cs > 0.0f32 {
+                    v2 = -1.0f32;
+                }
+            }
+        } else if formula == 1073u32 {
+            // funding / sentiment alignment: slot 1 funding (x0), slot 2 long ratio (x1),
+            // 0.5 until the first ratio
+            if side[i] == 2.0f32 {
+                pa = 1.0f32;
+            }
+            let mut lr = 0.5f32;
+            if pa > 0.0f32 {
+                lr = x[n + i];
+            }
+            if x[i] > 0.0f32 && lr > 0.5f32 {
+                v0 = 1.0f32;
+            } else if x[i] < 0.0f32 && lr < 0.5f32 {
+                v0 = -1.0f32;
+            }
+        } else if formula == 1074u32 {
+            // IV/HV spread `[iv, hv, spread]`: slot 1 historical vol (x0), slot 2 vol index (x1)
+            v0 = x[n + i];
+            v1 = x[i];
+            v2 = x[n + i] - x[i];
+        } else if formula == 1075u32 {
+            // long squeeze detector: slot 1 open interest (x0), slot 2 mark price (x1);
+            // `prev` values only move once a value was seen before; the signal holds
+            // between recomputes and starts at 0
+            if side[i] == 1.0f32 {
+                if pa > 0.0f32 {
+                    pb = h1;
+                }
+                h1 = x[i];
+                pa = pa + 1.0f32;
+            } else {
+                if cs > 0.0f32 {
+                    h2 = h0;
+                }
+                h0 = x[n + i];
+                cs = cs + 1.0f32;
+            }
+            if pa > 0.0f32 && cs > 0.0f32 {
+                let doi = h1 - pb;
+                let dpr = h0 - h2;
+                h3 = 0.0f32;
+                if doi < 0.0f32 && dpr < 0.0f32 {
+                    h3 = 1.0f32;
+                } else if doi < 0.0f32 && dpr > 0.0f32 {
+                    h3 = -1.0f32;
+                }
+            }
+            v0 = h3;
+        } else if formula == 1076u32 {
+            // mark vs last traded `[deviation, deviation_pct]`: slot 1 mark (x0), slot 2 ticker
+            // last price (x1, taken only when > 0)
+            if side[i] == 1.0f32 {
+                pa = 1.0f32;
+            } else if x[n + i] > 0.0f32 {
+                h0 = x[n + i];
+            }
+            if pa > 0.0f32 && h0 > 0.0f32 && h0 >= 1.0e-12f32 {
+                // h0 holds the last accepted traded price
+                v0 = x[i] - h0;
+                v1 = (x[i] - h0) / h0 * 100.0f32;
+            }
+        } else if formula == 1077u32 {
+            // index tracking error: slot 1 index price (x0), slot 2 composite (x1); every row
+            // with both > 0 pushes `index - composite`; population std of the last `period`
+            // (>= 2) diffs, needs 2
+            let mut w = period as usize;
+            if w < 2 {
+                w = 2;
+            }
+            let mut cnt = 0usize;
+            let mut sum = 0.0f32;
+            let mut j = i + 1;
+            while cnt < w && j > 0 {
+                j = j - 1;
+                if x[j] > 0.0f32 && x[n + j] > 0.0f32 {
+                    cnt = cnt + 1;
+                    sum = sum + (x[j] - x[n + j]);
+                }
+            }
+            if cnt >= 2 {
+                let mean = sum / (cnt as f32);
+                let mut ss = 0.0f32;
+                let mut c2 = 0usize;
+                let mut j2 = i + 1;
+                while c2 < cnt && j2 > 0 {
+                    j2 = j2 - 1;
+                    if x[j2] > 0.0f32 && x[n + j2] > 0.0f32 {
+                        c2 = c2 + 1;
+                        let dd = x[j2] - x[n + j2] - mean;
+                        ss = ss + dd * dd;
+                    }
+                }
+                v0 = (ss / (cnt as f32)).sqrt();
             }
         }
         out[i] = v0;

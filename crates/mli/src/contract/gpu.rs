@@ -601,6 +601,22 @@ pub enum CubeFormula {
     PressureComp = 1059,
     /// Composite: MACD histogram z-score. UNTESTED on GPU.
     MacdHistZComp = 1060,
+    /// Composite: funding drift. UNTESTED on GPU.
+    FundingDriftMg = 1070,
+    /// Composite: funding OI pressure funding/oi_delta/pressure. UNTESTED on GPU.
+    FundingOiPressureMg = 1071,
+    /// Composite: funding price divergence. UNTESTED on GPU.
+    FundingPriceDivMg = 1072,
+    /// Composite: funding sentiment alignment. UNTESTED on GPU.
+    FundingSentimentMg = 1073,
+    /// Composite: IV HV spread. UNTESTED on GPU.
+    IvHvSpreadMg = 1074,
+    /// Composite: long squeeze detector. UNTESTED on GPU.
+    LongSqueezeMg = 1075,
+    /// Composite: mark vs last deviation/pct. UNTESTED on GPU.
+    MarkVsLastMg = 1076,
+    /// Composite: index tracking error. UNTESTED on GPU.
+    IndexTrackingMg = 1077,
     /// Composite: book churn rate. UNTESTED on GPU.
     BookChurnEv = 980,
     /// Composite: level replenishment rate. UNTESTED on GPU.
@@ -927,6 +943,10 @@ impl CubeFormula {
             CubeFormula::LayerConcentrationBk => 3,
             CubeFormula::LiqClusterEv => 3,
             CubeFormula::QuoteStuffingEv => 2,
+            CubeFormula::FundingOiPressureMg => 3,
+            CubeFormula::FundingPriceDivMg => 3,
+            CubeFormula::IvHvSpreadMg => 3,
+            CubeFormula::MarkVsLastMg => 2,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1193,6 +1213,14 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::FundingDrift), Some(CubeFormula::FundingDriftMg));
+        assert_eq!(formula_of(IndicatorId::FundingOiPressure), Some(CubeFormula::FundingOiPressureMg));
+        assert_eq!(formula_of(IndicatorId::FundingPriceDivergence), Some(CubeFormula::FundingPriceDivMg));
+        assert_eq!(formula_of(IndicatorId::FundingSentimentAlignment), Some(CubeFormula::FundingSentimentMg));
+        assert_eq!(formula_of(IndicatorId::IvHvSpread), Some(CubeFormula::IvHvSpreadMg));
+        assert_eq!(formula_of(IndicatorId::LongSqueezeDetector), Some(CubeFormula::LongSqueezeMg));
+        assert_eq!(formula_of(IndicatorId::MarkPriceVsLast), Some(CubeFormula::MarkVsLastMg));
+        assert_eq!(formula_of(IndicatorId::IndexTrackingError), Some(CubeFormula::IndexTrackingMg));
         assert_eq!(formula_of(IndicatorId::BookChurnRate), Some(CubeFormula::BookChurnEv));
         assert_eq!(formula_of(IndicatorId::LevelReplenishRate), Some(CubeFormula::LevelReplenishEv));
         assert_eq!(formula_of(IndicatorId::QuoteStuffingDetector), Some(CubeFormula::QuoteStuffingEv));

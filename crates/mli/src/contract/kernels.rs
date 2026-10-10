@@ -7831,6 +7831,169 @@ mod tests {
         assert_close(&launch_cube_events(CubeFormula::BasisExtremeEv, &fr, pp(15, 0.0, 0.0))[0], &c);
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): merged multi-stream rows 1070..=1077.
+    #[test]
+    fn lane_matches_cpu_merged_batch() {
+        use super::super::event_frame::{GpuEventFrame, MergedStream};
+        use super::super::kernels_ev::launch_cube_events;
+        use crate::core::types::{
+            CompositeIndex, FundingRate, HistoricalVolatility, IndexPrice, LongShortRatio, MarkPrice,
+            OpenInterest, PredictedFunding, Ticker, VolatilityIndex,
+        };
+        use crate::engine::streams::composite_index_consumer::CompositeIndexConsumer;
+        use crate::engine::streams::funding_rate_consumer::FundingRateConsumer;
+        use crate::engine::streams::historical_volatility_consumer::HistoricalVolatilityConsumer;
+        use crate::engine::streams::index_price_consumer::IndexPriceConsumer;
+        use crate::engine::streams::long_short_ratio_consumer::LongShortRatioConsumer;
+        use crate::engine::streams::mark_price_consumer::MarkPriceConsumer;
+        use crate::engine::streams::open_interest_consumer::OpenInterestConsumer;
+        use crate::engine::streams::predicted_funding_consumer::PredictedFundingConsumer;
+        use crate::engine::streams::ticker_consumer::TickerConsumer;
+        use crate::engine::streams::volatility_index_consumer::VolatilityIndexConsumer;
+        use crate::indicators::composites::funding_oi_pressure::FundingOiPressure;
+        use crate::indicators::composites::funding_sentiment_alignment::FundingSentimentAlignment;
+        use crate::indicators::composites::index_tracking_error::IndexTrackingError;
+        use crate::indicators::composites::iv_hv_spread::IvHvSpread;
+        use crate::indicators::funding_advanced::funding_drift::FundingDrift;
+        use crate::indicators::funding_advanced::funding_price_divergence::FundingPriceMomentumDivergence;
+        use crate::indicators::mark_price_advanced::mark_price_vs_last::MarkPriceVsLast;
+        use crate::indicators::open_interest::long_squeeze_detector::LongSqueezeDetector;
+
+        let n = 40usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let t0 = 1_700_000_000_000i64;
+        let pp = |p: u32, b: f32| { let mut c = CubeParams::period(p); c.b = b; c };
+        let fund: Vec<FundingRate> = (0..n).map(|i| FundingRate { rate: (w(i, 0.9) - 0.5) * 0.002, timestamp: t0 + i as i64 * 1000, ..Default::default() }).collect();
+        let pred: Vec<PredictedFunding> = (0..n).map(|i| PredictedFunding { predicted_rate: (w(i, 0.7) - 0.5) * 0.002, next_funding_time: 0, timestamp: t0 + i as i64 * 1300 + 50 }).collect();
+        let oi: Vec<OpenInterest> = (0..n).map(|i| OpenInterest { open_interest: 1000.0 + 100.0 * w(i, 0.6), timestamp: t0 + i as i64 * 1700 + 20, ..Default::default() }).collect();
+        let marks: Vec<MarkPrice> = (0..n).map(|i| MarkPrice { mark_price: 100.0 + 3.0 * w(i, 0.5), timestamp: t0 + i as i64 * 900 + 10, ..Default::default() }).collect();
+        let lsr: Vec<LongShortRatio> = (0..n).map(|i| LongShortRatio { long_ratio: 0.3 + 0.4 * w(i, 0.8), timestamp: t0 + i as i64 * 2100 + 30, ..Default::default() }).collect();
+        let sf = MergedStream::scalar(&fund, |f| f.timestamp, |f| f.rate);
+        let sp = MergedStream::scalar(&pred, |f| f.timestamp, |f| f.predicted_rate);
+        let so = MergedStream::scalar(&oi, |f| f.timestamp, |f| f.open_interest);
+        let sm = MergedStream::scalar(&marks, |f| f.timestamp, |f| f.mark_price);
+        let sl = MergedStream::scalar(&lsr, |f| f.timestamp, |f| f.long_ratio);
+
+        // Replay helper: merged order = time, then stream order (the frame's own order).
+        enum Ev<'a> { F(&'a FundingRate), P(&'a PredictedFunding), O(&'a OpenInterest), M(&'a MarkPrice), L(&'a LongShortRatio) }
+        let order = |streams: Vec<(i64, usize, usize)>| { let mut v = streams; v.sort(); v };
+        let mk = |lists: Vec<Vec<i64>>| -> Vec<(i64, usize, usize)> {
+            order(lists.iter().enumerate().flat_map(|(s, l)| l.iter().enumerate().map(move |(k, t)| (*t, s, k))).collect())
+        };
+        let ts_f: Vec<i64> = fund.iter().map(|f| f.timestamp).collect();
+        let ts_p: Vec<i64> = pred.iter().map(|f| f.timestamp).collect();
+        let ts_o: Vec<i64> = oi.iter().map(|f| f.timestamp).collect();
+        let ts_m: Vec<i64> = marks.iter().map(|f| f.timestamp).collect();
+        let ts_l: Vec<i64> = lsr.iter().map(|f| f.timestamp).collect();
+
+        // Funding drift: [predicted, funding].
+        let fr = GpuEventFrame::merged(&[sp.clone(), sf.clone()]);
+        let mut m = FundingDrift::new();
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![ts_p.clone(), ts_f.clone()]) {
+            if s == 0 { m.update_predicted_funding(&pred[k]); } else { m.update_funding(&fund[k]); }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::FundingDriftMg, &fr, pp(1, 0.0))[0], &c);
+
+        // Funding x OI pressure: [funding, oi].
+        let fr = GpuEventFrame::merged(&[sf.clone(), so.clone()]);
+        let mut m = FundingOiPressure::new();
+        let (mut a, mut b, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        for (_, s, k) in mk(vec![ts_f.clone(), ts_o.clone()]) {
+            if s == 0 { m.update_funding(&fund[k]); } else { m.update_oi(&oi[k]); }
+            a.push(m.funding());
+            b.push(m.oi_delta());
+            c3.push(m.pressure());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::FundingOiPressureMg, &fr, pp(1, 0.0)), &[&a, &b, &c3]);
+
+        // Funding sentiment alignment: [funding, long ratio].
+        let fr = GpuEventFrame::merged(&[sf.clone(), sl.clone()]);
+        let mut m = FundingSentimentAlignment::new();
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![ts_f.clone(), ts_l.clone()]) {
+            if s == 0 { m.update_funding(&fund[k]); } else { m.update_long_short_ratio(&lsr[k]); }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::FundingSentimentMg, &fr, pp(1, 0.0))[0], &c);
+
+        // Long squeeze: [open interest, mark].
+        let fr = GpuEventFrame::merged(&[so.clone(), sm.clone()]);
+        let mut m = LongSqueezeDetector::new();
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![ts_o.clone(), ts_m.clone()]) {
+            if s == 0 { m.update_oi(&oi[k]); } else { m.update_mark(&marks[k]); }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::LongSqueezeMg, &fr, pp(1, 0.0))[0], &c);
+
+        // Funding price divergence: [funding, price (bar close)].
+        let prices: Vec<(i64, f64)> = (0..n).map(|i| (t0 + i as i64 * 1100 + 5, 100.0 + 4.0 * w(i, 0.45))).collect();
+        let spr = MergedStream::scalar(&prices, |p| p.0, |p| p.1);
+        let fr = GpuEventFrame::merged(&[sf.clone(), spr]);
+        let mut m = FundingPriceMomentumDivergence::new(4, 5);
+        let (mut a, mut b, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        let pt: Vec<i64> = prices.iter().map(|p| p.0).collect();
+        for (_, s, k) in mk(vec![ts_f.clone(), pt]) {
+            if s == 0 { m.update_funding(&fund[k]); } else { m.update_price(prices[k].1); }
+            a.push(m.funding_slope());
+            b.push(m.price_slope());
+            c3.push(m.signal());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::FundingPriceDivMg, &fr, pp(4, 5.0)), &[&a, &b, &c3]);
+
+        // IV/HV spread: [historical vol, vol index].
+        let hv: Vec<HistoricalVolatility> = (0..n).map(|i| HistoricalVolatility { volatility: 0.2 + 0.1 * w(i, 0.3), timestamp: t0 + i as i64 * 1000 }).collect();
+        let vi: Vec<VolatilityIndex> = (0..n).map(|i| { let mut v = VolatilityIndex::default(); v.value = 0.3 + 0.1 * w(i, 0.35); v.timestamp = t0 + i as i64 * 1200 + 7; v }).collect();
+        let fr = GpuEventFrame::merged(&[
+            MergedStream::scalar(&hv, |f| f.timestamp, |f| f.volatility),
+            MergedStream::scalar(&vi, |f| f.timestamp, |f| f.value),
+        ]);
+        let mut m = IvHvSpread::new();
+        let (mut a, mut b, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        let th: Vec<i64> = hv.iter().map(|f| f.timestamp).collect();
+        let tv: Vec<i64> = vi.iter().map(|f| f.timestamp).collect();
+        for (_, s, k) in mk(vec![th, tv]) {
+            if s == 0 { m.update_historical_volatility(&hv[k]); } else { m.update_volatility_index(&vi[k]); }
+            a.push(m.iv());
+            b.push(m.hv());
+            c3.push(m.spread());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::IvHvSpreadMg, &fr, pp(1, 0.0)), &[&a, &b, &c3]);
+
+        // Mark vs last: [mark, ticker].
+        let tk: Vec<Ticker> = (0..n).map(|i| Ticker { last_price: 100.0 + 3.0 * w(i, 0.52), timestamp: t0 + i as i64 * 1500 + 3, ..Default::default() }).collect();
+        let fr = GpuEventFrame::merged(&[sm.clone(), MergedStream::scalar(&tk, |f| f.timestamp, |f| f.last_price)]);
+        let mut m = MarkPriceVsLast::new();
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        let tt: Vec<i64> = tk.iter().map(|f| f.timestamp).collect();
+        for (_, s, k) in mk(vec![ts_m.clone(), tt]) {
+            if s == 0 { m.update_mark(&marks[k]); } else { m.update_ticker(&tk[k]); }
+            a.push(m.deviation());
+            b.push(m.deviation_pct());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::MarkVsLastMg, &fr, pp(1, 0.0)), &[&a, &b]);
+
+        // Index tracking error: [index price, composite].
+        let ip: Vec<IndexPrice> = (0..n).map(|i| IndexPrice { price: 100.0 + 2.0 * w(i, 0.4), timestamp: t0 + i as i64 * 1000, ..Default::default() }).collect();
+        let ci: Vec<CompositeIndex> = (0..n).map(|i| CompositeIndex { price: 100.0 + 2.0 * w(i, 0.43), components: Vec::new(), timestamp: t0 + i as i64 * 1100 + 9 }).collect();
+        let fr = GpuEventFrame::merged(&[
+            MergedStream::scalar(&ip, |f| f.timestamp, |f| f.price),
+            MergedStream::scalar(&ci, |f| f.timestamp, |f| f.price),
+        ]);
+        let mut m = IndexTrackingError::new(6);
+        let mut c = Vec::new();
+        let ti: Vec<i64> = ip.iter().map(|f| f.timestamp).collect();
+        let tc: Vec<i64> = ci.iter().map(|f| f.timestamp).collect();
+        for (_, s, k) in mk(vec![ti, tc]) {
+            if s == 0 { m.update_index_price(&ip[k]); } else { m.update_composite_index(&ci[k]); }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::IndexTrackingMg, &fr, pp(6, 0.0))[0], &c);
+        let _ = Ev::F(&fund[0]);
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
