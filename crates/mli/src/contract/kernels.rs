@@ -7353,6 +7353,40 @@ mod tests {
         assert_close(&run(CubeFormula::KpComp, &bars, kp), &lanes.iter().map(|x| m.feed(x)).collect::<Vec<f64>>());
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): composites 1055..=1059.
+    #[test]
+    fn lane_matches_cpu_comp_batch9() {
+        use crate::indicators::momentum::pressure::Pressure;
+        use crate::indicators::trend::gann_hilo_activator::GannHiLoActivator;
+        use crate::indicators::trend_stop::atr_trailing_stop::ATRTrailingStop;
+        use crate::indicators::trend_stop::chande_kroll_stop::ChandeKrollStop;
+        use crate::indicators::trend_stop::chandelier_stop::ChandelierStop;
+
+        let bars = bars(140);
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let mut p = CubeParams::period(10);
+        p.a = 2.0;
+        p.slow = 7;
+        p.smoother = CubeSmoother::Sma;
+        p.smoother2 = CubeSmoother::Rma;
+        let mut m = ChandelierStop::with_params(10, 2.0);
+        assert_close(&run(CubeFormula::ChandComp, &bars, p), &lanes.iter().map(|x| { m.feed(x); m.value() }).collect::<Vec<f64>>());
+        let mut m = ChandeKrollStop::new(10, 2.0, 7, 7);
+        assert_close(&run(CubeFormula::CksComp, &bars, p), &lanes.iter().map(|x| { m.feed(x); m.value() }).collect::<Vec<f64>>());
+        let mut m = ATRTrailingStop::with_params(10, 2.0);
+        assert_close(&run(CubeFormula::AtrtsComp, &bars, p), &lanes.iter().map(|x| { m.feed(x); m.value() }).collect::<Vec<f64>>());
+        let mut m = GannHiLoActivator::from_smoother(10, SmootherId::Sma);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for x in &lanes {
+            let (u, s) = m.feed(x);
+            a.push(u);
+            b.push(s);
+        }
+        assert_cols(&run_cols(CubeFormula::GannHiloCols, &bars, p), &[&a, &b]);
+        let mut m = Pressure::from_smoothers(10, SmootherId::Sma, SmootherId::Rma);
+        assert_close(&run(CubeFormula::PressureComp, &bars, p), &lanes.iter().map(|x| m.feed(x)).collect::<Vec<f64>>());
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

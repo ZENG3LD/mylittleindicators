@@ -42,6 +42,7 @@ fn ew_scan(
 ) {
     let n = x.len();
     let mut held = 0.0f32;
+    let mut held2 = 1.0f32;
     for t in 0..n {
         let mut v = 0.0f32;
         if op == 1u32 {
@@ -525,6 +526,76 @@ fn ew_scan(
             let kw = (y[t] - z[t]) / 2.0f32;
             if kw > 0.0f32 {
                 v = (x[t] - w[t]) / kw;
+            }
+        } else if op == 59u32 {
+            // ATR trailing stop long level: x = new long level, y = close
+            if t == 0 {
+                held = x[0];
+            } else if x[t] > held || y[t] < held {
+                held = x[t];
+            }
+            v = held;
+        } else if op == 60u32 {
+            let p = a as usize;
+            let mut lo = 0usize;
+            if t + 1 > p {
+                lo = t + 1 - p;
+            }
+            v = x[lo];
+            for j in lo..(t + 1) {
+                if x[j] > v {
+                    v = x[j];
+                }
+            }
+        } else if op == 61u32 {
+            let p = a as usize;
+            let mut lo = 0usize;
+            if t + 1 > p {
+                lo = t + 1 - p;
+            }
+            v = x[lo];
+            for j in lo..(t + 1) {
+                if x[j] < v {
+                    v = x[j];
+                }
+            }
+        } else if op == 62u32 {
+            // Gann HiLo activator state machine: x = close, y = ma(high), z = ma(low), b = ready
+            // bar count; `a` = 0 activator, 1 side. Side starts long; activator starts 0.
+            if (t as f32) + 1.0f32 >= b {
+                if held2 > 0.0f32 {
+                    if x[t] < z[t] {
+                        held2 = -1.0f32;
+                        held = y[t];
+                    } else {
+                        held = z[t];
+                    }
+                } else if x[t] > y[t] {
+                    held2 = 1.0f32;
+                    held = z[t];
+                } else {
+                    held = y[t];
+                }
+            }
+            if a < 0.5f32 {
+                v = held;
+            } else {
+                v = held2;
+            }
+        } else if op == 64u32 {
+            // Pressure: x = 2c - l - h, y = ATR, z = volume, w = avg volume, window a
+            if (t as f32) + 1.0f32 >= a {
+                let mut aa = y[t];
+                if aa < 0.0f32 {
+                    aa = -aa;
+                }
+                let mut av = w[t];
+                if av < 0.0f32 {
+                    av = -av;
+                }
+                if av >= 1.0e-12f32 && aa >= 1.0e-12f32 {
+                    v = x[t] / y[t] * (z[t] / w[t]);
+                }
             }
         } else if op == 29u32 {
             if z[t] != 0.0f32 {
@@ -1633,6 +1704,58 @@ pub fn launch_cube_comp(
             let c = lane_series(samples, p, OhlcvField::Close);
             let k = launch_cube_comp(CubeFormula::VoKcCols, samples, p);
             vec![ewb(58, &c, &k[0], &k[2], &k[1], 0.0, 0.0)]
+        }
+        // Chandelier stop long level: `max(high, period) - mult * ATR(Rma, period)`, `a` = mult.
+        CubeFormula::ChandComp => {
+            let h = lane_series(samples, p, OhlcvField::High);
+            let hh = ewc(60, &h, &h, &h, p.period as f32, 0.0);
+            let atr = atr_series(samples, p, CubeSmoother::Rma, p.period, 0);
+            vec![ewc(14, &hh, &atr, &hh, p.a, 0.0)]
+        }
+        // Chande-Kroll stop long level: highest high over `slow` bars minus `a` (non-positive ->
+        // 1.5) times ATR(Rma, `period`).
+        CubeFormula::CksComp => {
+            let h = lane_series(samples, p, OhlcvField::High);
+            let hh = ewc(60, &h, &h, &h, p.slow.max(1) as f32, 0.0);
+            let atr = atr_series(samples, p, CubeSmoother::Rma, p.period.max(1), 0);
+            let k = if p.a > 0.0 { p.a } else { 1.5 };
+            vec![ewc(14, &hh, &atr, &hh, k, 0.0)]
+        }
+        // ATR trailing stop long level: ratcheting `max(high, period) - mult * ATR`
+        // (smoother `smoother2`, default Wilder), `a` = mult.
+        CubeFormula::AtrtsComp => {
+            let h = lane_series(samples, p, OhlcvField::High);
+            let c = lane_series(samples, p, OhlcvField::Close);
+            let hh = ewc(60, &h, &h, &h, p.period as f32, 0.0);
+            let atr = atr_series(samples, p, p.smoother2, p.period, 0);
+            let nl = ewc(14, &hh, &atr, &hh, p.a, 0.0);
+            vec![ew2(59, &nl, &c, 0.0)]
+        }
+        // Gann HiLo activator `[activator, side]`: `smoother` of highs / lows over `period`.
+        CubeFormula::GannHiloCols => {
+            let h = lane_series(samples, p, OhlcvField::High);
+            let l = lane_series(samples, p, OhlcvField::Low);
+            let c = lane_series(samples, p, OhlcvField::Close);
+            let pp = p.period.max(1);
+            let mh = sm(&h, p.smoother, pp, 0, p);
+            let ml = sm(&l, p.smoother, pp, 0, p);
+            vec![
+                ewb(62, &c, &mh, &ml, &c, 0.0, pp as f32),
+                ewb(62, &c, &mh, &ml, &c, 1.0, pp as f32),
+            ]
+        }
+        // Buy/sell pressure: `period`, volume smoother `smoother`, ATR smoother `smoother2`.
+        CubeFormula::PressureComp => {
+            let h = lane_series(samples, p, OhlcvField::High);
+            let l = lane_series(samples, p, OhlcvField::Low);
+            let c = lane_series(samples, p, OhlcvField::Close);
+            let v = lane_series(samples, p, OhlcvField::Volume);
+            let pp = p.period.max(1);
+            let atr = atr_series(samples, p, p.smoother2, pp, 0);
+            let av = sm(&v, p.smoother, pp, 0, p);
+            let c2 = ewc(13, &c, &c, &c, 1.0, 0.0);
+            let n = ew2(2, &ew2(2, &c2, &l, 0.0), &h, 0.0);
+            vec![ewb(64, &n, &atr, &v, &av, pp as f32, 0.0)]
         }
         _ => Vec::new(),
     }

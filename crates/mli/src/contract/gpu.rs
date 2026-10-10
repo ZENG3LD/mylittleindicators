@@ -589,6 +589,16 @@ pub enum CubeFormula {
     TrimaBandsCols = 1053,
     /// Composite: Keltner position. UNTESTED on GPU.
     KpComp = 1054,
+    /// Composite: Chandelier stop long level. UNTESTED on GPU.
+    ChandComp = 1055,
+    /// Composite: Chande-Kroll stop long level. UNTESTED on GPU.
+    CksComp = 1056,
+    /// Composite: ATR trailing stop long level. UNTESTED on GPU.
+    AtrtsComp = 1057,
+    /// Composite: Gann HiLo activator activator/side. UNTESTED on GPU.
+    GannHiloCols = 1058,
+    /// Composite: Buy/sell pressure. UNTESTED on GPU.
+    PressureComp = 1059,
     /// Composite: Spectral flatness percentile. UNTESTED on GPU.
     SflatpComp = 1120,
     /// Composite: Spectral rolloff percentile. UNTESTED on GPU.
@@ -824,6 +834,7 @@ impl CubeFormula {
             CubeFormula::AbgCols => 3,
             CubeFormula::SbpCols => 3,
             CubeFormula::TrimaBandsCols => 3,
+            CubeFormula::GannHiloCols => 2,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1089,6 +1100,11 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Chand), Some(CubeFormula::ChandComp));
+        assert_eq!(formula_of(IndicatorId::Cks), Some(CubeFormula::CksComp));
+        assert_eq!(formula_of(IndicatorId::Atrts), Some(CubeFormula::AtrtsComp));
+        assert_eq!(formula_of(IndicatorId::GannHilo), Some(CubeFormula::GannHiloCols));
+        assert_eq!(formula_of(IndicatorId::Pressure), Some(CubeFormula::PressureComp));
         assert_eq!(formula_of(IndicatorId::Trimabands), Some(CubeFormula::TrimaBandsCols));
         assert_eq!(formula_of(IndicatorId::Kp), Some(CubeFormula::KpComp));
         assert_eq!(formula_of(IndicatorId::Butter), Some(CubeFormula::ButterComp));
