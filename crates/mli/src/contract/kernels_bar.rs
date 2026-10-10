@@ -181,6 +181,55 @@ fn ring_ret(c: &[f32], t: usize, w: usize, i: usize) -> f32 {
     (c[m + 1] / c[m]).ln()
 }
 
+/// One DFA scale step at bar `t` (needs `t >= n`): rebuilds the CPU ring (slot 0 holds the
+/// previous fluctuation `f_prev` unless the current close lands there) and returns the new
+/// fluctuation `f`.
+#[cube]
+fn dfa_f(c: &[f32], t: usize, n: usize, f_prev: f32, scr: &mut [f32]) -> f32 {
+    let mut sm = 0.0f32;
+    for i in 0..n {
+        let mut val = c[t - ((t + n - i) % n)];
+        if i == 0usize {
+            if t % n == 0usize {
+                val = c[t];
+            } else if t > n {
+                val = f_prev;
+            } else {
+                val = c[0];
+            }
+        }
+        scr[i] = val;
+        sm = sm + val;
+    }
+    let nf = n as f32;
+    let mean = sm / nf;
+    let mut sxy = 0.0f32;
+    let mut sx = 0.0f32;
+    let mut sy = 0.0f32;
+    let mut sxx = 0.0f32;
+    for i in 0..n {
+        let x = i as f32;
+        let y = scr[i] - mean;
+        sx = sx + x;
+        sy = sy + y;
+        sxy = sxy + x * y;
+        sxx = sxx + x * x;
+    }
+    let den = nf * sxx - sx * sx;
+    let mut a = 0.0f32;
+    let mut beta = 0.0f32;
+    if den.abs() > 1.0e-12f32 {
+        beta = (nf * sxy - sx * sy) / den;
+        a = (sy - beta * sx) / nf;
+    }
+    let mut rss = 0.0f32;
+    for i in 0..n {
+        let r = (scr[i] - mean) - (a + beta * (i as f32));
+        rss = rss + r * r;
+    }
+    (rss / nf).sqrt()
+}
+
 /// 1200 Stochastik-D `[k, d]` (`period` %K window, `p2` %D window), 1201 Donchian stop
 /// (lower stop: `period` lower window, `p2` upper window unused in the output, `a` offset, `flag`
 /// percentage), 1202 projection bands `[upper, middle, lower]` (`period` window clamped 2..=512,
@@ -210,6 +259,11 @@ fn bar_scan(
     let mut dh = 0.0f32;
     let mut dl = 0.0f32;
     let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
     let mut rstate = a;
     let mut vw = 0.0f32;
     let mut held0 = 0.0f32;
@@ -1195,6 +1249,221 @@ fn bar_scan(
                 }
             }
             v0 = held0;
+        } else if formula == 1231u32 {
+            // Hurst exponent by rescaled range over the last min(period, 512) closes
+            let mut pr = period as usize;
+            if pr > 512 {
+                pr = 512;
+            }
+            let mut minp = pr / 2;
+            if minp < 10usize {
+                minp = 10usize;
+            }
+            if pr > 0usize && minp > pr - 1 {
+                minp = pr - 1;
+            }
+            let mut n = t + 1;
+            if n > pr {
+                n = pr;
+            }
+            if n >= 2usize && n - 1 >= minp {
+                let base = t + 1 - n;
+                let rn = n - 1;
+                let mut sm = 0.0f32;
+                for j in 1..n {
+                    sm = sm + (c[base + j] / c[base + j - 1]).ln();
+                }
+                let mean = sm / (rn as f32);
+                let mut cs = 0.0f32;
+                let mut mx = cs - 3.4e38f32;
+                let mut mn = cs + 3.4e38f32;
+                let mut var = 0.0f32;
+                for j in 1..n {
+                    let d = (c[base + j] / c[base + j - 1]).ln() - mean;
+                    cs = cs + d;
+                    if cs > mx {
+                        mx = cs;
+                    }
+                    if cs < mn {
+                        mn = cs;
+                    }
+                    var = var + d * d;
+                }
+                let sd = (var / (rn as f32)).sqrt();
+                if sd > 1.0e-10f32 {
+                    let rs = (mx - mn) / sd;
+                    let nf = rn as f32;
+                    if rs > 0.0f32 && nf > 2.0f32 {
+                        held0 = (rs.ln() / (nf / 2.0f32).ln()).max(0.0f32).min(1.0f32);
+                    }
+                }
+            }
+            if hset == 0u32 {
+                held0 = 0.5f32;
+                hset = 1u32;
+            }
+            v0 = held0;
+        } else if formula == 1232u32 {
+            // Higuchi fractal dimension (period window, p2 max k)
+            let mut pr = period as usize;
+            if pr > 512 {
+                pr = 512;
+            }
+            let mut mk = p2 as usize;
+            if mk > pr / 4 {
+                mk = pr / 4;
+            }
+            if mk < 2usize {
+                mk = 2usize;
+            }
+            if hset == 0u32 {
+                held0 = 1.5f32;
+                hset = 1u32;
+            }
+            if t + 1 >= pr {
+                let base = t + 1 - pr;
+                let n = pr;
+                let mut cntk = 0.0f32;
+                let mut sx = 0.0f32;
+                let mut sy = 0.0f32;
+                let mut sxy = 0.0f32;
+                let mut sxx = 0.0f32;
+                for k in 1..(mk + 1) {
+                    let mut lk = 0.0f32;
+                    if k < n {
+                        let m = (n - 1) / k;
+                        let mut total = 0.0f32;
+                        for i in 1..(k + 1) {
+                            let mut length = 0.0f32;
+                            let mut count = 0u32;
+                            for j in 1..(m + 1) {
+                                let i1 = i + (j - 1) * k - 1;
+                                let i2 = i + j * k - 1;
+                                if i1 < n && i2 < n {
+                                    length = length + (c[base + i2] - c[base + i1]).abs();
+                                    count = count + 1u32;
+                                }
+                            }
+                            if count > 0u32 {
+                                length = length * ((n as f32) - 1.0f32) / ((count as f32) * (k as f32));
+                                total = total + length;
+                            }
+                        }
+                        lk = total / (k as f32);
+                    }
+                    if lk > 0.0f32 {
+                        let x = (k as f32).ln();
+                        let y = lk.ln();
+                        cntk = cntk + 1.0f32;
+                        sx = sx + x;
+                        sy = sy + y;
+                        sxy = sxy + x * y;
+                        sxx = sxx + x * x;
+                    }
+                }
+                if cntk >= 3.0f32 {
+                    let den = cntk * sxx - sx * sx;
+                    let mut slope = 0.0f32;
+                    if den.abs() >= 1.0e-10f32 {
+                        slope = (cntk * sxy - sx * sy) / den;
+                    }
+                    held0 = (2.0f32 - slope).max(1.0f32).min(2.0f32);
+                }
+            }
+            v0 = held0;
+        } else if formula == 1233u32 {
+            // detrended fluctuation analysis alpha over four scales (period, p2, p3, p4)
+            let n0 = period as usize;
+            let n1 = p2 as usize;
+            let n2 = p3 as usize;
+            let n3 = p4 as usize;
+            if t == 0usize {
+                f0 = c[0];
+                f1 = c[0];
+                f2 = c[0];
+                f3 = c[0];
+            }
+            if t >= n0 {
+                f0 = dfa_f(c, t, n0, f0, scr);
+            }
+            if t >= n1 {
+                f1 = dfa_f(c, t, n1, f1, scr);
+            }
+            if t >= n2 {
+                f2 = dfa_f(c, t, n2, f2, scr);
+            }
+            if t >= n3 {
+                f3 = dfa_f(c, t, n3, f3, scr);
+            }
+            if t + 1 >= n0 && t + 1 >= n1 && t + 1 >= n2 && t + 1 >= n3 {
+                let mut cn = 0.0f32;
+                let mut sx = 0.0f32;
+                let mut sy = 0.0f32;
+                let mut sxy = 0.0f32;
+                let mut sxx = 0.0f32;
+                if f0 > 0.0f32 {
+                    let x = (n0 as f32).ln();
+                    let y = f0.ln();
+                    cn = cn + 1.0f32;
+                    sx = sx + x;
+                    sy = sy + y;
+                    sxy = sxy + x * y;
+                    sxx = sxx + x * x;
+                }
+                if f1 > 0.0f32 {
+                    let x = (n1 as f32).ln();
+                    let y = f1.ln();
+                    cn = cn + 1.0f32;
+                    sx = sx + x;
+                    sy = sy + y;
+                    sxy = sxy + x * y;
+                    sxx = sxx + x * x;
+                }
+                if f2 > 0.0f32 {
+                    let x = (n2 as f32).ln();
+                    let y = f2.ln();
+                    cn = cn + 1.0f32;
+                    sx = sx + x;
+                    sy = sy + y;
+                    sxy = sxy + x * y;
+                    sxx = sxx + x * x;
+                }
+                if f3 > 0.0f32 {
+                    let x = (n3 as f32).ln();
+                    let y = f3.ln();
+                    cn = cn + 1.0f32;
+                    sx = sx + x;
+                    sy = sy + y;
+                    sxy = sxy + x * y;
+                    sxx = sxx + x * x;
+                }
+                if cn >= 2.0f32 {
+                    let den = cn * sxx - sx * sx;
+                    if den.abs() > 1.0e-9f32 {
+                        held0 = (cn * sxy - sx * sy) / den;
+                    } else {
+                        held0 = 0.5f32;
+                    }
+                }
+            }
+            v0 = held0;
+        } else if formula == 1234u32 || formula == 1235u32 {
+            // percentile rank of the inner series (`volume` slot) over the last `flag` values
+            let w = flag as usize;
+            if hset == 0u32 {
+                held0 = 0.5f32;
+                hset = 1u32;
+            }
+            if t + 1 >= w {
+                let mut cnt = 0.0f32;
+                for j in (t + 1 - w)..(t + 1) {
+                    if v[j] <= v[t] {
+                        cnt = cnt + 1.0f32;
+                    }
+                }
+                held0 = cnt / (w as f32);
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -1248,6 +1517,17 @@ pub fn launch_cube_bar(
         dp.smoother = super::CubeSmoother::Sma;
         v = super::kernels::launch_cube(CubeFormula::DpoCols, samples, dp);
     }
+    if formula == CubeFormula::HurstPctBar || formula == CubeFormula::DfaPctBar {
+        // inner series on the device, percentile rank in the scan below
+        let mut ip = params;
+        let inner = if formula == CubeFormula::HurstPctBar {
+            ip.period = params.period.max(50);
+            CubeFormula::HurstBar
+        } else {
+            CubeFormula::DfaBar
+        };
+        v = launch_cube_bar(inner, samples, ip).swap_remove(0);
+    }
     if formula == CubeFormula::DistLevelsBar {
         let mut mp = params;
         mp.period = params.period.max(1);
@@ -1281,7 +1561,7 @@ pub fn launch_cube_bar(
     let up = |s: &Vec<f32>| client.create_from_slice(f32::as_bytes(s));
     let out = client.empty(5 * n * core::mem::size_of::<f32>());
     // scratch (histograms / rings) sized per formula
-    let scr_len = (params.period as usize * 12 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
+    let scr_len = ((params.period.max(params.fast).max(params.slow).max(params.signal)) as usize * 12 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
     let scr_buf = client.create_from_slice(f32::as_bytes(&vec![0.0f32; scr_len]));
     unsafe {
         bar_map::launch_unchecked(
@@ -1303,7 +1583,13 @@ pub fn launch_cube_bar(
             params.a,
             params.b,
             params.c,
-            params.flag,
+            if formula == CubeFormula::HurstPctBar {
+                params.period.max(50)
+            } else if formula == CubeFormula::DfaPctBar {
+                params.flag.max(50)
+            } else {
+                params.flag
+            },
         );
     }
     let bytes = client.read_one_unchecked(out);

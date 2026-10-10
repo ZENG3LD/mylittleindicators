@@ -645,6 +645,16 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: hurst exponent. UNTESTED on GPU.
+    HurstBar = 1231,
+    /// Composite: higuchi fractal dimension. UNTESTED on GPU.
+    FractalDimBar = 1232,
+    /// Composite: dfa alpha. UNTESTED on GPU.
+    DfaBar = 1233,
+    /// Composite: hurst percentile. UNTESTED on GPU.
+    HurstPctBar = 1234,
+    /// Composite: dfa percentile. UNTESTED on GPU.
+    DfaPctBar = 1235,
     /// Composite: ljung box. UNTESTED on GPU.
     LjungBoxBar = 1227,
     /// Composite: pacf. UNTESTED on GPU.
@@ -1319,6 +1329,11 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Hurst), Some(CubeFormula::HurstBar));
+        assert_eq!(formula_of(IndicatorId::FractalDim), Some(CubeFormula::FractalDimBar));
+        assert_eq!(formula_of(IndicatorId::Dfa), Some(CubeFormula::DfaBar));
+        assert_eq!(formula_of(IndicatorId::HurstPct), Some(CubeFormula::HurstPctBar));
+        assert_eq!(formula_of(IndicatorId::DfaPct), Some(CubeFormula::DfaPctBar));
         assert_eq!(formula_of(IndicatorId::LjungBox), Some(CubeFormula::LjungBoxBar));
         assert_eq!(formula_of(IndicatorId::Pacf), Some(CubeFormula::PacfBar));
         assert_eq!(formula_of(IndicatorId::HalfLifeMr), Some(CubeFormula::HalfLifeBar));

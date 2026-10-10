@@ -8665,6 +8665,48 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1231..=1235.
+    #[test]
+    fn lane_matches_cpu_bar_batch11() {
+        use crate::indicators::chaos::dfa::Dfa;
+        use crate::indicators::chaos::dfa_percentile::DfaPercentile;
+        use crate::indicators::chaos::fractal_dimension::FractalDimension;
+        use crate::indicators::chaos::hurst_exponent::HurstExponent;
+        use crate::indicators::chaos::hurst_percentile::HurstPercentile;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = HurstExponent::new(40);
+        chk(&run_cols(CubeFormula::HurstBar, &bars, CubeParams::period(40)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(40);
+        p.fast = 8;
+        let mut m = FractalDimension::new(40, 8);
+        chk(&run_cols(CubeFormula::FractalDimBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(8);
+        p.fast = 12;
+        p.slow = 16;
+        p.signal = 24;
+        let mut m = Dfa::new([8, 12, 16, 24]);
+        chk(&run_cols(CubeFormula::DfaBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = HurstPercentile::new(50);
+        chk(&run_cols(CubeFormula::HurstPctBar, &bars, CubeParams::period(50)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut pp = p;
+        pp.flag = 50;
+        let mut m = DfaPercentile::new([8, 12, 16, 24], 50);
+        chk(&run_cols(CubeFormula::DfaPctBar, &bars, pp), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
