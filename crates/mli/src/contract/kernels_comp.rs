@@ -457,6 +457,50 @@ fn ew_scan(
             if v < 0.0f32 {
                 v = -v;
             }
+        } else if op == 54u32 {
+            // Kalman slope z-score over a rolling window a (partial until full)
+            let w = a as usize;
+            let mut lo = 0usize;
+            if t + 1 > w {
+                lo = t + 1 - w;
+            }
+            let nn = (t + 1 - lo) as f32;
+            let mut sum = 0.0f32;
+            let mut sq = 0.0f32;
+            for j in lo..(t + 1) {
+                sum = sum + x[j];
+                sq = sq + x[j] * x[j];
+            }
+            let mean = sum / nn;
+            let mut var = sq / nn - mean * mean;
+            if var < 1.0e-12f32 {
+                var = 1.0e-12f32;
+            }
+            v = (x[t] - mean) / var.sqrt();
+        } else if op == 55u32 {
+            // Kalman slope z-score, window a, 0 until full, sd floor 1e-9
+            let w = a as usize;
+            if t + 1 >= w {
+                let st = t + 1 - w;
+                let mut sum = 0.0f32;
+                for j in st..(t + 1) {
+                    sum = sum + x[j];
+                }
+                let mean = sum / a;
+                let mut ss = 0.0f32;
+                for j in st..(t + 1) {
+                    let d = x[j] - mean;
+                    ss = ss + d * d;
+                }
+                let mut sd = (ss / a).sqrt();
+                if sd < 1.0e-9f32 {
+                    sd = 1.0e-9f32;
+                }
+                v = (x[t] - mean) / sd;
+            }
+        } else if op == 56u32 {
+            // 0.5 * (tanh(x) + 1) = 1 / (1 + exp(-2x))
+            v = 1.0f32 / (1.0f32 + (-2.0f32 * x[t]).exp());
         } else if op == 29u32 {
             if z[t] != 0.0f32 {
                 v = (x[t] - y[t]) / z[t];
@@ -633,6 +677,208 @@ pub(crate) fn lr_all(x: &[f32], period: u32, zero_lag: bool) -> Vec<Vec<f32>> {
             BufferArg::from_raw_parts(bufs[4].clone(), n),
             period,
             zero_lag as u32,
+        );
+    }
+    bufs.into_iter()
+        .map(|b| f32::from_bytes(&client.read_one_unchecked(b)).to_vec())
+        .collect()
+}
+
+/// `BasicKalmanFilter` (2-state position / velocity filter, H = [[1,0],[0,0]], R = diag(r, 1e12),
+/// P0 = diag(1000, 100)), scalar form of the CPU matrix algebra. `pos` is the corrected
+/// position (`filtered_value`), `velp` the velocity right after the predict step (the CPU
+/// `FilterResult::velocity`, which the slope indicators read; 0 on the first bar).
+/// `adaptive != 0` runs the 10-sample innovation window noise adaptation.
+#[cube]
+fn kal_scan(x: &[f32], pos: &mut [f32], velp: &mut [f32], dt: f32, q: f32, r0: f32, adaptive: u32) {
+    let n = x.len();
+    let mut win = Array::<f32>::new(10usize);
+    let mut wlen = 0usize;
+    let mut wpos = 0usize;
+    let mut r = r0;
+    let mut px = 0.0f32;
+    let mut pv = 0.0f32;
+    let mut p00 = 1000.0f32;
+    let mut p01 = 0.0f32;
+    let mut p10 = 0.0f32;
+    let mut p11 = 100.0f32;
+    let q00 = q * dt * dt * dt / 3.0f32;
+    let q01 = q * dt * dt / 2.0f32;
+    let q11 = q * dt;
+    for t in 0..n {
+        if t == 0 {
+            px = x[0];
+            pv = 0.0f32;
+            p00 = 1000.0f32;
+            p01 = 0.0f32;
+            p10 = 0.0f32;
+            p11 = 100.0f32;
+            pos[0] = x[0];
+            velp[0] = 0.0f32;
+        } else {
+            // predict
+            px = px + dt * pv;
+            let a00 = p00 + dt * p10;
+            let a01 = p01 + dt * p11;
+            let n00 = a00 + dt * a01 + q00;
+            let n01 = a01 + q01;
+            let n10 = p10 + dt * p11 + q01;
+            let n11 = p11 + q11;
+            p00 = n00;
+            p01 = n01;
+            p10 = n10;
+            p11 = n11;
+            velp[t] = pv;
+            // correct
+            let innov = x[t] - px;
+            let s00 = p00 + r;
+            let det = s00 * 1.0e12f32;
+            let mut adet = det;
+            if adet < 0.0f32 {
+                adet = -adet;
+            }
+            if adet >= 1.0e-12f32 {
+                let i00 = 1.0e12f32 / det;
+                let k0 = p00 * i00;
+                let k1 = p10 * i00;
+                px = px + k0 * innov;
+                pv = pv + k1 * innov;
+                let c00 = (1.0f32 - k0) * p00;
+                let c01 = (1.0f32 - k0) * p01;
+                let c10 = p10 - k1 * p00;
+                let c11 = p11 - k1 * p01;
+                p00 = c00;
+                p01 = c01;
+                p10 = c10;
+                p11 = c11;
+                if adaptive != 0u32 {
+                    win[wpos] = innov;
+                    wpos = (wpos + 1) % 10;
+                    if wlen < 10 {
+                        wlen = wlen + 1;
+                    }
+                    if wlen >= 5 {
+                        let mut sum = 0.0f32;
+                        for j in 0..wlen {
+                            sum = sum + win[j];
+                        }
+                        let mean = sum / (wlen as f32);
+                        let mut ss = 0.0f32;
+                        for j in 0..wlen {
+                            let d = win[j] - mean;
+                            ss = ss + d * d;
+                        }
+                        let var = ss / ((wlen - 1) as f32);
+                        if var > r * 2.0f32 {
+                            let mut nr = r * 1.1f32;
+                            if var < nr {
+                                nr = var;
+                            }
+                            r = nr;
+                        } else if var < r * 0.5f32 {
+                            let mut nr = r * 0.9f32;
+                            if nr < 1.0e-12f32 {
+                                nr = 1.0e-12f32;
+                            }
+                            r = nr;
+                        }
+                    }
+                }
+            }
+            pos[t] = px;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn kal_map(x: &[f32], pos: &mut [f32], velp: &mut [f32], dt: f32, q: f32, r0: f32, adaptive: u32) {
+    kal_scan(x, pos, velp, dt, q, r0, adaptive);
+}
+
+/// `[filtered position, velocity after predict]`; `dt`, process and measurement noise are
+/// clamped like `BasicKalmanFilter::new`.
+pub(crate) fn kalman_all(x: &[f32], dt: f32, q: f32, r: f32, adaptive: bool) -> Vec<Vec<f32>> {
+    let n = x.len();
+    if n == 0 {
+        return vec![Vec::new(), Vec::new()];
+    }
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let xb = client.create_from_slice(f32::as_bytes(x));
+    let pb = client.empty(n * core::mem::size_of::<f32>());
+    let vb = client.empty(n * core::mem::size_of::<f32>());
+    unsafe {
+        kal_map::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(xb, n),
+            BufferArg::from_raw_parts(pb.clone(), n),
+            BufferArg::from_raw_parts(vb.clone(), n),
+            dt.max(1.0e-6),
+            q.max(1.0e-12),
+            r.max(1.0e-12),
+            adaptive as u32,
+        );
+    }
+    vec![
+        f32::from_bytes(&client.read_one_unchecked(pb)).to_vec(),
+        f32::from_bytes(&client.read_one_unchecked(vb)).to_vec(),
+    ]
+}
+
+/// Alpha-beta-gamma filter `[pos, vel, acc]` with coefficients `alpha`, `beta`, `gamma`.
+#[cube]
+fn abg_scan(x: &[f32], pos: &mut [f32], vel: &mut [f32], acc: &mut [f32], al: f32, be: f32, ga: f32) {
+    let n = x.len();
+    let mut p = 0.0f32;
+    let mut v = 0.0f32;
+    let mut a = 0.0f32;
+    for t in 0..n {
+        if t == 0 {
+            p = x[0];
+            v = 0.0f32;
+            a = 0.0f32;
+        } else {
+            let pp = p + v + 0.5f32 * a;
+            let vp = v + a;
+            let res = x[t] - pp;
+            p = pp + al * res;
+            v = vp + be * res;
+            a = a + ga * res;
+        }
+        pos[t] = p;
+        vel[t] = v;
+        acc[t] = a;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn abg_map(x: &[f32], pos: &mut [f32], vel: &mut [f32], acc: &mut [f32], al: f32, be: f32, ga: f32) {
+    abg_scan(x, pos, vel, acc, al, be, ga);
+}
+
+pub(crate) fn abg_all(x: &[f32], al: f32, be: f32, ga: f32) -> Vec<Vec<f32>> {
+    let n = x.len();
+    if n == 0 {
+        return vec![Vec::new(); 3];
+    }
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let xb = client.create_from_slice(f32::as_bytes(x));
+    let bufs: Vec<_> = (0..3).map(|_| client.empty(n * core::mem::size_of::<f32>())).collect();
+    unsafe {
+        abg_map::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(xb, n),
+            BufferArg::from_raw_parts(bufs[0].clone(), n),
+            BufferArg::from_raw_parts(bufs[1].clone(), n),
+            BufferArg::from_raw_parts(bufs[2].clone(), n),
+            al,
+            be,
+            ga,
         );
     }
     bufs.into_iter()
@@ -1075,6 +1321,48 @@ pub fn launch_cube_comp(
                 return vec![ewc(53, &ew2(2, &up, &lo, 0.0), &up, &up, 0.0, 0.0)];
             }
             vec![up, mid, lo]
+        }
+        // Basic Kalman filter filtered position. `a` = dt, `b` = process noise,
+        // `c` = measurement noise, `flag != 0` adaptive noise.
+        CubeFormula::KalmanComp | CubeFormula::RtsComp => {
+            let src = lane_series(samples, p, p.lane);
+            let (dt, q, r, ad) = if formula == CubeFormula::RtsComp { (1.0, 1.0, 1.0, false) } else { (p.a, p.b, p.c, p.flag != 0) };
+            vec![kalman_all(&src, dt, q, r, ad).swap_remove(0)]
+        }
+        // Kalman trend slope `[slope, slope_z]`; window = `period` (at least 10).
+        CubeFormula::KslopeCols => {
+            let src = lane_series(samples, p, p.lane);
+            let k = kalman_all(&src, p.a, p.b, p.c, p.flag != 0);
+            let z = ewc(54, &k[1], &k[1], &k[1], p.period.max(10) as f32, 0.0);
+            vec![k[1].clone(), z]
+        }
+        // Kalman regime score: `0.5 * (tanh(slope_z) + 1)`, window `period` (at least 10).
+        CubeFormula::KscrComp => {
+            let src = lane_series(samples, p, p.lane);
+            let k = kalman_all(&src, p.a, p.b, p.c, p.flag != 0);
+            let z = ewc(54, &k[1], &k[1], &k[1], p.period.max(10) as f32, 0.0);
+            vec![ewc(56, &z, &z, &z, 0.0, 0.0)]
+        }
+        // Kalman slope z-score, window `period` (at least 20), 0 until the window is full.
+        CubeFormula::KslopezComp => {
+            let src = lane_series(samples, p, p.lane);
+            let k = kalman_all(&src, p.a, p.b, p.c, p.flag != 0);
+            vec![ewc(55, &k[1], &k[1], &k[1], p.period.max(20) as f32, 0.0)]
+        }
+        // Alpha-beta-gamma filter `[pos, vel, acc]`: `flag == 0` derives the coefficients from
+        // `period` (alpha = 2 / (n + 1), beta = alpha^2 / 2, gamma = beta * alpha / 2),
+        // otherwise alpha, beta, gamma = `a`, `b`, `c`.
+        CubeFormula::AbgCols => {
+            let src = lane_series(samples, p, p.lane);
+            let n = p.period.max(1) as f32;
+            let (al, be, ga) = if p.flag == 0 {
+                let al = 2.0 / (n + 1.0);
+                let be = al * al / 2.0;
+                (al, be, be * al / 2.0)
+            } else {
+                (p.a, p.b, p.c)
+            };
+            abg_all(&src, al, be, ga)
         }
         _ => Vec::new(),
     }

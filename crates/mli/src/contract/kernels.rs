@@ -7091,6 +7091,57 @@ mod tests {
         assert_close(&run(CubeFormula::StdDevWidthComp, &bars, p), &cpu(&close, |v| m.feed(v)));
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Kalman family and alpha-beta-gamma 1040..=1045.
+    #[test]
+    fn lane_matches_cpu_comp_batch7() {
+        use crate::indicators::kalman::alpha_beta_gamma_filter::AlphaBetaGammaFilter;
+        use crate::indicators::kalman::basic_kalman_filter::BasicKalmanFilter;
+        use crate::indicators::kalman::kalman_regime_score::KalmanRegimeScore;
+        use crate::indicators::kalman::kalman_slope_zscore::KalmanSlopeZscore;
+        use crate::indicators::kalman::kalman_trend_slope::KalmanTrendSlope;
+        use crate::indicators::kalman::rts_smoother::RtsSmoother;
+
+        let bars = bars(200);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let mut p = CubeParams::period(12);
+        p.a = 1.0;
+        p.b = 0.05;
+        p.c = 0.5;
+        let mut m = BasicKalmanFilter::new(1.0, 0.05, 0.5);
+        assert_close(&run(CubeFormula::KalmanComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut ap = p;
+        ap.flag = 1;
+        let mut m = BasicKalmanFilter::new_adaptive(1.0, 0.05, 0.5);
+        assert_close(&run(CubeFormula::KalmanComp, &bars, ap), &cpu(&close, |v| m.feed(v)));
+        let mut m = RtsSmoother::new();
+        assert_close(&run(CubeFormula::RtsComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+
+        let mut m = KalmanTrendSlope::new(1.0, 0.05, 0.5, 12);
+        let (mut s, mut z) = (Vec::new(), Vec::new());
+        for c in &close {
+            let (a, b) = m.feed(*c);
+            s.push(a);
+            z.push(b);
+        }
+        assert_cols(&run_cols(CubeFormula::KslopeCols, &bars, p), &[&s, &z]);
+        let mut m = KalmanRegimeScore::new(1.0, 0.05, 0.5, 12, 0.9);
+        assert_close(&run(CubeFormula::KscrComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut zp = p;
+        zp.period = 24;
+        let mut m = KalmanSlopeZscore::new(1.0, 0.05, 0.5, 24);
+        assert_close(&run(CubeFormula::KslopezComp, &bars, zp), &cpu(&close, |v| m.feed(v)));
+
+        let mut m = AlphaBetaGammaFilter::new(10);
+        let (mut a, mut b, mut c) = (Vec::new(), Vec::new(), Vec::new());
+        for v in &close {
+            m.feed(*v);
+            a.push(m.pos());
+            b.push(m.vel());
+            c.push(m.acc());
+        }
+        assert_cols(&run_cols(CubeFormula::AbgCols, &bars, CubeParams::period(10)), &[&a, &b, &c]);
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

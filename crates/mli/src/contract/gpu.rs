@@ -567,6 +567,18 @@ pub enum CubeFormula {
     StdDevChanCols = 1038,
     /// Composite: Standard deviation channel width. UNTESTED on GPU.
     StdDevWidthComp = 1039,
+    /// Composite: Basic Kalman filter (2-state, optional adaptive noise). UNTESTED on GPU.
+    KalmanComp = 1040,
+    /// Composite: RTS smoother value (Kalman 1/1/1). UNTESTED on GPU.
+    RtsComp = 1041,
+    /// Composite: Kalman trend slope slope/slope_z. UNTESTED on GPU.
+    KslopeCols = 1042,
+    /// Composite: Kalman regime score. UNTESTED on GPU.
+    KscrComp = 1043,
+    /// Composite: Kalman slope z-score. UNTESTED on GPU.
+    KslopezComp = 1044,
+    /// Composite: Alpha-beta-gamma filter pos/vel/acc. UNTESTED on GPU.
+    AbgCols = 1045,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -750,6 +762,8 @@ impl CubeFormula {
             CubeFormula::LrCols => 4,
             CubeFormula::RegChanCols => 3,
             CubeFormula::StdDevChanCols => 3,
+            CubeFormula::KslopeCols => 2,
+            CubeFormula::AbgCols => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1015,6 +1029,12 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Kalman), Some(CubeFormula::KalmanComp));
+        assert_eq!(formula_of(IndicatorId::Rts), Some(CubeFormula::RtsComp));
+        assert_eq!(formula_of(IndicatorId::Kslope), Some(CubeFormula::KslopeCols));
+        assert_eq!(formula_of(IndicatorId::Kscr), Some(CubeFormula::KscrComp));
+        assert_eq!(formula_of(IndicatorId::Kslopez), Some(CubeFormula::KslopezComp));
+        assert_eq!(formula_of(IndicatorId::Abgfilter), Some(CubeFormula::AbgCols));
         assert_eq!(formula_of(IndicatorId::Lr), Some(CubeFormula::LrCols));
         assert_eq!(formula_of(IndicatorId::Regchan), Some(CubeFormula::RegChanCols));
         assert_eq!(formula_of(IndicatorId::Regchanwidth), Some(CubeFormula::RegChanWidthComp));
