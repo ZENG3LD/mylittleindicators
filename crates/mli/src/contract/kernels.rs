@@ -4251,6 +4251,9 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     if formula.code() >= 1000 && formula.code() < 1100 {
         return super::kernels_comp::launch_cube_comp(formula, samples, params).swap_remove(0);
     }
+    if formula.code() >= 1100 && formula.code() < 1200 {
+        return super::kernels_spec::launch_cube_spectral(formula, samples, params).swap_remove(0);
+    }
     if formula.code() >= 830 && formula.code() < 850 {
         return super::kernels_post::launch_cube_barsig(formula, samples, params).swap_remove(0);
     }
@@ -4572,6 +4575,9 @@ pub fn launch_cube_columns(
     }
     if formula.code() >= 1000 && formula.code() < 1100 {
         return super::kernels_comp::launch_cube_comp(formula, samples, params);
+    }
+    if formula.code() >= 1100 && formula.code() < 1200 {
+        return super::kernels_spec::launch_cube_spectral(formula, samples, params);
     }
     if formula.code() >= 830 && formula.code() < 850 {
         return super::kernels_post::launch_cube_barsig(formula, samples, params);
@@ -7155,6 +7161,68 @@ mod tests {
                 .expect("wgpu adapter");
             let mut m = Decycler::new(period as f64);
             assert_close(&gpu[0], &cpu(&close, |v| m.feed(v)));
+        }
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): spectral family 1100..=1112.
+    #[test]
+    fn lane_matches_cpu_spectral_batch() {
+        use crate::indicators::signal_processing::spectral_bandpower::SpectralBandpower;
+        use crate::indicators::signal_processing::spectral_bandpower_ratio_hl::SpectralBandpowerRatioHL;
+        use crate::indicators::signal_processing::spectral_bandwidth_feature::SpectralBandwidthFeature;
+        use crate::indicators::signal_processing::spectral_centroid_feature::SpectralCentroidFeature;
+        use crate::indicators::signal_processing::spectral_crest::SpectralCrest;
+        use crate::indicators::signal_processing::spectral_energy_ratio::SpectralEnergyRatio;
+        use crate::indicators::signal_processing::spectral_entropy::SpectralEntropy;
+        use crate::indicators::signal_processing::spectral_flatness::SpectralFlatness;
+        use crate::indicators::signal_processing::spectral_high_mid_power_ratio::SpectralHighMidPowerRatio;
+        use crate::indicators::signal_processing::spectral_low_mid_power_ratio::SpectralLowMidPowerRatio;
+        use crate::indicators::signal_processing::spectral_rolloff::SpectralRolloff;
+        use crate::indicators::signal_processing::spectral_rolloff_95::SpectralRolloff95;
+        use crate::indicators::signal_processing::spectral_slope::SpectralSlope;
+
+        // 300 bars: enough for 2 * ws samples and the 8-spectrum average at window 32 and 64.
+        let bars = bars(300);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        for w in [32usize, 64] {
+            let mut p = CubeParams::period(w as u32);
+            p.a = 0.2;
+            p.b = 0.4;
+            let mut m = SpectralFlatness::new(w);
+            assert_close(&run(CubeFormula::SflatComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = SpectralSlope::new(w);
+            assert_close(&run(CubeFormula::SslopeComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = SpectralBandpower::new(w, 0.2, 0.4);
+            let (mut l, mut mi, mut h) = (Vec::new(), Vec::new(), Vec::new());
+            for c in &close {
+                let (a, b, d) = m.feed(*c);
+                l.push(a);
+                mi.push(b);
+                h.push(d);
+            }
+            assert_cols(&run_cols(CubeFormula::SbpCols, &bars, p), &[&l, &mi, &h]);
+            let mut m = SpectralBandpowerRatioHL::new(w, 0.2, 0.4);
+            assert_close(&run(CubeFormula::SbprhlComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = SpectralBandwidthFeature::new(w);
+            assert_close(&run(CubeFormula::SbwfComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = SpectralCentroidFeature::new(w);
+            assert_close(&run(CubeFormula::ScfComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = SpectralCrest::new(w);
+            assert_close(&run(CubeFormula::ScrestComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = SpectralEntropy::new(w);
+            assert_close(&run(CubeFormula::SentComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = SpectralEnergyRatio::new(w, 0.2);
+            assert_close(&run(CubeFormula::SerComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = SpectralHighMidPowerRatio::new(w, 0.2, 0.4);
+            assert_close(&run(CubeFormula::ShmprComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = SpectralLowMidPowerRatio::new(w, 0.2, 0.4);
+            assert_close(&run(CubeFormula::SlmprComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut rp = p;
+            rp.a = 0.8;
+            let mut m = SpectralRolloff::new(w, 0.8);
+            assert_close(&run(CubeFormula::SrollComp, &bars, rp), &cpu(&close, |v| m.feed(v)));
+            let mut m = SpectralRolloff95::new(w);
+            assert_close(&run(CubeFormula::Sroll95Comp, &bars, p), &cpu(&close, |v| m.feed(v)));
         }
     }
 

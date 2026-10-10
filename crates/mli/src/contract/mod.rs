@@ -714,6 +714,10 @@ pub mod shader_run;
 #[cfg(feature = "gpu")]
 pub mod kernels_comp;
 
+/// Spectral family (FFT averaging port). UNTESTED on GPU.
+#[cfg(feature = "gpu")]
+pub mod kernels_spec;
+
 /// Event-frame formulas, codes 900..=999. UNTESTED on GPU.
 #[cfg(feature = "gpu")]
 pub mod kernels_ev;

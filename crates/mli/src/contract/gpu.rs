@@ -579,6 +579,32 @@ pub enum CubeFormula {
     KslopezComp = 1044,
     /// Composite: Alpha-beta-gamma filter pos/vel/acc. UNTESTED on GPU.
     AbgCols = 1045,
+    /// Composite: Spectral flatness. UNTESTED on GPU.
+    SflatComp = 1100,
+    /// Composite: Spectral slope. UNTESTED on GPU.
+    SslopeComp = 1101,
+    /// Composite: Spectral band power low/mid/high. UNTESTED on GPU.
+    SbpCols = 1102,
+    /// Composite: Spectral band power ratio high/low. UNTESTED on GPU.
+    SbprhlComp = 1103,
+    /// Composite: Spectral bandwidth feature. UNTESTED on GPU.
+    SbwfComp = 1104,
+    /// Composite: Spectral centroid feature. UNTESTED on GPU.
+    ScfComp = 1105,
+    /// Composite: Spectral crest. UNTESTED on GPU.
+    ScrestComp = 1106,
+    /// Composite: Spectral entropy. UNTESTED on GPU.
+    SentComp = 1107,
+    /// Composite: Spectral energy ratio. UNTESTED on GPU.
+    SerComp = 1108,
+    /// Composite: Spectral high/mid power ratio. UNTESTED on GPU.
+    ShmprComp = 1109,
+    /// Composite: Spectral low/mid power ratio. UNTESTED on GPU.
+    SlmprComp = 1110,
+    /// Composite: Spectral rolloff. UNTESTED on GPU.
+    SrollComp = 1111,
+    /// Composite: Spectral rolloff 95. UNTESTED on GPU.
+    Sroll95Comp = 1112,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -764,6 +790,7 @@ impl CubeFormula {
             CubeFormula::StdDevChanCols => 3,
             CubeFormula::KslopeCols => 2,
             CubeFormula::AbgCols => 3,
+            CubeFormula::SbpCols => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1029,6 +1056,19 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Sflat), Some(CubeFormula::SflatComp));
+        assert_eq!(formula_of(IndicatorId::Sslope), Some(CubeFormula::SslopeComp));
+        assert_eq!(formula_of(IndicatorId::Sbp), Some(CubeFormula::SbpCols));
+        assert_eq!(formula_of(IndicatorId::Sbprhl), Some(CubeFormula::SbprhlComp));
+        assert_eq!(formula_of(IndicatorId::Sbwf), Some(CubeFormula::SbwfComp));
+        assert_eq!(formula_of(IndicatorId::Scf), Some(CubeFormula::ScfComp));
+        assert_eq!(formula_of(IndicatorId::Screst), Some(CubeFormula::ScrestComp));
+        assert_eq!(formula_of(IndicatorId::Sent), Some(CubeFormula::SentComp));
+        assert_eq!(formula_of(IndicatorId::Ser), Some(CubeFormula::SerComp));
+        assert_eq!(formula_of(IndicatorId::Shmpr), Some(CubeFormula::ShmprComp));
+        assert_eq!(formula_of(IndicatorId::Slmpr), Some(CubeFormula::SlmprComp));
+        assert_eq!(formula_of(IndicatorId::Sroll), Some(CubeFormula::SrollComp));
+        assert_eq!(formula_of(IndicatorId::Sroll95), Some(CubeFormula::Sroll95Comp));
         assert_eq!(formula_of(IndicatorId::Kalman), Some(CubeFormula::KalmanComp));
         assert_eq!(formula_of(IndicatorId::Rts), Some(CubeFormula::RtsComp));
         assert_eq!(formula_of(IndicatorId::Kslope), Some(CubeFormula::KslopeCols));
