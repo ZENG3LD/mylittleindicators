@@ -173,6 +173,14 @@ fn win_std(c: &[f32], base: usize, n: usize) -> f32 {
     (var / (n as f32)).sqrt()
 }
 
+/// Log return held in ring slot `i` of a `w`-slot return ring (first return at bar 1 goes to slot 0)
+/// after bar `t` (needs `t >= w`).
+#[cube]
+fn ring_ret(c: &[f32], t: usize, w: usize, i: usize) -> f32 {
+    let m = (t - 1) - ((t - 1 + w - i) % w);
+    (c[m + 1] / c[m]).ln()
+}
+
 /// 1200 Stochastik-D `[k, d]` (`period` %K window, `p2` %D window), 1201 Donchian stop
 /// (lower stop: `period` lower window, `p2` upper window unused in the output, `a` offset, `flag`
 /// percentage), 1202 projection bands `[upper, middle, lower]` (`period` window clamped 2..=512,
@@ -1014,6 +1022,179 @@ fn bar_scan(
                 held0 = (cc as f32) / norm;
             }
             v0 = held0;
+        } else if formula == 1227u32 {
+            // Ljung-Box Q over the ring-ordered returns (period window >= 20, fast lags)
+            let mut w = period as usize;
+            if w < 20 {
+                w = 20;
+            }
+            let mut lg = p2 as usize;
+            if lg < 1 {
+                lg = 1;
+            }
+            if lg > w / 2 {
+                lg = w / 2;
+            }
+            if t >= w {
+                let nf = w as f32;
+                let mut mean = 0.0f32;
+                for i in 0..w {
+                    let r = ring_ret(c, t, w, i);
+                    scr[i] = r;
+                    mean = mean + r;
+                }
+                mean = mean / nf;
+                let mut var = 0.0f32;
+                for i in 0..w {
+                    scr[i] = scr[i] - mean;
+                    var = var + scr[i] * scr[i];
+                }
+                var = var / nf;
+                if var <= 1.0e-12f32 {
+                    held0 = 0.0f32;
+                } else {
+                    let mut q = 0.0f32;
+                    for hh in 1..(lg + 1) {
+                        let mut num = 0.0f32;
+                        for k in hh..w {
+                            num = num + scr[k] * scr[k - hh];
+                        }
+                        let rho = num / (nf * var);
+                        q = q + rho * rho / (nf - (hh as f32));
+                    }
+                    held0 = q * nf * (nf + 2.0f32);
+                }
+            }
+            v0 = held0;
+        } else if formula == 1228u32 {
+            // partial autocorrelation at `fast` lag by Durbin-Levinson on ring-ordered returns
+            let mut w = period as usize;
+            if w < 10 {
+                w = 10;
+            }
+            let mut kl = p2 as usize;
+            if kl < 1 {
+                kl = 1;
+            }
+            if kl > w - 2 {
+                kl = w - 2;
+            }
+            if t >= w {
+                let nf = w as f32;
+                let mut mean = 0.0f32;
+                for i in 0..w {
+                    let r = ring_ret(c, t, w, i);
+                    scr[i] = r;
+                    mean = mean + r;
+                }
+                mean = mean / nf;
+                for i in 0..w {
+                    scr[i] = scr[i] - mean;
+                }
+                // autoc at [w .. w + kl], phi at [w + kl + 1 ..], tmp after
+                let ao = w;
+                let po = w + kl + 1;
+                let to = w + 2 * (kl + 1);
+                for lag in 0..(kl + 1) {
+                    let mut sm = 0.0f32;
+                    for k in lag..w {
+                        sm = sm + scr[k] * scr[k - lag];
+                    }
+                    scr[ao + lag] = sm / nf;
+                }
+                if scr[ao].abs() < 1.0e-12f32 {
+                    held0 = 0.0f32;
+                } else {
+                    for j in 0..(kl + 1) {
+                        scr[po + j] = 0.0f32;
+                    }
+                    let mut vv = scr[ao];
+                    for m in 1..(kl + 1) {
+                        let mut sum = 0.0f32;
+                        for j in 1..m {
+                            sum = sum + scr[po + j] * scr[ao + m - j];
+                        }
+                        let km = (scr[ao + m] - sum) / vv.max(1.0e-12f32);
+                        for j in 1..m {
+                            scr[to + j] = scr[po + j] - km * scr[po + m - j];
+                        }
+                        for j in 1..m {
+                            scr[po + j] = scr[to + j];
+                        }
+                        scr[po + m] = km;
+                        vv = vv * (1.0f32 - km * km);
+                    }
+                    held0 = scr[po + kl].max(-1.0f32).min(1.0f32);
+                }
+            }
+            v0 = held0;
+        } else if formula == 1229u32 {
+            // half life of mean reversion from an AR(1) fit of consecutive returns
+            let mut w = period as usize;
+            if w < 20 {
+                w = 20;
+            }
+            if t >= w {
+                let mut sx = 0.0f32;
+                let mut sy = 0.0f32;
+                let mut sxx = 0.0f32;
+                let mut sxy = 0.0f32;
+                let mut cn = 0.0f32;
+                for i in 1..w {
+                    let j = t + 1 - w + i;
+                    let y = (c[j] / c[j - 1]).ln();
+                    let x = (c[j - 1] / c[j - 2]).ln();
+                    sx = sx + x;
+                    sy = sy + y;
+                    sxx = sxx + x * x;
+                    sxy = sxy + x * y;
+                    cn = cn + 1.0f32;
+                }
+                let den = cn * sxx - sx * sx;
+                let mut phi = 0.0f32;
+                if den.abs() > 1.0e-12f32 {
+                    phi = (cn * sxy - sx * sy) / den;
+                }
+                if phi > 0.0f32 && phi < 1.0f32 {
+                    held0 = (-(0.6931472f32) / phi.ln()).max(0.0f32);
+                } else {
+                    // +inf on the CPU: patched on the host after read-back
+                    held0 = 3.4e38f32;
+                }
+            }
+            v0 = held0;
+        } else if formula == 1230u32 {
+            // residual stationarity: var(close - running SMA) / var(close) over ring-ordered closes
+            let mut w = period as usize;
+            if w < 20 {
+                w = 20;
+            }
+            if t + 1 >= w {
+                let nf = w as f32;
+                let mut mean = 0.0f32;
+                for i in 0..w {
+                    let b = t - ((t + w - i) % w);
+                    scr[i] = c[b];
+                    mean = mean + c[b];
+                }
+                mean = mean / nf;
+                let mut run = 0.0f32;
+                let mut vr = 0.0f32;
+                let mut vc = 0.0f32;
+                for i in 0..w {
+                    run = run + scr[i];
+                    let sma = run / ((i + 1) as f32);
+                    let r = scr[i] - sma;
+                    vr = vr + r * r;
+                    vc = vc + (scr[i] - mean) * (scr[i] - mean);
+                }
+                if vc > 0.0f32 {
+                    held0 = (vr / nf) / (vc / nf);
+                } else {
+                    held0 = 0.0f32;
+                }
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -1137,6 +1318,14 @@ pub fn launch_cube_bar(
         res[1] = up.iter().zip(lo.iter()).map(|(u, l)| (u + l) / 2.0).collect();
         res[0] = up;
         res[2] = lo;
+    }
+    if formula == CubeFormula::HalfLifeBar {
+        // +inf on the CPU is carried as a huge sentinel through the kernel
+        for x in res[0].iter_mut() {
+            if *x >= 3.0e38 {
+                *x = f32::INFINITY;
+            }
+        }
     }
     res
 }

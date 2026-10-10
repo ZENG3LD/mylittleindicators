@@ -645,6 +645,14 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: ljung box. UNTESTED on GPU.
+    LjungBoxBar = 1227,
+    /// Composite: pacf. UNTESTED on GPU.
+    PacfBar = 1228,
+    /// Composite: half life. UNTESTED on GPU.
+    HalfLifeBar = 1229,
+    /// Composite: residual stationarity. UNTESTED on GPU.
+    ResidStatBar = 1230,
     /// Composite: js divergence. UNTESTED on GPU.
     JsdBar = 1224,
     /// Composite: kl divergence. UNTESTED on GPU.
@@ -1311,6 +1319,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::LjungBox), Some(CubeFormula::LjungBoxBar));
+        assert_eq!(formula_of(IndicatorId::Pacf), Some(CubeFormula::PacfBar));
+        assert_eq!(formula_of(IndicatorId::HalfLifeMr), Some(CubeFormula::HalfLifeBar));
+        assert_eq!(formula_of(IndicatorId::ResidStat), Some(CubeFormula::ResidStatBar));
         assert_eq!(formula_of(IndicatorId::Jsd), Some(CubeFormula::JsdBar));
         assert_eq!(formula_of(IndicatorId::Kld), Some(CubeFormula::KldBar));
         assert_eq!(formula_of(IndicatorId::Lz), Some(CubeFormula::LzBar));

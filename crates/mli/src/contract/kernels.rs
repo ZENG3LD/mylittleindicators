@@ -8632,6 +8632,39 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1227..=1230.
+    #[test]
+    fn lane_matches_cpu_bar_batch10() {
+        use crate::indicators::statistics::half_life_mr::HalfLifeMr;
+        use crate::indicators::statistics::ljung_box::LjungBox;
+        use crate::indicators::statistics::pacf::Pacf;
+        use crate::indicators::statistics::residual_stationarity::ResidualStationarity;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(30);
+        p.fast = 5;
+        let mut m = LjungBox::new(30, 5);
+        chk(&run_cols(CubeFormula::LjungBoxBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = Pacf::new(30, 5);
+        chk(&run_cols(CubeFormula::PacfBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = HalfLifeMr::new(30);
+        chk(&run_cols(CubeFormula::HalfLifeBar, &bars, CubeParams::period(30)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = ResidualStationarity::new(30);
+        chk(&run_cols(CubeFormula::ResidStatBar, &bars, CubeParams::period(30)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
