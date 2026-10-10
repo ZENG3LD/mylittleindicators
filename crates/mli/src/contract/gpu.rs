@@ -645,6 +645,14 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: median channels. UNTESTED on GPU.
+    MedChanBar = 1212,
+    /// Composite: median channel position. UNTESTED on GPU.
+    MedChanPosBar = 1213,
+    /// Composite: dpo bands. UNTESTED on GPU.
+    DpoBandsBar = 1214,
+    /// Composite: volatility stop. UNTESTED on GPU.
+    VoltsBar = 1215,
     /// Composite: ichimoku. UNTESTED on GPU.
     IchimokuBar = 1209,
     /// Composite: ichimoku pos. UNTESTED on GPU.
@@ -1012,6 +1020,8 @@ impl CubeFormula {
             CubeFormula::VwapChanBar => 3,
             CubeFormula::VprbBar => 3,
             CubeFormula::IchimokuBar => 5,
+            CubeFormula::MedChanBar => 3,
+            CubeFormula::DpoBandsBar => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1278,6 +1288,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Medchan), Some(CubeFormula::MedChanBar));
+        assert_eq!(formula_of(IndicatorId::Medchanpos), Some(CubeFormula::MedChanPosBar));
+        assert_eq!(formula_of(IndicatorId::Dpobands), Some(CubeFormula::DpoBandsBar));
+        assert_eq!(formula_of(IndicatorId::Volts), Some(CubeFormula::VoltsBar));
         assert_eq!(formula_of(IndicatorId::Ichimoku), Some(CubeFormula::IchimokuBar));
         assert_eq!(formula_of(IndicatorId::Ichimokupos), Some(CubeFormula::IchimokuPosBar));
         assert_eq!(formula_of(IndicatorId::Ichimokuthick), Some(CubeFormula::IchimokuThickBar));

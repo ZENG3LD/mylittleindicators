@@ -8462,6 +8462,46 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1212..=1215.
+    #[test]
+    fn lane_matches_cpu_bar_batch5() {
+        use crate::indicators::channels::dpo_bands::DpoBands;
+        use crate::indicators::channels::median_channel_position::MedianChannelPosition;
+        use crate::indicators::channels::median_channels::{MedianChannels, MedianMode, MedianSource};
+        use crate::indicators::trend_stop::volatility_stop::{VolatilityStop, VolatilityType};
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = MedianChannels::new_custom(9, MedianMode::Simple, MedianSource::Close, 1.4826);
+        chk(&run_cols(CubeFormula::MedChanBar, &bars, CubeParams::period(9)), close.iter().map(|c| { let (u, mi, lo) = m.feed(*c); vec![u, mi, lo] }).collect());
+        let mut m = MedianChannelPosition::new(9);
+        chk(&run_cols(CubeFormula::MedChanPosBar, &bars, CubeParams::period(9)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(6);
+        p.fast = 12;
+        p.a = 2.0;
+        let mut m = DpoBands::new(6, 12, 2.0);
+        chk(&run_cols(CubeFormula::DpoBandsBar, &bars, p), close.iter().map(|c| { let (u, mi, lo) = m.feed(*c); vec![u, mi, lo] }).collect());
+        for (flag, vt) in [(0u32, VolatilityType::StandardDeviation), (1, VolatilityType::Atr), (2, VolatilityType::Range)] {
+            let mut p = CubeParams::period(8);
+            p.a = 2.0;
+            p.flag = flag;
+            p.smoother = CubeSmoother::Sma;
+            let mut m = VolatilityStop::from_smoother(SmootherId::Sma, 8, 2.0, vt);
+            chk(&run_cols(CubeFormula::VoltsBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]])]).collect());
+        }
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

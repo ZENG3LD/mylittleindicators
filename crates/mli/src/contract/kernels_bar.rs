@@ -414,6 +414,95 @@ fn bar_scan(
             } else {
                 v0 = (top - bot).abs();
             }
+        } else if formula == 1212u32 || formula == 1213u32 {
+            // median channels (Simple mode, close source): median +- 1.4826 * MAD over `period`
+            let mut w = period as usize;
+            if formula == 1213u32 {
+                if w < 3 {
+                    w = 3;
+                }
+            } else if w < 2 {
+                w = 2;
+            }
+            if t + 1 >= w {
+                let med = kth_in(c, t + 1 - w, w, (w / 2) as u32);
+                let mad = 1.4826f32 * kth_dev(c, t + 1 - w, w, (w / 2) as u32, med);
+                if formula == 1212u32 {
+                    v0 = med + mad;
+                    v1 = med;
+                    v2 = med - mad;
+                } else {
+                    // CPU position reads (median, upper, lower) from the swapped tuple
+                    let width = (med - (med - mad)).abs();
+                    v0 = 0.5f32;
+                    if width > 0.0f32 {
+                        v0 = ((c[t] - (med - mad)) / width).max(0.0f32).min(1.0f32);
+                    }
+                }
+            } else if formula == 1213u32 {
+                v0 = 0.5f32;
+            }
+        } else if formula == 1214u32 {
+            // DPO bands: the `volume` slot carries the DPO series; window `p2` clamped 5..=512
+            let mut w = p2 as usize;
+            if w < 5 {
+                w = 5;
+            }
+            if w > 512 {
+                w = 512;
+            }
+            let mut kk = a;
+            if kk <= 0.0f32 {
+                kk = 2.0f32;
+            }
+            if t + 1 >= w {
+                let mut sum = 0.0f32;
+                for j in (t + 1 - w)..(t + 1) {
+                    sum = sum + v[j];
+                }
+                let mean = sum / (w as f32);
+                let mut var = 0.0f32;
+                for j in (t + 1 - w)..(t + 1) {
+                    var = var + (v[j] - mean) * (v[j] - mean);
+                }
+                let sd = (var / (w as f32)).sqrt();
+                v0 = kk * sd;
+                v2 = -kk * sd;
+            }
+        } else if formula == 1215u32 {
+            // volatility stop (long stop): v = smoothed typical price, o = ATR (flag 1)
+            // flag 0 = std of closes, 1 = ATR, 2 = mean range
+            let mut w = period as usize;
+            if w < 1 {
+                w = 1;
+            }
+            let mut st = 0usize;
+            if t + 1 > w {
+                st = t + 1 - w;
+            }
+            let cnt = t + 1 - st;
+            let mut vol = 0.0f32;
+            if flag == 1u32 {
+                vol = _o[t];
+            } else if flag == 2u32 {
+                let mut sr = 0.0f32;
+                for j in st..(t + 1) {
+                    sr = sr + (h[j] - l[j]);
+                }
+                vol = sr / (cnt as f32);
+            } else if cnt >= 2usize {
+                let mut sm = 0.0f32;
+                for j in st..(t + 1) {
+                    sm = sm + c[j];
+                }
+                let mean = sm / (cnt as f32);
+                let mut var = 0.0f32;
+                for j in st..(t + 1) {
+                    var = var + (c[j] - mean) * (c[j] - mean);
+                }
+                vol = (var / (cnt as f32)).sqrt();
+            }
+            v0 = v[t] - vol * a;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -459,6 +548,23 @@ pub fn launch_cube_bar(
     let l = lane_series(samples, params, OhlcvField::Low);
     let c = lane_series(samples, params, params.lane);
     let mut v = lane_series(samples, params, OhlcvField::Volume);
+    let mut o = o;
+    if formula == CubeFormula::DpoBandsBar {
+        let mut dp = params;
+        dp.period = params.period.max(2);
+        dp.smoother = super::CubeSmoother::Sma;
+        v = super::kernels::launch_cube(CubeFormula::DpoCols, samples, dp);
+    }
+    if formula == CubeFormula::VoltsBar {
+        let tp = lane_series(samples, params, OhlcvField::HLC3);
+        v = smooth_series(&tp, params.smoother, params.period.max(1), 0, params.a, params.b);
+        if params.flag == 1 {
+            let mut ap = params;
+            ap.period = params.period.max(1);
+            ap.smoother = super::CubeSmoother::Rma;
+            o = super::kernels::launch_cube(CubeFormula::Atr, samples, ap);
+        }
+    }
     if formula == CubeFormula::VprbBar {
         // ATR (EMA smoothed) runs on the device first and rides in the volume slot
         let mut ap = params;
