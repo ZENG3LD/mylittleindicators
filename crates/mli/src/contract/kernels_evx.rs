@@ -1648,6 +1648,74 @@ fn evx_scan(
                 h3 = sm / ((nb - lo) as f32);
             }
             v0 = h3;
+        } else if formula == 993u32 {
+            // absorption detector `[score, signal]` over the last max(period, 2) ticks (held until the window is full)
+            let mut w = period as usize;
+            if w < 2usize {
+                w = 2usize;
+            }
+            if i + 1 >= w {
+                let lo = i + 1 - w;
+                let mut tv = 0.0f32;
+                let mut bv = 0.0f32;
+                for q in lo..(i + 1) {
+                    tv = tv + x[n + q];
+                    if side[q] > 0.0f32 {
+                        bv = bv + x[n + q];
+                    }
+                }
+                let pr = (x[i] - x[lo]).abs();
+                if pr > 1.0e-9f32 {
+                    h0 = tv / pr;
+                } else if tv > 0.0f32 {
+                    h0 = tv * 1000.0f32;
+                } else {
+                    h0 = 0.0f32;
+                }
+                let sv = tv - bv;
+                if bv > sv * 1.5f32 {
+                    h1 = 1.0f32;
+                } else if sv > bv * 1.5f32 {
+                    h1 = 0.0f32 - 1.0f32;
+                } else {
+                    h1 = 0.0f32;
+                }
+            }
+            v0 = h0;
+            v1 = h1;
+        } else if formula == 994u32 {
+            // adaptive window selector: `period` short window, `b` long window (>= short), `a` volatility threshold;
+            // short window when the sample std of the last `short` prices exceeds it, else long
+            let mut sw = period as usize;
+            if sw < 2usize {
+                sw = 2usize;
+            }
+            let mut lw = b as usize;
+            if lw < sw {
+                lw = sw;
+            }
+            let mut cnt = i + 1;
+            if cnt > sw {
+                cnt = sw;
+            }
+            let mut sd = 0.0f32;
+            if cnt >= 2usize {
+                let mut mean = 0.0f32;
+                for q in (i + 1 - cnt)..(i + 1) {
+                    mean = mean + x[q];
+                }
+                mean = mean / (cnt as f32);
+                let mut va = 0.0f32;
+                for q in (i + 1 - cnt)..(i + 1) {
+                    va = va + (x[q] - mean) * (x[q] - mean);
+                }
+                sd = (va / ((cnt - 1) as f32)).sqrt();
+            }
+            if sd > a {
+                v0 = sw as f32;
+            } else {
+                v0 = lw as f32;
+            }
         }
         out[i] = v0;
         if formula != 992u32 {

@@ -741,6 +741,10 @@ pub enum CubeFormula {
     VdeltaEv = 991,
     /// Event: VPIN. UNTESTED on GPU.
     VpinEv = 992,
+    /// Event: absorption detector `[score, signal]`. UNTESTED on GPU.
+    AbsorptionEv = 993,
+    /// Event: adaptive window selector. UNTESTED on GPU.
+    AdaptWinEv = 994,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1251,6 +1255,7 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::AbsorptionEv => 2,
             CubeFormula::AdaptiveStochBar => 2,
             CubeFormula::WickspikeBar => 2,
             CubeFormula::TsSwingsBar => 2,
@@ -1584,6 +1589,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Cvd), Some(CubeFormula::CvdEv));
         assert_eq!(formula_of(IndicatorId::Vdelta), Some(CubeFormula::VdeltaEv));
         assert_eq!(formula_of(IndicatorId::Vpin), Some(CubeFormula::VpinEv));
+        assert_eq!(formula_of(IndicatorId::AbsorptionDetector), Some(CubeFormula::AbsorptionEv));
+        assert_eq!(formula_of(IndicatorId::AdaptiveWindowSelector), Some(CubeFormula::AdaptWinEv));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

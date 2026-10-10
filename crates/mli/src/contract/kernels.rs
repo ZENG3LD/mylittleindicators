@@ -11740,4 +11740,36 @@ mod tests {
         p.a = 25.0;
         assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::VpinEv, &fr, p)[0], &c);
     }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): tick AbsorptionDetector / AdaptiveWindowSelector (993-994).
+    #[test]
+    fn tick_absorption_and_window_selector_match_cpu() {
+        use crate::core::types::Tick;
+        use crate::engine::streams::tick_consumer::TickConsumer;
+        use crate::indicators::clusters::absorption_detector::AbsorptionDetector;
+        use crate::indicators::composites::adaptive_window_selector::AdaptiveWindowSelector;
+        use super::super::event_frame::GpuEventFrame;
+        let n = 300usize;
+        let ticks: Vec<Tick> = (0..n)
+            .map(|i| {
+                let f = i as f64;
+                Tick::new(1_000 + i as i64 * 100, 100.0 + 2.0 * (f * 0.2).sin() + (f * 1.9).sin() * 0.4, 1.0 + (f * 0.7).sin().abs() * 3.0, (f * 1.3).sin() > 0.0)
+            })
+            .collect();
+        let fr = GpuEventFrame::from_ticks(&ticks);
+        let mut m = AbsorptionDetector::new(15);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for t in &ticks {
+            m.update_tick(t);
+            a.push(m.score());
+            b.push(m.signal());
+        }
+        assert_cols(&super::super::kernels_ev::launch_cube_events(CubeFormula::AbsorptionEv, &fr, CubeParams::period(15)), &[&a, &b]);
+        let mut m = AdaptiveWindowSelector::new(8, 40, 0.5);
+        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
+        let mut p = CubeParams::period(8);
+        p.a = 0.5;
+        p.b = 40.0;
+        assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::AdaptWinEv, &fr, p)[0], &c);
+    }
 }
