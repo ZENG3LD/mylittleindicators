@@ -105,6 +105,27 @@ impl GpuEventFrame {
         Self::from_rows(&r)
     }
 
+    /// Book deltas: `x0` total changed levels, `x1` levels with size > 0 (added / updated).
+    pub fn from_deltas(v: &[crate::core::types::OrderbookDelta]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|d| {
+                let upd = d.updated_bids().count() + d.updated_asks().count();
+                ([d.total_changes() as f64, upd as f64, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 0.0, d.timestamp)
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    /// Basis: `x0` basis.
+    pub fn from_basis(v: &[crate::core::types::Basis]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|b| ([b.basis, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 0.0, b.timestamp))
+            .collect();
+        Self::from_rows(&r)
+    }
+
     pub fn from_ticks(v: &[Tick]) -> Self {
         let r: Vec<_> = v
             .iter()

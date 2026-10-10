@@ -7777,6 +7777,60 @@ mod tests {
         assert_close(&launch_cube_book(CubeFormula::OrderBookVelocityBk, &fr, CubeParams::period(6))[0], &c);
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): delta and basis event rows 980..=983.
+    #[test]
+    fn lane_matches_cpu_event_batch5() {
+        use super::super::event_frame::GpuEventFrame;
+        use super::super::kernels_ev::launch_cube_events;
+        use crate::core::types::{Basis, OrderBookLevel, OrderbookDelta};
+        use crate::engine::streams::basis_consumer::BasisConsumer;
+        use crate::engine::streams::orderbook_delta_consumer::OrderbookDeltaConsumer;
+        use crate::indicators::book::book_churn_rate::BookChurnRate;
+        use crate::indicators::book::level_replenishment_rate::LevelReplenishmentRate;
+        use crate::indicators::index_basis::basis_extreme::BasisExtreme;
+        use crate::indicators::microstructure::quote_stuffing_detector::QuoteStuffingDetector;
+
+        let n = 80usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let t0 = 1_700_000_000_000i64;
+        let pp = |p: u32, a: f32, b: f32| { let mut c = CubeParams::period(p); c.a = a; c.b = b; c };
+        let deltas: Vec<OrderbookDelta> = (0..n)
+            .map(|i| {
+                let kb = (w(i, 0.9) * 4.0) as usize;
+                let ka = (w(i, 0.5) * 4.0) as usize;
+                OrderbookDelta {
+                    bids: (0..kb).map(|l| OrderBookLevel::new(100.0 - l as f64, if (i + l) % 3 == 0 { 0.0 } else { 1.0 })).collect(),
+                    asks: (0..ka).map(|l| OrderBookLevel::new(101.0 + l as f64, if (i + l) % 4 == 0 { 0.0 } else { 2.0 })).collect(),
+                    timestamp: t0 + i as i64 * 150 + (i as i64 % 3) * 40,
+                    ..Default::default()
+                }
+            })
+            .collect();
+        let fr = GpuEventFrame::from_deltas(&deltas);
+        let mut m = BookChurnRate::new(7);
+        let c: Vec<f64> = deltas.iter().map(|d| { m.update_delta(d); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::BookChurnEv, &fr, pp(7, 0.0, 0.0))[0], &c);
+        let mut m = LevelReplenishmentRate::new(9);
+        let c: Vec<f64> = deltas.iter().map(|d| { m.update_delta(d); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::LevelReplenishEv, &fr, pp(9, 0.0, 0.0))[0], &c);
+        let mut m = QuoteStuffingDetector::new(1000, 5.0);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for d in &deltas {
+            m.update_delta(d);
+            a.push(m.rate());
+            b.push(m.signal());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::QuoteStuffingEv, &fr, pp(1, 1000.0, 5.0)), &[&a, &b]);
+
+        let basis: Vec<Basis> = (0..n)
+            .map(|i| Basis { basis: 10.0 * w(i, 0.37) - 5.0, timestamp: t0 + i as i64 * 1000, ..Default::default() })
+            .collect();
+        let fr = GpuEventFrame::from_basis(&basis);
+        let mut m = BasisExtreme::new(15);
+        let c: Vec<f64> = basis.iter().map(|b| { m.update_basis(b); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::BasisExtremeEv, &fr, pp(15, 0.0, 0.0))[0], &c);
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

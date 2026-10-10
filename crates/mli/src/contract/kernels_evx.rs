@@ -12,7 +12,7 @@ use cubecl::__private::Runtime;
 
 use super::event_frame::GpuEventFrame;
 use super::gpu::CubeParams;
-use super::kernels_ev::win_start;
+use super::kernels_ev::{ev_mean, win_start};
 use super::kernels_post::kth_in;
 use super::CubeFormula;
 
@@ -511,6 +511,94 @@ fn evx_scan(
                 v0 = best_bucket * b + b * 0.5f32;
                 v1 = best_cnt;
                 v2 = best_vol;
+            }
+        } else if formula == 980u32 {
+            // book churn rate: mean changed levels (x0) over the last `period` (>= 1) deltas
+            let mut w = period as usize;
+            if w < 1 {
+                w = 1;
+            }
+            let mut lo = 0usize;
+            if i + 1 > w {
+                lo = i + 1 - w;
+            }
+            v0 = ev_mean(x, 0, n, lo, i);
+        } else if formula == 981u32 {
+            // level replenishment rate: updated levels (x1) are the events; the last `period`
+            // (>= 2) events across deltas, rate = count / span seconds (span >= 1 ms)
+            let mut w = period as usize;
+            if w < 2 {
+                w = 2;
+            }
+            let mut total = 0.0f32;
+            for j in 0..(i + 1) {
+                total = total + x[n + j];
+            }
+            let mut cnt = total;
+            if cnt > (w as f32) {
+                cnt = w as f32;
+            }
+            if cnt < 2.0f32 {
+                v0 = cnt;
+            } else {
+                let mut nj = i;
+                while x[n + nj] <= 0.0f32 {
+                    nj = nj - 1;
+                }
+                let mut acc = 0.0f32;
+                let mut oj = nj;
+                let mut go = true;
+                let mut j = nj + 1;
+                while go && j > 0 {
+                    j = j - 1;
+                    acc = acc + x[n + j];
+                    oj = j;
+                    if acc >= cnt {
+                        go = false;
+                    }
+                }
+                let mut span = ts[nj] - ts[oj];
+                if span < 1.0f32 {
+                    span = 1.0f32;
+                }
+                v0 = cnt / (span / 1000.0f32);
+            }
+        } else if formula == 982u32 {
+            // quote stuffing `[rate, signal]`: deltas in the last `a` ms per second, `b` threshold
+            let s = win_start(ts, i, a);
+            v0 = ((i + 1 - s) as f32) / (a / 1000.0f32);
+            let mut th = b;
+            if th < 0.0f32 {
+                th = 0.0f32;
+            }
+            if v0 > th {
+                v1 = 1.0f32;
+            }
+        } else if formula == 983u32 {
+            // basis extreme: +1 above the 95th / -1 below the 5th percentile of the previous
+            // `period` (>= 3) values (needs 2 of them)
+            let mut w = period as usize;
+            if w < 3 {
+                w = 3;
+            }
+            let mut lo = 0usize;
+            if i > w {
+                lo = i - w;
+            }
+            let len = i - lo;
+            if len >= 2 {
+                let mut k95 = len * 95 / 100;
+                if k95 > len - 1 {
+                    k95 = len - 1;
+                }
+                let k5 = len * 5 / 100;
+                let p95 = kth_in(x, lo, len, k95 as u32);
+                let p5 = kth_in(x, lo, len, k5 as u32);
+                if x[i] > p95 {
+                    v0 = 1.0f32;
+                } else if x[i] < p5 {
+                    v0 = -1.0f32;
+                }
             }
         }
         out[i] = v0;

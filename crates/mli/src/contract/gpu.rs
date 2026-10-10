@@ -601,6 +601,14 @@ pub enum CubeFormula {
     PressureComp = 1059,
     /// Composite: MACD histogram z-score. UNTESTED on GPU.
     MacdHistZComp = 1060,
+    /// Composite: book churn rate. UNTESTED on GPU.
+    BookChurnEv = 980,
+    /// Composite: level replenishment rate. UNTESTED on GPU.
+    LevelReplenishEv = 981,
+    /// Composite: quote stuffing rate/signal. UNTESTED on GPU.
+    QuoteStuffingEv = 982,
+    /// Composite: basis extreme. UNTESTED on GPU.
+    BasisExtremeEv = 983,
     /// Composite: liquidation cluster detector price/count/volume. UNTESTED on GPU.
     LiqClusterEv = 959,
     /// Composite: large trade filter signal/ratio. UNTESTED on GPU.
@@ -918,6 +926,7 @@ impl CubeFormula {
             CubeFormula::SpreadDistributionBk => 2,
             CubeFormula::LayerConcentrationBk => 3,
             CubeFormula::LiqClusterEv => 3,
+            CubeFormula::QuoteStuffingEv => 2,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1184,6 +1193,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::BookChurnRate), Some(CubeFormula::BookChurnEv));
+        assert_eq!(formula_of(IndicatorId::LevelReplenishRate), Some(CubeFormula::LevelReplenishEv));
+        assert_eq!(formula_of(IndicatorId::QuoteStuffingDetector), Some(CubeFormula::QuoteStuffingEv));
+        assert_eq!(formula_of(IndicatorId::BasisExtreme), Some(CubeFormula::BasisExtremeEv));
         assert_eq!(formula_of(IndicatorId::LiquidationClusterDetector), Some(CubeFormula::LiqClusterEv));
         assert_eq!(formula_of(IndicatorId::LargeTradeFilter), Some(CubeFormula::LargeTradeFilterEv));
         assert_eq!(formula_of(IndicatorId::AggTradeSizeDistribution), Some(CubeFormula::AggSizeDistEv));

@@ -25,7 +25,7 @@ fn ev_sqrt(x: f32) -> f32 {
 
 /// Mean and population std of `x[col * n + start ..= i]`.
 #[cube]
-fn ev_mean(x: &[f32], col: usize, n: usize, start: usize, i: usize) -> f32 {
+pub(crate) fn ev_mean(x: &[f32], col: usize, n: usize, start: usize, i: usize) -> f32 {
     let mut sum = 0.0f32;
     for j in start..(i + 1) {
         sum = sum + x[col * n + j];
