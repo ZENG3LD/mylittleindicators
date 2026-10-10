@@ -132,6 +132,29 @@ pub enum CubeFormula {
     RealizedVol = 43,
     /// Kaufman efficiency ratio of the lane. Zero until the window is full. Clamped to `[0, 1]`.
     Efficiency = 44,
+    /// Gopalakrishnan range index of this bar: `ln(max(high-low, 1e-9)) / ln(window)`.
+    /// `window` below 2 is 2.
+    Gapo = 45,
+    /// Williams VIX fix. Zero until `lookback` bars. `(highest close - low) / highest close * 100`.
+    Wvf = 46,
+    /// Mean of fourth-power log returns, times `1e6`. First sample is 0.
+    Quarticity = 47,
+    /// Population std of close-to-close log returns, times `sqrt(252)`.
+    /// Zero until `window` returns. `window` is clamped to 5..=1024.
+    HvC2c = 48,
+    /// Psychological line of the lane. Zero until `period` samples. Up-bar share times 100.
+    Psl = 49,
+    /// Intraday momentum index. `100 * up / (up + down)` over the last `period` bars.
+    Imi = 50,
+    /// Price zone oscillator. `100 * sum(diff) / sum(|diff|)` over the last `period` closes.
+    /// The first diff is 0. `period` is clamped to 2..=1024.
+    Pzo = 51,
+    /// Ehlers center of gravity of the lane. Zero until the window is full.
+    /// `period` is clamped to 2..=512.
+    Cog = 52,
+    /// Bipower variance of the lane. First sample is 0. Scaled by `(pi/2) * 252 * 10000`.
+    /// Products follow the feed's ring slots, not time order.
+    Bipower = 53,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -272,6 +295,15 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Ui), Some(CubeFormula::Ulcer));
         assert_eq!(formula_of(IndicatorId::Rv), Some(CubeFormula::RealizedVol));
         assert_eq!(formula_of(IndicatorId::TrEr), Some(CubeFormula::Efficiency));
+        assert_eq!(formula_of(IndicatorId::Gapo), Some(CubeFormula::Gapo));
+        assert_eq!(formula_of(IndicatorId::Wvf), Some(CubeFormula::Wvf));
+        assert_eq!(formula_of(IndicatorId::Rq), Some(CubeFormula::Quarticity));
+        assert_eq!(formula_of(IndicatorId::Hvc2c), Some(CubeFormula::HvC2c));
+        assert_eq!(formula_of(IndicatorId::Psl), Some(CubeFormula::Psl));
+        assert_eq!(formula_of(IndicatorId::Imi), Some(CubeFormula::Imi));
+        assert_eq!(formula_of(IndicatorId::Pzo), Some(CubeFormula::Pzo));
+        assert_eq!(formula_of(IndicatorId::Cog), Some(CubeFormula::Cog));
+        assert_eq!(formula_of(IndicatorId::Bpv), Some(CubeFormula::Bipower));
     }
 
     #[cfg(feature = "gpu-shader")]

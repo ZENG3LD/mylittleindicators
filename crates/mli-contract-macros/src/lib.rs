@@ -199,6 +199,15 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "ulcer" => "Ulcer",
         "realized_vol" => "RealizedVol",
         "efficiency" => "Efficiency",
+        "gapo" => "Gapo",
+        "wvf" => "Wvf",
+        "quarticity" => "Quarticity",
+        "hv_c2c" => "HvC2c",
+        "psl" => "Psl",
+        "imi" => "Imi",
+        "pzo" => "Pzo",
+        "cog" => "Cog",
+        "bipower" => "Bipower",
         _ => {
             return Err(syn::Error::new(
                 name.span(),
