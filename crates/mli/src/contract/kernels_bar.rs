@@ -3282,6 +3282,78 @@ fn bar_scan(
                 }
             }
             v0 = held0;
+        } else if formula == 1286u32 {
+            // Kalman trend regime: z-score of the Kalman velocity (lane v) over `max(period, 20)`
+            // (population sd, floor 1e-9); +1 above 1, -1 below -1
+            let mut w = period as usize;
+            if w < 20usize {
+                w = 20usize;
+            }
+            if t + 1 >= w {
+                let st = t + 1 - w;
+                let mut sm = 0.0f32;
+                for j in st..(t + 1) {
+                    sm = sm + v[j];
+                }
+                let mean = sm / (w as f32);
+                let mut ss = 0.0f32;
+                for j in st..(t + 1) {
+                    let dd = v[j] - mean;
+                    ss = ss + dd * dd;
+                }
+                let sd = (ss / (w as f32)).sqrt().max(1.0e-9f32);
+                let z = (v[t] - mean) / sd;
+                if z > 1.0f32 {
+                    v0 = 1.0f32;
+                } else if z < 0.0f32 - 1.0f32 {
+                    v0 = 0.0f32 - 1.0f32;
+                }
+            }
+        } else if formula == 1287u32 {
+            // AMAT: smoothed fast (lane v) / slow (lane o) series, ready once the slow smoother is
+            // (index slow - 1); compares each with its value `signal` bars back (front of the deque)
+            let mut rdy = 0usize;
+            if p3 > 1u32 {
+                rdy = (p3 as usize) - 1;
+            }
+            if t >= rdy {
+                let mut fi = rdy;
+                if t >= rdy + (p4 as usize) {
+                    fi = t - (p4 as usize);
+                }
+                let d1 = v[t] - v[fi];
+                let d2 = o[t] - o[fi];
+                let up = (d1 > 0.0f32 && d2 < 0.0f32) || (d1 > 0.0f32 && d2 > 0.0f32);
+                let dn = (d1 < 0.0f32 && d2 > 0.0f32) || (d1 < 0.0f32 && d2 < 0.0f32);
+                if up {
+                    v0 = 1.0f32;
+                } else if dn {
+                    v0 = 0.0f32 - 1.0f32;
+                }
+            }
+        } else if formula == 1288u32 {
+            // Elder impulse: trend smoother series in lane v; MACD 12/26/9 EMAs inline
+            let mut prev = 0.0f32;
+            if t > 0usize {
+                prev = v[t - 1];
+            }
+            let slope_up = v[t] > prev + 1.0e-12f32;
+            if t == 0usize {
+                held0 = c[t];
+                held1 = c[t];
+                held2 = 0.0f32;
+            } else {
+                held0 = (2.0f32 / 13.0f32) * c[t] + (1.0f32 - 2.0f32 / 13.0f32) * held0;
+                held1 = (2.0f32 / 27.0f32) * c[t] + (1.0f32 - 2.0f32 / 27.0f32) * held1;
+                held2 = (2.0f32 / 10.0f32) * (held0 - held1) + (1.0f32 - 2.0f32 / 10.0f32) * held2;
+            }
+            let hist = (held0 - held1) - held2;
+            let macd_up = hist > 0.0f32;
+            if slope_up && macd_up {
+                v0 = 1.0f32;
+            } else if !slope_up && !macd_up {
+                v0 = 0.0f32 - 1.0f32;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -3498,6 +3570,22 @@ pub fn launch_cube_bar(
             extra.extend(smooth_series(&c, params.smoother, per, 0, params.a, params.b));
         }
         let flat = bar_run_x(formula.code(), [&o, &h, &l, &c, &v], &extra, params, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::KregimeBar {
+        let k = super::kernels_comp::kalman_all(&c, params.a, params.b, params.c, params.flag != 0);
+        let flat = bar_run(formula.code(), [&o, &h, &l, &c, &k[1]], params, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::AmatBar {
+        let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);
+        let slow = smooth_series(&c, params.smoother2, params.slow.max(1), 0, params.a, params.b);
+        let flat = bar_run(formula.code(), [&slow, &h, &l, &c, &fast], params, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::ElderImpulseBar {
+        let ema = smooth_series(&c, params.smoother, params.period.max(2), 0, params.a, params.b);
+        let flat = bar_run(formula.code(), [&o, &h, &l, &c, &ema], params, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {

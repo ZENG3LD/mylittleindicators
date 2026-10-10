@@ -9201,6 +9201,46 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1286..=1288 (Kregime, Amat, ElderImpulse).
+    #[test]
+    fn lane_matches_cpu_bar_batch25() {
+        use crate::indicators::kalman::kalman_trend_regime::KalmanTrendRegime;
+        use crate::indicators::momentum::elder_impulse::ElderImpulseSystem;
+        use crate::indicators::trend::amat::Amat;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(20);
+        p.a = 1.0;
+        p.b = 0.01;
+        p.c = 0.1;
+        let mut m = KalmanTrendRegime::new(1.0, 0.01, 0.1, 20);
+        chk(&run_cols(CubeFormula::KregimeBar, &bars, p), close.iter().map(|c| vec![m.feed(*c) as f64]).collect());
+        let mut p = CubeParams::period(1);
+        p.fast = 10;
+        p.slow = 21;
+        p.signal = 5;
+        p.smoother = CubeSmoother::Sma;
+        p.smoother2 = CubeSmoother::Sma;
+        let mut m = Amat::new(10, 21, 5);
+        chk(&run_cols(CubeFormula::AmatBar, &bars, p), close.iter().map(|c| vec![m.feed(*c) as f64]).collect());
+        let mut p = CubeParams::period(13);
+        p.smoother = CubeSmoother::Ema;
+        let mut m = ElderImpulseSystem::new(13);
+        chk(&run_cols(CubeFormula::ElderImpulseBar, &bars, p), close.iter().map(|c| vec![m.feed(*c) as f64]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

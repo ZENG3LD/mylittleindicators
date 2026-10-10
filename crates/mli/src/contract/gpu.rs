@@ -661,6 +661,12 @@ pub enum CubeFormula {
     PvCoherenceBar = 1284,
     /// Composite: demand index. UNTESTED on GPU.
     DiBar = 1285,
+    /// Composite: kalman trend regime. UNTESTED on GPU.
+    KregimeBar = 1286,
+    /// Composite: amat signal. UNTESTED on GPU.
+    AmatBar = 1287,
+    /// Composite: elder impulse. UNTESTED on GPU.
+    ElderImpulseBar = 1288,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1449,6 +1455,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Rcb), Some(CubeFormula::RcbBar));
         assert_eq!(formula_of(IndicatorId::PvCoherence), Some(CubeFormula::PvCoherenceBar));
         assert_eq!(formula_of(IndicatorId::Di), Some(CubeFormula::DiBar));
+        assert_eq!(formula_of(IndicatorId::Kregime), Some(CubeFormula::KregimeBar));
+        assert_eq!(formula_of(IndicatorId::Amat), Some(CubeFormula::AmatBar));
+        assert_eq!(formula_of(IndicatorId::ElderImpulse), Some(CubeFormula::ElderImpulseBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
