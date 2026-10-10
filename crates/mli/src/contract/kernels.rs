@@ -4245,6 +4245,9 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     if formula.code() >= 200 && formula.code() < 300 {
         return launch_cube_gx(formula, samples, params);
     }
+    if formula.code() >= 400 && formula.code() < 500 && formula.output_count() == 1 {
+        return launch_cube_smoothed_gx(formula, samples, params);
+    }
     if formula.output_count() > 1 {
         // Multi-column formulas return their first column here; use `launch_cube_columns` for all.
         return launch_cube_columns(formula, samples, params).swap_remove(0);
@@ -5804,6 +5807,223 @@ fn launch_cube_gx_columns(
     flat.chunks(n).take(cols).map(|ch| ch.to_vec()).collect()
 }
 
+/// gx smoothed formulas, prep stage (codes 410..=415). `raw0` feeds the first smoother,
+/// `raw1` the second (or the combine step).
+/// 410 Ewmac / 411 Gator / 412 Ravi: the lane. 413 Twiggs money flow: `mf * volume` and volume.
+/// 414 volatility ratio / 415 range over ATR: the Wilder true range (`raw1` is `max(high - low, 0)`).
+#[cube]
+fn gx_prep_scan(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    raw0: &mut [f32],
+    raw1: &mut [f32],
+    lane: u32,
+    formula: u32,
+) {
+    let n = open.len();
+    for i in 0..n {
+        if formula == 413u32 {
+            let mut hl = high[i] - low[i];
+            if hl < 0.0f32 {
+                hl = -hl;
+            }
+            if hl < 1.0e-12f32 {
+                hl = 1.0e-12f32;
+            }
+            let mf = ((close[i] - low[i]) - (high[i] - close[i])) / hl;
+            raw0[i] = mf * volume[i];
+            raw1[i] = volume[i];
+        } else if formula == 414u32 || formula == 415u32 {
+            raw0[i] = wilder_tr(high, low, close, i);
+            let mut r = high[i] - low[i];
+            if r < 0.0f32 {
+                r = 0.0f32;
+            }
+            raw1[i] = r;
+        } else {
+            let v = fld(open, high, low, close, volume, i, lane);
+            raw0[i] = v;
+            raw1[i] = v;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn gx_prep_map(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    raw0: &mut [f32],
+    raw1: &mut [f32],
+    lane: u32,
+    formula: u32,
+) {
+    gx_prep_scan(open, high, low, close, volume, raw0, raw1, lane, formula);
+}
+
+/// gx smoothed formulas, combine stage. `sm0` / `sm1` are the smoother outputs.
+#[cube]
+fn gx_comb_scan(
+    sm0: &[f32],
+    sm1: &[f32],
+    raw1: &[f32],
+    output: &mut [f32],
+    formula: u32,
+) {
+    let n = sm0.len();
+    for i in 0..n {
+        let f = sm0[i];
+        let s = sm1[i];
+        let mut v = 0.0f32;
+        if formula == 410u32 || formula == 411u32 {
+            v = f - s;
+        } else if formula == 412u32 {
+            let mut abs_s = s;
+            if abs_s < 0.0f32 {
+                abs_s = -abs_s;
+            }
+            if abs_s > 1.0e-12f32 {
+                let mut d = f - s;
+                if d < 0.0f32 {
+                    d = -d;
+                }
+                v = (d / s) * 100.0f32;
+            }
+        } else if formula == 413u32 {
+            let mut abs_d = s;
+            if abs_d < 0.0f32 {
+                abs_d = -abs_d;
+            }
+            if abs_d >= 1.0e-12f32 {
+                v = f / s;
+            }
+        } else if formula == 414u32 {
+            if f > 0.0f32 {
+                v = s / f;
+            }
+        } else if formula == 415u32 {
+            if f > 1.0e-12f32 {
+                v = raw1[i] / f;
+            }
+        }
+        output[i] = v;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn gx_comb_map(
+    sm0: &[f32],
+    sm1: &[f32],
+    raw1: &[f32],
+    output: &mut [f32],
+    formula: u32,
+) {
+    gx_comb_scan(sm0, sm1, raw1, output, formula);
+}
+
+/// Run a gx smoothed formula (code 410..=419): prep -> smoother -> (second smoother) -> combine.
+/// Each stage is its own launch, so no shader holds more than one stage's arms.
+fn launch_cube_smoothed_gx(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    params: CubeParams,
+) -> Vec<f32> {
+    let n = samples.len();
+    let code = formula.code();
+    let c = GpuSample::columns(samples);
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let open_b = client.create_from_slice(f32::as_bytes(&c.open));
+    let high_b = client.create_from_slice(f32::as_bytes(&c.high));
+    let low_b = client.create_from_slice(f32::as_bytes(&c.low));
+    let close_b = client.create_from_slice(f32::as_bytes(&c.close));
+    let volume_b = client.create_from_slice(f32::as_bytes(&c.volume));
+    let bytes_n = n * core::mem::size_of::<f32>();
+    let raw0 = client.empty(bytes_n);
+    let raw1 = client.empty(bytes_n);
+    let sm0 = client.empty(bytes_n);
+    let sm1 = client.empty(bytes_n);
+    let output = client.empty(bytes_n);
+    macro_rules! smooth {
+        ($src:expr, $dst:expr, $which:expr, $per:expr) => {
+            if $which >= 6u32 {
+                smooth_map_r::launch_unchecked(
+                    &client,
+                    CubeCount::new_1d(1),
+                    CubeDim::new_1d(1),
+                    BufferArg::from_raw_parts($src.clone(), n),
+                    BufferArg::from_raw_parts($dst.clone(), n),
+                    $which,
+                    $per,
+                    0u32,
+                    params.a,
+                    params.b,
+                );
+            } else {
+                smooth_map_q::launch_unchecked(
+                    &client,
+                    CubeCount::new_1d(1),
+                    CubeDim::new_1d(1),
+                    BufferArg::from_raw_parts($src.clone(), n),
+                    BufferArg::from_raw_parts($dst.clone(), n),
+                    $which,
+                    $per,
+                    0u32,
+                );
+            }
+        };
+    }
+    // Second-leg period: Ravi and Gator keep the slow period at 2 or more.
+    let mut per2 = params.smooth_period2;
+    if (code == 411 || code == 412) && per2 < 2 {
+        per2 = 2;
+    }
+    unsafe {
+        gx_prep_map::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(open_b, n),
+            BufferArg::from_raw_parts(high_b, n),
+            BufferArg::from_raw_parts(low_b, n),
+            BufferArg::from_raw_parts(close_b, n),
+            BufferArg::from_raw_parts(volume_b, n),
+            BufferArg::from_raw_parts(raw0.clone(), n),
+            BufferArg::from_raw_parts(raw1.clone(), n),
+            params.lane.code(),
+            code,
+        );
+        let first = params.smoother.code();
+        smooth!(raw0, sm0, first, params.smooth_period);
+        if code == 413 {
+            // Twiggs money flow: the same smoother over volume.
+            smooth!(raw1, sm1, first, params.smooth_period);
+        } else if code == 414 {
+            // Volatility ratio: the same smoother, slow period.
+            smooth!(raw0, sm1, first, per2);
+        } else if code != 415 {
+            smooth!(raw0, sm1, params.smoother2.code(), per2);
+        }
+        gx_comb_map::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(sm0, n),
+            BufferArg::from_raw_parts(sm1, n),
+            BufferArg::from_raw_parts(raw1, n),
+            BufferArg::from_raw_parts(output.clone(), n),
+            code,
+        );
+    }
+    let bytes = client.read_one_unchecked(output);
+    f32::from_bytes(&bytes).to_vec()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -6178,6 +6398,75 @@ mod tests {
             &run_cols(CubeFormula::DonchianBands, &bars, CubeParams::period(5)),
             &[&du, &dmid, &dl],
         );
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): gx batch 3, smoothed codes 410..=415.
+    #[test]
+    fn lane_matches_cpu_gx_batch3() {
+        use crate::indicators::accumulation::tmf::Tmf;
+        use crate::indicators::momentum::gator_oscillator::GatorOscillator;
+        use crate::indicators::momentum::ewmac::Ewmac;
+        use crate::indicators::ratio::range_to_atr::RangeToAtr;
+        use crate::indicators::trend::ravi::Ravi;
+        use crate::indicators::volatility::vr::Vr;
+
+        let bars = bars(70);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+
+        let mut ew = Ewmac::from_smoothers(SmootherId::Ema, 4, SmootherId::Wma, 9);
+        let mut ewp = CubeParams::period(4);
+        ewp.smoother = CubeSmoother::Ema;
+        ewp.smooth_period = 4;
+        ewp.smoother2 = CubeSmoother::Wma;
+        ewp.smooth_period2 = 9;
+        assert_close(&run(CubeFormula::Ewmac, &bars, ewp), &cpu(&close, |v| ew.feed(v)));
+
+        let mut ga = GatorOscillator::from_smoothers(SmootherId::Sma, 3, SmootherId::Rma, 8);
+        let mut gap = CubeParams::period(3);
+        gap.smoother = CubeSmoother::Sma;
+        gap.smooth_period = 3;
+        gap.smoother2 = CubeSmoother::Rma;
+        gap.smooth_period2 = 8;
+        assert_close(&run(CubeFormula::Gator, &bars, gap), &cpu(&close, |v| ga.feed(v)));
+
+        let mut rv = Ravi::from_smoothers(SmootherId::Ema, 4, SmootherId::Sma, 12);
+        let mut rvp = CubeParams::period(4);
+        rvp.smoother = CubeSmoother::Ema;
+        rvp.smooth_period = 4;
+        rvp.smoother2 = CubeSmoother::Sma;
+        rvp.smooth_period2 = 12;
+        assert_close(&run(CubeFormula::Ravi, &bars, rvp), &cpu(&close, |v| rv.feed(v)));
+
+        let mut tmf = Tmf::new(6);
+        let cpu_tmf: Vec<f64> = bars
+            .iter()
+            .map(|b| tmf.feed(&[b.high, b.low, b.close, b.volume]))
+            .collect();
+        let mut tp = CubeParams::period(6);
+        tp.smoother = CubeSmoother::Ema;
+        tp.smooth_period = 6;
+        assert_close(&run(CubeFormula::Tmf, &bars, tp), &cpu_tmf);
+
+        let mut vr = Vr::from_smoothers(5, 12, SmootherId::Rma);
+        let cpu_vr: Vec<f64> = bars
+            .iter()
+            .map(|b| vr.feed(&[b.high, b.low, b.close]))
+            .collect();
+        let mut vp = CubeParams::period(5);
+        vp.smoother = CubeSmoother::Rma;
+        vp.smooth_period = 5;
+        vp.smooth_period2 = 12;
+        assert_close(&run(CubeFormula::VolRatio, &bars, vp), &cpu_vr);
+
+        let mut ra = RangeToAtr::new(7, SmootherId::Rma);
+        let cpu_ra: Vec<f64> = bars
+            .iter()
+            .map(|b| ra.feed(&[b.high, b.low, b.close]))
+            .collect();
+        let mut rap = CubeParams::period(7);
+        rap.smoother = CubeSmoother::Rma;
+        rap.smooth_period = 7;
+        assert_close(&run(CubeFormula::RangeAtr, &bars, rap), &cpu_ra);
     }
 
     #[test]

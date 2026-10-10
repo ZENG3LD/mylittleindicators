@@ -282,6 +282,12 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "rwi" => "Rwi",
         "higher_moments" => "HigherMoments",
         "swing_age" => "SwingAge",
+        "ewmac" => "Ewmac",
+        "gator" => "Gator",
+        "ravi" => "Ravi",
+        "tmf" => "Tmf",
+        "vol_ratio" => "VolRatio",
+        "range_atr" => "RangeAtr",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

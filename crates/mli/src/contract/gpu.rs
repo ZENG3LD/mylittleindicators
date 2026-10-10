@@ -315,6 +315,18 @@ pub enum CubeFormula {
     HigherMoments = 304,
     /// `SwingAge`. Columns: bars since a new window high, bars since a new window low (as f32). Window is `period` (at least 2); holds 0 until it is full. UNTESTED on GPU.
     SwingAge = 305,
+    /// EWMAC: smoother(lane, `smooth_period`) minus smoother2(lane, `smooth_period2`). Smoothed path (`launch_cube_smoothed_gx`). UNTESTED on GPU.
+    Ewmac = 410,
+    /// Gator oscillator: same math as [`CubeFormula::Ewmac`] (`fast - slow`); the slow period is at least 2. UNTESTED on GPU.
+    Gator = 411,
+    /// RAVI: `100 * |fast - slow| / slow`, 0 when `slow` is ~0; slow period at least 2. UNTESTED on GPU.
+    Ravi = 412,
+    /// Twiggs money flow: `smoother(mf * volume) / smoother(volume)` with the first smoother and `smooth_period` for both; 0 when the volume mean is ~0. UNTESTED on GPU.
+    Tmf = 413,
+    /// Volatility ratio: `smoother(TR, smooth_period2) / smoother(TR, smooth_period)` (slow ATR over fast ATR), 0 when the fast ATR is not positive. Both legs use the first smoother. UNTESTED on GPU.
+    VolRatio = 414,
+    /// Range over ATR: `max(high - low, 0) / smoother(TR, smooth_period)`, 0 when the ATR is ~0. UNTESTED on GPU.
+    RangeAtr = 415,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -705,6 +717,12 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Hmom), Some(CubeFormula::HigherMoments));
         assert_eq!(formula_of(IndicatorId::SwingAge), Some(CubeFormula::SwingAge));
         assert_eq!(formula_of(IndicatorId::VoDc), Some(CubeFormula::DonchianBands));
+        assert_eq!(formula_of(IndicatorId::Ewmac), Some(CubeFormula::Ewmac));
+        assert_eq!(formula_of(IndicatorId::Gator), Some(CubeFormula::Gator));
+        assert_eq!(formula_of(IndicatorId::Ravi), Some(CubeFormula::Ravi));
+        assert_eq!(formula_of(IndicatorId::Tmf), Some(CubeFormula::Tmf));
+        assert_eq!(formula_of(IndicatorId::VoVr), Some(CubeFormula::VolRatio));
+        assert_eq!(formula_of(IndicatorId::RangeAtr), Some(CubeFormula::RangeAtr));
         assert_eq!(gpu_of(IndicatorId::Decyc), GpuMode::Shader);
         assert_eq!(formula_of(IndicatorId::Decyc), None);
         let spec = shader_of(IndicatorId::Decyc).expect("decycler shader");
