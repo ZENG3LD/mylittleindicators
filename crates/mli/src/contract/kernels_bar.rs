@@ -4713,6 +4713,184 @@ fn bar_scan(
                 held0 = ent;
             }
             v0 = held0;
+        } else if formula == 1325u32 {
+            // mutual information of the close return and its lag-return over the last (window - lag) pairs.
+            // period = window (>= 2), p2 = lag (1..window-1), p3 = bins (2..32), a = clip. Equivalent to the CPU
+            // incremental joint table: pairs of bars max(first full ring bar, t - (window - lag) + 1) ..= t.
+            // scratch: joint [0, 1024), px [1024, 1056), py [1056, 1088)
+            let mut w = period as usize;
+            if w < 2usize {
+                w = 2usize;
+            }
+            let mut lg = p2 as usize;
+            if lg < 1usize {
+                lg = 1usize;
+            }
+            if lg > w - 1usize {
+                lg = w - 1usize;
+            }
+            let mut bn = p3 as usize;
+            if bn < 2usize {
+                bn = 2usize;
+            }
+            if bn > 32usize {
+                bn = 32usize;
+            }
+            let clip = a.max(1.0e-6f32);
+            let ring = w + 1usize + lg;
+            if t + 1usize >= ring {
+                let np = w - lg;
+                let mut st = 0usize;
+                if t + 1usize > np {
+                    st = t + 1usize - np;
+                }
+                if st < ring - 1usize {
+                    st = ring - 1usize;
+                }
+                for i in 0..(bn * bn) {
+                    scr[i] = 0.0f32;
+                }
+                let mut cnt = 0.0f32;
+                for s in st..(t + 1usize) {
+                    let mut r = 0.0f32;
+                    if c[s - 1usize] > 0.0f32 && c[s] > 0.0f32 {
+                        r = (c[s] / c[s - 1usize]).ln();
+                    }
+                    let mut rl = 0.0f32;
+                    if c[s - lg - 1usize] > 0.0f32 && c[s - lg] > 0.0f32 {
+                        rl = (c[s - lg] / c[s - lg - 1usize]).ln();
+                    }
+                    let rr = r.max(0.0f32 - clip).min(clip);
+                    let xr = (rr + clip) / (2.0f32 * clip) * (bn as f32);
+                    let bx = (xr.floor().max(0.0f32).min((bn - 1usize) as f32)) as usize;
+                    let rr2 = rl.max(0.0f32 - clip).min(clip);
+                    let yr = (rr2 + clip) / (2.0f32 * clip) * (bn as f32);
+                    let by = (yr.floor().max(0.0f32).min((bn - 1usize) as f32)) as usize;
+                    scr[bx * bn + by] = scr[bx * bn + by] + 1.0f32;
+                    cnt = cnt + 1.0f32;
+                }
+                let total = cnt.max(1.0f32);
+                for i in 0..bn {
+                    scr[1024 + i] = 0.0f32;
+                    scr[1056 + i] = 0.0f32;
+                }
+                for bx in 0..bn {
+                    for by in 0..bn {
+                        scr[1024 + bx] = scr[1024 + bx] + scr[bx * bn + by];
+                        scr[1056 + by] = scr[1056 + by] + scr[bx * bn + by];
+                    }
+                }
+                let mut mi = 0.0f32;
+                for bx in 0..bn {
+                    for by in 0..bn {
+                        let pxy = scr[bx * bn + by] / total;
+                        let pxv = scr[1024 + bx] / total;
+                        let pyv = scr[1056 + by] / total;
+                        if pxy > 0.0f32 && pxv > 0.0f32 && pyv > 0.0f32 {
+                            mi = mi + pxy * (pxy / (pxv * pyv)).ln();
+                        }
+                    }
+                }
+                held0 = mi.max(0.0f32);
+            }
+            v0 = held0;
+        } else if formula == 1326u32 {
+            // transfer entropy (volume return -> price return), lanes close / volume. period = window (>= 3),
+            // p2 = lag (1..window-2), p3 = bins (2..16), a = clip. Joint triples (y, y1, x1) of bars
+            // max(first full ring bar, t - (window - lag - 1) + 1) ..= t. scratch: joint [0, 4096),
+            // p(y|y1,x1) marginal [4096, 4352), p(y,y1) marginal [4352, 4608)
+            let mut w = period as usize;
+            if w < 3usize {
+                w = 3usize;
+            }
+            let mut lg = p2 as usize;
+            if lg < 1usize {
+                lg = 1usize;
+            }
+            if lg > w - 2usize {
+                lg = w - 2usize;
+            }
+            let mut bn = p3 as usize;
+            if bn < 2usize {
+                bn = 2usize;
+            }
+            if bn > 16usize {
+                bn = 16usize;
+            }
+            let clip = a.max(1.0e-6f32);
+            let ring = w + 2usize;
+            if t >= ring {
+                let np = w - lg - 1usize;
+                let mut st = 0usize;
+                if t + 1usize > np {
+                    st = t + 1usize - np;
+                }
+                if st < ring {
+                    st = ring;
+                }
+                let b3 = bn * bn * bn;
+                let b2 = bn * bn;
+                for i in 0..b3 {
+                    scr[i] = 0.0f32;
+                }
+                let mut cnt = 0.0f32;
+                for s in st..(t + 1usize) {
+                    let mut yv = 0.0f32;
+                    let mut yv1 = 0.0f32;
+                    let mut xv1 = 0.0f32;
+                    if c[s - 1usize] > 0.0f32 {
+                        yv = (c[s] / c[s - 1usize]).ln();
+                    }
+                    if c[s - 2usize] > 0.0f32 {
+                        yv1 = (c[s - 1usize] / c[s - 2usize]).ln();
+                    }
+                    let xq = s - 1usize - lg;
+                    let pvq = v[xq - 1usize].max(1.0f32);
+                    if v[xq] > 0.0f32 {
+                        xv1 = (v[xq] / pvq).ln();
+                    }
+                    let r0 = yv.max(0.0f32 - clip).min(clip);
+                    let by = (((r0 + clip) / (2.0f32 * clip) * (bn as f32)).floor().max(0.0f32).min((bn - 1usize) as f32)) as usize;
+                    let r1 = yv1.max(0.0f32 - clip).min(clip);
+                    let by1 = (((r1 + clip) / (2.0f32 * clip) * (bn as f32)).floor().max(0.0f32).min((bn - 1usize) as f32)) as usize;
+                    let r2 = xv1.max(0.0f32 - clip).min(clip);
+                    let bx1 = (((r2 + clip) / (2.0f32 * clip) * (bn as f32)).floor().max(0.0f32).min((bn - 1usize) as f32)) as usize;
+                    let ix = (by * bn + by1) * bn + bx1;
+                    scr[ix] = scr[ix] + 1.0f32;
+                    cnt = cnt + 1.0f32;
+                }
+                let total = cnt.max(1.0f32);
+                for i in 0..b2 {
+                    scr[4096 + i] = 0.0f32;
+                    scr[4352 + i] = 0.0f32;
+                }
+                for y in 0..bn {
+                    for y1 in 0..bn {
+                        for x1 in 0..bn {
+                            let jv = scr[(y * bn + y1) * bn + x1];
+                            scr[4096 + y1 * bn + x1] = scr[4096 + y1 * bn + x1] + jv;
+                            scr[4352 + y * bn + y1] = scr[4352 + y * bn + y1] + jv;
+                        }
+                    }
+                }
+                let mut te = 0.0f32;
+                for y in 0..bn {
+                    for y1 in 0..bn {
+                        for x1 in 0..bn {
+                            let pyyx = scr[(y * bn + y1) * bn + x1] / total;
+                            if pyyx > 0.0f32 {
+                                let a1 = pyyx / (scr[4096 + y1 * bn + x1] / total).max(1.0e-12f32);
+                                let a2 = pyyx / (scr[4352 + y * bn + y1] / total).max(1.0e-12f32);
+                                if a1 > 0.0f32 && a2 > 0.0f32 {
+                                    te = te + pyyx * (a1 / a2).ln();
+                                }
+                            }
+                        }
+                    }
+                }
+                held0 = te.max(0.0f32);
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -4981,6 +5159,10 @@ fn launch_cube_bar_x(
         let atr = super::kernels_comp::atr_series(samples, params, super::CubeSmoother::Rma, params.fast.max(1), 0);
         let base = smooth_series(&atr, params.smoother, params.slow.max(1), 0, params.a, params.b);
         let flat = bar_run(formula.code(), [&base, &h, &l, &c, &atr], params, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::MinfoBar || formula == CubeFormula::TeBar {
+        let flat = bar_run(formula.code(), [&o, &h, &l, &c, &v], CubeParams { signal: params.signal.max(200), ..params }, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::WaveBar {

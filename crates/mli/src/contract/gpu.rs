@@ -753,6 +753,10 @@ pub enum CubeFormula {
     FftBar = 1323,
     /// Composite: wavelet entropy. UNTESTED on GPU.
     WaveBar = 1324,
+    /// Composite: mutual information. UNTESTED on GPU.
+    MinfoBar = 1325,
+    /// Composite: transfer entropy. UNTESTED on GPU.
+    TeBar = 1326,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1603,6 +1607,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::GammaSqueezeDetector), Some(CubeFormula::GammaSqEv));
         assert_eq!(formula_of(IndicatorId::Fft), Some(CubeFormula::FftBar));
         assert_eq!(formula_of(IndicatorId::Wave), Some(CubeFormula::WaveBar));
+        assert_eq!(formula_of(IndicatorId::Minfo), Some(CubeFormula::MinfoBar));
+        assert_eq!(formula_of(IndicatorId::Te), Some(CubeFormula::TeBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

@@ -9815,6 +9815,39 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Mutual information and transfer entropy (1325-1326).
+    #[test]
+    fn lane_matches_cpu_bar_batch42() {
+        use crate::indicators::entropy::mutual_information::MutualInformation;
+        use crate::indicators::entropy::transfer_entropy::TransferEntropy;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(30);
+        p.fast = 3;
+        p.slow = 8;
+        p.a = 0.05;
+        let mut m = MutualInformation::new(30, 3, 8, 0.05);
+        chk(&run_cols(CubeFormula::MinfoBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(30);
+        p.fast = 2;
+        p.slow = 4;
+        p.a = 0.05;
+        let mut m = TransferEntropy::new(30, 2, 4, 0.05);
+        chk(&run_cols(CubeFormula::TeBar, &bars, p), bars.iter().map(|b| vec![m.feed(&[b.close, b.volume])]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
