@@ -11710,4 +11710,34 @@ mod tests {
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
     }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): tick CVD / volume delta / VPIN event formulas 990-992.
+    #[test]
+    fn tick_cvd_vdelta_vpin_match_cpu() {
+        use crate::core::types::Tick;
+        use crate::engine::streams::tick_consumer::TickConsumer;
+        use crate::indicators::volume::cumulative_volume_delta::CumulativeVolumeDelta;
+        use crate::indicators::volume::volume_delta::VolumeDelta;
+        use crate::indicators::volume::vpin::Vpin;
+        use super::super::event_frame::GpuEventFrame;
+        let n = 400usize;
+        let ticks: Vec<Tick> = (0..n)
+            .map(|i| {
+                let f = i as f64;
+                Tick::new(1_000 + i as i64 * 100, 100.0 + (f * 0.3).sin(), 1.0 + (f * 0.7).sin().abs() * 3.0, (f * 1.3).sin() > 0.1)
+            })
+            .collect();
+        let fr = GpuEventFrame::from_ticks(&ticks);
+        let mut m = CumulativeVolumeDelta::new(20);
+        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
+        assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::CvdEv, &fr, CubeParams::period(20))[0], &c);
+        let mut m = VolumeDelta::new(10);
+        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
+        assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::VdeltaEv, &fr, CubeParams::period(10))[0], &c);
+        let mut m = Vpin::new(25.0, 5);
+        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
+        let mut p = CubeParams::period(5);
+        p.a = 25.0;
+        assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::VpinEv, &fr, p)[0], &c);
+    }
 }

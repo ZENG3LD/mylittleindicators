@@ -1595,10 +1595,65 @@ fn evx_scan(
                 }
             }
             v0 = h2;
+        } else if formula == 990u32 {
+            // tick CVD: sum of signed size (side * size) over the last max(period, 1) ticks
+            let mut w = period as usize;
+            if w < 1usize {
+                w = 1usize;
+            }
+            let mut lo = 0usize;
+            if i + 1 > w {
+                lo = i + 1 - w;
+            }
+            let mut sm = 0.0f32;
+            for q in lo..(i + 1) {
+                sm = sm + side[q] * x[n + q];
+            }
+            v0 = sm;
+        } else if formula == 991u32 {
+            // tick volume delta: signed size of the current tick
+            v0 = side[i] * x[n + i];
+        } else if formula == 992u32 {
+            // VPIN: volume buckets of size `a`; completed bucket |buy - sell| / a goes to out[n + k]
+            // (cols 1 and 2 are not written for this formula), value = mean of the last
+            // clamp(period, 1, n) buckets. h0 = buy, h1 = sell, h2 = bucket volume, cs = buckets, h3 = last
+            let bs = a.max(1.0e-9f32);
+            let mut sw = period as usize;
+            if sw < 1usize {
+                sw = 1usize;
+            }
+            if side[i] > 0.0f32 {
+                h0 = h0 + x[n + i];
+            } else {
+                h1 = h1 + x[n + i];
+            }
+            h2 = h2 + x[n + i];
+            if h2 >= bs {
+                out[n + (cs as usize)] = (h0 - h1).abs() / bs;
+                cs = cs + 1.0f32;
+                h0 = 0.0f32;
+                h1 = 0.0f32;
+                h2 = 0.0f32;
+            }
+            let nb = cs as usize;
+            if nb > 0usize {
+                let mut lo = 0usize;
+                if nb > sw {
+                    lo = nb - sw;
+                }
+                let mut sm = 0.0f32;
+                for q in lo..nb {
+                    sm = sm + out[n + q];
+                }
+                h3 = sm / ((nb - lo) as f32);
+            }
+            v0 = h3;
         }
         out[i] = v0;
-        out[n + i] = v1;
-        out[2 * n + i] = v2;
+        if formula != 992u32 {
+            out[n + i] = v1;
+            out[2 * n + i] = v2;
+        }
     }
 }
 

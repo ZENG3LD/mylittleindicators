@@ -735,6 +735,12 @@ pub enum CubeFormula {
     LiqgapBar = 1322,
     /// Composite: Chebyshev filter. UNTESTED on GPU.
     ChebyComp = 1092,
+    /// Event: tick cumulative volume delta over a window. UNTESTED on GPU.
+    CvdEv = 990,
+    /// Event: tick volume delta. UNTESTED on GPU.
+    VdeltaEv = 991,
+    /// Event: VPIN. UNTESTED on GPU.
+    VpinEv = 992,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1575,6 +1581,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Swingstr), Some(CubeFormula::SwingstrBar));
         assert_eq!(formula_of(IndicatorId::Liqgap), Some(CubeFormula::LiqgapBar));
         assert_eq!(formula_of(IndicatorId::Cheby), Some(CubeFormula::ChebyComp));
+        assert_eq!(formula_of(IndicatorId::Cvd), Some(CubeFormula::CvdEv));
+        assert_eq!(formula_of(IndicatorId::Vdelta), Some(CubeFormula::VdeltaEv));
+        assert_eq!(formula_of(IndicatorId::Vpin), Some(CubeFormula::VpinEv));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
