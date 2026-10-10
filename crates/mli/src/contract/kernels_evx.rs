@@ -1732,6 +1732,42 @@ fn evx_scan(
                 pa = ts[i];
                 v0 = 1.0f32;
             }
+        } else if formula == 1402u32 {
+            // quote lifecycle tracker: x2 = action (1 add, 3 delete), x3 = interned order id (1-based).
+            // out[n + id] = pending add time + 1 (0 = none), out[2n + k] = k-th completed lifetime;
+            // value = mean of the last max(period, 2) lifetimes (0 before the first)
+            if i == 0usize {
+                for q in 0..(2usize * n) {
+                    out[n + q] = 0.0f32;
+                }
+            }
+            let act = x[2usize * n + i];
+            let id = x[3usize * n + i] as usize;
+            if act == 1.0f32 {
+                out[n + id - 1usize] = ts[i] + 1.0f32;
+            } else if act == 3.0f32 {
+                let pend = out[n + id - 1usize];
+                if pend > 0.0f32 {
+                    out[n + id - 1usize] = 0.0f32;
+                    out[2usize * n + (cs as usize)] = (ts[i] - (pend - 1.0f32)).max(0.0f32);
+                    cs = cs + 1.0f32;
+                    let mut sw = period as usize;
+                    if sw < 2usize {
+                        sw = 2usize;
+                    }
+                    let nb = cs as usize;
+                    let mut lo = 0usize;
+                    if nb > sw {
+                        lo = nb - sw;
+                    }
+                    let mut sm = 0.0f32;
+                    for q in lo..nb {
+                        sm = sm + out[2usize * n + q];
+                    }
+                    h3 = sm / ((nb - lo) as f32);
+                }
+            }
+            v0 = h3;
         } else if formula == 996u32 {
             // gamma squeeze detector (OptionGreeks stream): the CPU consumer never receives a price on this
             // stream (prev / last price stay NaN), so `price_moved` is false and the signal is always 0;
@@ -1741,7 +1777,7 @@ fn evx_scan(
             }
         }
         out[i] = v0;
-        if formula != 992u32 {
+        if formula != 992u32 && formula != 1402u32 {
             out[n + i] = v1;
             out[2 * n + i] = v2;
         }

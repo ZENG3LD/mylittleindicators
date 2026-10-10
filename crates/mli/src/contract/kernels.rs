@@ -12149,4 +12149,28 @@ mod tests {
         let cc: Vec<f64> = ci.iter().map(|x| { c.update_composite_index(x); c.value() }).collect();
         assert_close(&launch_cube_keyed(CubeFormula::IndexCorrBreakKy, &fr, CubeParams::period(12))[0], &cc);
     }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): QuoteLifecycleTracker (1402) with interned order ids.
+    #[test]
+    fn quote_lifecycle_matches_cpu() {
+        use crate::core::types::{L3Action, OrderBookSide, OrderbookL3Event};
+        use crate::engine::streams::orderbook_l3_consumer::OrderbookL3Consumer;
+        use crate::indicators::microstructure::quote_lifecycle_tracker::QuoteLifecycleTracker;
+        use super::super::event_frame::GpuEventFrame;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let l3: Vec<OrderbookL3Event> = (0..300usize)
+            .map(|i| OrderbookL3Event {
+                side: OrderBookSide::Bid,
+                order_id: format!("o{}", (i * 7 + (i / 5)) % 23),
+                price: 100.0,
+                quantity: 1.0,
+                action: match (w(i, 1.3) * 3.0) as u32 { 0 => L3Action::Add, 1 => L3Action::Modify, _ => L3Action::Delete },
+                timestamp: 1_000 + i as i64 * 120,
+            })
+            .collect();
+        let fr = GpuEventFrame::from_l3(&l3);
+        let mut m = QuoteLifecycleTracker::new(9);
+        let c: Vec<f64> = l3.iter().map(|e| { m.update_orderbook_l3(e); m.value() }).collect();
+        assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::QuoteLifecycleEv, &fr, CubeParams::period(9))[0], &c);
+    }
 }

@@ -781,6 +781,8 @@ pub enum CubeFormula {
     WeightDriftKy = 1400,
     /// IndexCorrelationBreakdown (keyed / profile / fit family). UNTESTED on GPU.
     IndexCorrBreakKy = 1401,
+    /// QuoteLifecycleTracker (keyed / profile / fit family). UNTESTED on GPU.
+    QuoteLifecycleEv = 1402,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1771,6 +1773,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::CompositeWeightDrift), Some(CubeFormula::WeightDriftKy));
         assert_eq!(formula_of(IndicatorId::IndexComponentDrift), Some(CubeFormula::WeightDriftKy));
         assert_eq!(formula_of(IndicatorId::IndexCorrelationBreakdown), Some(CubeFormula::IndexCorrBreakKy));
+        assert_eq!(formula_of(IndicatorId::QuoteLifecycleTracker), Some(CubeFormula::QuoteLifecycleEv));
         assert_eq!(formula_of(IndicatorId::WallDetector), Some(CubeFormula::WallDetectorBk));
         assert_eq!(formula_of(IndicatorId::BestLevelVolatility), Some(CubeFormula::BestLevelVolBk));
         assert_eq!(formula_of(IndicatorId::PriceLevelDensity), Some(CubeFormula::PriceLevelDensityBk));

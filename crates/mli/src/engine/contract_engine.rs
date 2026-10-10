@@ -325,7 +325,7 @@ mli_contract_macros::contract_universe! {
         L3LargeOrderTracker: OrderbookL3  : _ +cube(comp_l3_large_order_ev)             => crate::indicators::microstructure::l3_large_order_tracker::L3LargeOrderTracker { side size price },
         L3OrderRate:         OrderbookL3  : _ +cube(comp_l3_order_rate_ev)             => crate::indicators::microstructure::l3_order_rate::L3OrderRate,
         L3SpooferScore:      OrderbookL3  : _ +cube(comp_l3_spoofer_score_ev)             => crate::indicators::microstructure::l3_spoofer_score::L3SpooferScore,
-        QuoteLifecycleTracker: OrderbookL3 : _            => crate::indicators::microstructure::quote_lifecycle_tracker::QuoteLifecycleTracker,
+        QuoteLifecycleTracker: OrderbookL3 : _ +cube(comp_quote_lifecycle_ev) => crate::indicators::microstructure::quote_lifecycle_tracker::QuoteLifecycleTracker,
         QuoteStuffingDetector: OrderbookDelta : _ +cube(comp_quote_stuffing_ev)         => crate::indicators::microstructure::quote_stuffing_detector::QuoteStuffingDetector { rate signal },
         SizeWeightedDirectionalMomentum: Tick : _ +cube(ev_size_wt_mom) => crate::indicators::tick_advanced::size_weighted_directional_momentum::SizeWeightedDirectionalMomentum,
         LargeTradeFilter: Tick : _ +cube(comp_large_trade_filter_ev) => crate::indicators::tick_advanced::large_trade_filter::LargeTradeFilter { signal ratio },
