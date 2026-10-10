@@ -253,6 +253,65 @@ pub enum CubeFormula {
     HeikinAshiCols = 104,
     /// Candle anatomy. Columns: body, upper wick, lower wick, long upper (0/1), long lower (0/1). [`CubeParams::a`] is the long-wick ratio threshold. All 0 when the range is ~0.
     CandleAnatomyCols = 105,
+    /// Qstick: smoother of `close - open`. Smoother and period come from [`CubeParams::smoother`] / [`CubeParams::smooth_period`]. Smoothed formulas run through `launch_cube_smoothed` (prep, smoother, combine).
+    QstickSmoothed = 120,
+    /// Force index: smoother of `volume * (close - prev_close)`. Bar 0 is 0 and is not fed to the smoother.
+    ForceIndexSmoothed = 121,
+    /// Coppock curve: smoother of `ROC(period) + ROC(fast)` (percent, 0 until the lag exists).
+    CoppockSmoothed = 122,
+    /// Volume oscillator: smoother(volume, `smooth_period`) minus smoother2(volume, `smooth_period2`).
+    VolumeOscSmoothed = 123,
+    /// Chaikin oscillator: smoother of the A/D line minus smoother2 of the same line.
+    ChaikinOscSmoothed = 124,
+    /// Intraday intensity: `100 * smoother(II) / smoother(volume)`, both with the first smoother. 0 when the volume mean is ~0.
+    IntradayIntensitySmoothed = 125,
+    /// Ease of movement: smoother of the raw EOM. [`CubeParams::a`] is the scale factor. Bar 0 is 0 and is not fed to the smoother.
+    EaseOfMovementSmoothed = 126,
+    /// Normalized ATR: `100 * smoother(true range) / |close|`. The first true range is `high - low`.
+    NatrSmoothed = 127,
+}
+
+/// Smoother a smoothed cube formula applies to its pre-smoother series.
+/// Mirrors the `+smoother` members of the manifest (`SmootherId`). `Tma` and
+/// `Trima` are the same math. The kernel arms are the single-lane formulas of
+/// the same name, run on a derived series instead of an OHLCV lane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum CubeSmoother {
+    Sma = 0,
+    Ema = 1,
+    Wma = 2,
+    Rma = 3,
+    Dema = 4,
+    Tema = 5,
+    /// Also `Trima`.
+    Tma = 6,
+    Hma = 7,
+    /// Offset is [`CubeParams::a`], sigma is [`CubeParams::b`].
+    Alma = 8,
+}
+
+impl CubeSmoother {
+    /// Discriminant the smoother kernels compare against.
+    pub const fn code(self) -> u32 {
+        self as u32
+    }
+
+    /// The cube smoother for a manifest `SmootherId`.
+    pub fn from_id(id: crate::engine::contract_engine::SmootherId) -> Self {
+        use crate::engine::contract_engine::SmootherId as S;
+        match id {
+            S::Sma => CubeSmoother::Sma,
+            S::Ema => CubeSmoother::Ema,
+            S::Wma => CubeSmoother::Wma,
+            S::Rma => CubeSmoother::Rma,
+            S::Dema => CubeSmoother::Dema,
+            S::Tema => CubeSmoother::Tema,
+            S::Tma | S::Trima => CubeSmoother::Tma,
+            S::Hma => CubeSmoother::Hma,
+            S::Alma => CubeSmoother::Alma,
+        }
+    }
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -277,6 +336,14 @@ pub struct CubeParams {
     pub levels: u32,
     /// Scalar slot for window formulas. `0` is `s0`, `3` is `s3`.
     pub slot: u32,
+    /// Smoother of a smoothed formula (code 120..=127). Default `Sma`.
+    pub smoother: CubeSmoother,
+    /// Period of that smoother. Default is `period`.
+    pub smooth_period: u32,
+    /// Second smoother (volume oscillator, Chaikin oscillator slow leg).
+    pub smoother2: CubeSmoother,
+    /// Period of the second smoother. Default is `period`.
+    pub smooth_period2: u32,
 }
 
 impl CubeParams {
@@ -295,6 +362,10 @@ impl CubeParams {
             flag: 0,
             levels: 1,
             slot: 0,
+            smoother: CubeSmoother::Sma,
+            smooth_period: period,
+            smoother2: CubeSmoother::Sma,
+            smooth_period2: period,
         }
     }
 }
@@ -308,6 +379,31 @@ impl CubeFormula {
     /// Number of output columns one launch writes. `1` for every single-output
     /// formula. A multi-column formula (code 100 and up) is read with
     /// `launch_cube_columns`; column `c` is the `c`-th name in the manifest braces.
+    /// `true` for the smoothed formulas (code 120..=127). They run as
+    /// prep -> smoother -> combine and read [`CubeParams::smoother`].
+    pub const fn is_smoothed(self) -> bool {
+        self.code() >= 120 && self.code() < 200
+    }
+
+    /// Leading bars the smoother does not see (their output is 0).
+    pub const fn smooth_skip(self) -> u32 {
+        match self {
+            CubeFormula::ForceIndexSmoothed | CubeFormula::EaseOfMovementSmoothed => 1,
+            _ => 0,
+        }
+    }
+
+    /// Smoother passes the combine step reads: `2` for the oscillators built from
+    /// two smoothed legs, otherwise `1`.
+    pub const fn smoother_stages(self) -> u32 {
+        match self {
+            CubeFormula::VolumeOscSmoothed
+            | CubeFormula::ChaikinOscSmoothed
+            | CubeFormula::IntradayIntensitySmoothed => 2,
+            _ => 1,
+        }
+    }
+
     pub const fn output_count(self) -> u32 {
         match self {
             CubeFormula::DonchianBands => 3,
@@ -474,6 +570,14 @@ mod tests {
                 "{id:?}"
             );
         }
+        assert_eq!(formula_of(IndicatorId::Qstick), Some(CubeFormula::QstickSmoothed));
+        assert_eq!(formula_of(IndicatorId::Fi), Some(CubeFormula::ForceIndexSmoothed));
+        assert_eq!(formula_of(IndicatorId::Coppock), Some(CubeFormula::CoppockSmoothed));
+        assert_eq!(formula_of(IndicatorId::Vo), Some(CubeFormula::VolumeOscSmoothed));
+        assert_eq!(formula_of(IndicatorId::Cho), Some(CubeFormula::ChaikinOscSmoothed));
+        assert_eq!(formula_of(IndicatorId::Ii), Some(CubeFormula::IntradayIntensitySmoothed));
+        assert_eq!(formula_of(IndicatorId::Eom), Some(CubeFormula::EaseOfMovementSmoothed));
+        assert_eq!(formula_of(IndicatorId::Natr), Some(CubeFormula::NatrSmoothed));
     }
 
     #[cfg(feature = "gpu-shader")]

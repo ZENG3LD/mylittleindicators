@@ -251,6 +251,14 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "central_pivot_range" => "CentralPivotRange",
         "heikin_ashi_cols" => "HeikinAshiCols",
         "candle_anatomy_cols" => "CandleAnatomyCols",
+        "qstick_smoothed" => "QstickSmoothed",
+        "force_index_smoothed" => "ForceIndexSmoothed",
+        "coppock_smoothed" => "CoppockSmoothed",
+        "volume_osc_smoothed" => "VolumeOscSmoothed",
+        "chaikin_osc_smoothed" => "ChaikinOscSmoothed",
+        "intraday_intensity_smoothed" => "IntradayIntensitySmoothed",
+        "ease_of_movement_smoothed" => "EaseOfMovementSmoothed",
+        "natr_smoothed" => "NatrSmoothed",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

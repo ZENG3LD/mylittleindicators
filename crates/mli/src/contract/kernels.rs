@@ -3385,6 +3385,435 @@ fn bar_map_m(
     bar_scan_m(open, high, low, close, output, period, a, formula);
 }
 
+/// Linear-weighted mean of `src[off + i + 1 - wp ..= off + i]`, or the sample itself
+/// while the window is short. `i` counts from `off`.
+#[cube]
+fn sm_wma_at(src: &[f32], off: usize, i: usize, wp: usize) -> f32 {
+    let mut out = src[off + i];
+    if i + 1 >= wp {
+        let start = i + 1 - wp;
+        let mut acc = 0.0f32;
+        let mut wsum = 0.0f32;
+        for k in 0..wp {
+            let w = (k + 1) as f32;
+            acc = acc + src[off + start + k] * w;
+            wsum = wsum + w;
+        }
+        out = acc / wsum;
+    }
+    out
+}
+
+/// Mean of the (partial) window of `p` samples ending at `i`, counted from `off`.
+#[cube]
+fn sm_mean_at(src: &[f32], off: usize, i: usize, p: usize) -> f32 {
+    let mut window = p;
+    if window > i + 1 {
+        window = i + 1;
+    }
+    let start = i + 1 - window;
+    let mut acc = 0.0f32;
+    for k in 0..window {
+        acc = acc + src[off + start + k];
+    }
+    acc / (window as f32)
+}
+
+/// Smoother pass A: codes 0 SMA, 1 EMA, 2 WMA, 3 RMA, 4 DEMA, 5 TEMA.
+/// The series is `src[skip..]`; bars before `skip` write 0. Seeds and warm-up
+/// follow the matching `CubeFormula` arm, so a smoother choice here is the same
+/// math as the single-lane formula on that series.
+#[cube]
+fn smooth_scan_q(
+    src: &[f32],
+    dst: &mut [f32],
+    code: u32,
+    period: u32,
+    skip: u32,
+) {
+    let n = src.len();
+    let off = skip as usize;
+    let mut p = period as usize;
+    if p < 1 {
+        p = 1;
+    }
+    let pf = p as f32;
+    let alpha = 2.0f32 / (pf + 1.0f32);
+    for z in 0..off {
+        dst[z] = 0.0f32;
+    }
+    if n > off {
+        let m = n - off;
+        if code == 0u32 {
+            for t in 0..m {
+                dst[off + t] = sm_mean_at(src, off, t, p);
+            }
+        } else if code == 1u32 {
+            let mut y = src[off];
+            dst[off] = y;
+            for t in 1..m {
+                y = alpha * src[off + t] + (1.0f32 - alpha) * y;
+                dst[off + t] = y;
+            }
+        } else if code == 2u32 {
+            for t in 0..m {
+                dst[off + t] = sm_wma_at(src, off, t, p);
+            }
+        } else if code == 3u32 {
+            let mut y = src[off];
+            dst[off] = y;
+            for t in 1..m {
+                y = (y * (pf - 1.0f32) + src[off + t]) / pf;
+                dst[off + t] = y;
+            }
+        } else if code == 4u32 {
+            let mut e1 = src[off];
+            let mut e2 = e1;
+            dst[off] = 2.0f32 * e1 - e2;
+            for t in 1..m {
+                e1 = alpha * src[off + t] + (1.0f32 - alpha) * e1;
+                e2 = alpha * e1 + (1.0f32 - alpha) * e2;
+                dst[off + t] = 2.0f32 * e1 - e2;
+            }
+        } else if code == 5u32 {
+            let mut e1 = src[off];
+            let mut e2 = e1;
+            let mut e3 = e2;
+            dst[off] = 3.0f32 * e1 - 3.0f32 * e2 + e3;
+            for t in 1..m {
+                e1 = alpha * src[off + t] + (1.0f32 - alpha) * e1;
+                e2 = alpha * e1 + (1.0f32 - alpha) * e2;
+                e3 = alpha * e2 + (1.0f32 - alpha) * e3;
+                dst[off + t] = 3.0f32 * e1 - 3.0f32 * e2 + e3;
+            }
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn smooth_map_q(
+    src: &[f32],
+    dst: &mut [f32],
+    code: u32,
+    period: u32,
+    skip: u32,
+) {
+    smooth_scan_q(src, dst, code, period, skip);
+}
+
+/// Smoother pass B: codes 6 TMA / Trima, 7 HMA, 8 ALMA (`a` offset, `b` sigma;
+/// zero until the window is full). Own entry: these are the O(window^2) ones.
+#[cube]
+fn smooth_scan_r(
+    src: &[f32],
+    dst: &mut [f32],
+    code: u32,
+    period: u32,
+    skip: u32,
+    a: f32,
+    b: f32,
+) {
+    let n = src.len();
+    let off = skip as usize;
+    let mut p = period as usize;
+    if p < 1 {
+        p = 1;
+    }
+    let pf = p as f32;
+    for z in 0..off {
+        dst[z] = 0.0f32;
+    }
+    if n > off {
+        let m = n - off;
+        if code == 6u32 {
+            for t in 0..m {
+                let mut window = p;
+                if window > t + 1 {
+                    window = t + 1;
+                }
+                let start = t + 1 - window;
+                let mut acc = 0.0f32;
+                for j in 0..window {
+                    acc = acc + sm_mean_at(src, off, start + j, p);
+                }
+                dst[off + t] = acc / (window as f32);
+            }
+        } else if code == 7u32 {
+            let mut half = 0usize;
+            let mut left = p;
+            for _step in 0..p {
+                if left >= 2 {
+                    left = left - 2;
+                    half = half + 1;
+                }
+            }
+            if half < 1 {
+                half = 1;
+            }
+            let mut sq = 1usize;
+            for cand in 1..p + 1 {
+                if cand * cand <= p {
+                    sq = cand;
+                }
+            }
+            for t in 0..m {
+                if t + 1 < sq {
+                    let w1 = sm_wma_at(src, off, t, half);
+                    let w2 = sm_wma_at(src, off, t, p);
+                    dst[off + t] = 2.0f32 * w1 - w2;
+                } else {
+                    let start = t + 1 - sq;
+                    let mut acc = 0.0f32;
+                    let mut wsum = 0.0f32;
+                    for k in 0..sq {
+                        let w1 = sm_wma_at(src, off, start + k, half);
+                        let w2 = sm_wma_at(src, off, start + k, p);
+                        let w = (k + 1) as f32;
+                        acc = acc + (2.0f32 * w1 - w2) * w;
+                        wsum = wsum + w;
+                    }
+                    dst[off + t] = acc / wsum;
+                }
+            }
+        } else if code == 8u32 {
+            let mo = a * (pf - 1.0f32);
+            let mut s = pf / b;
+            if s < 1.0e-9f32 {
+                s = 1.0e-9f32;
+            }
+            for t in 0..m {
+                if t + 1 < p {
+                    dst[off + t] = 0.0f32;
+                } else {
+                    let start = t + 1 - p;
+                    let mut acc = 0.0f32;
+                    let mut wsum = 0.0f32;
+                    for k in 0..p {
+                        let x = ((k as f32) - mo) / s;
+                        let wi = (-0.5f32 * x * x).exp();
+                        acc = acc + src[off + start + k] * wi;
+                        wsum = wsum + wi;
+                    }
+                    dst[off + t] = acc / wsum;
+                }
+            }
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn smooth_map_r(
+    src: &[f32],
+    dst: &mut [f32],
+    code: u32,
+    period: u32,
+    skip: u32,
+    a: f32,
+    b: f32,
+) {
+    smooth_scan_r(src, dst, code, period, skip, a, b);
+}
+
+/// Pre-smoother series for the smoothed formulas (codes 120..=127).
+/// `raw0` is the series the smoother reads; `raw1` is a second series for 125.
+/// 120 Qstick `close - open`, 121 force index `volume * dclose`, 122 Coppock ROC sum
+/// (`period`, `fast` lengths), 123 volume, 124 Chaikin ADL, 125 intraday intensity
+/// (`raw0`) and volume (`raw1`), 126 ease of movement raw (`a` is the scale),
+/// 127 true range (first bar `high - low`).
+#[cube]
+fn prep_scan_p(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    raw0: &mut [f32],
+    raw1: &mut [f32],
+    period: u32,
+    fast: u32,
+    a: f32,
+    formula: u32,
+) {
+    let n = open.len();
+    let mut adl = 0.0f32;
+    for i in 0..n {
+        raw1[i] = volume[i];
+        if formula == 120u32 {
+            raw0[i] = close[i] - open[i];
+        } else if formula == 121u32 {
+            if i == 0 {
+                raw0[i] = 0.0f32;
+            } else {
+                raw0[i] = volume[i] * (close[i] - close[i - 1]);
+            }
+        } else if formula == 122u32 {
+            let mut l1 = period as usize;
+            if l1 < 1 {
+                l1 = 1;
+            }
+            let mut l2 = fast as usize;
+            if l2 < 1 {
+                l2 = 1;
+            }
+            let mut r1 = 0.0f32;
+            let mut r2 = 0.0f32;
+            if i >= l1 {
+                let base = close[i - l1];
+                let mut ab = base;
+                if ab < 0.0f32 {
+                    ab = -ab;
+                }
+                if ab >= 1.0e-12f32 {
+                    r1 = 100.0f32 * (close[i] - base) / base;
+                }
+            }
+            if i >= l2 {
+                let base = close[i - l2];
+                let mut ab = base;
+                if ab < 0.0f32 {
+                    ab = -ab;
+                }
+                if ab >= 1.0e-12f32 {
+                    r2 = 100.0f32 * (close[i] - base) / base;
+                }
+            }
+            raw0[i] = r1 + r2;
+        } else if formula == 123u32 {
+            raw0[i] = volume[i];
+        } else if formula == 124u32 || formula == 125u32 {
+            let mut hl = high[i] - low[i];
+            if hl < 0.0f32 {
+                hl = -hl;
+            }
+            if hl < 1.0e-12f32 {
+                hl = 1.0e-12f32;
+            }
+            if formula == 124u32 {
+                adl = adl + (((close[i] - low[i]) - (high[i] - close[i])) / hl) * volume[i];
+                raw0[i] = adl;
+            } else {
+                raw0[i] = ((2.0f32 * close[i] - high[i] - low[i]) / hl) * volume[i];
+            }
+        } else if formula == 126u32 {
+            if i == 0 {
+                raw0[i] = 0.0f32;
+            } else {
+                let dist = (high[i] + low[i]) / 2.0f32 - (high[i - 1] + low[i - 1]) / 2.0f32;
+                let range = high[i] - low[i];
+                let mut ar = range;
+                if ar < 0.0f32 {
+                    ar = -ar;
+                }
+                let mut av = volume[i];
+                if av < 0.0f32 {
+                    av = -av;
+                }
+                let mut boxr = 0.0f32;
+                if ar >= 1.0e-12f32 && av >= 1.0e-12f32 {
+                    boxr = volume[i] / a / range;
+                }
+                let mut ab = boxr;
+                if ab < 0.0f32 {
+                    ab = -ab;
+                }
+                if ab < 1.0e-12f32 {
+                    raw0[i] = 0.0f32;
+                } else {
+                    raw0[i] = dist / boxr;
+                }
+            }
+        } else if formula == 127u32 {
+            let mut tr = high[i] - low[i];
+            if i > 0 {
+                let mut d1 = high[i] - close[i - 1];
+                if d1 < 0.0f32 {
+                    d1 = -d1;
+                }
+                let mut d2 = low[i] - close[i - 1];
+                if d2 < 0.0f32 {
+                    d2 = -d2;
+                }
+                if d1 > tr {
+                    tr = d1;
+                }
+                if d2 > tr {
+                    tr = d2;
+                }
+            }
+            raw0[i] = tr;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn prep_map_p(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    raw0: &mut [f32],
+    raw1: &mut [f32],
+    period: u32,
+    fast: u32,
+    a: f32,
+    formula: u32,
+) {
+    prep_scan_p(open, high, low, close, volume, raw0, raw1, period, fast, a, formula);
+}
+
+/// Final combine of the smoothed series. 123 and 124 are `sm0 - sm1`;
+/// 125 is `100 * sm0 / sm1` (0 when `|sm1| < 1e-12`); 127 is `100 * sm0 / |close|`
+/// (0 when `|close| < 1e-12`); every other code is `sm0`.
+#[cube]
+fn comb_scan_s(
+    close: &[f32],
+    sm0: &[f32],
+    sm1: &[f32],
+    output: &mut [f32],
+    formula: u32,
+) {
+    let n = close.len();
+    for i in 0..n {
+        if formula == 123u32 || formula == 124u32 {
+            output[i] = sm0[i] - sm1[i];
+        } else if formula == 125u32 {
+            let mut den = sm1[i];
+            if den < 0.0f32 {
+                den = -den;
+            }
+            if den < 1.0e-12f32 {
+                output[i] = 0.0f32;
+            } else {
+                output[i] = 100.0f32 * sm0[i] / sm1[i];
+            }
+        } else if formula == 127u32 {
+            let mut ac = close[i];
+            if ac < 0.0f32 {
+                ac = -ac;
+            }
+            if ac < 1.0e-12f32 {
+                output[i] = 0.0f32;
+            } else {
+                output[i] = 100.0f32 * sm0[i] / ac;
+            }
+        } else {
+            output[i] = sm0[i];
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn comb_map_s(
+    close: &[f32],
+    sm0: &[f32],
+    sm1: &[f32],
+    output: &mut [f32],
+    formula: u32,
+) {
+    comb_scan_s(close, sm0, sm1, output, formula);
+}
+
 #[cube(launch_unchecked)]
 fn lane_map(
     open: &[f32],
@@ -3523,6 +3952,9 @@ fn lane_map(
 pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubeParams) -> Vec<f32> {
     if samples.is_empty() {
         return Vec::new();
+    }
+    if formula.is_smoothed() {
+        return launch_cube_smoothed(formula, samples, params);
     }
     if formula.output_count() > 1 {
         // Multi-column formulas return their first column here; use `launch_cube_columns` for all.
@@ -3824,11 +4256,113 @@ pub fn launch_cube_columns(
     flat.chunks(n).map(|ch| ch.to_vec()).collect()
 }
 
+/// Run a smoothed formula (code 120..=127): pre-smoother series, one or two
+/// smoother passes chosen by [`CubeParams::smoother`] / [`CubeParams::smoother2`],
+/// then the combine step. Each stage is its own launch on the same client, so no
+/// shader holds more than one stage's arms.
+fn launch_cube_smoothed(formula: CubeFormula, samples: &[GpuSample], params: CubeParams) -> Vec<f32> {
+    let n = samples.len();
+    let c = GpuSample::columns(samples);
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let open_b = client.create_from_slice(f32::as_bytes(&c.open));
+    let high_b = client.create_from_slice(f32::as_bytes(&c.high));
+    let low_b = client.create_from_slice(f32::as_bytes(&c.low));
+    let close_b = client.create_from_slice(f32::as_bytes(&c.close));
+    let volume_b = client.create_from_slice(f32::as_bytes(&c.volume));
+    let bytes_n = n * core::mem::size_of::<f32>();
+    let raw0 = client.empty(bytes_n);
+    let raw1 = client.empty(bytes_n);
+    let sm0 = client.empty(bytes_n);
+    let sm1 = client.empty(bytes_n);
+    let output = client.empty(bytes_n);
+    let skip = formula.smooth_skip();
+    let code = formula.code();
+    macro_rules! smooth {
+        ($src:expr, $dst:expr, $which:expr, $per:expr) => {
+            if $which >= 6u32 {
+                smooth_map_r::launch_unchecked(
+                    &client,
+                    CubeCount::new_1d(1),
+                    CubeDim::new_1d(1),
+                    BufferArg::from_raw_parts($src.clone(), n),
+                    BufferArg::from_raw_parts($dst.clone(), n),
+                    $which,
+                    $per,
+                    skip,
+                    params.a,
+                    params.b,
+                );
+            } else {
+                smooth_map_q::launch_unchecked(
+                    &client,
+                    CubeCount::new_1d(1),
+                    CubeDim::new_1d(1),
+                    BufferArg::from_raw_parts($src.clone(), n),
+                    BufferArg::from_raw_parts($dst.clone(), n),
+                    $which,
+                    $per,
+                    skip,
+                );
+            }
+        };
+    }
+    unsafe {
+        prep_map_p::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(open_b, n),
+            BufferArg::from_raw_parts(high_b, n),
+            BufferArg::from_raw_parts(low_b, n),
+            BufferArg::from_raw_parts(close_b.clone(), n),
+            BufferArg::from_raw_parts(volume_b, n),
+            BufferArg::from_raw_parts(raw0.clone(), n),
+            BufferArg::from_raw_parts(raw1.clone(), n),
+            params.period,
+            params.fast,
+            params.a,
+            code,
+        );
+        let first = params.smoother.code();
+        smooth!(raw0, sm0, first, params.smooth_period);
+        if formula.smoother_stages() >= 2 {
+            if code == 125 {
+                smooth!(raw1, sm1, first, params.smooth_period);
+            } else {
+                smooth!(raw0, sm1, params.smoother2.code(), params.smooth_period2);
+            }
+        }
+        comb_map_s::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(close_b, n),
+            BufferArg::from_raw_parts(sm0, n),
+            BufferArg::from_raw_parts(sm1, n),
+            BufferArg::from_raw_parts(output.clone(), n),
+            code,
+        );
+    }
+    let bytes = client.read_one_unchecked(output);
+    f32::from_bytes(&bytes).to_vec()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::engine::ohlcv_field::OhlcvField;
     use crate::indicators::accumulation::accumulation_distribution::AccumulationDistribution;
+    use crate::contract::gpu::CubeSmoother;
+    use crate::engine::contract_engine::SmootherId;
+    use crate::indicators::momentum::qstick::Qstick;
+    use crate::indicators::accumulation::force_index::ForceIndex;
+    use crate::indicators::momentum::coppock::CoppockCurve;
+    use crate::indicators::volume::volume_oscillator::VolumeOscillator;
+    use crate::indicators::accumulation::chaikin_oscillator::ChaikinOscillator;
+    use crate::indicators::accumulation::intraday_intensity::IntradayIntensity;
+    use crate::indicators::accumulation::ease_of_movement::EaseOfMovement;
+    use crate::indicators::volatility::natr::Natr;
     use crate::indicators::channels::donchian_channel::DonchianChannel;
     use crate::indicators::channels::donchian_channel_metrics::DonchianMetrics;
     use crate::indicators::momentum::aroon::Aroon;
@@ -5249,6 +5783,94 @@ mod tests {
             &run_cols(CubeFormula::CandleAnatomyCols, &bars, anat_params),
             &[&an_b, &an_u, &an_l, &an_lu, &an_ll],
         );
+
+        // UNTESTED on GPU (no GPU on the authoring box): smoothed formulas, codes 120..=127.
+        // Every cube smoother is checked against its core on Qstick; the other formulas
+        // check the default leg plus one cascaded smoother.
+        let smoothers: [(CubeSmoother, SmootherId); 9] = [
+            (CubeSmoother::Sma, SmootherId::Sma),
+            (CubeSmoother::Ema, SmootherId::Ema),
+            (CubeSmoother::Wma, SmootherId::Wma),
+            (CubeSmoother::Rma, SmootherId::Rma),
+            (CubeSmoother::Dema, SmootherId::Dema),
+            (CubeSmoother::Tema, SmootherId::Tema),
+            (CubeSmoother::Tma, SmootherId::Tma),
+            (CubeSmoother::Hma, SmootherId::Hma),
+            (CubeSmoother::Alma, SmootherId::Alma),
+        ];
+        assert_eq!(CubeSmoother::from_id(SmootherId::Trima), CubeSmoother::Tma);
+        for (cs, id) in smoothers {
+            let mut q = Qstick::from_smoother(wper, id);
+            let cpu_q: Vec<f64> = bars.iter().map(|b| q.feed(&[b.open, b.close])).collect();
+            let mut qp = CubeParams::period(wper as u32);
+            qp.smoother = cs;
+            assert_close(&run(CubeFormula::QstickSmoothed, &bars, qp), &cpu_q);
+        }
+        for (cs, id) in [
+            (CubeSmoother::Ema, SmootherId::Ema),
+            (CubeSmoother::Hma, SmootherId::Hma),
+        ] {
+            let mut fi = ForceIndex::from_smoothers(id, wper);
+            let cpu_fi: Vec<f64> = bars.iter().map(|b| fi.feed(&[b.close, b.volume])).collect();
+            let mut fp = CubeParams::period(wper as u32);
+            fp.smoother = cs;
+            assert_close(&run(CubeFormula::ForceIndexSmoothed, &bars, fp), &cpu_fi);
+
+            let mut cop = CoppockCurve::from_smoother(4, 6, wper, id);
+            let cpu_cop: Vec<f64> = bars.iter().map(|b| cop.feed(b.close)).collect();
+            let mut cp = CubeParams::period(4);
+            cp.fast = 6;
+            cp.smoother = cs;
+            cp.smooth_period = wper as u32;
+            assert_close(&run(CubeFormula::CoppockSmoothed, &bars, cp), &cpu_cop);
+
+            let mut vo = VolumeOscillator::from_smoothers(id, 3, SmootherId::Sma, 8);
+            let cpu_vo: Vec<f64> = bars.iter().map(|b| vo.feed(b.volume)).collect();
+            let mut vp = CubeParams::period(3);
+            vp.smoother = cs;
+            vp.smooth_period = 3;
+            vp.smoother2 = CubeSmoother::Sma;
+            vp.smooth_period2 = 8;
+            assert_close(&run(CubeFormula::VolumeOscSmoothed, &bars, vp), &cpu_vo);
+
+            let mut cho = ChaikinOscillator::from_smoothers(id, 3, SmootherId::Ema, 10);
+            let cpu_cho: Vec<f64> = bars
+                .iter()
+                .map(|b| cho.feed(&[b.high, b.low, b.close, b.volume]))
+                .collect();
+            let mut hp = CubeParams::period(3);
+            hp.smoother = cs;
+            hp.smooth_period = 3;
+            hp.smoother2 = CubeSmoother::Ema;
+            hp.smooth_period2 = 10;
+            assert_close(&run(CubeFormula::ChaikinOscSmoothed, &bars, hp), &cpu_cho);
+
+            let mut natr = Natr::from_smoother(wper, id);
+            let cpu_natr: Vec<f64> = bars
+                .iter()
+                .map(|b| natr.feed(&[b.high, b.low, b.close]))
+                .collect();
+            let mut np = CubeParams::period(wper as u32);
+            np.smoother = cs;
+            assert_close(&run(CubeFormula::NatrSmoothed, &bars, np), &cpu_natr);
+        }
+        let mut ii = IntradayIntensity::new(wper);
+        let cpu_ii: Vec<f64> = bars
+            .iter()
+            .map(|b| ii.feed(&[b.high, b.low, b.close, b.volume]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::IntradayIntensitySmoothed, &bars, CubeParams::period(wper as u32)),
+            &cpu_ii,
+        );
+        let mut eom = EaseOfMovement::with_params(wper, 1000.0);
+        let cpu_eom: Vec<f64> = bars
+            .iter()
+            .map(|b| eom.feed(&[b.high, b.low, b.volume]))
+            .collect();
+        let mut ep = CubeParams::period(wper as u32);
+        ep.a = 1000.0;
+        assert_close(&run(CubeFormula::EaseOfMovementSmoothed, &bars, ep), &cpu_eom);
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
     }

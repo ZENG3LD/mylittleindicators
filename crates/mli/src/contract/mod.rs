@@ -686,7 +686,7 @@ pub use render::{
 };
 
 pub mod gpu;
-pub use gpu::{CubeFormula, CubeParams, GpuCube, GpuMode, GpuShader};
+pub use gpu::{CubeFormula, CubeParams, CubeSmoother, GpuCube, GpuMode, GpuShader};
 
 pub mod gpu_sample;
 pub use gpu_sample::{GpuColumns, GpuLevel, GpuSample};
