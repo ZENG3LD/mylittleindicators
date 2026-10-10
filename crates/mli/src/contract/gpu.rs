@@ -113,6 +113,25 @@ pub enum CubeFormula {
     /// distance from mid, over [`CubeParams::levels`] (at least 2). Holds the
     /// previous value when either side is missing.
     BookSlope = 35,
+    /// Williams %R. `-50` until `period` bars, and when the high-low range is ~0.
+    WilliamsR = 36,
+    /// On-balance volume. First sample is 0. Price lane up adds volume, down subtracts it.
+    Obv = 37,
+    /// Price-volume trend. First sample is 0. Adds `(x - prev) / prev * volume`.
+    Pvt = 38,
+    /// Money flow index. `50` until `period` bars. First typical-price step is positive.
+    Mfi = 39,
+    /// Accumulation/distribution line. Multiplier is 0 when the high-low range is ~0.
+    AdLine = 40,
+    /// DeMarker. First sample is 0. Wilder sums of up-high and down-low, then `up / (up + down)`.
+    Demarker = 41,
+    /// Ulcer index of [`CubeParams`] lane. Zero until two windows of drawdown squares exist.
+    Ulcer = 42,
+    /// Close-to-close realized vol of the lane. RMS of squared log returns.
+    /// [`CubeParams::a`] > 0 multiplies the result. The first sample is 0.
+    RealizedVol = 43,
+    /// Kaufman efficiency ratio of the lane. Zero until the window is full. Clamped to `[0, 1]`.
+    Efficiency = 44,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -244,6 +263,15 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::AuctionImbalance), Some(CubeFormula::RatioToMean));
         assert_eq!(formula_of(IndicatorId::InsuranceFundMomentum), Some(CubeFormula::EmaStep));
         assert_eq!(formula_of(IndicatorId::BookSlope), Some(CubeFormula::BookSlope));
+        assert_eq!(formula_of(IndicatorId::WilliamsR), Some(CubeFormula::WilliamsR));
+        assert_eq!(formula_of(IndicatorId::Obv), Some(CubeFormula::Obv));
+        assert_eq!(formula_of(IndicatorId::Pvt), Some(CubeFormula::Pvt));
+        assert_eq!(formula_of(IndicatorId::Mfi), Some(CubeFormula::Mfi));
+        assert_eq!(formula_of(IndicatorId::Ad), Some(CubeFormula::AdLine));
+        assert_eq!(formula_of(IndicatorId::Demarker), Some(CubeFormula::Demarker));
+        assert_eq!(formula_of(IndicatorId::Ui), Some(CubeFormula::Ulcer));
+        assert_eq!(formula_of(IndicatorId::Rv), Some(CubeFormula::RealizedVol));
+        assert_eq!(formula_of(IndicatorId::TrEr), Some(CubeFormula::Efficiency));
     }
 
     #[cfg(feature = "gpu-shader")]

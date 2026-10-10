@@ -190,6 +190,15 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "ratio_to_mean" => "RatioToMean",
         "ema_step" => "EmaStep",
         "book_slope" => "BookSlope",
+        "williams_r" => "WilliamsR",
+        "obv" => "Obv",
+        "pvt" => "Pvt",
+        "mfi" => "Mfi",
+        "ad_line" => "AdLine",
+        "demarker" => "Demarker",
+        "ulcer" => "Ulcer",
+        "realized_vol" => "RealizedVol",
+        "efficiency" => "Efficiency",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

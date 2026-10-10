@@ -811,6 +811,286 @@ fn scan_lane(
     }
 }
 
+/// Bar formulas 36 through 44. A second entry keeps the shader that already
+/// launched at the size that fit the compiler stack. One unit writes the series.
+#[cube]
+fn bar_scan(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    a: f32,
+    formula: u32,
+) {
+    let n = open.len();
+    let mut p = period as usize;
+    if p < 1 {
+        p = 1;
+    }
+    if formula == 36u32 {
+        for i in 0..n {
+            if i + 1 < p {
+                output[i] = -50.0f32;
+            } else {
+                let start = i + 1 - p;
+                let mut hh = high[start];
+                let mut ll = low[start];
+                for k in 0..p {
+                    if high[start + k] > hh {
+                        hh = high[start + k];
+                    }
+                    if low[start + k] < ll {
+                        ll = low[start + k];
+                    }
+                }
+                let range = hh - ll;
+                let mut ar = range;
+                if ar < 0.0f32 {
+                    ar = -ar;
+                }
+                if ar < 1.0e-12 {
+                    output[i] = -50.0f32;
+                } else {
+                    let mut v = ((hh - close[i]) / range) * -100.0f32;
+                    if v < -100.0f32 {
+                        v = -100.0f32;
+                    }
+                    if v > 0.0f32 {
+                        v = 0.0f32;
+                    }
+                    output[i] = v;
+                }
+            }
+        }
+    } else if formula == 37u32 {
+        let mut y = 0.0f32;
+        let mut prev = fld(open, high, low, close, volume, 0, lane);
+        output[0] = 0.0f32;
+        for k in 1..n {
+            let x = fld(open, high, low, close, volume, k, lane);
+            if x > prev {
+                y = y + volume[k];
+            } else if x < prev {
+                y = y - volume[k];
+            }
+            prev = x;
+            output[k] = y;
+        }
+    } else if formula == 38u32 {
+        let mut y = 0.0f32;
+        let mut prev = fld(open, high, low, close, volume, 0, lane);
+        output[0] = 0.0f32;
+        for k in 1..n {
+            let x = fld(open, high, low, close, volume, k, lane);
+            let mut ap = prev;
+            if ap < 0.0f32 {
+                ap = -ap;
+            }
+            let mut pct = 0.0f32;
+            if ap > 1.0e-12 {
+                pct = (x - prev) / prev;
+            }
+            y = y + pct * volume[k];
+            prev = x;
+            output[k] = y;
+        }
+    } else if formula == 39u32 {
+        for i in 0..n {
+            if i + 1 < p {
+                output[i] = 50.0f32;
+            } else {
+                let start = i + 1 - p;
+                let mut pos = 0.0f32;
+                let mut neg = 0.0f32;
+                for k in 0..p {
+                    let j = start + k;
+                    let tp = (high[j] + low[j] + close[j]) / 3.0f32;
+                    let raw = tp * volume[j];
+                    let mut up = 0u32;
+                    if j == 0 {
+                        up = 1u32;
+                    } else {
+                        let prev = (high[j - 1] + low[j - 1] + close[j - 1]) / 3.0f32;
+                        if tp > prev {
+                            up = 1u32;
+                        }
+                    }
+                    if up == 1u32 {
+                        pos = pos + raw;
+                    } else {
+                        neg = neg + raw;
+                    }
+                }
+                if neg == 0.0f32 {
+                    output[i] = 100.0f32;
+                } else if pos == 0.0f32 {
+                    output[i] = 0.0f32;
+                } else {
+                    let ratio = pos / neg;
+                    output[i] = 100.0f32 - (100.0f32 / (1.0f32 + ratio));
+                }
+            }
+        }
+    } else if formula == 40u32 {
+        let mut y = 0.0f32;
+        for i in 0..n {
+            let range = high[i] - low[i];
+            let mut ar = range;
+            if ar < 0.0f32 {
+                ar = -ar;
+            }
+            let mut mfm = 0.0f32;
+            if ar >= 1.0e-12 {
+                mfm = ((close[i] - low[i]) - (high[i] - close[i])) / range;
+            }
+            y = y + mfm * volume[i];
+            output[i] = y;
+        }
+    } else if formula == 41u32 {
+        output[0] = 0.0f32;
+        let mut prev_h = high[0];
+        let mut prev_l = low[0];
+        let mut sum_up = 0.0f32;
+        let mut sum_down = 0.0f32;
+        let pf = p as f32;
+        for k in 1..n {
+            let mut up = high[k] - prev_h;
+            if up < 0.0f32 {
+                up = 0.0f32;
+            }
+            let mut down = prev_l - low[k];
+            if down < 0.0f32 {
+                down = 0.0f32;
+            }
+            sum_up = (sum_up * (pf - 1.0f32) + up) / pf;
+            sum_down = (sum_down * (pf - 1.0f32) + down) / pf;
+            let denom = sum_up + sum_down;
+            if denom > 0.0f32 {
+                output[k] = sum_up / denom;
+            } else {
+                output[k] = 0.0f32;
+            }
+            prev_h = high[k];
+            prev_l = low[k];
+        }
+    } else if formula == 42u32 {
+        let twice = p + p;
+        for i in 0..n {
+            if i + 2 < twice {
+                output[i] = 0.0f32;
+            } else {
+                let mut sum = 0.0f32;
+                for t in 0..p {
+                    let j = i - p + 1 + t;
+                    let hs = j + 1 - p;
+                    let mut hh = fld(open, high, low, close, volume, hs, lane);
+                    for u in 0..p {
+                        let v = fld(open, high, low, close, volume, hs + u, lane);
+                        if v > hh {
+                            hh = v;
+                        }
+                    }
+                    let cur = fld(open, high, low, close, volume, j, lane);
+                    let mut r = 0.0f32;
+                    if hh > 1.0e-12 {
+                        r = (cur - hh) / hh * 100.0f32;
+                    }
+                    sum = sum + r * r;
+                }
+                output[i] = sqrt_f(sum / (p as f32));
+            }
+        }
+    } else if formula == 43u32 {
+        let mut win = p;
+        if win < 1 {
+            win = 1;
+        }
+        output[0] = 0.0f32;
+        for i in 1..n {
+            let mut use_n = i;
+            if use_n > win {
+                use_n = win;
+            }
+            let mut sum = 0.0f32;
+            for t in 0..use_n {
+                let j = i - use_n + 1 + t;
+                let mut pv = fld(open, high, low, close, volume, j - 1, lane);
+                if pv < 1.0e-12 {
+                    pv = 1.0e-12;
+                }
+                let cx = fld(open, high, low, close, volume, j, lane);
+                let r = (cx / pv).ln();
+                sum = sum + r * r;
+            }
+            let vol = sqrt_f(sum / (use_n as f32));
+            if a > 0.0f32 {
+                output[i] = vol * a;
+            } else {
+                output[i] = vol;
+            }
+        }
+    } else if formula == 44u32 {
+        let mut win = p;
+        if win < 2 {
+            win = 2;
+        }
+        for i in 0..n {
+            if i + 1 < win {
+                output[i] = 0.0f32;
+            } else {
+                let start = i + 1 - win;
+                let newest = fld(open, high, low, close, volume, i, lane);
+                let oldest = fld(open, high, low, close, volume, start, lane);
+                let mut dir = newest - oldest;
+                if dir < 0.0f32 {
+                    dir = -dir;
+                }
+                let mut vol = 0.0f32;
+                for k in 0..win - 1 {
+                    let mut d = fld(open, high, low, close, volume, start + k + 1, lane)
+                        - fld(open, high, low, close, volume, start + k, lane);
+                    if d < 0.0f32 {
+                        d = -d;
+                    }
+                    vol = vol + d;
+                }
+                if vol > 0.0f32 {
+                    let mut er = dir / vol;
+                    if er < 0.0f32 {
+                        er = 0.0f32;
+                    }
+                    if er > 1.0f32 {
+                        er = 1.0f32;
+                    }
+                    output[i] = er;
+                } else {
+                    output[i] = 0.0f32;
+                }
+            }
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    a: f32,
+    formula: u32,
+) {
+    bar_scan(open, high, low, close, volume, output, lane, period, a, formula);
+}
+
 #[cube(launch_unchecked)]
 fn lane_map(
     open: &[f32],
@@ -975,6 +1255,23 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     let cubes = (n as u32).div_ceil(dim);
     let book_len = c.bid_px.len();
     unsafe {
+        if formula.code() >= 36 {
+            bar_map::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(open_b, n),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(volume_b, n),
+                BufferArg::from_raw_parts(output.clone(), n),
+                params.lane.code(),
+                params.period,
+                params.a,
+                formula.code(),
+            );
+        } else {
         lane_map::launch_unchecked(
             &client,
             CubeCount::new_1d(cubes),
@@ -1010,6 +1307,7 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
             params.slot,
             formula.code(),
         );
+        }
     }
     let bytes = client.read_one_unchecked(output);
     f32::from_bytes(&bytes).to_vec()
@@ -1019,6 +1317,7 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
 mod tests {
     use super::*;
     use crate::engine::ohlcv_field::OhlcvField;
+    use crate::indicators::accumulation::accumulation_distribution::AccumulationDistribution;
     use crate::indicators::average::alma::Alma;
     use crate::indicators::average::dema::Dema;
     use crate::indicators::average::ema::Ema;
@@ -1033,6 +1332,8 @@ mod tests {
     use crate::indicators::average::vwma::Vwma;
     use crate::indicators::average::wma::Wma;
     use crate::indicators::momentum::apo::Apo;
+    use crate::indicators::momentum::demarker::Demarker;
+    use crate::indicators::momentum::williams_r::WilliamsR;
     use crate::indicators::momentum::bias::Bias;
     use crate::indicators::momentum::bop::Bop;
     use crate::indicators::momentum::cmo::Cmo;
@@ -1046,7 +1347,13 @@ mod tests {
     use crate::indicators::book_advanced::bid_ask_asymmetry::BidAskAsymmetry;
     use crate::indicators::swing::highest::Highest;
     use crate::indicators::swing::lowest::Lowest;
+    use crate::indicators::trend::efficiency_ratio::EfficiencyRatio;
     use crate::indicators::volatility::atr::Atr;
+    use crate::indicators::volatility::realized_vol::RealizedVol;
+    use crate::indicators::volatility::ulcer_index::UlcerIndex;
+    use crate::indicators::volume::mfi::Mfi;
+    use crate::indicators::volume::obv::Obv;
+    use crate::indicators::volume::pvt::PriceVolumeTrend;
     use crate::indicators::volatility::true_range::TrueRange;
     use crate::core::types::{
         AuctionEvent, Basis, FundingRate, FundingSettlement, HistoricalVolatility, InsuranceFund,
@@ -1082,11 +1389,13 @@ mod tests {
     use crate::indicators::volatility_advanced::hv_momentum::HvMomentum;
     use crate::indicators::volatility_advanced::vol_idx_momentum::VolIdxMomentum;
 
+    /// f32 running sums (the A/D line) sit a few ulps above `1e-4` versus the f64 core.
+    #[track_caller]
     fn assert_close(gpu: &[f32], cpu: &[f64]) {
         assert_eq!(gpu.len(), cpu.len());
         for (g, c) in gpu.iter().zip(cpu) {
             let delta = (*g as f64 - *c).abs();
-            assert!(delta < 1e-4, "{g} vs {c} (delta {delta})");
+            assert!(delta < 1.0e-3, "{g} vs {c} (delta {delta})");
         }
     }
 
@@ -1886,6 +2195,80 @@ mod tests {
         assert_close(
             &launch_cube(CubeFormula::RatioToMean, &auction_samples, slot1),
             &cpu_auction,
+        );
+
+        let wper = 5usize;
+        let mut wr = WilliamsR::new(wper);
+        let cpu_wr: Vec<f64> = bars
+            .iter()
+            .map(|b| wr.feed(&[b.high, b.low, b.close]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::WilliamsR, &bars, CubeParams::period(wper as u32)),
+            &cpu_wr,
+        );
+        let mut obv = Obv::new();
+        let cpu_obv: Vec<f64> = bars
+            .iter()
+            .map(|b| obv.feed(&[b.close, b.volume]))
+            .collect();
+        assert_close(&run(CubeFormula::Obv, &bars, CubeParams::period(1)), &cpu_obv);
+        let mut obv_hi = Obv::new();
+        let cpu_obv_hi: Vec<f64> = bars
+            .iter()
+            .map(|b| obv_hi.feed(&[b.high, b.volume]))
+            .collect();
+        let mut obv_hi_params = CubeParams::period(1);
+        obv_hi_params.lane = OhlcvField::High;
+        assert_close(&run(CubeFormula::Obv, &bars, obv_hi_params), &cpu_obv_hi);
+        let mut pvt = PriceVolumeTrend::new();
+        let cpu_pvt: Vec<f64> = bars
+            .iter()
+            .map(|b| pvt.feed(&[b.close, b.volume]))
+            .collect();
+        assert_close(&run(CubeFormula::Pvt, &bars, CubeParams::period(1)), &cpu_pvt);
+        let mut mfi = Mfi::new(wper);
+        let cpu_mfi: Vec<f64> = bars
+            .iter()
+            .map(|b| mfi.feed(&[b.high, b.low, b.close, b.volume]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::Mfi, &bars, CubeParams::period(wper as u32)),
+            &cpu_mfi,
+        );
+        let mut ad = AccumulationDistribution::new();
+        let cpu_ad: Vec<f64> = bars
+            .iter()
+            .map(|b| ad.feed(&[b.high, b.low, b.close, b.volume]))
+            .collect();
+        assert_close(&run(CubeFormula::AdLine, &bars, CubeParams::period(1)), &cpu_ad);
+        let mut dem = Demarker::new(wper);
+        let cpu_dem: Vec<f64> = bars.iter().map(|b| dem.feed(&[b.high, b.low])).collect();
+        assert_close(
+            &run(CubeFormula::Demarker, &bars, CubeParams::period(wper as u32)),
+            &cpu_dem,
+        );
+        let mut ulcer = UlcerIndex::with_period(wper);
+        let cpu_ulcer: Vec<f64> = bars.iter().map(|b| ulcer.feed(b.close)).collect();
+        assert_close(
+            &run(CubeFormula::Ulcer, &bars, CubeParams::period(wper as u32)),
+            &cpu_ulcer,
+        );
+        let mut rv = RealizedVol::new(wper, 252.0_f64.sqrt());
+        let cpu_rv: Vec<f64> = bars.iter().map(|b| rv.feed(b.close)).collect();
+        let mut rv_params = CubeParams::period(wper as u32);
+        rv_params.a = (252.0_f32).sqrt();
+        assert_close(&run(CubeFormula::RealizedVol, &bars, rv_params), &cpu_rv);
+        let mut rv_raw = RealizedVol::new(wper, 0.0);
+        let cpu_rv_raw: Vec<f64> = bars.iter().map(|b| rv_raw.feed(b.close)).collect();
+        let mut rv_raw_params = CubeParams::period(wper as u32);
+        rv_raw_params.a = 0.0;
+        assert_close(&run(CubeFormula::RealizedVol, &bars, rv_raw_params), &cpu_rv_raw);
+        let mut er = EfficiencyRatio::new(wper);
+        let cpu_er: Vec<f64> = bars.iter().map(|b| er.feed(b.close)).collect();
+        assert_close(
+            &run(CubeFormula::Efficiency, &bars, CubeParams::period(wper as u32)),
+            &cpu_er,
         );
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
