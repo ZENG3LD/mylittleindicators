@@ -6862,6 +6862,57 @@ mod tests {
         chk(&run_cols(CubeFormula::ElderRayCols, &bars, ep), lanes.iter().map(|l| { let (a, b) = m.feed(l); vec![a, b] }).collect());
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): composites 1010..=1015.
+    #[test]
+    fn lane_matches_cpu_comp_batch2() {
+        use crate::indicators::channels::bb_period::BbPeriod;
+        use crate::indicators::channels::bollinger_bands::BollingerBands;
+        use crate::indicators::channels::bollinger_metrics::BollingerMetrics;
+        use crate::indicators::channels::envelope_channels::{EnvelopeChannels, EnvelopeMode};
+        use crate::indicators::momentum::kdj::Kdj;
+        use crate::indicators::momentum::stochastics::Stochastics;
+
+        let bars = bars(140);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        for (sid, cs) in [(SmootherId::Sma, CubeSmoother::Sma), (SmootherId::Ema, CubeSmoother::Ema), (SmootherId::Wma, CubeSmoother::Wma)] {
+            let mut p = CubeParams::period(9);
+            p.smoother = cs;
+            p.smooth_period = 5;
+            p.a = 2.0;
+            let mut m = BollingerBands::from_smoother(sid, 9, 2.0);
+            chk(&run_cols(CubeFormula::BbCols, &bars, p), close.iter().map(|c| { m.feed(*c); vec![m.upper(), m.middle(), m.lower(), m.std_dev(), m.bandwidth(), m.percent_b()] }).collect());
+
+            let mut m = BbPeriod::new(9, 2.0, sid);
+            chk(&run_cols(CubeFormula::BbPeriodCols, &bars, p), lanes.iter().map(|l| { let (a, b, c) = m.feed(l); vec![a, b, c] }).collect());
+
+            let mut m = EnvelopeChannels::new(9, 2.5, EnvelopeMode::Fixed, sid);
+            let mut ep = p;
+            ep.a = 2.5;
+            chk(&run_cols(CubeFormula::EnvelopeCols, &bars, ep), close.iter().map(|c| { let (u, mi, l) = m.feed(*c); vec![u, mi, l] }).collect());
+
+            let mut kp = p;
+            kp.period = 6;
+            kp.smooth_period = 4;
+            let mut m = Stochastics::from_smoother(sid, 6, 4);
+            chk(&run_cols(CubeFormula::StochCols, &bars, kp), lanes.iter().map(|l| { let (k, d) = m.feed(l); vec![k, d] }).collect());
+            let mut m = Kdj::from_smoother(6, 4, sid);
+            chk(&run_cols(CubeFormula::KdjCols, &bars, kp), lanes.iter().map(|l| { let (k, d, j) = m.feed(l); vec![k, d, j] }).collect());
+        }
+        let mut p = CubeParams::period(9);
+        p.a = 2.0;
+        let mut m = BollingerMetrics::new(9, 2.0);
+        chk(&run_cols(CubeFormula::BbMetricsCols, &bars, p), close.iter().map(|c| { let (a, b) = m.feed(*c); vec![a, b] }).collect());
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

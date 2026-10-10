@@ -38,6 +38,7 @@ fn ew_scan(
     out: &mut [f32],
     op: u32,
     a: f32,
+    b: f32,
 ) {
     let n = x.len();
     let mut held = 0.0f32;
@@ -139,18 +140,109 @@ fn ew_scan(
                     v = (x[t] - p) / p * 100.0f32;
                 }
             }
+        } else if op == 13u32 {
+            v = x[t] + a * y[t];
+        } else if op == 14u32 {
+            v = x[t] - a * y[t];
+        } else if op == 15u32 {
+            v = b;
+            if (t as f32) + 1.0f32 >= a {
+                v = x[t];
+            }
+        } else if op == 16u32 {
+            // population std of the window (length min(a, t + 1)) about y[t]
+            let p = a as usize;
+            let mut lo = 0usize;
+            if t + 1 > p {
+                lo = t + 1 - p;
+            }
+            let mut ss = 0.0f32;
+            for j in lo..(t + 1) {
+                let d = x[j] - y[t];
+                ss = ss + d * d;
+            }
+            v = (ss / ((t + 1 - lo) as f32)).sqrt();
+        } else if op == 23u32 {
+            // percent position: x = close, y = lower, z = upper; 0.5 when width <= 0
+            let wd = z[t] - y[t];
+            v = 0.5f32;
+            if wd > 0.0f32 {
+                v = (x[t] - y[t]) / wd;
+            }
+        } else if op == 24u32 {
+            // bandwidth: x = upper, y = lower, z = middle
+            let mut wd = x[t] - y[t];
+            if wd < 0.0f32 {
+                wd = 0.0f32;
+            }
+            let mut am = z[t];
+            if am < 0.0f32 {
+                am = -am;
+            }
+            if am > 1.0e-12f32 {
+                v = wd / am;
+            }
+        } else if op == 25u32 {
+            // stochastic raw %K over window a: x = close, y = high, z = low
+            let p = a as usize;
+            if t + 1 >= p {
+                let mut hh = y[t + 1 - p];
+                let mut ll = z[t + 1 - p];
+                for j in (t + 1 - p)..(t + 1) {
+                    if y[j] > hh {
+                        hh = y[j];
+                    }
+                    if z[j] < ll {
+                        ll = z[j];
+                    }
+                }
+                let mut r = hh - ll;
+                if r < 0.0f32 {
+                    r = -r;
+                }
+                if r >= 1.0e-12f32 {
+                    v = 100.0f32 * (x[t] - ll) / (hh - ll);
+                }
+            }
+        } else if op == 29u32 {
+            if z[t] != 0.0f32 {
+                v = (x[t] - y[t]) / z[t];
+            }
+        } else if op == 26u32 {
+            v = 3.0f32 * x[t] - 2.0f32 * y[t];
+        } else if op == 27u32 {
+            if (t as f32) + 1.0f32 >= b {
+                v = x[t] * (1.0f32 + a / 100.0f32);
+            }
+        } else if op == 28u32 {
+            if (t as f32) + 1.0f32 >= b {
+                v = x[t] * (1.0f32 - a / 100.0f32);
+            }
         }
         out[t] = v;
     }
 }
 
 #[cube(launch_unchecked)]
-fn ew_map(x: &[f32], y: &[f32], z: &[f32], w: &[f32], out: &mut [f32], op: u32, a: f32) {
-    ew_scan(x, y, z, w, out, op, a);
+fn ew_map(x: &[f32], y: &[f32], z: &[f32], w: &[f32], out: &mut [f32], op: u32, a: f32, b: f32) {
+    ew_scan(x, y, z, w, out, op, a, b);
 }
 
 /// One `ew_scan` launch. Unused inputs can repeat `x`.
 pub(crate) fn ew(op: u32, x: &[f32], y: &[f32], z: &[f32], w: &[f32], a: f32) -> Vec<f32> {
+    ewb(op, x, y, z, w, a, 0.0)
+}
+
+/// `ew` with the second scalar `b`.
+pub(crate) fn ewb(
+    op: u32,
+    x: &[f32],
+    y: &[f32],
+    z: &[f32],
+    w: &[f32],
+    a: f32,
+    b: f32,
+) -> Vec<f32> {
     let n = x.len();
     if n == 0 {
         return Vec::new();
@@ -174,6 +266,7 @@ pub(crate) fn ew(op: u32, x: &[f32], y: &[f32], z: &[f32], w: &[f32], a: f32) ->
             BufferArg::from_raw_parts(out.clone(), n),
             op,
             a,
+            b,
         );
     }
     let bytes = client.read_one_unchecked(out);
@@ -182,6 +275,10 @@ pub(crate) fn ew(op: u32, x: &[f32], y: &[f32], z: &[f32], w: &[f32], a: f32) ->
 
 fn ew2(op: u32, x: &[f32], y: &[f32], a: f32) -> Vec<f32> {
     ew(op, x, y, x, x, a)
+}
+
+fn ewc(op: u32, x: &[f32], y: &[f32], z: &[f32], a: f32, b: f32) -> Vec<f32> {
+    ewb(op, x, y, z, x, a, b)
 }
 
 fn lane_series(samples: &[GpuSample], params: CubeParams, lane: OhlcvField) -> Vec<f32> {
@@ -296,6 +393,79 @@ pub fn launch_cube_comp(
             let lo = lane_series(samples, p, OhlcvField::Low);
             let e = sm(&close, p.smoother, p.smooth_period, 0, p);
             vec![ew2(2, &hi, &e, 0.0), ew2(2, &lo, &e, 0.0)]
+        }
+        // Bollinger bands: `[upper, middle, lower, std_dev, bandwidth, percent_b]`, centre line
+        // `smoother` over `period`, `a` = std multiplier. Bands need the full window.
+        CubeFormula::BbCols => {
+            let src = lane_series(samples, p, p.lane);
+            let mid = sm(&src, p.smoother, p.period, 0, p);
+            let sd = ewc(16, &src, &mid, &src, p.period as f32, 0.0);
+            let up = ewc(13, &mid, &sd, &mid, p.a, 0.0);
+            let lo = ewc(14, &mid, &sd, &mid, p.a, 0.0);
+            let g = p.period.max(1) as f32;
+            let up = ewc(15, &up, &up, &up, g, 0.0);
+            let lo = ewc(15, &lo, &lo, &lo, g, 0.0);
+            let sd = ewc(15, &sd, &sd, &sd, g, 0.0);
+            // CPU bandwidth divides by the signed middle when it is non-zero.
+            let bw = ewc(29, &up, &lo, &mid, 0.0, 0.0);
+            let pb = ewc(23, &src, &lo, &up, 0.0, 0.0);
+            vec![up, mid, lo, sd, bw, pb]
+        }
+        // Bollinger on the typical price: `[middle, upper, lower]`, all 0 until a full window.
+        CubeFormula::BbPeriodCols => {
+            let tp = lane_series(samples, p, OhlcvField::HLC3);
+            let mid = sm(&tp, p.smoother, p.period, 0, p);
+            let sd = ewc(16, &tp, &mid, &tp, p.period as f32, 0.0);
+            let up = ewc(13, &mid, &sd, &mid, p.a, 0.0);
+            let lo = ewc(14, &mid, &sd, &mid, p.a, 0.0);
+            let g = p.period.max(1) as f32;
+            vec![
+                ewc(15, &mid, &mid, &mid, g, 0.0),
+                ewc(15, &up, &up, &up, g, 0.0),
+                ewc(15, &lo, &lo, &lo, g, 0.0),
+            ]
+        }
+        // `[percent_b, bandwidth]` of SMA Bollinger bands (`a` = multiplier).
+        CubeFormula::BbMetricsCols => {
+            let src = lane_series(samples, p, p.lane);
+            let mid = sm(&src, CubeSmoother::Sma, p.period, 0, p);
+            let sd = ewc(16, &src, &mid, &src, p.period as f32, 0.0);
+            let g = p.period.max(1) as f32;
+            let up = ewc(15, &ewc(13, &mid, &sd, &mid, p.a, 0.0), &mid, &mid, g, 0.0);
+            let lo = ewc(15, &ewc(14, &mid, &sd, &mid, p.a, 0.0), &mid, &mid, g, 0.0);
+            vec![ewc(23, &src, &lo, &up, 0.0, 0.0), ewc(24, &up, &lo, &mid, 0.0, 0.0)]
+        }
+        // Envelope `[upper, middle, lower]`; `a` = percent. Fixed, adaptive and multiple modes
+        // all give the base percentage on the main channel (the adaptive factor stays 1).
+        CubeFormula::EnvelopeCols => {
+            let src = lane_series(samples, p, p.lane);
+            let mid = sm(&src, p.smoother, p.period, 0, p);
+            let g = p.period.max(1) as f32;
+            vec![
+                ewc(27, &mid, &mid, &mid, p.a, g),
+                mid.clone(),
+                ewc(28, &mid, &mid, &mid, p.a, g),
+            ]
+        }
+        // Stochastics `[k, d]`: %K over `period`, %D = `smoother` over `smooth_period`, fed
+        // from the first full %K window.
+        CubeFormula::StochCols => {
+            let c = lane_series(samples, p, OhlcvField::Close);
+            let h = lane_series(samples, p, OhlcvField::High);
+            let l = lane_series(samples, p, OhlcvField::Low);
+            let k = ewc(25, &c, &h, &l, p.period as f32, 0.0);
+            let d = sm(&k, p.smoother, p.smooth_period, p.period.max(1) - 1, p);
+            vec![k, d]
+        }
+        // KDJ `[k, d, j]`: %K as Stochastics, %D smoother fed on every bar, J = 3D - 2K.
+        CubeFormula::KdjCols => {
+            let c = lane_series(samples, p, OhlcvField::Close);
+            let h = lane_series(samples, p, OhlcvField::High);
+            let l = lane_series(samples, p, OhlcvField::Low);
+            let k = ewc(25, &c, &h, &l, p.period as f32, 0.0);
+            let d = sm(&k, p.smoother, p.smooth_period, 0, p);
+            let j = ew2(26, &d, &k, 0.0);
+            vec![k, d, j]
         }
         _ => Vec::new(),
     }
