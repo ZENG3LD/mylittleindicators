@@ -182,6 +182,9 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "microprice" => "Microprice",
         "book_imbalance" => "BookImbalance",
         "book_pressure" => "BookPressure",
+        "endpoint_slope" => "EndpointSlope",
+        "pop_zscore" => "PopZScore",
+        "scale" => "Scale",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

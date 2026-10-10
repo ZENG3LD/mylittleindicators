@@ -89,6 +89,14 @@ pub enum CubeFormula {
     BookPressure = 26,
     /// `output[i] = s0[i]`. Primary number of a non-bar sample.
     Scalar = 27,
+    /// `(latest - oldest) / (n - 1)` over the last `period` values of
+    /// [`CubeParams::slot`]. Zero until two samples. `period` below 2 is 2.
+    EndpointSlope = 28,
+    /// Population z-score of that same window: `(x - mean) / std`, `std`
+    /// divides by `n`. Zero when fewer than two samples or `std` is zero.
+    PopZScore = 29,
+    /// `output[i] = s0[i] * a`. Stateless scale of the primary number.
+    Scale = 30,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -96,7 +104,8 @@ pub enum CubeFormula {
 /// `lane` / `lane2` are [`crate::engine::ohlcv_field::OhlcvField`] codes.
 /// `a` is the ALMA offset or the T3 volume factor. `b` is the ALMA sigma.
 /// `flag == 1` selects log ROC. `signal` is the MACD signal period; the
-/// kernel's one output for MACD is still the line.
+/// kernel's one output for MACD is still the line. `slot` selects `s0`..`s3`
+/// for the scalar-window formulas (`0` is `s0`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CubeParams {
     pub lane: crate::engine::ohlcv_field::OhlcvField,
@@ -110,6 +119,8 @@ pub struct CubeParams {
     pub flag: u32,
     /// Book levels to sum. `1` is top of book.
     pub levels: u32,
+    /// Scalar slot for window formulas. `0` is `s0`, `3` is `s3`.
+    pub slot: u32,
 }
 
 impl CubeParams {
@@ -127,6 +138,7 @@ impl CubeParams {
             b: 6.0,
             flag: 0,
             levels: 1,
+            slot: 0,
         }
     }
 }
@@ -194,6 +206,22 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::BookImb), Some(CubeFormula::BookImbalance));
         assert_eq!(formula_of(IndicatorId::BidAskAsymmetry), Some(CubeFormula::BookImbalance));
         assert_eq!(formula_of(IndicatorId::BookPressure), Some(CubeFormula::BookPressure));
+        assert_eq!(formula_of(IndicatorId::OiMomentum), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::MarkPriceMomentum), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::BasisMomentum), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::SettledFundingMomentum), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::HvMomentum), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::VolIdxMomentum), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::Volume24hMomentum), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::DeltaExposureFlow), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::VegaExposureFlow), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::FundDepletionRate), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::SettlementPriceMomentum), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::OiZScore), Some(CubeFormula::PopZScore));
+        assert_eq!(formula_of(IndicatorId::FundingZScore), Some(CubeFormula::PopZScore));
+        assert_eq!(formula_of(IndicatorId::BasisZScore), Some(CubeFormula::PopZScore));
+        assert_eq!(formula_of(IndicatorId::Volume24hZScore), Some(CubeFormula::PopZScore));
+        assert_eq!(formula_of(IndicatorId::AnnualizedFundingRate), Some(CubeFormula::Scale));
     }
 
     #[cfg(feature = "gpu-shader")]

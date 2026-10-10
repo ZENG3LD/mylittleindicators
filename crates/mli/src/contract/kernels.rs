@@ -113,6 +113,20 @@ fn depth_sum(sz: &[f32], nside: &[f32], i: usize, depth: usize, levels: usize) -
     acc
 }
 
+/// `slot` 0..3 reads `s0`..`s3`. Anything else is `s0`.
+#[cube]
+fn slot_at(s0: &[f32], s1: &[f32], s2: &[f32], s3: &[f32], i: usize, slot: u32) -> f32 {
+    let mut v = s0[i];
+    if slot == 1u32 {
+        v = s1[i];
+    } else if slot == 2u32 {
+        v = s2[i];
+    } else if slot == 3u32 {
+        v = s3[i];
+    }
+    v
+}
+
 /// Sequential formulas. One unit writes the whole lane.
 #[cube]
 fn scan_lane(
@@ -127,6 +141,10 @@ fn scan_lane(
     ask_sz: &[f32],
     bid_n: &[f32],
     ask_n: &[f32],
+    s0: &[f32],
+    s1: &[f32],
+    s2: &[f32],
+    s3: &[f32],
     output: &mut [f32],
     lane: u32,
     lane2: u32,
@@ -139,6 +157,7 @@ fn scan_lane(
     flag: u32,
     depth: u32,
     levels: u32,
+    slot: u32,
     formula: u32,
 ) {
     let n = open.len();
@@ -577,6 +596,51 @@ fn scan_lane(
                 output[i] = (bid_last - bid_first) / denom - (ask_last - ask_first) / denom;
             }
         }
+    } else if formula == 28u32 || formula == 29u32 {
+        let mut win = p;
+        if win < 2 {
+            win = 2;
+        }
+        for i in 0..n {
+            let mut cnt = i + 1;
+            if cnt > win {
+                cnt = win;
+            }
+            if cnt < 2 {
+                output[i] = 0.0f32;
+            } else if formula == 28u32 {
+                let first = i + 1 - cnt;
+                let oldest = slot_at(s0, s1, s2, s3, first, slot);
+                let latest = slot_at(s0, s1, s2, s3, i, slot);
+                output[i] = (latest - oldest) / ((cnt - 1) as f32);
+            } else {
+                let start = i + 1 - cnt;
+                let mut sum = 0.0f32;
+                for k in 0..cnt {
+                    sum = sum + slot_at(s0, s1, s2, s3, start + k, slot);
+                }
+                let mean = sum / (cnt as f32);
+                let mut var = 0.0f32;
+                for k in 0..cnt {
+                    let d = slot_at(s0, s1, s2, s3, start + k, slot) - mean;
+                    var = var + d * d;
+                }
+                var = var / (cnt as f32);
+                let mut std = 0.0f32;
+                if var > 0.0f32 {
+                    std = var;
+                    for _step in 0..12 {
+                        std = 0.5f32 * (std + var / std);
+                    }
+                }
+                if std == 0.0f32 {
+                    output[i] = 0.0f32;
+                } else {
+                    let cur = slot_at(s0, s1, s2, s3, i, slot);
+                    output[i] = (cur - mean) / std;
+                }
+            }
+        }
     }
 }
 
@@ -610,6 +674,7 @@ fn lane_map(
     flag: u32,
     depth: u32,
     levels: u32,
+    slot: u32,
     formula: u32,
 ) {
     let i = ABSOLUTE_POS;
@@ -643,12 +708,14 @@ fn lane_map(
             }
         } else if formula == 27u32 {
             output[i] = s0[i] + touch * 0.0f32;
+        } else if formula == 30u32 {
+            output[i] = s0[i] * a;
         } else if formula >= 5u32 {
             if i == 0 {
                 scan_lane(
                     open, high, low, close, volume, bid_px, bid_sz, ask_px, ask_sz, bid_n, ask_n,
-                    output, lane, lane2, period, fast, slow, signal, a, b, flag, depth, levels,
-                    formula,
+                    s0, s1, s2, s3, output, lane, lane2, period, fast, slow, signal, a, b, flag,
+                    depth, levels, slot, formula,
                 );
             }
         } else if formula == 0u32 {
@@ -773,6 +840,7 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
             params.flag,
             c.depth,
             params.levels,
+            params.slot,
             formula.code(),
         );
     }
@@ -812,8 +880,32 @@ mod tests {
     use crate::indicators::swing::lowest::Lowest;
     use crate::indicators::volatility::atr::Atr;
     use crate::indicators::volatility::true_range::TrueRange;
-    use crate::core::types::{FundingRate, OrderBook};
+    use crate::core::types::{
+        Basis, FundingRate, FundingSettlement, HistoricalVolatility, InsuranceFund, MarkPrice,
+        OpenInterest, OptionGreeks, OrderBook, SettlementEvent, Ticker, VolatilityIndex,
+    };
     use crate::engine::streams::order_book_consumer::OrderBookConsumer;
+    use crate::engine::streams::{
+        BasisConsumer, FundingRateConsumer, FundingSettlementConsumer, HistoricalVolatilityConsumer,
+        InsuranceFundConsumer, MarkPriceConsumer, OpenInterestConsumer, OptionGreeksConsumer,
+        SettlementEventConsumer, TickerConsumer, VolatilityIndexConsumer,
+    };
+    use crate::indicators::funding_advanced::annualized_funding_rate::AnnualizedFundingRate;
+    use crate::indicators::funding_advanced::funding_z_score::FundingZScore;
+    use crate::indicators::funding_advanced::settled_funding_momentum::SettledFundingMomentum;
+    use crate::indicators::greeks::delta_exposure_flow::DeltaExposureFlow;
+    use crate::indicators::greeks::vega_exposure_flow::VegaExposureFlow;
+    use crate::indicators::index_basis::basis_momentum::BasisMomentum;
+    use crate::indicators::index_basis::basis_z_score::BasisZScore;
+    use crate::indicators::mark_price_advanced::mark_price_momentum::MarkPriceMomentum;
+    use crate::indicators::open_interest::oi_momentum::OiMomentum;
+    use crate::indicators::open_interest::oi_z_score::OiZScore;
+    use crate::indicators::settlement::settlement_price_momentum::SettlementPriceMomentum;
+    use crate::indicators::stress::fund_depletion_rate::FundDepletionRate;
+    use crate::indicators::ticker_advanced::volume_24h_momentum::Volume24hMomentum;
+    use crate::indicators::ticker_advanced::volume_24h_z_score::Volume24hZScore;
+    use crate::indicators::volatility_advanced::hv_momentum::HvMomentum;
+    use crate::indicators::volatility_advanced::vol_idx_momentum::VolIdxMomentum;
 
     fn assert_close(gpu: &[f32], cpu: &[f64]) {
         assert_eq!(gpu.len(), cpu.len());
@@ -1161,6 +1253,353 @@ mod tests {
         assert_close(
             &launch_cube(CubeFormula::Scalar, &funding, CubeParams::period(1)),
             &rates,
+        );
+
+        let mut xs = vec![10.0, 10.0, 10.0];
+        for i in 0..12 {
+            xs.push(10.0 + (i as f64 * 0.55).sin() * 4.0 + (i as f64) * 0.3);
+        }
+        let period = 5u32;
+        let mut slot0 = CubeParams::period(period);
+        slot0.slot = 0;
+        let mut slot2 = CubeParams::period(period);
+        slot2.slot = 2;
+        let mut slot3 = CubeParams::period(period);
+        slot3.slot = 3;
+
+        let oi_samples: Vec<GpuSample> = xs
+            .iter()
+            .map(|v| {
+                let mut oi = OpenInterest::default();
+                oi.open_interest = *v;
+                GpuSample::from(&oi)
+            })
+            .collect();
+        let mut oi_m = OiMomentum::new(period as usize);
+        let cpu_oi_m: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let mut oi = OpenInterest::default();
+                oi.open_interest = *v;
+                oi_m.update_oi(&oi);
+                oi_m.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &oi_samples, slot0),
+            &cpu_oi_m,
+        );
+        let mut oi_z = OiZScore::new(period as usize);
+        let cpu_oi_z: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let mut oi = OpenInterest::default();
+                oi.open_interest = *v;
+                oi_z.update_oi(&oi);
+                oi_z.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::PopZScore, &oi_samples, slot0),
+            &cpu_oi_z,
+        );
+
+        let mark_samples: Vec<GpuSample> = xs
+            .iter()
+            .map(|v| {
+                let mut mp = MarkPrice::default();
+                mp.mark_price = *v;
+                GpuSample::from(&mp)
+            })
+            .collect();
+        let mut mark_m = MarkPriceMomentum::new(period as usize);
+        let cpu_mark: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let mut mp = MarkPrice::default();
+                mp.mark_price = *v;
+                mark_m.update_mark(&mp);
+                mark_m.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &mark_samples, slot0),
+            &cpu_mark,
+        );
+
+        let basis_samples: Vec<GpuSample> = xs
+            .iter()
+            .map(|v| {
+                let mut b = Basis::default();
+                b.basis = *v;
+                GpuSample::from(&b)
+            })
+            .collect();
+        let mut basis_m = BasisMomentum::new(period as usize);
+        let cpu_basis_m: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let mut b = Basis::default();
+                b.basis = *v;
+                basis_m.update_basis(&b);
+                basis_m.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &basis_samples, slot0),
+            &cpu_basis_m,
+        );
+        let mut basis_z = BasisZScore::new(period as usize);
+        let cpu_basis_z: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let mut b = Basis::default();
+                b.basis = *v;
+                basis_z.update_basis(&b);
+                basis_z.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::PopZScore, &basis_samples, slot0),
+            &cpu_basis_z,
+        );
+
+        let settle_samples: Vec<GpuSample> = xs
+            .iter()
+            .map(|v| {
+                let s = FundingSettlement {
+                    settled_rate: *v,
+                    settlement_time: 0,
+                    timestamp: 0,
+                };
+                GpuSample::from(&s)
+            })
+            .collect();
+        let mut settled = SettledFundingMomentum::new(period as usize);
+        let cpu_settled: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let s = FundingSettlement {
+                    settled_rate: *v,
+                    settlement_time: 0,
+                    timestamp: 0,
+                };
+                settled.update_funding_settlement(&s);
+                settled.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &settle_samples, slot0),
+            &cpu_settled,
+        );
+
+        let hv_samples: Vec<GpuSample> = xs
+            .iter()
+            .map(|v| {
+                let hv = HistoricalVolatility { volatility: *v, timestamp: 0 };
+                GpuSample::from(&hv)
+            })
+            .collect();
+        let mut hv_m = HvMomentum::new(period as usize);
+        let cpu_hv: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let hv = HistoricalVolatility { volatility: *v, timestamp: 0 };
+                hv_m.update_historical_volatility(&hv);
+                hv_m.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &hv_samples, slot0),
+            &cpu_hv,
+        );
+
+        let vi_samples: Vec<GpuSample> = xs
+            .iter()
+            .map(|v| {
+                let mut vi = VolatilityIndex::default();
+                vi.value = *v;
+                GpuSample::from(&vi)
+            })
+            .collect();
+        let mut vi_m = VolIdxMomentum::new(period as usize);
+        let cpu_vi: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let mut vi = VolatilityIndex::default();
+                vi.value = *v;
+                vi_m.update_volatility_index(&vi);
+                vi_m.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &vi_samples, slot0),
+            &cpu_vi,
+        );
+
+        let tickers: Vec<Ticker> = xs
+            .iter()
+            .map(|v| {
+                let mut t = Ticker::default();
+                t.last_price = 999.0;
+                t.volume_24h = Some(*v);
+                t
+            })
+            .collect();
+        let ticker_samples: Vec<GpuSample> = tickers.iter().map(GpuSample::from).collect();
+        let mut vol_m = Volume24hMomentum::new(period as usize);
+        let cpu_vol_m: Vec<f64> = tickers
+            .iter()
+            .map(|t| {
+                vol_m.update_ticker(t);
+                vol_m.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &ticker_samples, slot3),
+            &cpu_vol_m,
+        );
+        let mut vol_z = Volume24hZScore::new(period as usize);
+        let cpu_vol_z: Vec<f64> = tickers
+            .iter()
+            .map(|t| {
+                vol_z.update_ticker(t);
+                vol_z.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::PopZScore, &ticker_samples, slot3),
+            &cpu_vol_z,
+        );
+
+        let greeks: Vec<OptionGreeks> = xs
+            .iter()
+            .map(|v| OptionGreeks {
+                delta: *v,
+                gamma: 0.0,
+                vega: *v * 2.0 + 3.0,
+                theta: 0.0,
+                rho: 0.0,
+                mark_iv: 0.0,
+                bid_iv: None,
+                ask_iv: None,
+                timestamp: 0,
+            })
+            .collect();
+        let greek_samples: Vec<GpuSample> = greeks.iter().map(GpuSample::from).collect();
+        let mut delta_m = DeltaExposureFlow::new(period as usize);
+        let cpu_delta: Vec<f64> = greeks
+            .iter()
+            .map(|g| {
+                delta_m.update_option_greeks(g);
+                delta_m.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &greek_samples, slot0),
+            &cpu_delta,
+        );
+        let mut vega_m = VegaExposureFlow::new(period as usize);
+        let cpu_vega: Vec<f64> = greeks
+            .iter()
+            .map(|g| {
+                vega_m.update_option_greeks(g);
+                vega_m.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &greek_samples, slot2),
+            &cpu_vega,
+        );
+
+        let funds: Vec<InsuranceFund> = xs
+            .iter()
+            .map(|v| InsuranceFund { balance: *v, timestamp: 0 })
+            .collect();
+        let fund_samples: Vec<GpuSample> = funds.iter().map(GpuSample::from).collect();
+        let mut deplete = FundDepletionRate::new(period as usize);
+        let cpu_deplete: Vec<f64> = funds
+            .iter()
+            .map(|f| {
+                deplete.update_insurance_fund(f);
+                deplete.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &fund_samples, slot0),
+            &cpu_deplete,
+        );
+
+        let settlements: Vec<SettlementEvent> = xs
+            .iter()
+            .map(|v| {
+                let mut s = SettlementEvent::default();
+                s.settlement_price = *v;
+                s
+            })
+            .collect();
+        let settlement_samples: Vec<GpuSample> = settlements.iter().map(GpuSample::from).collect();
+        let mut settle_m = SettlementPriceMomentum::new(period as usize);
+        let cpu_settle_m: Vec<f64> = settlements
+            .iter()
+            .map(|s| {
+                settle_m.update_settlement(s);
+                settle_m.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &settlement_samples, slot0),
+            &cpu_settle_m,
+        );
+
+        let rate_values = [0.001_f64, -0.002, 0.0, 0.004, 0.0005];
+        let rate_samples: Vec<GpuSample> = rate_values
+            .iter()
+            .map(|r| {
+                let mut fr = FundingRate::default();
+                fr.rate = *r;
+                GpuSample::from(&fr)
+            })
+            .collect();
+        for periods in [3.0_f32, 1.0_f32] {
+            let mut annual = AnnualizedFundingRate::new(periods as f64);
+            let cpu_annual: Vec<f64> = rate_values
+                .iter()
+                .map(|r| {
+                    let mut fr = FundingRate::default();
+                    fr.rate = *r;
+                    annual.update_funding(&fr);
+                    annual.value()
+                })
+                .collect();
+            let mut scale = CubeParams::period(1);
+            scale.a = periods * 365.0 * 100.0;
+            assert_close(
+                &launch_cube(CubeFormula::Scale, &rate_samples, scale),
+                &cpu_annual,
+            );
+        }
+        let mut fund_z = FundingZScore::new(period as usize);
+        let fund_z_samples: Vec<GpuSample> = xs
+            .iter()
+            .map(|v| {
+                let mut fr = FundingRate::default();
+                fr.rate = (*v - 12.0) * 0.01;
+                GpuSample::from(&fr)
+            })
+            .collect();
+        let cpu_fund_z: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let mut fr = FundingRate::default();
+                fr.rate = (*v - 12.0) * 0.01;
+                fund_z.update_funding(&fr);
+                fund_z.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::PopZScore, &fund_z_samples, slot0),
+            &cpu_fund_z,
         );
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
