@@ -245,6 +245,12 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "vol_break" => "VolBreak",
         "autocorr" => "Autocorr",
         "variance_ratio" => "VarianceRatio",
+        "donchian_bands" => "DonchianBands",
+        "donchian_metrics" => "DonchianMetrics",
+        "aroon_cols" => "AroonCols",
+        "central_pivot_range" => "CentralPivotRange",
+        "heikin_ashi_cols" => "HeikinAshiCols",
+        "candle_anatomy_cols" => "CandleAnatomyCols",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

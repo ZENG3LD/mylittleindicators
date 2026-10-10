@@ -241,6 +241,18 @@ pub enum CubeFormula {
     Autocorr = 89,
     /// Variance ratio of log returns. `period` is the window (at least 20), [`CubeParams::fast`] the aggregation (2..=window/2). `1` until a window of returns exists.
     VarianceRatio = 90,
+    /// Donchian channel bands. Columns: upper, middle, lower. All 0 until `period` bars. Multi-column: use `launch_cube_columns`.
+    DonchianBands = 100,
+    /// Donchian metrics. Columns: width (`upper - lower`), position (`0.5` when the width is not positive).
+    DonchianMetrics = 101,
+    /// Aroon. Columns: up, down, oscillator. 0 until `period` bars. Ties pick the newest bar, as the feed.
+    AroonCols = 102,
+    /// Central pivot range of this bar. Columns: bc, pivot, tc.
+    CentralPivotRange = 103,
+    /// Heikin Ashi candle. Columns: open, high, low, close.
+    HeikinAshiCols = 104,
+    /// Candle anatomy. Columns: body, upper wick, lower wick, long upper (0/1), long lower (0/1). [`CubeParams::a`] is the long-wick ratio threshold. All 0 when the range is ~0.
+    CandleAnatomyCols = 105,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -291,6 +303,21 @@ impl CubeFormula {
     /// Discriminant the kernel compares against.
     pub const fn code(self) -> u32 {
         self as u32
+    }
+
+    /// Number of output columns one launch writes. `1` for every single-output
+    /// formula. A multi-column formula (code 100 and up) is read with
+    /// `launch_cube_columns`; column `c` is the `c`-th name in the manifest braces.
+    pub const fn output_count(self) -> u32 {
+        match self {
+            CubeFormula::DonchianBands => 3,
+            CubeFormula::DonchianMetrics => 2,
+            CubeFormula::AroonCols => 3,
+            CubeFormula::CentralPivotRange => 3,
+            CubeFormula::HeikinAshiCols => 4,
+            CubeFormula::CandleAnatomyCols => 5,
+            _ => 1,
+        }
     }
 }
 
@@ -427,6 +454,26 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vbexp), Some(CubeFormula::VolBreak));
         assert_eq!(formula_of(IndicatorId::Autocorr), Some(CubeFormula::Autocorr));
         assert_eq!(formula_of(IndicatorId::Vr), Some(CubeFormula::VarianceRatio));
+        assert_eq!(formula_of(IndicatorId::Dc), Some(CubeFormula::DonchianBands));
+        assert_eq!(formula_of(IndicatorId::Dcmetrics), Some(CubeFormula::DonchianMetrics));
+        assert_eq!(formula_of(IndicatorId::Aroon), Some(CubeFormula::AroonCols));
+        assert_eq!(formula_of(IndicatorId::Cpr), Some(CubeFormula::CentralPivotRange));
+        assert_eq!(formula_of(IndicatorId::Heikinashi), Some(CubeFormula::HeikinAshiCols));
+        assert_eq!(formula_of(IndicatorId::Candleanatomy), Some(CubeFormula::CandleAnatomyCols));
+        for (id, f) in [
+            (IndicatorId::Dc, CubeFormula::DonchianBands),
+            (IndicatorId::Dcmetrics, CubeFormula::DonchianMetrics),
+            (IndicatorId::Aroon, CubeFormula::AroonCols),
+            (IndicatorId::Cpr, CubeFormula::CentralPivotRange),
+            (IndicatorId::Heikinashi, CubeFormula::HeikinAshiCols),
+            (IndicatorId::Candleanatomy, CubeFormula::CandleAnatomyCols),
+        ] {
+            assert_eq!(
+                crate::engine::contract_engine::outputs_of(id).map(|o| o.len() as u32),
+                Some(f.output_count()),
+                "{id:?}"
+            );
+        }
     }
 
     #[cfg(feature = "gpu-shader")]

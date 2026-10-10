@@ -3190,6 +3190,201 @@ fn bar_map_l(
     bar_scan_l(open, high, low, close, volume, output, lane, period, fast, formula);
 }
 
+/// Multi-column bar formulas, codes 100 and up. One launch writes
+/// `CubeFormula::output_count()` columns into one buffer, column-major:
+/// column `c` of bar `i` is `output[c * n + i]`. Column order is the manifest
+/// brace order of the indicator.
+/// 100 Donchian bands (upper middle lower), 101 Donchian metrics (width position),
+/// 102 Aroon (up down oscillator), 103 central pivot range (bc pivot tc),
+/// 104 Heikin Ashi (open high low close),
+/// 105 candle anatomy (body upper_wick lower_wick long_upper long_lower; flags are 0/1).
+#[cube]
+fn bar_scan_m(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    output: &mut [f32],
+    period: u32,
+    a: f32,
+    formula: u32,
+) {
+    let n = open.len();
+    let mut p = period as usize;
+    if p < 1 {
+        p = 1;
+    }
+    if formula == 100u32 || formula == 101u32 {
+        for i in 0..n {
+            let mut up = 0.0f32;
+            let mut lo = 0.0f32;
+            if i + 1 >= p {
+                let start = i + 1 - p;
+                up = high[start];
+                lo = low[start];
+                for k in 0..p {
+                    if high[start + k] > up {
+                        up = high[start + k];
+                    }
+                    if low[start + k] < lo {
+                        lo = low[start + k];
+                    }
+                }
+            }
+            if formula == 100u32 {
+                output[i] = up;
+                output[n + i] = (up + lo) / 2.0f32;
+                output[2 * n + i] = lo;
+            } else {
+                let width = up - lo;
+                output[i] = width;
+                if width > 0.0f32 {
+                    output[n + i] = (close[i] - lo) / width;
+                } else {
+                    output[n + i] = 0.5f32;
+                }
+            }
+        }
+    } else if formula == 102u32 {
+        let pf = p as f32;
+        for i in 0..n {
+            let mut au = 0.0f32;
+            let mut ad = 0.0f32;
+            if i + 1 >= p {
+                let mut hi_v = high[i];
+                let mut lo_v = low[i];
+                let mut hi_k = 0usize;
+                let mut lo_k = 0usize;
+                for k in 0..p {
+                    let t = i - k;
+                    if high[t] > hi_v {
+                        hi_v = high[t];
+                        hi_k = k;
+                    }
+                    if low[t] < lo_v {
+                        lo_v = low[t];
+                        lo_k = k;
+                    }
+                }
+                au = 100.0f32 * ((p - hi_k) as f32) / pf;
+                ad = 100.0f32 * ((p - lo_k) as f32) / pf;
+            }
+            output[i] = au;
+            output[n + i] = ad;
+            output[2 * n + i] = au - ad;
+        }
+    } else if formula == 103u32 {
+        for i in 0..n {
+            let pivot = (high[i] + low[i] + close[i]) / 3.0f32;
+            let mut tc = pivot - low[i];
+            if tc < 0.0f32 {
+                tc = -tc;
+            }
+            let mut bc = high[i] - pivot;
+            if bc < 0.0f32 {
+                bc = -bc;
+            }
+            let mut m = tc;
+            if bc > m {
+                m = bc;
+            }
+            output[i] = pivot - m;
+            output[n + i] = pivot;
+            output[2 * n + i] = pivot + m;
+        }
+    } else if formula == 104u32 {
+        let mut ha_o = (open[0] + close[0]) / 2.0f32;
+        let mut ha_c = (open[0] + high[0] + low[0] + close[0]) / 4.0f32;
+        for i in 0..n {
+            let c_new = (open[i] + high[i] + low[i] + close[i]) / 4.0f32;
+            let mut o_new = (open[i] + close[i]) / 2.0f32;
+            if i > 0 {
+                o_new = (ha_o + ha_c) / 2.0f32;
+            }
+            let mut hh = c_new;
+            if o_new > hh {
+                hh = o_new;
+            }
+            if high[i] > hh {
+                hh = high[i];
+            }
+            let mut ll = c_new;
+            if o_new < ll {
+                ll = o_new;
+            }
+            if low[i] < ll {
+                ll = low[i];
+            }
+            ha_o = o_new;
+            ha_c = c_new;
+            output[i] = o_new;
+            output[n + i] = hh;
+            output[2 * n + i] = ll;
+            output[3 * n + i] = c_new;
+        }
+    } else if formula == 105u32 {
+        for i in 0..n {
+            let mut range = high[i] - low[i];
+            if range < 0.0f32 {
+                range = -range;
+            }
+            let mut body = 0.0f32;
+            let mut upper = 0.0f32;
+            let mut lower = 0.0f32;
+            let mut lu = 0.0f32;
+            let mut ll = 0.0f32;
+            if range > 1.0e-12f32 {
+                let mut hi_oc = open[i];
+                let mut lo_oc = close[i];
+                if close[i] > hi_oc {
+                    hi_oc = close[i];
+                    lo_oc = open[i];
+                }
+                let mut bd = close[i] - open[i];
+                if bd < 0.0f32 {
+                    bd = -bd;
+                }
+                body = bd / range;
+                let mut uw = high[i] - hi_oc;
+                if uw < 0.0f32 {
+                    uw = 0.0f32;
+                }
+                let mut lw = lo_oc - low[i];
+                if lw < 0.0f32 {
+                    lw = 0.0f32;
+                }
+                upper = uw / range;
+                lower = lw / range;
+                if upper >= a {
+                    lu = 1.0f32;
+                }
+                if lower >= a {
+                    ll = 1.0f32;
+                }
+            }
+            output[i] = body;
+            output[n + i] = upper;
+            output[2 * n + i] = lower;
+            output[3 * n + i] = lu;
+            output[4 * n + i] = ll;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_m(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    output: &mut [f32],
+    period: u32,
+    a: f32,
+    formula: u32,
+) {
+    bar_scan_m(open, high, low, close, output, period, a, formula);
+}
+
 #[cube(launch_unchecked)]
 fn lane_map(
     open: &[f32],
@@ -3328,6 +3523,10 @@ fn lane_map(
 pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubeParams) -> Vec<f32> {
     if samples.is_empty() {
         return Vec::new();
+    }
+    if formula.output_count() > 1 {
+        // Multi-column formulas return their first column here; use `launch_cube_columns` for all.
+        return launch_cube_columns(formula, samples, params).swap_remove(0);
     }
     let n = samples.len();
     let c = GpuSample::columns(samples);
@@ -3580,11 +3779,62 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     f32::from_bytes(&bytes).to_vec()
 }
 
+/// Run a multi-column cube formula. Returns `formula.output_count()` columns of
+/// `samples.len()` values each, in the manifest brace order of the indicator.
+/// A single-output formula returns one column, the same buffer [`launch_cube`] returns.
+/// An empty slice returns no columns and does not create a device.
+pub fn launch_cube_columns(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    params: CubeParams,
+) -> Vec<Vec<f32>> {
+    if samples.is_empty() {
+        return Vec::new();
+    }
+    if formula.output_count() <= 1 {
+        return vec![launch_cube(formula, samples, params)];
+    }
+    let n = samples.len();
+    let cols = formula.output_count() as usize;
+    let c = GpuSample::columns(samples);
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let open_b = client.create_from_slice(f32::as_bytes(&c.open));
+    let high_b = client.create_from_slice(f32::as_bytes(&c.high));
+    let low_b = client.create_from_slice(f32::as_bytes(&c.low));
+    let close_b = client.create_from_slice(f32::as_bytes(&c.close));
+    let output = client.empty(n * cols * core::mem::size_of::<f32>());
+    unsafe {
+        bar_map_m::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(open_b, n),
+            BufferArg::from_raw_parts(high_b, n),
+            BufferArg::from_raw_parts(low_b, n),
+            BufferArg::from_raw_parts(close_b, n),
+            BufferArg::from_raw_parts(output.clone(), n * cols),
+            params.period,
+            params.a,
+            formula.code(),
+        );
+    }
+    let bytes = client.read_one_unchecked(output);
+    let flat = f32::from_bytes(&bytes).to_vec();
+    flat.chunks(n).map(|ch| ch.to_vec()).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::engine::ohlcv_field::OhlcvField;
     use crate::indicators::accumulation::accumulation_distribution::AccumulationDistribution;
+    use crate::indicators::channels::donchian_channel::DonchianChannel;
+    use crate::indicators::channels::donchian_channel_metrics::DonchianMetrics;
+    use crate::indicators::momentum::aroon::Aroon;
+    use crate::indicators::levels::central_pivot_range::CentralPivotRange;
+    use crate::indicators::candles::heikin_ashi::HeikinAshi;
+    use crate::indicators::candles::candle_anatomy::CandleAnatomy;
     use crate::indicators::signal_processing::cyber_cycle::CyberCycle;
     use crate::indicators::average::ama::Ama;
     use crate::indicators::volatility::volatility_break_exp::VolatilityBreakExp;
@@ -3732,6 +3982,20 @@ mod tests {
     fn run(formula: CubeFormula, bars: &[ResearchBar], params: CubeParams) -> Vec<f32> {
         let samples: Vec<GpuSample> = bars.iter().map(GpuSample::from).collect();
         launch_cube(formula, &samples, params)
+    }
+
+    fn run_cols(formula: CubeFormula, bars: &[ResearchBar], params: CubeParams) -> Vec<Vec<f32>> {
+        let samples: Vec<GpuSample> = bars.iter().map(GpuSample::from).collect();
+        launch_cube_columns(formula, &samples, params)
+    }
+
+    /// One `assert_close` per column; the column count must match the formula.
+    #[track_caller]
+    fn assert_cols(gpu: &[Vec<f32>], cpu: &[&Vec<f64>]) {
+        assert_eq!(gpu.len(), cpu.len());
+        for (g, c) in gpu.iter().zip(cpu) {
+            assert_close(g, c);
+        }
     }
 
     fn cpu(values: &[f64], mut step: impl FnMut(f64) -> f64) -> Vec<f64> {
@@ -4905,6 +5169,86 @@ mod tests {
         let mut vr_params = CubeParams::period(20);
         vr_params.fast = 5;
         assert_close(&run(CubeFormula::VarianceRatio, &bars, vr_params), &cpu_vr);
+
+        // UNTESTED on GPU (no GPU on the authoring box): multi-column batch M, codes 100..=105.
+        let mut dc = DonchianChannel::new(wper);
+        let (mut dc_u, mut dc_m, mut dc_l) = (Vec::new(), Vec::new(), Vec::new());
+        for b in &bars {
+            let (u, l, m) = dc.feed(&[b.high, b.low]);
+            dc_u.push(u);
+            dc_m.push(m);
+            dc_l.push(l);
+        }
+        assert_cols(
+            &run_cols(CubeFormula::DonchianBands, &bars, CubeParams::period(wper as u32)),
+            &[&dc_u, &dc_m, &dc_l],
+        );
+        let mut dcm = DonchianMetrics::new(wper);
+        let (mut dcm_w, mut dcm_p) = (Vec::new(), Vec::new());
+        for b in &bars {
+            let (w, p) = dcm.feed(&[b.high, b.low, b.close]);
+            dcm_w.push(w);
+            dcm_p.push(p);
+        }
+        assert_cols(
+            &run_cols(CubeFormula::DonchianMetrics, &bars, CubeParams::period(wper as u32)),
+            &[&dcm_w, &dcm_p],
+        );
+        let mut aroon = Aroon::new(wper);
+        let (mut ar_u, mut ar_d, mut ar_o) = (Vec::new(), Vec::new(), Vec::new());
+        for b in &bars {
+            let (u, d, o) = aroon.feed(&[b.high, b.low]);
+            ar_u.push(u);
+            ar_d.push(d);
+            ar_o.push(o);
+        }
+        assert_cols(
+            &run_cols(CubeFormula::AroonCols, &bars, CubeParams::period(wper as u32)),
+            &[&ar_u, &ar_d, &ar_o],
+        );
+        let mut cpr = CentralPivotRange::new();
+        let (mut cpr_bc, mut cpr_p, mut cpr_tc) = (Vec::new(), Vec::new(), Vec::new());
+        for b in &bars {
+            cpr.feed(&[b.high, b.low, b.close]);
+            cpr_bc.push(cpr.bc());
+            cpr_p.push(cpr.pivot());
+            cpr_tc.push(cpr.tc());
+        }
+        assert_cols(
+            &run_cols(CubeFormula::CentralPivotRange, &bars, CubeParams::period(1)),
+            &[&cpr_bc, &cpr_p, &cpr_tc],
+        );
+        let mut ha = HeikinAshi::new();
+        let (mut ha_o, mut ha_h, mut ha_l, mut ha_c) =
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        for b in &bars {
+            let (o, h, l, c) = ha.feed(&[b.open, b.high, b.low, b.close]);
+            ha_o.push(o);
+            ha_h.push(h);
+            ha_l.push(l);
+            ha_c.push(c);
+        }
+        assert_cols(
+            &run_cols(CubeFormula::HeikinAshiCols, &bars, CubeParams::period(1)),
+            &[&ha_o, &ha_h, &ha_l, &ha_c],
+        );
+        let mut anat = CandleAnatomy::new(0.6);
+        let (mut an_b, mut an_u, mut an_l, mut an_lu, mut an_ll) =
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        for b in &bars {
+            let v = anat.feed(&[b.open, b.high, b.low, b.close]);
+            an_b.push(v.body);
+            an_u.push(v.upper_wick);
+            an_l.push(v.lower_wick);
+            an_lu.push(if v.long_upper { 1.0 } else { 0.0 });
+            an_ll.push(if v.long_lower { 1.0 } else { 0.0 });
+        }
+        let mut anat_params = CubeParams::period(1);
+        anat_params.a = 0.6;
+        assert_cols(
+            &run_cols(CubeFormula::CandleAnatomyCols, &bars, anat_params),
+            &[&an_b, &an_u, &an_l, &an_lu, &an_ll],
+        );
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
     }
