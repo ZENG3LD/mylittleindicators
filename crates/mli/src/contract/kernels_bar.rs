@@ -6749,6 +6749,139 @@ fn bar_scan(
             v2 = scr[3];
             v3 = scr[4];
             v4 = scr[5];
+        } else if formula == 1358u32 {
+            // adaptive Bollinger bands (upper, middle, lower, bandwidth, %B, squeeze ratio). Lanes: o = source price,
+            // h = close, v = host ATR(14). period = base period, a / b / _cc = base / min / max multiplier,
+            // flag = min period | max period << 12 | MA kind << 24 (CubeSmoother code: 0 SMA, 1 EMA, 2 WMA, 3 RMA).
+            // The adaptive MA is rebuilt (restarted at this bar) when the period moves more than 20% from the one it
+            // was built with, exactly as the CPU slot is. scr: 0 MA value, 1 MA count since restart, 2 MA period,
+            // 3 MA start bar, 4 adaptive period, 5 adaptive multiplier, 16.. bandwidth ring (32).
+            let base_p = period as f32;
+            let min_p = (flag & 4095u32) as f32;
+            let max_p = ((flag >> 12u32) & 4095u32) as f32;
+            let kind = flag >> 24u32;
+            if t == 0usize {
+                scr[0] = 0.0f32;
+                scr[1] = 0.0f32;
+                scr[2] = base_p;
+                scr[3] = 0.0f32;
+                scr[4] = base_p;
+                scr[5] = a;
+            }
+            if t >= 20usize {
+                let mut lo = 20usize;
+                if t >= 29usize {
+                    lo = t - 9usize;
+                }
+                let mut sm = 0.0f32;
+                for i in lo..(t + 1usize) {
+                    sm = sm + v[i];
+                }
+                let sv = sm / ((t + 1usize - lo) as f32);
+                let mut ratio = 1.0f32;
+                if sv > 0.0f32 {
+                    ratio = v[t] / sv;
+                }
+                scr[4] = (base_p / ratio.sqrt()).max(min_p).min(max_p);
+                scr[5] = (a * ratio.sqrt()).max(b).min(_cc);
+            }
+            let newp = scr[4].floor();
+            let curp = scr[2];
+            if (newp - curp).abs() / curp > 0.2f32 {
+                scr[2] = newp;
+                scr[1] = 0.0f32;
+                scr[3] = t as f32;
+            }
+            let pm = scr[2] as usize;
+            let st = scr[3] as usize;
+            let cnt = scr[1];
+            let x = o[t];
+            if kind == 1u32 {
+                if cnt < 0.5f32 {
+                    scr[0] = x;
+                } else {
+                    let al = 2.0f32 / (scr[2] + 1.0f32);
+                    scr[0] = al * x + (1.0f32 - al) * scr[0];
+                }
+            } else if kind == 3u32 {
+                if cnt < 0.5f32 {
+                    scr[0] = x;
+                } else {
+                    scr[0] = (scr[0] * (scr[2] - 1.0f32) + x) / scr[2];
+                }
+            } else if kind == 0u32 {
+                let mut ln = t - st + 1usize;
+                if ln > pm {
+                    ln = pm;
+                }
+                let mut sm = 0.0f32;
+                for i in (t + 1usize - ln)..(t + 1usize) {
+                    sm = sm + o[i];
+                }
+                scr[0] = sm / (ln as f32);
+            } else {
+                let ln = t - st + 1usize;
+                if ln < pm {
+                    scr[0] = x;
+                } else {
+                    let mut ws = 0.0f32;
+                    for i in 0..pm {
+                        ws = ws + o[t + 1usize - pm + i] * ((i + 1usize) as f32);
+                    }
+                    scr[0] = ws / (scr[2] * (scr[2] + 1.0f32) / 2.0f32);
+                }
+            }
+            scr[1] = cnt + 1.0f32;
+            let mid = scr[0];
+            let ps = scr[4] as usize;
+            let mut avail = t + 1usize;
+            if avail > 64usize {
+                avail = 64usize;
+            }
+            if avail > ps {
+                avail = ps;
+            }
+            let mut sd = 0.1f32;
+            if avail >= 2usize {
+                let mut sm = 0.0f32;
+                for i in (t + 1usize - avail)..(t + 1usize) {
+                    sm = sm + o[i];
+                }
+                let mean = sm / (avail as f32);
+                let mut vs = 0.0f32;
+                for i in (t + 1usize - avail)..(t + 1usize) {
+                    let dv = o[i] - mean;
+                    vs = vs + dv * dv;
+                }
+                sd = (vs / (avail as f32)).sqrt();
+            }
+            let up = mid + scr[5] * sd;
+            let lw = mid - scr[5] * sd;
+            let bw = up - lw;
+            scr[16usize + t % 32usize] = bw;
+            let mut pb = 0.5f32;
+            if bw > 0.0f32 {
+                pb = (h[t] - lw) / bw;
+            }
+            let mut sq = 0.5f32;
+            if t >= 9usize {
+                let mut mxb = 0.0f32;
+                for i in (t - 9usize)..(t + 1usize) {
+                    let bi = scr[16usize + i % 32usize];
+                    if bi > mxb {
+                        mxb = bi;
+                    }
+                }
+                if mxb > 0.0f32 {
+                    sq = bw / mxb;
+                }
+            }
+            v0 = up;
+            v1 = mid;
+            v2 = lw;
+            v3 = bw;
+            v4 = pb;
+            v5 = sq;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -7386,6 +7519,17 @@ fn launch_cube_bar_x(
         pb.b = params.fast as f32;
         let flat = bar_run(formula.code(), [&centre, &h, &l, &c, &atr], pb, flag);
         return (0..5).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect();
+    }
+    if formula == CubeFormula::AdaptivebbBar {
+        // period = base period, a / b / c = base / min / max multiplier, ext[0] / ext[1] = min / max period,
+        // smoother = adaptive MA kind (SMA / EMA / WMA / RMA), smoother2 = ATR(14) smoother, lane = source
+        let atr = super::kernels_comp::atr_series(samples, params, params.smoother2, 14, 0);
+        let close = lane_series(samples, params, OhlcvField::Close);
+        let flag = params.ext[0] | (params.ext[1] << 12) | (params.smoother.code() << 24);
+        let mut pb = params;
+        pb.b = params.b;
+        let flat = bar_run(formula.code(), [&c, &close, &l, &c, &atr], pb, flag);
+        return (0..6).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect();
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

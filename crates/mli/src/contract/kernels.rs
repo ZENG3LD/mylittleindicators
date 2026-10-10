@@ -10553,6 +10553,36 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Adaptive Bollinger bands with in-kernel MA restart (1358).
+    #[test]
+    fn lane_matches_cpu_bar_batch66() {
+        use crate::indicators::channels::adaptive_bollinger_bands::AdaptiveBollingerBands;
+
+        let bars = bars(300);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(20);
+        p.a = 2.0;
+        p.b = 1.0;
+        p.c = 3.0;
+        p.ext[0] = 10;
+        p.ext[1] = 40;
+        p.smoother = CubeSmoother::Ema;
+        p.smoother2 = CubeSmoother::Rma;
+        let mut m = AdaptiveBollingerBands::from_base_params(20, 2.0);
+        chk(&run_cols(CubeFormula::AdaptivebbBar, &bars, p), bars.iter().map(|b| { m.feed(&[b.open, b.high, b.low, b.close, b.volume]); vec![m.upper(), m.middle(), m.lower(), m.bandwidth(), m.percent_b(), m.squeeze_ratio()] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

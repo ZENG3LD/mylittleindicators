@@ -839,6 +839,8 @@ pub enum CubeFormula {
     VwapLevelsBar = 1356,
     /// Composite: adaptive channels. UNTESTED on GPU.
     AdaptivechanBar = 1357,
+    /// Composite: adaptive bollinger bands. UNTESTED on GPU.
+    AdaptivebbBar = 1358,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1355,6 +1357,7 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::AdaptivebbBar => 6,
             CubeFormula::AdaptivechanBar => 5,
             CubeFormula::VolprofchanBar => 3,
             CubeFormula::PocBar => 2,
@@ -1728,6 +1731,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Volprofchan), Some(CubeFormula::VolprofchanBar));
         assert_eq!(formula_of(IndicatorId::VwapLevels), Some(CubeFormula::VwapLevelsBar));
         assert_eq!(formula_of(IndicatorId::Adaptivechan), Some(CubeFormula::AdaptivechanBar));
+        assert_eq!(formula_of(IndicatorId::Adaptivebb), Some(CubeFormula::AdaptivebbBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

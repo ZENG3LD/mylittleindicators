@@ -600,6 +600,6 @@ mli_contract_macros::contract_universe! {
         Poc: Fields : _ +time +cube(comp_poc_bar) => crate::indicators::volume::poc_detector::PocDetector { poc volume_imbalance },
         Var: Field : _ +cube(var) => crate::indicators::regression::var::Var,
         Vprofile: Fields : _ +time +cube(comp_vprofile_bar) => crate::indicators::volume::volume_profile::VolumeProfile { #profile_grid },
-        Adaptivebb: Fields : Channel => crate::indicators::channels::adaptive_bollinger_bands::AdaptiveBollingerBands { upper middle lower bandwidth percent_b squeeze_ratio },
+        Adaptivebb: Fields : Channel +cube(comp_adaptbb_bar) => crate::indicators::channels::adaptive_bollinger_bands::AdaptiveBollingerBands { upper middle lower bandwidth percent_b squeeze_ratio },
     }
 }
