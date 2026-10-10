@@ -319,6 +319,8 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "comp_uo_smooth_bar" => "UoSmoothBar",
         "comp_atr_rsi_bar" => "AtrRsiBar",
         "comp_vwrsi_bar" => "VwrsiBar",
+        "comp_qqe_bar" => "QqeBar",
+        "comp_sqmom_bar" => "SqmomBar",
         "comp_esine_bar" => "EsineBar",
         "comp_ess_bar" => "EssBar",
         "comp_ehlersfa_bar" => "EhlersfaBar",

@@ -9281,6 +9281,45 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1292..=1294 (Qqe, Sqmom).
+    #[test]
+    fn lane_matches_cpu_bar_batch27() {
+        use crate::indicators::momentum::qqe::Qqe;
+        use crate::indicators::volatility::squeeze_momentum::SqueezeMomentum;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(14);
+        p.fast = 5;
+        p.a = 1.5;
+        p.smoother = CubeSmoother::Ema;
+        p.smoother2 = CubeSmoother::Rma;
+        let mut m = Qqe::new(14, 5, 1.5);
+        let g = run_cols(CubeFormula::QqeBar, &bars, p);
+        chk(&g[..1], close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(20);
+        p.fast = 20;
+        p.slow = 12;
+        p.smoother = CubeSmoother::Sma;
+        p.smoother2 = CubeSmoother::Sma;
+        let mut m = SqueezeMomentum::new(20, 20, 12);
+        chk(&run_cols(CubeFormula::SqmomBar, &bars, p), lanes.iter().map(|l| {
+            let (mo, sq) = m.feed(&[l[0], l[1], l[2]]);
+            vec![mo, if sq { 1.0 } else { 0.0 }]
+        }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

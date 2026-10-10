@@ -3478,6 +3478,104 @@ fn bar_scan(
             } else if held2 > 0.0f32 {
                 v0 = held2;
             }
+        } else if formula == 1292u32 {
+            // helper stage: |v[t] - v[t - 1]| (previous value 0 on the first bar)
+            let mut pv = 0.0f32;
+            if t > 0usize {
+                pv = v[t - 1];
+            }
+            v0 = (v[t] - pv).abs();
+        } else if formula == 1293u32 {
+            // QQE: smoothed RSI in lane v, smoothed |delta| (ATR of RSI) in lane o; `a` = threshold
+            // multiplier (<= 0 means 1.5). Trailing bands start at lower = 100, upper = 0, long.
+            let mut tm = a;
+            if tm <= 0.0f32 {
+                tm = 1.5f32;
+            }
+            if t == 0usize {
+                held0 = 100.0f32;
+                held1 = 0.0f32;
+                held2 = 1.0f32;
+            }
+            let bw = tm * o[t];
+            let sr = v[t];
+            let mut val = 0.0f32;
+            if held2 > 0.5f32 {
+                let nl = sr - bw;
+                if nl > held0 {
+                    held0 = nl;
+                }
+                if sr < held0 {
+                    held2 = 0.0f32;
+                    held1 = sr + bw;
+                    val = held1;
+                } else {
+                    val = held0;
+                }
+            } else {
+                let nu = sr + bw;
+                if nu < held1 {
+                    held1 = nu;
+                }
+                if sr > held1 {
+                    held2 = 1.0f32;
+                    held0 = sr - bw;
+                    val = held0;
+                } else {
+                    val = held1;
+                }
+            }
+            v0 = val;
+            v1 = sr;
+        } else if formula == 1294u32 {
+            // squeeze momentum `[momentum, squeeze]`: lane o = BB middle, h = KC middle, l = ATR
+            // (ATR fed from bar 1); period = bb period, p2 = kc period, p3 = momentum period
+            let bbp = period as usize;
+            let kcp = p2 as usize;
+            let mp = p3 as usize;
+            let mut sq = 0.0f32;
+            if t + 1 >= bbp && bbp >= 1usize {
+                let mut ss = 0.0f32;
+                for k2 in 0..bbp {
+                    let d2 = c[t - k2] - o[t];
+                    ss = ss + d2 * d2;
+                }
+                let sd = (ss / (bbp as f32)).sqrt();
+                let bbu = o[t] + 2.0f32 * sd;
+                let bbl = o[t] - 2.0f32 * sd;
+                if t >= kcp {
+                    let kcu = h[t] + 1.5f32 * l[t];
+                    let kcl = h[t] - 1.5f32 * l[t];
+                    if bbu < kcu && bbl > kcl {
+                        sq = 1.0f32;
+                    }
+                }
+                // momentum: slope of (close - bb middle) over the last `mp` of those values
+                if t + 2 >= bbp + mp && mp >= 2usize {
+                    let nn = mp as f32;
+                    let mut sy = 0.0f32;
+                    let mut sxy = 0.0f32;
+                    let mut sx = 0.0f32;
+                    let mut sx2 = 0.0f32;
+                    for i in 0..mp {
+                        let q = t + 1 - mp + i;
+                        let y = c[q] - o[q];
+                        let x = i as f32;
+                        sy = sy + y;
+                        sxy = sxy + x * y;
+                        sx = sx + x;
+                        sx2 = sx2 + x * x;
+                    }
+                    let den = nn * sx2 - sx * sx;
+                    if den.abs() >= 1.0e-12f32 {
+                        held0 = (nn * sxy - sx * sy) / den;
+                    } else {
+                        held0 = 0.0f32;
+                    }
+                }
+            }
+            v0 = held0;
+            v1 = sq;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -3723,6 +3821,24 @@ pub fn launch_cube_bar(
         let base = smooth_series(&atr, params.smoother, params.slow.max(1), 0, params.a, params.b);
         let flat = bar_run(formula.code(), [&base, &h, &l, &c, &atr], params, 0);
         return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::QqeBar {
+        let rp = params.period.max(1);
+        let sp = params.fast.max(1);
+        let rsi = super::kernels::launch_cube(CubeFormula::Rsi, samples, CubeParams { period: rp, ..params });
+        let sm = smooth_series(&rsi, params.smoother, sp, 0, params.a, params.b);
+        let delta = bar_stage(1292, [&o, &h, &l, &c, &sm], params, 0);
+        let atr_p = (((sp as f32) * 4.236f32).round() as u32).max(2);
+        let atr = smooth_series(&delta, params.smoother2, atr_p, 0, params.a, params.b);
+        let flat = bar_run(formula.code(), [&atr, &h, &l, &c, &sm], params, 0);
+        return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec()];
+    }
+    if formula == CubeFormula::SqmomBar {
+        let bb = smooth_series(&c, params.smoother, params.period.max(1), 0, params.a, params.b);
+        let kc = smooth_series(&c, params.smoother2, params.fast.max(1), 0, params.a, params.b);
+        let atr = super::kernels_comp::atr_series(samples, params, super::CubeSmoother::Sma, params.fast.max(1), 1);
+        let flat = bar_run(formula.code(), [&bb, &kc, &atr, &c, &c], CubeParams { fast: params.fast.max(1), slow: params.slow.max(1), ..params }, 0);
+        return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

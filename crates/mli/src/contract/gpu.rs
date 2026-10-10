@@ -673,6 +673,10 @@ pub enum CubeFormula {
     AtrRsiBar = 1290,
     /// Composite: volume weighted rsi. UNTESTED on GPU.
     VwrsiBar = 1291,
+    /// Composite: qqe. UNTESTED on GPU.
+    QqeBar = 1293,
+    /// Composite: squeeze momentum. UNTESTED on GPU.
+    SqmomBar = 1294,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1183,6 +1187,8 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::QqeBar => 2,
+            CubeFormula::SqmomBar => 2,
             CubeFormula::HilbBar => 3,
             CubeFormula::RvolBar => 2,
             CubeFormula::RocPctBar => 2,
@@ -1467,6 +1473,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::UoSmooth), Some(CubeFormula::UoSmoothBar));
         assert_eq!(formula_of(IndicatorId::AtrRsi), Some(CubeFormula::AtrRsiBar));
         assert_eq!(formula_of(IndicatorId::Vwrsi), Some(CubeFormula::VwrsiBar));
+        assert_eq!(formula_of(IndicatorId::Qqe), Some(CubeFormula::QqeBar));
+        assert_eq!(formula_of(IndicatorId::Sqmom), Some(CubeFormula::SqmomBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
