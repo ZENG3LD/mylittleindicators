@@ -519,6 +519,18 @@ pub enum CubeFormula {
     StochCols = 1014,
     /// Composite: KDJ k/d/j. UNTESTED on GPU.
     KdjCols = 1015,
+    /// Composite: Keltner channel upper/middle/lower. UNTESTED on GPU.
+    KcCols = 1016,
+    /// Composite: Keltner width/position. UNTESTED on GPU.
+    KcMetricsCols = 1017,
+    /// Composite: ATR channels (volatility) upper/middle/lower. UNTESTED on GPU.
+    AtrcCols = 1018,
+    /// Composite: ATR channels (channels) upper/middle/lower. UNTESTED on GPU.
+    AtrChanCols = 1019,
+    /// Composite: STARC bands upper/middle/lower. UNTESTED on GPU.
+    StarcCols = 1020,
+    /// Composite: Keltner on SMA(typical) upper/middle/lower. UNTESTED on GPU.
+    VoKcCols = 1021,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -690,6 +702,12 @@ impl CubeFormula {
             CubeFormula::EnvelopeCols => 3,
             CubeFormula::StochCols => 2,
             CubeFormula::KdjCols => 3,
+            CubeFormula::KcCols => 3,
+            CubeFormula::KcMetricsCols => 2,
+            CubeFormula::AtrcCols => 3,
+            CubeFormula::AtrChanCols => 3,
+            CubeFormula::StarcCols => 3,
+            CubeFormula::VoKcCols => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -955,6 +973,12 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Kc), Some(CubeFormula::KcCols));
+        assert_eq!(formula_of(IndicatorId::Kcmetrics), Some(CubeFormula::KcMetricsCols));
+        assert_eq!(formula_of(IndicatorId::Atrc), Some(CubeFormula::AtrcCols));
+        assert_eq!(formula_of(IndicatorId::Atrchan), Some(CubeFormula::AtrChanCols));
+        assert_eq!(formula_of(IndicatorId::Starc), Some(CubeFormula::StarcCols));
+        assert_eq!(formula_of(IndicatorId::VoKc), Some(CubeFormula::VoKcCols));
         assert_eq!(formula_of(IndicatorId::Bb), Some(CubeFormula::BbCols));
         assert_eq!(formula_of(IndicatorId::BbPeriod), Some(CubeFormula::BbPeriodCols));
         assert_eq!(formula_of(IndicatorId::Bbmetrics), Some(CubeFormula::BbMetricsCols));

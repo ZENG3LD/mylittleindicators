@@ -204,6 +204,33 @@ fn ew_scan(
                     v = 100.0f32 * (x[t] - ll) / (hh - ll);
                 }
             }
+        } else if op == 30u32 {
+            // true range, first fed bar `a`: x = high, y = low, z = close; 0 before it
+            let st = a as usize;
+            if t == st {
+                v = x[t] - y[t];
+            } else if t > st {
+                let hl = x[t] - y[t];
+                let mut d1 = x[t] - z[t - 1];
+                if d1 < 0.0f32 {
+                    d1 = -d1;
+                }
+                let mut d2 = y[t] - z[t - 1];
+                if d2 < 0.0f32 {
+                    d2 = -d2;
+                }
+                let mut hl2 = hl;
+                if hl2 < 0.0f32 {
+                    hl2 = -hl2;
+                }
+                v = hl;
+                if d1 > v {
+                    v = d1;
+                }
+                if d2 > v {
+                    v = d2;
+                }
+            }
         } else if op == 29u32 {
             if z[t] != 0.0f32 {
                 v = (x[t] - y[t]) / z[t];
@@ -279,6 +306,22 @@ fn ew2(op: u32, x: &[f32], y: &[f32], a: f32) -> Vec<f32> {
 
 fn ewc(op: u32, x: &[f32], y: &[f32], z: &[f32], a: f32, b: f32) -> Vec<f32> {
     ewb(op, x, y, z, x, a, b)
+}
+
+/// ATR series: true range from bar `start` smoothed by `which` over `period` (first TR is
+/// `high - low`, like `Atr::feed`).
+fn atr_series(
+    samples: &[GpuSample],
+    p: CubeParams,
+    which: CubeSmoother,
+    period: u32,
+    start: u32,
+) -> Vec<f32> {
+    let h = lane_series(samples, p, OhlcvField::High);
+    let l = lane_series(samples, p, OhlcvField::Low);
+    let c = lane_series(samples, p, OhlcvField::Close);
+    let tr = ewc(30, &h, &l, &c, start as f32, 0.0);
+    sm(&tr, which, period, start, p)
 }
 
 fn lane_series(samples: &[GpuSample], params: CubeParams, lane: OhlcvField) -> Vec<f32> {
@@ -466,6 +509,61 @@ pub fn launch_cube_comp(
             let d = sm(&k, p.smoother, p.smooth_period, 0, p);
             let j = ew2(26, &d, &k, 0.0);
             vec![k, d, j]
+        }
+        // Keltner channel `[upper, middle, lower]`: centre `smoother` of lane `lane`, ATR with
+        // `smoother2`, both over `period`, `a` = multiplier. Middle always shows the centre;
+        // the bands are 0 until `period` bars (mode is unused by the CPU feed).
+        CubeFormula::KcCols => {
+            let src = lane_series(samples, p, p.lane);
+            let mid = sm(&src, p.smoother, p.period, 0, p);
+            let atr = atr_series(samples, p, p.smoother2, p.period, 0);
+            let g = p.period.max(1) as f32;
+            let up = ewc(15, &ewc(13, &mid, &atr, &mid, p.a, 0.0), &mid, &mid, g, 0.0);
+            let lo = ewc(15, &ewc(14, &mid, &atr, &mid, p.a, 0.0), &mid, &mid, g, 0.0);
+            vec![up, mid, lo]
+        }
+        // `[width, position]` of the Keltner channel.
+        CubeFormula::KcMetricsCols => {
+            let c = lane_series(samples, p, OhlcvField::Close);
+            let src = lane_series(samples, p, p.lane);
+            let mid = sm(&src, p.smoother, p.period, 0, p);
+            let atr = atr_series(samples, p, p.smoother2, p.period, 0);
+            let g = p.period.max(1) as f32;
+            let up = ewc(15, &ewc(13, &mid, &atr, &mid, p.a, 0.0), &mid, &mid, g, 0.0);
+            let lo = ewc(15, &ewc(14, &mid, &atr, &mid, p.a, 0.0), &mid, &mid, g, 0.0);
+            vec![ew2(2, &up, &lo, 0.0), ewc(23, &c, &lo, &up, 0.0, 0.0)]
+        }
+        // ATR channels (volatility/atr_channels): MA of close over `period` with `smoother`,
+        // ATR over `smooth_period` with `smoother2`, `a` = k. Never gated: `[upper, middle, lower]`.
+        CubeFormula::AtrcCols | CubeFormula::StarcCols => {
+            let src = lane_series(samples, p, if formula == CubeFormula::StarcCols { p.lane } else { OhlcvField::Close });
+            let mid = sm(&src, p.smoother, p.period, 0, p);
+            let atr = atr_series(samples, p, p.smoother2, p.smooth_period, 0);
+            vec![ewc(13, &mid, &atr, &mid, p.a, 0.0), mid.clone(), ewc(14, &mid, &atr, &mid, p.a, 0.0)]
+        }
+        // ATR channels (channels/atr_channels): as `AtrcCols` but one `period`, bands 0 until
+        // `period` bars.
+        CubeFormula::AtrChanCols => {
+            let src = lane_series(samples, p, OhlcvField::Close);
+            let mid = sm(&src, p.smoother, p.period, 0, p);
+            let atr = atr_series(samples, p, p.smoother2, p.period, 0);
+            let g = p.period.max(1) as f32;
+            let up = ewc(15, &ewc(13, &mid, &atr, &mid, p.a, 0.0), &mid, &mid, g, 0.0);
+            let lo = ewc(15, &ewc(14, &mid, &atr, &mid, p.a, 0.0), &mid, &mid, g, 0.0);
+            vec![up, mid, lo]
+        }
+        // Keltner (volatility/kc): SMA of the typical price, ATR (`smoother`) only from the
+        // bar the SMA window is full; everything 0 before. `[upper, middle, lower]`.
+        CubeFormula::VoKcCols => {
+            let tp = lane_series(samples, p, OhlcvField::HLC3);
+            let pp = p.period.max(1);
+            let mid = sm(&tp, CubeSmoother::Sma, pp, 0, p);
+            let atr = atr_series(samples, p, p.smoother, pp, pp - 1);
+            let g = pp as f32;
+            let up = ewc(15, &ewc(13, &mid, &atr, &mid, p.a, 0.0), &mid, &mid, g, 0.0);
+            let lo = ewc(15, &ewc(14, &mid, &atr, &mid, p.a, 0.0), &mid, &mid, g, 0.0);
+            let mi = ewc(15, &mid, &mid, &mid, g, 0.0);
+            vec![up, mi, lo]
         }
         _ => Vec::new(),
     }

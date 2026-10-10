@@ -6913,6 +6913,53 @@ mod tests {
         chk(&run_cols(CubeFormula::BbMetricsCols, &bars, p), close.iter().map(|c| { let (a, b) = m.feed(*c); vec![a, b] }).collect());
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): composites 1016..=1021.
+    #[test]
+    fn lane_matches_cpu_comp_batch3() {
+        use crate::engine::ohlcv_field::OhlcvField;
+        use crate::indicators::channels::atr_channels::{AtrChannelMode, AtrChannels as AtrChan};
+        use crate::indicators::channels::keltner_channel::{KeltnerChannel, KeltnerMode};
+        use crate::indicators::channels::keltner_channel_metrics::KeltnerMetrics;
+        use crate::indicators::channels::starc_bands::StarcBands;
+        use crate::indicators::volatility::atr_channels::AtrChannels;
+        use crate::indicators::volatility::kc::Kc;
+
+        let bars = bars(140);
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(8);
+        p.smoother = CubeSmoother::Sma;
+        p.smoother2 = CubeSmoother::Rma;
+        p.smooth_period = 6;
+        p.a = 1.5;
+        p.lane = OhlcvField::HLC3;
+        let (sa, sb) = (SmootherId::Sma, SmootherId::Rma);
+
+        let mut m = KeltnerChannel::from_smoothers(sa, sb, 8, 1.5, KeltnerMode::Classic, OhlcvField::HLC3);
+        chk(&run_cols(CubeFormula::KcCols, &bars, p), lanes.iter().map(|l| { let (u, mi, lo) = m.feed(l); vec![u, mi, lo] }).collect());
+        let mut m = KeltnerMetrics::with_smoothers(8, 1.5, sa, sb);
+        let mut mp = p;
+        mp.lane = OhlcvField::Close;
+        chk(&run_cols(CubeFormula::KcMetricsCols, &bars, mp), lanes.iter().map(|l| { let (w, ps) = m.feed(l); vec![w, ps] }).collect());
+        let mut m = AtrChannels::from_smoothers(8, sa, 6, sb, 1.5);
+        chk(&run_cols(CubeFormula::AtrcCols, &bars, p), lanes.iter().map(|l| { let (u, mi, lo) = m.feed(l); vec![u, mi, lo] }).collect());
+        let mut m = AtrChan::from_smoothers(sa, sb, 8, 1.5, AtrChannelMode::Close);
+        chk(&run_cols(CubeFormula::AtrChanCols, &bars, p), lanes.iter().map(|l| { let (u, mi, lo) = m.feed(l); vec![u, mi, lo] }).collect());
+        let mut m = StarcBands::from_smoothers(8, 6, 1.5, sa, sb, OhlcvField::HLC3);
+        chk(&run_cols(CubeFormula::StarcCols, &bars, p), lanes.iter().map(|l| { let (u, mi, lo) = m.feed(l); vec![u, mi, lo] }).collect());
+        let mut m = Kc::from_smoothers(8, 1.5, sb);
+        let mut vp = p;
+        vp.smoother = CubeSmoother::Rma;
+        chk(&run_cols(CubeFormula::VoKcCols, &bars, vp), lanes.iter().map(|l| { let (u, mi, lo) = m.feed(l); vec![u, mi, lo] }).collect());
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
