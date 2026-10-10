@@ -3576,6 +3576,109 @@ fn bar_scan(
             }
             v0 = held0;
             v1 = sq;
+        } else if formula >= 1295u32 && formula <= 1299u32 {
+            // pivot levels family: every `period` bars (aligned to bar 0) the H/L/C (open for Woodie / Demark)
+            // of the finished period give new levels; between completions the last levels are held.
+            // The CPU `levels_grid` matrix (one price rung per row) is emitted as one column per rung.
+            // scr[0..9] holds the rungs in grid order (lowest first). 1295 Pivot `[r1, s1, point, grid(7)]`,
+            // 1296 Floor `[pivot, grid(7)]`, 1297 Camarilla `[pivot, grid(9)]`, 1298 Woodie `[pivot, grid(9)]`,
+            // 1299 DeMark `[pivot, grid(3)]`.
+            let mut pp = period as usize;
+            if pp < 1usize {
+                pp = 1usize;
+            }
+            if (t + 1) % pp == 0usize {
+                let mut hh = h[t];
+                let mut ll = l[t];
+                for k2 in 0..pp {
+                    hh = hh.max(h[t - k2]);
+                    ll = ll.min(l[t - k2]);
+                }
+                let cl = c[t];
+                let op = o[t + 1 - pp];
+                let rg = hh - ll;
+                if formula == 1295u32 || formula == 1296u32 {
+                    let pv = (hh + ll + cl) / 3.0f32;
+                    scr[0] = ll - 2.0f32 * (hh - pv);
+                    scr[1] = pv - rg;
+                    scr[2] = 2.0f32 * pv - hh;
+                    scr[3] = pv;
+                    scr[4] = 2.0f32 * pv - ll;
+                    scr[5] = pv + rg;
+                    scr[6] = hh + 2.0f32 * (pv - ll);
+                } else if formula == 1297u32 {
+                    let mm = 1.1f32;
+                    scr[0] = cl - rg * mm / 2.0f32;
+                    scr[1] = cl - rg * mm / 4.0f32;
+                    scr[2] = cl - rg * mm / 6.0f32;
+                    scr[3] = cl - rg * mm / 12.0f32;
+                    scr[4] = (hh + ll + cl) / 3.0f32;
+                    scr[5] = cl + rg * mm / 12.0f32;
+                    scr[6] = cl + rg * mm / 6.0f32;
+                    scr[7] = cl + rg * mm / 4.0f32;
+                    scr[8] = cl + rg * mm / 2.0f32;
+                } else if formula == 1298u32 {
+                    let pv = (hh + ll + 2.0f32 * op) / 4.0f32;
+                    let r3 = hh + 2.0f32 * (pv - ll);
+                    let s3 = ll - 2.0f32 * (hh - pv);
+                    scr[0] = s3 - rg;
+                    scr[1] = s3;
+                    scr[2] = pv - rg;
+                    scr[3] = 2.0f32 * pv - hh;
+                    scr[4] = pv;
+                    scr[5] = 2.0f32 * pv - ll;
+                    scr[6] = pv + rg;
+                    scr[7] = r3;
+                    scr[8] = r3 + rg;
+                } else {
+                    let mut xv = hh + ll + 2.0f32 * cl;
+                    if cl < op {
+                        xv = hh + 2.0f32 * ll + cl;
+                    } else if cl > op {
+                        xv = 2.0f32 * hh + ll + cl;
+                    }
+                    scr[0] = xv / 2.0f32 - hh;
+                    scr[1] = xv / 4.0f32;
+                    scr[2] = xv / 2.0f32 - ll;
+                }
+            }
+            if formula == 1295u32 {
+                v0 = scr[4];
+                v1 = scr[2];
+                v2 = scr[3];
+                v3 = scr[0];
+                v4 = scr[1];
+                v5 = scr[2];
+                v6 = scr[3];
+                v7 = scr[4];
+                v8 = scr[5];
+                v9 = scr[6];
+            } else if formula == 1296u32 {
+                v0 = scr[3];
+                v1 = scr[0];
+                v2 = scr[1];
+                v3 = scr[2];
+                v4 = scr[3];
+                v5 = scr[4];
+                v6 = scr[5];
+                v7 = scr[6];
+            } else if formula == 1299u32 {
+                v0 = scr[1];
+                v1 = scr[0];
+                v2 = scr[1];
+                v3 = scr[2];
+            } else {
+                v0 = scr[4];
+                v1 = scr[0];
+                v2 = scr[1];
+                v3 = scr[2];
+                v4 = scr[3];
+                v5 = scr[4];
+                v6 = scr[5];
+                v7 = scr[6];
+                v8 = scr[7];
+                v9 = scr[8];
+            }
         }
         out[t] = v0;
         out[n + t] = v1;

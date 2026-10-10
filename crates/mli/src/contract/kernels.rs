@@ -9320,6 +9320,67 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1295..=1299 (Pivot, Floorpivot, Camarilla, Woodie, Demark).
+    #[test]
+    fn lane_matches_cpu_bar_batch28() {
+        use crate::indicators::levels::camarilla_pivots::CamarillaPivots;
+        use crate::indicators::levels::demark_pivots::DeMarkPivots;
+        use crate::indicators::levels::floor_trader_pivots::FloorTraderPivots;
+        use crate::indicators::levels::pivot_points::PivotPoints;
+        use crate::indicators::levels::woodie_pivots::WoodiePivots;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let p = CubeParams::period(5);
+        let mut m = PivotPoints::with_period(5);
+        chk(&run_cols(CubeFormula::PivotBar, &bars, p), lanes.iter().map(|l| {
+            m.feed(&[l[0], l[1], l[2]]);
+            let lv = m.levels();
+            let mut r = vec![m.r1(), m.s1(), m.point()];
+            r.extend(lv.all_levels());
+            r
+        }).collect());
+        let mut m = FloorTraderPivots::with_period(5);
+        chk(&run_cols(CubeFormula::FloorpivotBar, &bars, p), lanes.iter().map(|l| {
+            m.feed(&[l[0], l[1], l[2]]);
+            let mut r = vec![m.value()];
+            r.extend(m.current_levels().map(|x| x.all_levels()).unwrap_or(vec![0.0; 7]));
+            r
+        }).collect());
+        let mut m = CamarillaPivots::with_period(5);
+        chk(&run_cols(CubeFormula::CamarillaBar, &bars, p), lanes.iter().map(|l| {
+            m.feed(&[l[0], l[1], l[2]]);
+            let mut r = vec![m.value()];
+            r.extend(m.current_levels().map(|x| x.all_levels()).unwrap_or(vec![0.0; 9]));
+            r
+        }).collect());
+        let mut m = WoodiePivots::with_period(5);
+        chk(&run_cols(CubeFormula::WoodieBar, &bars, p), bars.iter().map(|b| {
+            m.feed(&[b.open, b.high, b.low, b.close]);
+            let mut r = vec![m.value()];
+            r.extend(m.current_levels().map(|x| x.all_levels()).unwrap_or(vec![0.0; 9]));
+            r
+        }).collect());
+        let mut m = DeMarkPivots::with_period(5);
+        chk(&run_cols(CubeFormula::DemarkBar, &bars, p), bars.iter().map(|b| {
+            m.feed(&[b.open, b.high, b.low, b.close]);
+            let mut r = vec![m.value()];
+            r.extend(m.levels().all_levels());
+            r
+        }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

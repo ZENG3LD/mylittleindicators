@@ -677,6 +677,16 @@ pub enum CubeFormula {
     QqeBar = 1293,
     /// Composite: squeeze momentum. UNTESTED on GPU.
     SqmomBar = 1294,
+    /// Composite: classic pivot points. UNTESTED on GPU.
+    PivotBar = 1295,
+    /// Composite: floor trader pivots. UNTESTED on GPU.
+    FloorpivotBar = 1296,
+    /// Composite: camarilla pivots. UNTESTED on GPU.
+    CamarillaBar = 1297,
+    /// Composite: woodie pivots. UNTESTED on GPU.
+    WoodieBar = 1298,
+    /// Composite: demark pivots. UNTESTED on GPU.
+    DemarkBar = 1299,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1187,6 +1197,11 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::PivotBar => 10,
+            CubeFormula::FloorpivotBar => 8,
+            CubeFormula::CamarillaBar => 10,
+            CubeFormula::WoodieBar => 10,
+            CubeFormula::DemarkBar => 4,
             CubeFormula::QqeBar => 2,
             CubeFormula::SqmomBar => 2,
             CubeFormula::HilbBar => 3,
@@ -1475,6 +1490,11 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vwrsi), Some(CubeFormula::VwrsiBar));
         assert_eq!(formula_of(IndicatorId::Qqe), Some(CubeFormula::QqeBar));
         assert_eq!(formula_of(IndicatorId::Sqmom), Some(CubeFormula::SqmomBar));
+        assert_eq!(formula_of(IndicatorId::Pivot), Some(CubeFormula::PivotBar));
+        assert_eq!(formula_of(IndicatorId::Floorpivot), Some(CubeFormula::FloorpivotBar));
+        assert_eq!(formula_of(IndicatorId::Camarilla), Some(CubeFormula::CamarillaBar));
+        assert_eq!(formula_of(IndicatorId::Woodie), Some(CubeFormula::WoodieBar));
+        assert_eq!(formula_of(IndicatorId::Demark), Some(CubeFormula::DemarkBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
