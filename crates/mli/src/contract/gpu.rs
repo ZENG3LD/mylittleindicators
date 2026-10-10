@@ -395,6 +395,20 @@ pub enum CubeFormula {
     VolEventSig = 805,
     /// Slope direction of a smoother of the lane (first smoother, `smooth_period`). UNTESTED on GPU.
     SlopeDirLine = 806,
+    /// AND gate of two RSIs (`fast`, `slow` periods): 1 when both are beyond 70 or both below 30. UNTESTED on GPU.
+    LogicAnd = 810,
+    /// OR gate: either RSI outside 30..=70. UNTESTED on GPU.
+    LogicOr = 811,
+    /// XOR gate: exactly one RSI outside 30..=70. UNTESTED on GPU.
+    LogicXor = 812,
+    /// Sign combiner of the two RSI signals, clamped to -1..=1. UNTESTED on GPU.
+    LogicSign = 813,
+    /// Volatility regime transitions on the lane: thresholds `a` low, `b` high. UNTESTED on GPU.
+    VolRegimeSig = 814,
+    /// Relative position of two smoothers of the lane (first and second smoother). UNTESTED on GPU.
+    RelPositionSig = 815,
+    /// CUSUM event filter on the lane (`a` threshold): 1 / -1 / 0. UNTESTED on GPU.
+    CusumFilter = 816,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -803,6 +817,13 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Logicand), Some(CubeFormula::LogicAnd));
+        assert_eq!(formula_of(IndicatorId::Logicor), Some(CubeFormula::LogicOr));
+        assert_eq!(formula_of(IndicatorId::Logicxor), Some(CubeFormula::LogicXor));
+        assert_eq!(formula_of(IndicatorId::Logicsign), Some(CubeFormula::LogicSign));
+        assert_eq!(formula_of(IndicatorId::VolRegimeDetect), Some(CubeFormula::VolRegimeSig));
+        assert_eq!(formula_of(IndicatorId::RelPosition), Some(CubeFormula::RelPositionSig));
+        assert_eq!(formula_of(IndicatorId::StCusum), Some(CubeFormula::CusumFilter));
         assert_eq!(formula_of(IndicatorId::DirDetect), Some(CubeFormula::DirDetect));
         assert_eq!(formula_of(IndicatorId::RegimeGate), Some(CubeFormula::RegimeGateSig));
         assert_eq!(formula_of(IndicatorId::ThreshEdge), Some(CubeFormula::ThresholdEdge));

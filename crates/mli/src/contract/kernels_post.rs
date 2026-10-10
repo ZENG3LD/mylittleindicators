@@ -547,3 +547,229 @@ pub fn launch_cube_signal(
         _ => Vec::new(),
     }
 }
+
+/// Two-series signal stage (`a_ser`, `b_ser`), outputs -1 / 0 / 1 as f32.
+/// Ops: 30 AND gate / 31 OR gate / 32 XOR gate on two RSIs (extreme = outside 30..=70;
+/// AND needs both on the same side), 1 or 0, sticky, updated once `i >= rf`;
+/// 33 sign combiner (`(sig_short + sig_long)` clamped to -1..=1 with `<30 -> 1`, `>70 -> -1`);
+/// 34 volatility regime detector on `a_ser` (`a` low, `b` high; +1 into High or out of Low,
+/// -1 out of High or into Low, 0 otherwise and on bar 0);
+/// 35 relative position: sign of `a_ser - b_ser`, sticky on non-zero changes, from `i >= rf`;
+/// 36 CUSUM filter on `a_ser` closes (`a` threshold, abs and at least 1e-12).
+#[cube]
+fn post_scan4(
+    a_ser: &[f32],
+    b_ser: &[f32],
+    out: &mut [f32],
+    op: u32,
+    a: f32,
+    b: f32,
+    rf: u32,
+) {
+    let n = a_ser.len();
+    let mut sticky = 0.0f32;
+    let mut prev_level = 9u32;
+    let mut pos_sum = 0.0f32;
+    let mut neg_sum = 0.0f32;
+    for i in 0..n {
+        let sv = a_ser[i];
+        let lv = b_ser[i];
+        let mut res = 0.0f32;
+        if op >= 30u32 && op <= 33u32 {
+            if (i as u32) >= rf {
+                let s_ext = sv < 30.0f32 || sv > 70.0f32;
+                let l_ext = lv < 30.0f32 || lv > 70.0f32;
+                if op == 30u32 {
+                    let both_hi = sv > 70.0f32 && lv > 70.0f32;
+                    let both_lo = sv < 30.0f32 && lv < 30.0f32;
+                    sticky = 0.0f32;
+                    if both_hi || both_lo {
+                        sticky = 1.0f32;
+                    }
+                } else if op == 31u32 {
+                    sticky = 0.0f32;
+                    if s_ext || l_ext {
+                        sticky = 1.0f32;
+                    }
+                } else if op == 32u32 {
+                    sticky = 0.0f32;
+                    if s_ext != l_ext {
+                        sticky = 1.0f32;
+                    }
+                } else {
+                    let mut ss = 0.0f32;
+                    if sv < 30.0f32 {
+                        ss = 1.0f32;
+                    } else if sv > 70.0f32 {
+                        ss = -1.0f32;
+                    }
+                    let mut ls = 0.0f32;
+                    if lv < 30.0f32 {
+                        ls = 1.0f32;
+                    } else if lv > 70.0f32 {
+                        ls = -1.0f32;
+                    }
+                    let mut t = ss + ls;
+                    if t > 1.0f32 {
+                        t = 1.0f32;
+                    } else if t < -1.0f32 {
+                        t = -1.0f32;
+                    }
+                    sticky = t;
+                }
+            }
+            res = sticky;
+        } else if op == 34u32 {
+            // levels: 0 low, 1 normal, 2 high
+            let mut level = 1u32;
+            if sv < a {
+                level = 0u32;
+            } else if sv > b {
+                level = 2u32;
+            }
+            if prev_level != 9u32 && prev_level != level {
+                if level == 2u32 {
+                    res = 1.0f32;
+                } else if prev_level == 2u32 {
+                    res = -1.0f32;
+                } else if level == 0u32 {
+                    res = -1.0f32;
+                } else if prev_level == 0u32 {
+                    res = 1.0f32;
+                }
+            }
+            prev_level = level;
+        } else if op == 35u32 {
+            if (i as u32) >= rf {
+                let mut t = 0.0f32;
+                if sv > lv {
+                    t = 1.0f32;
+                } else if sv < lv {
+                    t = -1.0f32;
+                }
+                if t != 0.0f32 && t != sticky {
+                    sticky = t;
+                }
+            }
+            res = sticky;
+        } else if op == 36u32 {
+            if i > 0 {
+                let mut th = a;
+                if th < 0.0f32 {
+                    th = -th;
+                }
+                if th < 1.0e-12f32 {
+                    th = 1.0e-12f32;
+                }
+                let r = sv / a_ser[i - 1] - 1.0f32;
+                pos_sum = pos_sum + r;
+                if pos_sum < 0.0f32 {
+                    pos_sum = 0.0f32;
+                }
+                neg_sum = neg_sum + r;
+                if neg_sum > 0.0f32 {
+                    neg_sum = 0.0f32;
+                }
+                if pos_sum > th {
+                    res = 1.0f32;
+                    pos_sum = 0.0f32;
+                    neg_sum = 0.0f32;
+                }
+                if neg_sum < -th {
+                    res = -1.0f32;
+                    pos_sum = 0.0f32;
+                    neg_sum = 0.0f32;
+                }
+            }
+        }
+        out[i] = res;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn post_map4(a_ser: &[f32], b_ser: &[f32], out: &mut [f32], op: u32, a: f32, b: f32, rf: u32) {
+    post_scan4(a_ser, b_ser, out, op, a, b, rf);
+}
+
+pub(crate) fn run_post4(a_ser: &[f32], b_ser: &[f32], op: u32, a: f32, b: f32, rf: u32) -> Vec<f32> {
+    let n = a_ser.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let sa = client.create_from_slice(f32::as_bytes(a_ser));
+    let sb = client.create_from_slice(f32::as_bytes(b_ser));
+    let out = client.empty(n * core::mem::size_of::<f32>());
+    unsafe {
+        post_map4::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(sa, n),
+            BufferArg::from_raw_parts(sb, n),
+            BufferArg::from_raw_parts(out.clone(), n),
+            op,
+            a,
+            b,
+            rf,
+        );
+    }
+    let bytes = client.read_one_unchecked(out);
+    f32::from_bytes(&bytes).to_vec()
+}
+
+/// Launch a two-series signal formula (codes 810..=829).
+pub fn launch_cube_signal2(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    params: CubeParams,
+) -> Vec<f32> {
+    if samples.is_empty() {
+        return Vec::new();
+    }
+    let rsi_pair = || {
+        let mut ps = params;
+        ps.period = params.fast.max(1);
+        let mut pl = params;
+        pl.period = params.slow.max(1);
+        (
+            launch_cube(CubeFormula::Rsi, samples, ps),
+            launch_cube(CubeFormula::Rsi, samples, pl),
+            ps.period.max(pl.period),
+        )
+    };
+    match formula {
+        CubeFormula::LogicAnd | CubeFormula::LogicOr | CubeFormula::LogicXor | CubeFormula::LogicSign => {
+            let op = match formula {
+                CubeFormula::LogicAnd => 30,
+                CubeFormula::LogicOr => 31,
+                CubeFormula::LogicXor => 32,
+                _ => 33,
+            };
+            let (s, l, rf) = rsi_pair();
+            run_post4(&s, &l, op, 0.0, 0.0, rf)
+        }
+        CubeFormula::VolRegimeSig => {
+            let s = launch_cube(CubeFormula::Identity, samples, params);
+            run_post4(&s, &s, 34, params.a, params.b, 0)
+        }
+        CubeFormula::RelPositionSig => {
+            // Subject: first smoother / `smooth_period`; reference: second / `smooth_period2`.
+            // Every smoother is ready once `period` bars are in (SMA/EMA/RMA/WMA/DEMA/TEMA/HMA/
+            // ALMA count to `period`; TMA/TRIMA's two SMAs both reach `period` on the same bar).
+            let subj = launch_cube(CubeFormula::SmoothLane, samples, params);
+            let mut pr = params;
+            pr.smoother = params.smoother2;
+            pr.smooth_period = params.smooth_period2;
+            let refr = launch_cube(CubeFormula::SmoothLane, samples, pr);
+            let rf = params.smooth_period.max(1).max(params.smooth_period2.max(1)) - 1;
+            run_post4(&subj, &refr, 35, 0.0, 0.0, rf)
+        }
+        CubeFormula::CusumFilter => {
+            let s = launch_cube(CubeFormula::Identity, samples, params);
+            run_post4(&s, &s, 36, params.a, 0.0, 0)
+        }
+        _ => Vec::new(),
+    }
+}

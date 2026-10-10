@@ -4248,6 +4248,9 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     if formula.code() >= 400 && formula.code() < 500 && formula.output_count() == 1 {
         return launch_cube_smoothed_gx(formula, samples, params);
     }
+    if formula.code() >= 810 && formula.code() < 830 {
+        return super::kernels_post::launch_cube_signal2(formula, samples, params);
+    }
     if formula.code() >= 800 && formula.code() < 900 {
         return super::kernels_post::launch_cube_signal(formula, samples, params);
     }
@@ -6848,6 +6851,52 @@ mod tests {
         sp.smoother = CubeSmoother::Ema;
         sp.smooth_period = 5;
         assert_close(&run(CubeFormula::SlopeDirLine, &bars, sp), &cpu(&close, |v| { sd.feed(v); sd.value() }));
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): two-series signals 810..=815.
+    #[test]
+    fn lane_matches_cpu_signal2_batch() {
+        use crate::engine::contract_engine::SmootherSlot;
+        use crate::indicators::regime::relative_position::RelativePosition;
+        use crate::indicators::regime::volatility_regime::VolatilityRegimeDetector;
+        use crate::indicators::signal_logic::logic_gates::{AndGate, OrGate, SignCombiner, XorGate};
+        use crate::indicators::statistics::cusum_filter::CusumFilter;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let mut p = CubeParams::period(1);
+        p.fast = 5;
+        p.slow = 12;
+        let mut g = AndGate::with_periods(5, 12);
+        assert_close(&run(CubeFormula::LogicAnd, &bars, p), &cpu(&close, |v| { g.feed(v); g.value() }));
+        let mut g = OrGate::with_periods(5, 12);
+        assert_close(&run(CubeFormula::LogicOr, &bars, p), &cpu(&close, |v| { g.feed(v); g.value() }));
+        let mut g = XorGate::with_periods(5, 12);
+        assert_close(&run(CubeFormula::LogicXor, &bars, p), &cpu(&close, |v| { g.feed(v); g.value() }));
+        let mut g = SignCombiner::with_periods(5, 12);
+        assert_close(&run(CubeFormula::LogicSign, &bars, p), &cpu(&close, |v| { g.feed(v); g.value() }));
+
+        let lo = close.iter().cloned().fold(f64::MAX, f64::min);
+        let hi = close.iter().cloned().fold(f64::MIN, f64::max);
+        let mut vr = VolatilityRegimeDetector::new(lo + 0.3 * (hi - lo), lo + 0.7 * (hi - lo));
+        let mut vp = CubeParams::period(1);
+        vp.a = (lo + 0.3 * (hi - lo)) as f32;
+        vp.b = (lo + 0.7 * (hi - lo)) as f32;
+        assert_close(&run(CubeFormula::VolRegimeSig, &bars, vp), &cpu(&close, |v| { vr.feed(v); vr.value() }));
+
+        let mut rp = RelativePosition::new(SmootherSlot::new(SmootherId::Ema, 5), SmootherSlot::new(SmootherId::Sma, 12));
+        let mut sp = CubeParams::period(1);
+        sp.smoother = CubeSmoother::Ema;
+        sp.smooth_period = 5;
+        sp.smoother2 = CubeSmoother::Sma;
+        sp.smooth_period2 = 12;
+        let cpu_rp: Vec<f64> = bars.iter().map(|b| { rp.feed(&[b.open, b.high, b.low, b.close]); rp.value() }).collect();
+        assert_close(&run(CubeFormula::RelPositionSig, &bars, sp), &cpu_rp);
+
+        let mut cf = CusumFilter::new(0.01);
+        let mut cp = CubeParams::period(1);
+        cp.a = 0.01;
+        assert_close(&run(CubeFormula::CusumFilter, &bars, cp), &cpu(&close, |v| { cf.feed(v); cf.event as f64 }));
     }
 
     #[test]
