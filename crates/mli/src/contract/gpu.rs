@@ -579,6 +579,12 @@ pub enum CubeFormula {
     KslopezComp = 1044,
     /// Composite: Alpha-beta-gamma filter pos/vel/acc. UNTESTED on GPU.
     AbgCols = 1045,
+    /// Composite: Butterworth filter. UNTESTED on GPU.
+    ButterComp = 1050,
+    /// Composite: Savitzky-Golay filter. UNTESTED on GPU.
+    SgComp = 1051,
+    /// Composite: Roofing filter. UNTESTED on GPU.
+    RoofComp = 1052,
     /// Composite: Spectral flatness percentile. UNTESTED on GPU.
     SflatpComp = 1120,
     /// Composite: Spectral rolloff percentile. UNTESTED on GPU.
@@ -1078,6 +1084,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Butter), Some(CubeFormula::ButterComp));
+        assert_eq!(formula_of(IndicatorId::Sg), Some(CubeFormula::SgComp));
+        assert_eq!(formula_of(IndicatorId::Roof), Some(CubeFormula::RoofComp));
         assert_eq!(formula_of(IndicatorId::Sflatp), Some(CubeFormula::SflatpComp));
         assert_eq!(formula_of(IndicatorId::Srollp), Some(CubeFormula::SrollpComp));
         assert_eq!(formula_of(IndicatorId::Srollrp), Some(CubeFormula::SrollrpComp));

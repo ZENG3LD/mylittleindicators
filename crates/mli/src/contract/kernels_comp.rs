@@ -886,6 +886,152 @@ pub(crate) fn abg_all(x: &[f32], al: f32, be: f32, ga: f32) -> Vec<Vec<f32>> {
         .collect()
 }
 
+/// Direct-form IIR as `ButterworthFilter::update` runs it: buffers pre-filled with the first
+/// value, output `sum_i b[i] x[t-i] - sum_{i>=1} a[i] y[t-i]` over `i <= order`, first output
+/// is the first value. `a` and `b` hold `order + 1` coefficients.
+#[cube]
+fn iir_scan(x: &[f32], a: &[f32], b: &[f32], out: &mut [f32], order: u32) {
+    let n = x.len();
+    let o = order as usize;
+    for t in 0..n {
+        if t == 0 {
+            out[0] = x[0];
+        } else {
+            let mut acc = 0.0f32;
+            for i in 0..(o + 1) {
+                let mut xv = x[0];
+                if t >= i {
+                    xv = x[t - i];
+                }
+                acc = acc + b[i] * xv;
+            }
+            for i in 1..(o + 1) {
+                let mut yv = x[0];
+                if t >= i {
+                    yv = out[t - i];
+                }
+                acc = acc - a[i] * yv;
+            }
+            out[t] = acc;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn iir_map(x: &[f32], a: &[f32], b: &[f32], out: &mut [f32], order: u32) {
+    iir_scan(x, a, b, out, order);
+}
+
+/// FIR over the last `w` values; the raw value until the window is full
+/// (`SavitzkyGolayFilter`). `c[i]` multiplies the i-th oldest value of the window.
+#[cube]
+fn fir_scan(x: &[f32], c: &[f32], out: &mut [f32], w: u32) {
+    let n = x.len();
+    let ww = w as usize;
+    for t in 0..n {
+        if t + 1 < ww {
+            out[t] = x[t];
+        } else {
+            let mut acc = 0.0f32;
+            for i in 0..ww {
+                acc = acc + c[i] * x[t + 1 - ww + i];
+            }
+            out[t] = acc;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn fir_map(x: &[f32], c: &[f32], out: &mut [f32], w: u32) {
+    fir_scan(x, c, out, w);
+}
+
+/// Roofing filter: 2-pole high-pass then super smoother, 0 for the first two bars.
+#[cube]
+fn roof_scan(x: &[f32], out: &mut [f32], h0: f32, h1: f32, h2: f32, s1: f32, s2: f32, s3: f32) {
+    let n = x.len();
+    let mut p0 = 0.0f32;
+    let mut p1 = 0.0f32;
+    let mut hp0 = 0.0f32;
+    let mut hp1 = 0.0f32;
+    let mut ss0 = 0.0f32;
+    let mut ss1 = 0.0f32;
+    let mut val = 0.0f32;
+    for t in 0..n {
+        let c = x[t];
+        if t < 2 {
+            if t == 0 {
+                p1 = c;
+            } else {
+                p0 = p1;
+                p1 = c;
+            }
+        } else {
+            let hp = h0 * (c - 2.0f32 * p1 + p0) + h1 * hp1 - h2 * hp0;
+            let ss = s1 * (hp + hp1) / 2.0f32 + s2 * ss1 + s3 * ss0;
+            val = ss;
+            p0 = p1;
+            p1 = c;
+            hp0 = hp1;
+            hp1 = hp;
+            ss0 = ss1;
+            ss1 = ss;
+        }
+        out[t] = val;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn roof_map(x: &[f32], out: &mut [f32], h0: f32, h1: f32, h2: f32, s1: f32, s2: f32, s3: f32) {
+    roof_scan(x, out, h0, h1, h2, s1, s2, s3);
+}
+
+fn run_buf(x: &[f32], extra: &[&[f32]], which: u32, u: &[u32], f: &[f32]) -> Vec<f32> {
+    let n = x.len();
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let xb = client.create_from_slice(f32::as_bytes(x));
+    let ob = client.empty(n * 4);
+    let eb: Vec<_> = extra.iter().map(|e| client.create_from_slice(f32::as_bytes(e))).collect();
+    unsafe {
+        match which {
+            0 => iir_map::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(xb, n),
+                BufferArg::from_raw_parts(eb[0].clone(), extra[0].len()),
+                BufferArg::from_raw_parts(eb[1].clone(), extra[1].len()),
+                BufferArg::from_raw_parts(ob.clone(), n),
+                u[0],
+            ),
+            1 => fir_map::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(xb, n),
+                BufferArg::from_raw_parts(eb[0].clone(), extra[0].len()),
+                BufferArg::from_raw_parts(ob.clone(), n),
+                u[0],
+            ),
+            _ => roof_map::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(xb, n),
+                BufferArg::from_raw_parts(ob.clone(), n),
+                f[0],
+                f[1],
+                f[2],
+                f[3],
+                f[4],
+                f[5],
+            ),
+        }
+    }
+    f32::from_bytes(&client.read_one_unchecked(ob)).to_vec()
+}
+
 fn ew2(op: u32, x: &[f32], y: &[f32], a: f32) -> Vec<f32> {
     ew(op, x, y, x, x, a)
 }
@@ -1363,6 +1509,85 @@ pub fn launch_cube_comp(
                 (p.a, p.b, p.c)
             };
             abg_all(&src, al, be, ga)
+        }
+        // Butterworth: `ext[0]` filter type (0 low, 1 high, 2 band-pass, 3 band-stop),
+        // `ext[1]` order, `a` cutoff, `b` sampling rate. Coefficients come from the CPU design.
+        CubeFormula::ButterComp => {
+            use crate::indicators::signal_processing::butterworth::{ButterworthFilter, FilterType};
+            let src = lane_series(samples, p, p.lane);
+            let ft = match p.ext[0] {
+                1 => FilterType::HighPass,
+                2 => FilterType::BandPass,
+                3 => FilterType::BandStop,
+                _ => FilterType::LowPass,
+            };
+            let order = (p.ext[1] as usize).clamp(1, 8);
+            let f = ButterworthFilter::new(ft, order, p.a as f64, p.b as f64);
+            let (ac, bc) = f.coefficients();
+            let mut a: Vec<f32> = ac.iter().map(|v| *v as f32).collect();
+            let mut b: Vec<f32> = bc.iter().map(|v| *v as f32).collect();
+            a.resize(order + 1, 0.0);
+            b.resize(order + 1, 0.0);
+            vec![run_buf(&src, &[&a, &b], 0, &[order as u32], &[])]
+        }
+        // Savitzky-Golay: `period` window (made odd, 5..=63), `slow` polynomial order, `flag`
+        // derivative order (0 smoothing .. 3). Window coefficients are read off the CPU filter by
+        // feeding it unit impulses (its output is linear in the window).
+        CubeFormula::SgComp => {
+            use crate::indicators::signal_processing::savitzky_golay::{DerivativeOrder, SavitzkyGolayFilter};
+            let src = lane_series(samples, p, p.lane);
+            let d = match p.flag {
+                1 => DerivativeOrder::FirstDerivative,
+                2 => DerivativeOrder::SecondDerivative,
+                3 => DerivativeOrder::ThirdDerivative,
+                _ => DerivativeOrder::Smoothing,
+            };
+            let mut w = p.period as usize;
+            if w % 2 == 0 {
+                w += 1;
+            }
+            let w = w.clamp(5, 63);
+            let mut c = Vec::with_capacity(w);
+            for j in 0..w {
+                let mut f = SavitzkyGolayFilter::new(w, p.slow as usize, d);
+                let mut y = 0.0;
+                for i in 0..w {
+                    y = f.feed(if i == j { 1.0 } else { 0.0 });
+                }
+                c.push(y as f32);
+            }
+            vec![run_buf(&src, &[&c], 1, &[w as u32], &[])]
+        }
+        // Roofing filter: `flag == 0` periods `a` (high-pass) and `b` (smoother), otherwise
+        // alphas (period = 2 / clamp(alpha, 0.001, 1)).
+        CubeFormula::RoofComp => {
+            let src = lane_series(samples, p, p.lane);
+            let (hp, lp) = if p.flag == 0 {
+                (p.a as f64, p.b as f64)
+            } else {
+                (2.0 / (p.a as f64).clamp(0.001, 1.0), 2.0 / (p.b as f64).clamp(0.001, 1.0))
+            };
+            let hp = hp.max(2.0);
+            let lp = lp.max(2.0);
+            let pi = std::f64::consts::PI;
+            let sq2 = 2.0f64.sqrt();
+            let c1 = (sq2 * pi / hp).cos();
+            let s1 = (sq2 * pi / hp).sin();
+            let al = (c1 + s1 - 1.0) / c1;
+            let h0 = (1.0 - al / 2.0).powi(2);
+            let h1 = 2.0 * (1.0 - al);
+            let h2 = (1.0 - al).powi(2);
+            let bb = (-sq2 * pi / lp).exp();
+            let sc2 = 2.0 * bb * (sq2 * pi / lp).cos();
+            let sc3 = -bb * bb;
+            let sc1 = 1.0 - sc2 - sc3;
+            vec![run_buf(
+                &src,
+                &[],
+                2,
+                &[],
+                &[h0 as f32, h1 as f32, h2 as f32, sc1 as f32, sc2 as f32, sc3 as f32],
+            )]
         }
         _ => Vec::new(),
     }

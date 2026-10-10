@@ -7289,6 +7289,44 @@ mod tests {
         assert_close(&run(CubeFormula::StftComp, &bars, sp), &cpu(&close, |v| m.feed(v)));
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Butterworth, Savitzky-Golay, roofing 1050..=1052.
+    #[test]
+    fn lane_matches_cpu_filter_batch() {
+        use crate::indicators::signal_processing::butterworth::{ButterworthFilter, FilterType};
+        use crate::indicators::signal_processing::roofing_filter::RoofingFilter;
+        use crate::indicators::signal_processing::savitzky_golay::{DerivativeOrder, SavitzkyGolayFilter};
+
+        let bars = bars(160);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        for (code, ft) in [(0u32, FilterType::LowPass), (1, FilterType::HighPass)] {
+            let mut p = CubeParams::period(1);
+            p.ext[0] = code;
+            p.ext[1] = 3;
+            p.a = 0.1;
+            p.b = 1.0;
+            let mut m = ButterworthFilter::new(ft, 3, 0.1, 1.0);
+            assert_close(&run(CubeFormula::ButterComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        }
+        for (flag, d) in [(0u32, DerivativeOrder::Smoothing), (1, DerivativeOrder::FirstDerivative)] {
+            let mut p = CubeParams::period(11);
+            p.slow = 3;
+            p.flag = flag;
+            let mut m = SavitzkyGolayFilter::new(11, 3, d);
+            assert_close(&run(CubeFormula::SgComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        }
+        let mut p = CubeParams::period(1);
+        p.a = 48.0;
+        p.b = 10.0;
+        let mut m = RoofingFilter::new_with_periods(48.0, 10.0);
+        assert_close(&run(CubeFormula::RoofComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut ap = p;
+        ap.flag = 1;
+        ap.a = 0.05;
+        ap.b = 0.3;
+        let mut m = RoofingFilter::new(0.05, 0.3);
+        assert_close(&run(CubeFormula::RoofComp, &bars, ap), &cpu(&close, |v| m.feed(v)));
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
