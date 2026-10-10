@@ -418,7 +418,7 @@ mli_contract_macros::contract_universe! {
         HvSpike:      HistoricalVolatility : _ +cube(ev_hv_spike_ev)          => crate::indicators::volatility_advanced::hv_spike::HvSpike,
         VolIdxMomentum: VolatilityIndex    : Volatility +cube(endpoint_slope) => crate::indicators::volatility_advanced::vol_idx_momentum::VolIdxMomentum,
         VolIdxSpike:  VolatilityIndex      : _ +cube(comp_vol_idx_spike_ev)          => crate::indicators::volatility_advanced::vol_idx_spike::VolIdxSpike,
-        Volprofchan:          Fields : Channel => crate::indicators::volume::volume_profile_channels::VolumeProfileChannels { upper middle lower #profile_grid },
+        Volprofchan:          Fields : Channel +cube(comp_vpc_bar) => crate::indicators::volume::volume_profile_channels::VolumeProfileChannels { upper middle lower #profile_grid },
         AggressorImbalance:   Tick    : _ +cube(ev_aggressor_imb)       => crate::indicators::volume::aggressor_imbalance::AggressorImbalance,
         TradeFlowImbalance:   Tick    : _ +cube(comp_trade_flow_imb_ev)       => crate::indicators::volume::trade_flow_imbalance::TradeFlowImbalance { imbalance volume },
         UptickDowntickVolume: Tick    : _ +cube(comp_up_down_tick_vol_ev)       => crate::indicators::volume::uptick_downtick_volume::UptickDowntickVolume { uptick downtick },

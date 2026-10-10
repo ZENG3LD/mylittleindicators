@@ -10464,6 +10464,37 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Volume profile channels (1355).
+    #[test]
+    fn lane_matches_cpu_bar_batch63() {
+        use crate::indicators::volume::volume_profile_channels::VolumeProfileChannels;
+
+        let bars = bars(3200); // two recalculations after the first bar (1440-bar cadence)
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        for (nb, pct) in [(50u32, 70.0f32), (20, 80.0)] {
+            let mut p = CubeParams::period(nb);
+            p.a = pct;
+            let mut m = VolumeProfileChannels::new_custom(
+                crate::indicators::volume::volume_profile_channels::VolumeProfileMode::AdaptiveBins,
+                crate::indicators::volume::volume_profile_channels::VolumeProfilePeriod::Daily,
+                nb as usize,
+                pct as f64,
+            );
+            chk(&run_cols(CubeFormula::VolprofchanBar, &bars, p), bars.iter().map(|b| { m.feed(&[b.open, b.high, b.low, b.close, b.volume]); let t = m.value_tuple(); vec![t.0, t.1, t.2] }).collect());
+        }
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

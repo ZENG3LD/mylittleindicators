@@ -6426,6 +6426,138 @@ fn bar_scan(
             }
             v0 = scr[bs + 8usize];
             v1 = scr[bs + 7usize];
+        } else if formula == 1355u32 {
+            // volume profile channels (VAH, POC, VAL) in the factory configuration: adaptive bins, daily recompute
+            // (first bar, then every 1440 bars) over the last 1000 bars. period = bin count, a = value area percent.
+            // scr: 0 min price, 1 max price, 2 bars since recalc, 3 adaptive multiplier, 4 EMA range, 5 POC, 6 VAH,
+            // 7 VAL, 8 bin size, 9 bin count, bins: centres at 16.., volumes at 16 + (N + 2). POC tie rule = the CPU
+            // `max_by` (last maximal bin); value-area order = CPU stable sort (descending volume, lower index first).
+            let nb = period as usize;
+            let cap_b = nb + 2usize;
+            if t == 0usize {
+                scr[0] = l[t];
+                scr[1] = h[t];
+                scr[2] = 0.0f32;
+                scr[3] = 1.0f32;
+                scr[4] = 0.0f32;
+            } else {
+                if l[t] < scr[0] {
+                    scr[0] = l[t];
+                }
+                if h[t] > scr[1] {
+                    scr[1] = h[t];
+                }
+            }
+            scr[2] = scr[2] + 1.0f32;
+            if t == 0usize || scr[2] >= 1440.0f32 {
+                let mn = scr[0];
+                let mx = scr[1];
+                let range = mx - mn;
+                let mut bsz = range / (nb as f32) * scr[3];
+                let floor_b = range / 1000.0f32;
+                if floor_b > bsz {
+                    bsz = floor_b;
+                }
+                scr[8] = bsz;
+                let mut cnt = 0usize;
+                if bsz > 0.0f32 {
+                    let mut cur = mn;
+                    for _k in 0..cap_b {
+                        if cur <= mx && cnt < cap_b {
+                            scr[16usize + cnt] = cur + bsz / 2.0f32;
+                            scr[16usize + cap_b + cnt] = 0.0f32;
+                            cnt = cnt + 1usize;
+                            cur = cur + bsz;
+                        }
+                    }
+                } else {
+                    scr[16usize] = mn;
+                    scr[16usize + cap_b] = 0.0f32;
+                    cnt = 1usize;
+                }
+                scr[9] = cnt as f32;
+                let mut lo_b = 0usize;
+                if t + 1usize > 1000usize {
+                    lo_b = t + 1usize - 1000usize;
+                }
+                let mut total = 0.0f32;
+                for i in lo_b..(t + 1usize) {
+                    let rng = h[i] - l[i];
+                    if v[i] > 0.0f32 && rng > 0.0f32 {
+                        for q in 0..cnt {
+                            let bl = scr[16usize + q] - bsz / 2.0f32;
+                            let bh = scr[16usize + q] + bsz / 2.0f32;
+                            let ol = bl.max(l[i]);
+                            let oh = bh.min(h[i]);
+                            if oh > ol {
+                                scr[16usize + cap_b + q] = scr[16usize + cap_b + q] + v[i] * ((oh - ol) / rng);
+                            }
+                        }
+                        total = total + v[i];
+                    }
+                }
+                if cnt > 0usize {
+                    let mut pb = 0usize;
+                    let mut pv = scr[16usize + cap_b];
+                    for q in 1..cnt {
+                        if scr[16usize + cap_b + q] >= pv {
+                            pv = scr[16usize + cap_b + q];
+                            pb = q;
+                        }
+                    }
+                    scr[5] = scr[16usize + pb];
+                }
+                if cnt > 0usize && total > 0.0f32 {
+                    let target = total * (a / 100.0f32);
+                    let mut acc = 0.0f32;
+                    let mut imin = cnt;
+                    let mut imax = 0usize;
+                    let mut stop = false;
+                    // used flags are stored by driving the volume of a taken bin to -1 on a scratch copy
+                    for q in 0..cnt {
+                        scr[16usize + 2usize * cap_b + q] = scr[16usize + cap_b + q];
+                    }
+                    for _r in 0..cnt {
+                        if !stop {
+                            let mut bi = cnt;
+                            let mut bvv = 0.0f32;
+                            for q in 0..cnt {
+                                let vq = scr[16usize + 2usize * cap_b + q];
+                                if vq >= 0.0f32 && (bi == cnt || vq > bvv) {
+                                    bi = q;
+                                    bvv = vq;
+                                }
+                            }
+                            acc = acc + bvv;
+                            scr[16usize + 2usize * cap_b + bi] = -1.0f32;
+                            if bi < imin {
+                                imin = bi;
+                            }
+                            if bi > imax {
+                                imax = bi;
+                            }
+                            if acc >= target {
+                                stop = true;
+                            }
+                        }
+                    }
+                    scr[7] = scr[16usize + imin] - bsz / 2.0f32;
+                    scr[6] = scr[16usize + imax] + bsz / 2.0f32;
+                }
+                scr[2] = 0.0f32;
+            }
+            let tr = h[t] - l[t];
+            if scr[4] == 0.0f32 {
+                scr[4] = tr;
+            } else {
+                scr[4] = scr[4] * (1.0f32 - 2.0f32 / 22.0f32) + tr * (2.0f32 / 22.0f32);
+            }
+            if scr[4] > 0.0f32 {
+                scr[3] = (tr / scr[4]).max(0.5f32).min(2.0f32);
+            }
+            v0 = scr[6];
+            v1 = scr[5];
+            v2 = scr[7];
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -7041,6 +7173,11 @@ fn launch_cube_bar_x(
     }
     if formula == CubeFormula::VprofileBar || formula == CubeFormula::PocBar {
         panic!("{:?} reads the session clock: call launch_cube_bar_timed with a GpuTimes", formula);
+    }
+    if formula == CubeFormula::VolprofchanBar {
+        // period = bin count (6..=200), a = value area percent. The matrix output stays a CPU / host grid.
+        let flat = bar_run(formula.code(), [&o, &h, &l, &c, &v], params, 0);
+        return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec(), flat[2 * n..3 * n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

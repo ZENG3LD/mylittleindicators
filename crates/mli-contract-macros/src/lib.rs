@@ -372,6 +372,7 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "comp_rvp_bar" => "RvpBar",
         "comp_vprofile_bar" => "VprofileBar",
         "comp_poc_bar" => "PocBar",
+        "comp_vpc_bar" => "VolprofchanBar",
         "comp_esine_bar" => "EsineBar",
         "comp_ess_bar" => "EssBar",
         "comp_ehlersfa_bar" => "EhlersfaBar",
