@@ -11772,4 +11772,23 @@ mod tests {
         p.b = 40.0;
         assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::AdaptWinEv, &fr, p)[0], &c);
     }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): WarningFrequencyFilter (995) with interned kinds.
+    #[test]
+    fn warning_frequency_filter_matches_cpu() {
+        use crate::core::types::MarketWarning;
+        use crate::engine::streams::market_warning_consumer::MarketWarningConsumer;
+        use crate::indicators::risk::warning_frequency_filter::WarningFrequencyFilter;
+        use super::super::event_frame::GpuEventFrame;
+        let kinds = ["a", "b", "c"];
+        let ws: Vec<MarketWarning> = (0..200usize)
+            .map(|i| MarketWarning { symbol: "X".to_string(), warning_kind: kinds[(i / 3 + i % 2) % 3].to_string(), message: String::new(), timestamp: 1_000 + (i as i64) * 7_000 })
+            .collect();
+        let fr = GpuEventFrame::from_market_warnings(&ws);
+        let mut m = WarningFrequencyFilter::new(20_000);
+        let c: Vec<f64> = ws.iter().map(|w| { m.update_market_warning(w); m.value() }).collect();
+        let mut p = CubeParams::period(1);
+        p.a = 20_000.0;
+        assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::WarnFreqEv, &fr, p)[0], &c);
+    }
 }

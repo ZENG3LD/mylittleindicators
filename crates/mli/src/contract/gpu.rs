@@ -745,6 +745,10 @@ pub enum CubeFormula {
     AbsorptionEv = 993,
     /// Event: adaptive window selector. UNTESTED on GPU.
     AdaptWinEv = 994,
+    /// Event: warning frequency filter. UNTESTED on GPU.
+    WarnFreqEv = 995,
+    /// Event: gamma squeeze detector. UNTESTED on GPU.
+    GammaSqEv = 996,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1591,6 +1595,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vpin), Some(CubeFormula::VpinEv));
         assert_eq!(formula_of(IndicatorId::AbsorptionDetector), Some(CubeFormula::AbsorptionEv));
         assert_eq!(formula_of(IndicatorId::AdaptiveWindowSelector), Some(CubeFormula::AdaptWinEv));
+        assert_eq!(formula_of(IndicatorId::WarningFrequencyFilter), Some(CubeFormula::WarnFreqEv));
+        assert_eq!(formula_of(IndicatorId::GammaSqueezeDetector), Some(CubeFormula::GammaSqEv));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

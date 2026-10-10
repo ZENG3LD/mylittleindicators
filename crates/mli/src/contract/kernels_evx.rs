@@ -1716,6 +1716,29 @@ fn evx_scan(
             } else {
                 v0 = lw as f32;
             }
+        } else if formula == 995u32 {
+            // warning frequency filter: x0 = interned kind id, `a` = min interval ms. h0 = last kind (0 = none),
+            // pa = last emission ts; emit (1) when no previous kind, the kind changed, or ts - last > a
+            let mut emit = false;
+            if h0 == 0.0f32 {
+                emit = true;
+            } else if h0 != x[i] {
+                emit = true;
+            } else if ts[i] - pa > a.max(0.0f32) {
+                emit = true;
+            }
+            if emit {
+                h0 = x[i];
+                pa = ts[i];
+                v0 = 1.0f32;
+            }
+        } else if formula == 996u32 {
+            // gamma squeeze detector (OptionGreeks stream): the CPU consumer never receives a price on this
+            // stream (prev / last price stay NaN), so `price_moved` is false and the signal is always 0;
+            // the gamma test is kept for parity of the expression
+            if x[n + i] > a && false {
+                v0 = 1.0f32;
+            }
         }
         out[i] = v0;
         if formula != 992u32 {

@@ -427,8 +427,25 @@ impl GpuEventFrame {
         Self::from_rows(&r)
     }
 
+    /// Market warnings: `x0` is the warning kind interned to an integer id (`1 +` order of first appearance),
+    /// so the kernel can compare kinds without strings.
     pub fn from_market_warnings(v: &[MarketWarning]) -> Self {
-        let r: Vec<_> = v.iter().map(|g| ([0.0; EVENT_COLS], 0.0, g.timestamp)).collect();
+        let mut kinds: Vec<&str> = Vec::new();
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                let id = match kinds.iter().position(|k| *k == g.warning_kind.as_str()) {
+                    Some(i) => i,
+                    None => {
+                        kinds.push(g.warning_kind.as_str());
+                        kinds.len() - 1
+                    }
+                };
+                let mut row = [0.0; EVENT_COLS];
+                row[0] = (id + 1) as f64;
+                (row, 0.0, g.timestamp)
+            })
+            .collect();
         Self::from_rows(&r)
     }
 }

@@ -483,6 +483,8 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "comp_cvd_ev" => "CvdEv",
         "comp_vdelta_ev" => "VdeltaEv",
         "comp_vpin_ev" => "VpinEv",
+        "comp_warnfreq_ev" => "WarnFreqEv",
+        "comp_gammasq_ev" => "GammaSqEv",
         "comp_absorption_ev" => "AbsorptionEv",
         "comp_adaptwin_ev" => "AdaptWinEv",
         "comp_vol_idx_spike_ev" => "VolIdxSpikeEv",
