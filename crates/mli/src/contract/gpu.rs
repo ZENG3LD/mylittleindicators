@@ -36,6 +36,32 @@ pub enum CubeFormula {
     /// Linear weights, newest = `period`. Until the window is full the sample
     /// itself is the value, matching `Wma::feed`.
     WindowWeighted = 4,
+    /// `Ema::feed`. Seed is the first sample. Alpha is `2 / (period + 1)`.
+    Ema = 5,
+    /// `Rma::feed`. Seed is the first sample. Then `(prev * (n - 1) + x) / n`.
+    Rma = 6,
+    /// `Dema::feed`. Two cascaded EMAs: `2 e1 - e2`.
+    Dema = 7,
+    /// `Tema::feed`. Three cascaded EMAs: `3 e1 - 3 e2 + e3`.
+    Tema = 8,
+    /// `Tma::feed` and `Trima::feed`. SMA of an SMA, both of length `period`.
+    Tma = 9,
+    /// `Hma::feed`. WMA of `2 WMA(n/2) - WMA(n)` with length `floor(sqrt(n))`.
+    Hma = 10,
+    /// `Alma::new`. Offset `0.85`, sigma `6`. Zero until the window is full.
+    Alma = 11,
+    /// `T3::new`. Six cascaded EMAs, volume factor `0.7`.
+    T3 = 12,
+    /// `McGinleyDynamic::feed`.
+    Mcginley = 13,
+    /// `Roc::new(period, false)`. Zero until `period` samples, then `(x - x_lag) / x_lag`.
+    Roc = 14,
+    /// `Rsi::new`. Wilder RMA of gains and losses. Stays `0` until that RMA is ready.
+    Rsi = 15,
+    /// `Cmo::new`. Wilder RMA of gains and losses.
+    Cmo = 16,
+    /// `Bias::new`. `x / SMA(x) - 1` once the SMA is ready, otherwise `0`.
+    Bias = 17,
 }
 
 impl CubeFormula {
@@ -87,10 +113,11 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Wma), Some(CubeFormula::WindowWeighted));
         assert_eq!(formula_of(IndicatorId::Highest), Some(CubeFormula::WindowMax));
         assert_eq!(formula_of(IndicatorId::Lowest), Some(CubeFormula::WindowMin));
-        assert_eq!(gpu_of(IndicatorId::Rsi), GpuMode::None);
-        assert_eq!(formula_of(IndicatorId::Rsi), None);
-        assert_eq!(gpu_of(IndicatorId::Ema), GpuMode::None);
-        assert_eq!(formula_of(IndicatorId::Ema), None);
+        assert_eq!(gpu_of(IndicatorId::Rsi), GpuMode::Cube);
+        assert_eq!(formula_of(IndicatorId::Rsi), Some(CubeFormula::Rsi));
+        assert_eq!(gpu_of(IndicatorId::Ema), GpuMode::Cube);
+        assert_eq!(formula_of(IndicatorId::Ema), Some(CubeFormula::Ema));
+        assert_eq!(formula_of(IndicatorId::Macd), None);
     }
 
     #[cfg(feature = "gpu-shader")]

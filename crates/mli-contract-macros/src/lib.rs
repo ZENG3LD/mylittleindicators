@@ -160,10 +160,23 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "window_max" => "WindowMax",
         "window_min" => "WindowMin",
         "window_weighted" => "WindowWeighted",
+        "ema" => "Ema",
+        "rma" => "Rma",
+        "dema" => "Dema",
+        "tema" => "Tema",
+        "tma" => "Tma",
+        "hma" => "Hma",
+        "alma" => "Alma",
+        "t3" => "T3",
+        "mcginley" => "Mcginley",
+        "roc" => "Roc",
+        "rsi" => "Rsi",
+        "cmo" => "Cmo",
+        "bias" => "Bias",
         _ => {
             return Err(syn::Error::new(
                 name.span(),
-                "unknown cube formula; expected identity, window_mean, window_max, window_min, or window_weighted",
+                "unknown cube formula",
             ));
         }
     };
