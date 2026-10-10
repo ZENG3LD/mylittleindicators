@@ -327,6 +327,12 @@ pub enum CubeFormula {
     VolRatio = 414,
     /// Range over ATR: `max(high - low, 0) / smoother(TR, smooth_period)`, 0 when the ATR is ~0. UNTESTED on GPU.
     RangeAtr = 415,
+    /// Keltner bandwidth: `(upper - lower) / |centre|` with centre = smoother(lane, `smooth_period`), ATR = smoother2(TR, `smooth_period`), `a` the multiplier; 0 until `smooth_period` bars are in. UNTESTED on GPU.
+    KeltBw = 416,
+    /// Keltner distance: `(close - centre) / ATR`, 0 while not ready or ATR is not positive. UNTESTED on GPU.
+    KeltDist = 417,
+    /// Keltner position: `(close - lower) / (upper - lower)`, 0.5 while not ready or the width is 0. UNTESTED on GPU.
+    KeltPos = 418,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -723,6 +729,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Tmf), Some(CubeFormula::Tmf));
         assert_eq!(formula_of(IndicatorId::VoVr), Some(CubeFormula::VolRatio));
         assert_eq!(formula_of(IndicatorId::RangeAtr), Some(CubeFormula::RangeAtr));
+        assert_eq!(formula_of(IndicatorId::Atrbw), Some(CubeFormula::RangeAtr));
+        assert_eq!(formula_of(IndicatorId::Keltbw), Some(CubeFormula::KeltBw));
+        assert_eq!(formula_of(IndicatorId::Keltdist), Some(CubeFormula::KeltDist));
+        assert_eq!(formula_of(IndicatorId::Keltpos), Some(CubeFormula::KeltPos));
         assert_eq!(gpu_of(IndicatorId::Decyc), GpuMode::Shader);
         assert_eq!(formula_of(IndicatorId::Decyc), None);
         let spec = shader_of(IndicatorId::Decyc).expect("decycler shader");

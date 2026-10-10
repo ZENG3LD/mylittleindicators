@@ -288,6 +288,9 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "tmf" => "Tmf",
         "vol_ratio" => "VolRatio",
         "range_atr" => "RangeAtr",
+        "kelt_bw" => "KeltBw",
+        "kelt_dist" => "KeltDist",
+        "kelt_pos" => "KeltPos",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

@@ -5810,6 +5810,7 @@ fn launch_cube_gx_columns(
 /// gx smoothed formulas, prep stage (codes 410..=415). `raw0` feeds the first smoother,
 /// `raw1` the second (or the combine step).
 /// 410 Ewmac / 411 Gator / 412 Ravi: the lane. 413 Twiggs money flow: `mf * volume` and volume.
+/// 416..=418 Keltner width / distance / position: the lane and the Wilder true range.
 /// 414 volatility ratio / 415 range over ATR: the Wilder true range (`raw1` is `max(high - low, 0)`).
 #[cube]
 fn gx_prep_scan(
@@ -5843,6 +5844,9 @@ fn gx_prep_scan(
                 r = 0.0f32;
             }
             raw1[i] = r;
+        } else if formula >= 416u32 && formula <= 418u32 {
+            raw0[i] = fld(open, high, low, close, volume, i, lane);
+            raw1[i] = wilder_tr(high, low, close, i);
         } else {
             let v = fld(open, high, low, close, volume, i, lane);
             raw0[i] = v;
@@ -5872,8 +5876,11 @@ fn gx_comb_scan(
     sm0: &[f32],
     sm1: &[f32],
     raw1: &[f32],
+    close: &[f32],
     output: &mut [f32],
     formula: u32,
+    period: u32,
+    mult: f32,
 ) {
     let n = sm0.len();
     for i in 0..n {
@@ -5910,6 +5917,39 @@ fn gx_comb_scan(
             if f > 1.0e-12f32 {
                 v = raw1[i] / f;
             }
+        } else if formula >= 416u32 && formula <= 418u32 {
+            // Keltner family: `f` is the centre line, `s` the ATR, ready once `period` bars are in.
+            let mut p = period as usize;
+            if p < 1 {
+                p = 1;
+            }
+            let ready = i + 1 >= p;
+            let up = f + mult * s;
+            let lo = f - mult * s;
+            if formula == 416u32 {
+                let mut am = f;
+                if am < 0.0f32 {
+                    am = -am;
+                }
+                if ready && am > 1.0e-12f32 {
+                    v = (up - lo) / am;
+                }
+            } else if formula == 417u32 {
+                if ready && s > 0.0f32 {
+                    v = (close[i] - f) / s;
+                }
+            } else {
+                v = 0.5f32;
+                if ready {
+                    let mut width = up - lo;
+                    if width < 0.0f32 {
+                        width = 0.0f32;
+                    }
+                    if width > 0.0f32 {
+                        v = (close[i] - lo) / width;
+                    }
+                }
+            }
         }
         output[i] = v;
     }
@@ -5920,10 +5960,13 @@ fn gx_comb_map(
     sm0: &[f32],
     sm1: &[f32],
     raw1: &[f32],
+    close: &[f32],
     output: &mut [f32],
     formula: u32,
+    period: u32,
+    mult: f32,
 ) {
-    gx_comb_scan(sm0, sm1, raw1, output, formula);
+    gx_comb_scan(sm0, sm1, raw1, close, output, formula, period, mult);
 }
 
 /// Run a gx smoothed formula (code 410..=419): prep -> smoother -> (second smoother) -> combine.
@@ -5991,7 +6034,7 @@ fn launch_cube_smoothed_gx(
             BufferArg::from_raw_parts(open_b, n),
             BufferArg::from_raw_parts(high_b, n),
             BufferArg::from_raw_parts(low_b, n),
-            BufferArg::from_raw_parts(close_b, n),
+            BufferArg::from_raw_parts(close_b.clone(), n),
             BufferArg::from_raw_parts(volume_b, n),
             BufferArg::from_raw_parts(raw0.clone(), n),
             BufferArg::from_raw_parts(raw1.clone(), n),
@@ -6006,6 +6049,9 @@ fn launch_cube_smoothed_gx(
         } else if code == 414 {
             // Volatility ratio: the same smoother, slow period.
             smooth!(raw0, sm1, first, per2);
+        } else if code >= 416 && code <= 418 {
+            // Keltner: centre line with the first smoother, ATR (true range) with the second.
+            smooth!(raw1, sm1, params.smoother2.code(), params.smooth_period);
         } else if code != 415 {
             smooth!(raw0, sm1, params.smoother2.code(), per2);
         }
@@ -6016,8 +6062,11 @@ fn launch_cube_smoothed_gx(
             BufferArg::from_raw_parts(sm0, n),
             BufferArg::from_raw_parts(sm1, n),
             BufferArg::from_raw_parts(raw1, n),
+            BufferArg::from_raw_parts(close_b, n),
             BufferArg::from_raw_parts(output.clone(), n),
             code,
+            params.smooth_period,
+            params.a,
         );
     }
     let bytes = client.read_one_unchecked(output);
@@ -6467,6 +6516,42 @@ mod tests {
         rap.smoother = CubeSmoother::Rma;
         rap.smooth_period = 7;
         assert_close(&run(CubeFormula::RangeAtr, &bars, rap), &cpu_ra);
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): gx batch 4, Keltner family codes 416..=418 and Atrbw.
+    #[test]
+    fn lane_matches_cpu_gx_batch4() {
+        use crate::indicators::channels::keltner_bandwidth::KeltnerBandwidth;
+        use crate::indicators::channels::keltner_distance::KeltnerDistance;
+        use crate::indicators::channels::keltner_position::KeltnerPosition;
+        use crate::indicators::volatility::atr_bandwidth::AtrBandwidth;
+
+        let bars = bars(70);
+        let mut kp = CubeParams::period(8);
+        kp.smoother = CubeSmoother::Sma;
+        kp.smoother2 = CubeSmoother::Rma;
+        kp.smooth_period = 8;
+        kp.a = 1.5;
+        let lanes = |b: &ResearchBar| [b.high, b.low, b.close];
+
+        let mut bw = KeltnerBandwidth::with_smoothers(8, 1.5, SmootherId::Sma, SmootherId::Rma);
+        let cpu_bw: Vec<f64> = bars.iter().map(|b| bw.feed(&lanes(b))).collect();
+        assert_close(&run(CubeFormula::KeltBw, &bars, kp), &cpu_bw);
+
+        let mut kd = KeltnerDistance::with_smoothers(8, 1.5, SmootherId::Sma, SmootherId::Rma);
+        let cpu_kd: Vec<f64> = bars.iter().map(|b| kd.feed(&lanes(b))).collect();
+        assert_close(&run(CubeFormula::KeltDist, &bars, kp), &cpu_kd);
+
+        let mut kpos = KeltnerPosition::with_smoothers(8, 1.5, SmootherId::Sma, SmootherId::Rma);
+        let cpu_kp: Vec<f64> = bars.iter().map(|b| kpos.feed(&lanes(b))).collect();
+        assert_close(&run(CubeFormula::KeltPos, &bars, kp), &cpu_kp);
+
+        let mut ab = AtrBandwidth::from_smoother(7, SmootherId::Rma);
+        let cpu_ab: Vec<f64> = bars.iter().map(|b| ab.feed(&lanes(b))).collect();
+        let mut ap = CubeParams::period(7);
+        ap.smoother = CubeSmoother::Rma;
+        ap.smooth_period = 7;
+        assert_close(&run(CubeFormula::RangeAtr, &bars, ap), &cpu_ab);
     }
 
     #[test]
