@@ -60,6 +60,11 @@ impl Rsi {
         Self::from_smoother(period, sid)
     }
 
+    /// 0.1.8 entry. Feeds `close`. The factory path is [`Self::feed`].
+    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
+        self.feed(close)
+    }
+
     /// Feed ONE resolved scalar (the configured source field). The factory extracts
     /// `cfg.source` from the bar; the core knows no transport. Returns RSI 0-100.
     pub fn feed(&mut self, value: f64) -> f64 {

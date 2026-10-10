@@ -5,7 +5,9 @@ use crate::indicators::swing::SwingDetection;
 
 use super::config::EwaConfig;
 use super::ratios::build_fib_relations;
-use super::types::{EwaPivot, EwaPivotKind, EwaSegment, EwaSegmentDirection, EwaWorldAnalysis};
+use super::model::{EwaPivot, EwaPivotKind, EwaWorldAnalysis};
+use super::types::{EwaSegment, EwaSegmentDirection};
+use crate::fib::FibRelation;
 
 #[derive(Debug, Clone)]
 pub struct EwaSwingExtractor {
@@ -36,7 +38,7 @@ impl EwaSwingExtractor {
         let mut worlds = Vec::with_capacity(passes.len());
         let mut swing_cache = HashMap::<
             (String, usize, u64),
-            (Vec<EwaPivot>, Vec<EwaSegment>, Vec<super::types::EwaFibRelation>),
+            (Vec<EwaPivot>, Vec<EwaSegment>, Vec<FibRelation>),
         >::new();
 
         for pass in &passes {
@@ -71,7 +73,7 @@ fn extract_swing_world(
     mode: crate::indicators::swing::swing_detection::SwingMode,
     bars: &[Bar],
     pass: &super::config::EwaAlgorithmPassConfig,
-) -> (Vec<EwaPivot>, Vec<EwaSegment>, Vec<super::types::EwaFibRelation>) {
+) -> (Vec<EwaPivot>, Vec<EwaSegment>, Vec<FibRelation>) {
     let mut pivots = Vec::new();
     let mut detector = SwingDetection::new(mode);
     let mut search_start = 0usize;

@@ -1,22 +1,17 @@
-//! Cumulative Volume Delta — rolling sum of estimated buy/sell delta.
+//! Cumulative Volume Delta — rolling sum of real aggressor-side delta.
 //!
-//! Without a real tick stream the delta per bar is estimated from the candle
-//! direction:
+//! A bar's OHLCV has no taker side, so a bar sample does not move the
+//! accumulator. Each tick contributes `+size` (buy) or `−size` (sell).
+//! [`CumulativeVolumeDelta::update_with_delta`] is the same step for a
+//! host that already aggregated buy and sell volume.
 //!
-//! - `close > open` → bullish bar → `+volume` (buy pressure)
-//! - `close < open` → bearish bar → `−volume` (sell pressure)
-//! - `close == open` → doji → `0`
-//!
-//! The rolling window (`window` bars) keeps the CVD anchored to recent
-//! history rather than accumulating from the beginning of time.
+//! The rolling window counts those real deltas, not bars.
 
 use std::collections::VecDeque;
 
 /// Rolling Cumulative Volume Delta.
 ///
-/// Output is `Single(cumulative_delta)` — an unbounded oscillator that
-/// trends positive when buy pressure dominates and negative when sell
-/// pressure dominates.
+/// Output is the rolling sum of real aggressor delta.
 #[derive(Debug, Clone)]
 pub struct CumulativeVolumeDelta {
     window: usize,
@@ -37,23 +32,9 @@ impl CumulativeVolumeDelta {
         }
     }
 
-    /// Feed resolved lanes `[open, close, volume]` and return `Single(cumulative_delta)`.
-    ///
-    /// Uses a synthetic estimate: `delta = +volume` if close > open,
-    /// `-volume` if close < open, else `0`.
-    pub fn feed(&mut self, lanes: &[f64]) {
-        let open = lanes[0];
-        let close = lanes[1];
-        let volume = lanes[2];
-        const EPS: f64 = 1e-12;
-        let delta = if close > open + EPS {
-            volume
-        } else if close < open - EPS {
-            -volume
-        } else {
-            0.0
-        };
-
+    /// Push one real delta (`buy_volume - sell_volume`, or a tick's signed size)
+    /// into the rolling window.
+    fn push_delta(&mut self, delta: f64) {
         self.delta_history.push_back(delta);
         if self.delta_history.len() > self.window {
             if let Some(old) = self.delta_history.pop_front() {
@@ -61,8 +42,12 @@ impl CumulativeVolumeDelta {
             }
         }
         self.cumulative += delta;
+    }
 
-
+    /// Feed aggregated aggressor volume for one window and return the running total.
+    pub fn update_with_delta(&mut self, buy_volume: f64, sell_volume: f64) -> f64 {
+        self.push_delta(buy_volume - sell_volume);
+        self.cumulative
     }
 
     /// Returns the last computed value without advancing state.
@@ -70,7 +55,7 @@ impl CumulativeVolumeDelta {
         self.cumulative
     }
 
-    /// Returns `true` after at least one bar has been fed.
+    /// Returns `true` after at least one real delta has been pushed.
     pub fn is_ready(&self) -> bool {
         !self.delta_history.is_empty()
     }
@@ -86,55 +71,28 @@ impl CumulativeVolumeDelta {
 mod tests {
     use super::*;
 
-    // feed lanes: [open, close, volume]
-    fn bullish(cvd: &mut CumulativeVolumeDelta, vol: f64) -> f64 {
-        cvd.feed(&[100.0, 101.0, vol]); // close > open
-        cvd.value()
-    }
-    fn bearish(cvd: &mut CumulativeVolumeDelta, vol: f64) -> f64 {
-        cvd.feed(&[101.0, 100.0, vol]); // close < open
-        cvd.value()
-    }
-    fn doji(cvd: &mut CumulativeVolumeDelta, vol: f64) -> f64 {
-        cvd.feed(&[100.0, 100.0, vol]); // close == open
-        cvd.value()
-    }
-
     #[test]
-    fn bullish_bar_adds_volume() {
+    fn real_delta_accumulates() {
         let mut cvd = CumulativeVolumeDelta::new(10);
-        let r = bullish(&mut cvd, 500.0);
-        assert!((r - 500.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn bearish_bar_subtracts_volume() {
-        let mut cvd = CumulativeVolumeDelta::new(10);
-        let r = bearish(&mut cvd, 500.0);
-        assert!((r - (-500.0)).abs() < 1e-9);
-    }
-
-    #[test]
-    fn doji_bar_zero_delta() {
-        let mut cvd = CumulativeVolumeDelta::new(10);
-        let r = doji(&mut cvd, 500.0);
+        let r = cvd.update_with_delta(500.0, 200.0);
+        assert!((r - 300.0).abs() < 1e-9);
+        let r = cvd.update_with_delta(100.0, 400.0);
         assert!((r - 0.0).abs() < 1e-9);
     }
 
     #[test]
     fn rolling_window_evicts_old_delta() {
         let mut cvd = CumulativeVolumeDelta::new(3);
-        // Feed 3 bullish bars (+100 each) to fill window.
         for _ in 0..3 {
-            bullish(&mut cvd, 100.0);
+            cvd.update_with_delta(100.0, 0.0);
         }
-        // cumulative = 300; 4th bar (bearish -200): evict oldest +100, add -200 → 0.
-        let r = bearish(&mut cvd, 200.0);
+        // cumulative = 300; next delta −200 evicts the oldest +100 → 0.
+        let r = cvd.update_with_delta(0.0, 200.0);
         assert!((r - 0.0).abs() < 1e-9, "expected 0, got {r}");
     }
 
     #[test]
-    fn not_ready_before_first_bar() {
+    fn not_ready_before_first_real_delta() {
         let cvd = CumulativeVolumeDelta::new(5);
         assert!(!cvd.is_ready());
     }
@@ -142,7 +100,7 @@ mod tests {
     #[test]
     fn reset_clears_state() {
         let mut cvd = CumulativeVolumeDelta::new(5);
-        bullish(&mut cvd, 100.0);
+        cvd.update_with_delta(100.0, 0.0);
         cvd.reset();
         assert!(!cvd.is_ready());
         assert!((cvd.value() - 0.0).abs() < 1e-9);
@@ -163,7 +121,8 @@ use crate::contract::{Cost, Family, Indicator, Output, Param, SourceAxis, Update
 use crate::contract::Render;
 use crate::contract::{Color, RenderSpec};
 use crate::engine::stream_kind::StreamKind;
-use crate::engine::ohlcv_field::OhlcvField;
+use crate::engine::streams::tick_consumer::TickConsumer;
+use crate::core::types::Tick;
 
 /// Own config for [`CumulativeVolumeDelta`] — rolling window size for the CVD accumulator.
 #[derive(Debug, Clone, mli_contract_macros::ConfigAxes)]
@@ -175,15 +134,9 @@ impl Indicator for CumulativeVolumeDelta {
     const ID: IndicatorId = IndicatorId::Cvd;
     /// Rolling CVD is a standalone accumulator — not a pluggable oscillator family member.
     const FAMILY: &'static [Family] = &[];
-    const INPUT: &'static [StreamKind] = &[StreamKind::Bar];
-    /// Fixed lanes: open (lane 0, direction detection) + volume (lane 1, magnitude).
-    const SOURCE: Option<SourceAxis> = Some(SourceAxis::KlineSlice(&[
-        OhlcvField::Open,
-        OhlcvField::Close,
-        OhlcvField::Volume,
-    ]));
-    const NEEDS_VOLUME: bool = true;
-    /// O(1) rolling deque — one push + one pop per bar.
+    const INPUT: &'static [StreamKind] = &[StreamKind::Tick];
+    const SOURCE: Option<SourceAxis> = None;
+    /// O(1) rolling deque — one push + one pop per real delta.
     const COST: Cost = Cost::new(UpdateComplexity::Constant, &[Store::window(StoreKind::Deque)]);
     const OUTPUTS: &'static [Output] = &[Output::flow(IndicatorOutputId::Cvd)];
     type Config = CvdConfig;
@@ -211,6 +164,21 @@ impl crate::contract::Config for CvdConfig {
 }
 
 
+impl TickConsumer for CumulativeVolumeDelta {
+    fn update_tick(&mut self, tick: &Tick) {
+        let delta = if tick.is_buy { tick.size } else { -tick.size };
+        self.push_delta(delta);
+    }
+
+    fn reset(&mut self) {
+        CumulativeVolumeDelta::reset(self);
+    }
+
+    fn is_ready(&self) -> bool {
+        CumulativeVolumeDelta::is_ready(self)
+    }
+}
+
 impl Render for CumulativeVolumeDelta {
 
     fn rendering() -> RenderSpec {
@@ -229,15 +197,39 @@ mod contract_tests {
     use crate::engine::contract_engine::IndicatorOrder;
     use crate::contract::MarketSample;
 
+    /// `IndicatorOrder` is the whole-universe enum. Its largest variant does not
+    /// fit the default Windows test-thread stack, so factory proofs run here.
+    fn on_wide_stack(f: impl FnOnce() + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(f)
+            .expect("spawn")
+            .join()
+            .unwrap_or_else(|payload| std::panic::resume_unwind(payload));
+    }
+
     #[test]
-    fn factory_feeds_resolved_lanes() {
-        let mut f = IndicatorOrder::Cvd(<<CumulativeVolumeDelta as crate::contract::Indicator>::Config as crate::contract::Config>::defaults()).build_solo().unwrap();
-        // Bullish bar: close > open → +volume
-        f.feed(0, MarketSample::Bar { open: 100.0, high: 9999.0, low: 9999.0, close: 101.0, volume: 500.0 });
-        // Bearish bar: close < open → -volume
-        f.feed(0, MarketSample::Bar { open: 102.0, high: 9999.0, low: 9999.0, close: 100.0, volume: 300.0 });
-        // Net delta = +500 - 300 = +200
-        let v = f.read(IndicatorOutputId::Cvd);
-        assert!((v - 200.0).abs() < 1e-9, "expected +200 CVD, got {v}");
+    fn bar_feed_does_not_fabricate_delta() {
+        on_wide_stack(|| {
+            let mut f = IndicatorOrder::Cvd(<<CumulativeVolumeDelta as crate::contract::Indicator>::Config as crate::contract::Config>::defaults()).build_solo().unwrap();
+            f.feed(0, MarketSample::Bar { open: 100.0, high: 110.0, low: 90.0, close: 109.0, volume: 500.0 });
+            f.feed(0, MarketSample::Bar { open: 109.0, high: 110.0, low: 90.0, close: 91.0, volume: 800.0 });
+            assert!(!f.is_ready());
+            let v = f.read(IndicatorOutputId::Cvd);
+            assert!(v.abs() < 1e-9, "bar OHLCV must not move CVD, got {v}");
+        });
+    }
+
+    #[test]
+    fn tick_signed_size_accumulates() {
+        on_wide_stack(|| {
+            let mut f = IndicatorOrder::Cvd(<<CumulativeVolumeDelta as crate::contract::Indicator>::Config as crate::contract::Config>::defaults()).build_solo().unwrap();
+            let buy = crate::core::types::Tick::new(0, 100.0, 500.0, true);
+            let sell = crate::core::types::Tick::new(1, 100.0, 200.0, false);
+            f.feed(0, MarketSample::Tick(&buy));
+            f.feed(1, MarketSample::Tick(&sell));
+            let v = f.read(IndicatorOutputId::Cvd);
+            assert!((v - 300.0).abs() < 1e-9, "expected +300 CVD, got {v}");
+        });
     }
 }

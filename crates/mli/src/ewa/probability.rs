@@ -1,5 +1,5 @@
 use super::priors::prior_for;
-use super::types::EwaCandidate;
+use super::model::EwaCandidate;
 
 #[derive(Debug, Clone, Copy)]
 pub struct EwaProbabilityModel {
@@ -112,7 +112,8 @@ fn probability_logit(probability: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ewa::types::{EwaPatternKind, EwaTechnicalFeatures};
+    use crate::ewa::model::EwaTechnicalFeatures;
+    use crate::ewa::types::EwaPatternKind;
 
     fn candidate(score: f64, subdivision_score: f64) -> EwaCandidate {
         EwaCandidate {

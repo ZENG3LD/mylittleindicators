@@ -49,6 +49,11 @@ impl Sma {
         }
     }
 
+    /// 0.1.8 entry. Feeds `close`. The factory path is [`Self::feed`].
+    pub fn update_bar(&mut self, _open: f64, _high: f64, _low: f64, close: f64, _volume: f64) -> f64 {
+        self.feed(close)
+    }
+
     /// Feed ONE pre-extracted scalar — the pure core computation. The caller
     /// (the factory's source-resolving feed, or a host composite) supplies the value;
     /// the core knows nothing about OHLCV or fields.

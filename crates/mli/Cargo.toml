@@ -36,3 +36,7 @@ rayon = "1.10"
 # bin — NO serde, NO runtime I/O) instead of the structural `WEIGHTS` rubric. OFF by
 # default → the pure structural prior, with no dependency on the generated file.
 calibrated = []
+# CubeCL runtime is not a dependency until the first kernel.
+gpu = []
+# WGSL submitter is not a dependency until a shader impl exists.
+gpu-shader = []

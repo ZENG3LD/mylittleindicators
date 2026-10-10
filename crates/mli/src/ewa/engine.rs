@@ -14,13 +14,14 @@ use super::ranker::{
 use super::reinterpretation::build_reinterpretations;
 use super::scanner::{CpuEwaScanner, EwaScanner};
 use super::swing::EwaSwingExtractor;
-use super::types::{
+use super::model::{
     CandidateId, CountNodeId, EwaAffectedRange, EwaAnalysis, EwaCandidate, EwaCountNode,
-    EwaFibRelation, EwaHypothesisSource, EwaNestingRelation, EwaPatternKind, EwaProofStatus,
-    EwaRefreshTimings, EwaScenario, EwaScenarioStatus, EwaSegment, EwaSubdivisionMatch,
-    EwaSwingCoverage, EwaSwingFailure, EwaSwingHypothesis, EwaWorldAnalysis, ScenarioId,
-    WorldId,
+    EwaHypothesisSource, EwaNestingRelation, EwaProofStatus, EwaRefreshTimings, EwaScenario,
+    EwaScenarioStatus, EwaSubdivisionMatch, EwaSwingCoverage, EwaSwingFailure,
+    EwaSwingHypothesis, EwaTechnicalFeatures, EwaWorldAnalysis, ScenarioId, WorldId,
 };
+use super::types::{EwaPatternKind, EwaSegment, EwaSegmentDirection};
+use crate::fib::FibRelation;
 
 #[derive(Debug, Clone)]
 pub struct EwaEngine<S = CpuEwaScanner> {
@@ -334,7 +335,7 @@ fn build_swing_coverage_from(
                 }
             }
         }
-        let mut fib_by_segment = vec![Vec::<&EwaFibRelation>::new(); world.segments.len()];
+        let mut fib_by_segment = vec![Vec::<&FibRelation>::new(); world.segments.len()];
         for relation in &world.fib_relations {
             if let Some(relations) = fib_by_segment.get_mut(relation.previous_segment) {
                 relations.push(relation);
@@ -500,7 +501,7 @@ pub(crate) fn diagnostic_candidate_confidence(candidate: &EwaCandidate, strict: 
 fn fill_baseline_hypotheses(
     hypotheses: &mut Vec<EwaSwingHypothesis>,
     segment: &EwaSegment,
-    fib_relations: &[&EwaFibRelation],
+    fib_relations: &[&FibRelation],
     strict_candidate_count: usize,
 ) {
     let fib_score = if fib_relations.is_empty() {
@@ -583,7 +584,7 @@ struct SubdivisionEvidence {
     start_price: f64,
     end_price: f64,
     granularity_bars: f64,
-    technical_features: super::types::EwaTechnicalFeatures,
+    technical_features: EwaTechnicalFeatures,
     world: String,
 }
 
@@ -974,7 +975,7 @@ fn position_technical_context_score(
     parent: &EwaCandidate,
     position: EwaWavePosition,
     child_pattern: EwaPatternKind,
-    child: &super::types::EwaTechnicalFeatures,
+    child: &EwaTechnicalFeatures,
 ) -> f64 {
     let child_base = child.pattern_score;
     let score = match position {
@@ -1311,9 +1312,9 @@ fn wave_position_order(position: EwaWavePosition) -> usize {
 
 fn enrich_candidate_confluence(
     candidate: &mut EwaCandidate,
-    fib_relations: &[EwaFibRelation],
+    fib_relations: &[FibRelation],
     segments: &[EwaSegment],
-    pivots: &[super::types::EwaPivot],
+    pivots: &[super::model::EwaPivot],
 ) {
     if candidate.segment_indices.len() < 2 {
         return;
@@ -1375,10 +1376,10 @@ fn enrich_candidate_confluence(
 }
 
 fn find_fib_relation(
-    fib_relations: &[EwaFibRelation],
+    fib_relations: &[FibRelation],
     previous_segment: usize,
     current_segment: usize,
-) -> Option<&EwaFibRelation> {
+) -> Option<&FibRelation> {
     let key = (previous_segment, current_segment);
     let index = fib_relations.partition_point(|relation| {
         (relation.previous_segment, relation.current_segment) < key
@@ -1392,8 +1393,8 @@ fn find_fib_relation(
 fn technical_features(
     candidate: &EwaCandidate,
     segments: &[EwaSegment],
-    pivots: &[super::types::EwaPivot],
-) -> super::types::EwaTechnicalFeatures {
+    pivots: &[super::model::EwaPivot],
+) -> EwaTechnicalFeatures {
     let candidate_segments = candidate
         .segment_indices
         .iter()
@@ -1476,7 +1477,7 @@ fn technical_features(
         (0.0, 0.0)
     };
 
-    let mut features = super::types::EwaTechnicalFeatures {
+    let mut features = EwaTechnicalFeatures {
         alternation_score,
         channel_score,
         throw_over_score,
@@ -1492,7 +1493,7 @@ fn technical_features(
 
 fn pattern_technical_score(
     pattern: EwaPatternKind,
-    features: &super::types::EwaTechnicalFeatures,
+    features: &EwaTechnicalFeatures,
 ) -> f64 {
     let score = match pattern {
         EwaPatternKind::Impulse
@@ -1548,9 +1549,6 @@ fn pattern_technical_score(
                 + 0.30 * features.momentum_score
                 + 0.20 * features.divergence_score
         }
-        _ => {
-            0.55 * features.time_proportion_score + 0.45 * features.momentum_score
-        }
     };
     score.clamp(0.0, 1.0)
 }
@@ -1580,7 +1578,7 @@ fn adjacent_proportion_score(values: &[f64]) -> f64 {
         / values.len().saturating_sub(1) as f64
 }
 
-fn channel_score(candidate: &EwaCandidate, pivots: &[super::types::EwaPivot]) -> f64 {
+fn channel_score(candidate: &EwaCandidate, pivots: &[super::model::EwaPivot]) -> f64 {
     if candidate.pivot_indices.len() < 6 {
         return 0.0;
     }
@@ -1614,7 +1612,7 @@ fn channel_score(candidate: &EwaCandidate, pivots: &[super::types::EwaPivot]) ->
 
 fn diagonal_throw_scores(
     candidate: &EwaCandidate,
-    pivots: &[super::types::EwaPivot],
+    pivots: &[super::model::EwaPivot],
 ) -> (f64, f64) {
     if candidate.pivot_indices.len() < 6 {
         return (0.0, 0.0);
@@ -1625,8 +1623,8 @@ fn diagonal_throw_scores(
     let boundary = line_value(p1.index, p1.price, p3.index, p3.price, p5.index);
     let scale = (p3.price - p1.price).abs().max(f64::EPSILON);
     let overshoot = match segments_direction(p1.price, p3.price) {
-        super::types::EwaSegmentDirection::Up => p5.price - boundary,
-        super::types::EwaSegmentDirection::Down => boundary - p5.price,
+        EwaSegmentDirection::Up => p5.price - boundary,
+        EwaSegmentDirection::Down => boundary - p5.price,
     };
     if overshoot > 0.0 {
         (
@@ -1646,8 +1644,8 @@ fn line_value(x1: usize, y1: f64, x2: usize, y2: f64, x: usize) -> f64 {
     y1 + (y2 - y1) / dx * x.saturating_sub(x1) as f64
 }
 
-fn segments_direction(start: f64, end: f64) -> super::types::EwaSegmentDirection {
-    super::types::EwaSegmentDirection::from_delta(end - start)
+fn segments_direction(start: f64, end: f64) -> EwaSegmentDirection {
+    EwaSegmentDirection::from_delta(end - start)
 }
 
 fn is_harmonic_ratio(target: f64) -> bool {
@@ -1690,7 +1688,11 @@ fn geometry_score(candidate: &EwaCandidate, segments: &[EwaSegment]) -> f64 {
         | EwaPatternKind::DoubleThree
         | EwaPatternKind::TripleCombo
         | EwaPatternKind::TripleThree => sideways_geometry_score(&candidate_segments),
-        _ => trend_leg_geometry_score(&candidate_segments),
+        EwaPatternKind::Zigzag
+        | EwaPatternKind::RunningZigzag
+        | EwaPatternKind::DoubleZigzag
+        | EwaPatternKind::TripleZigzag
+        | EwaPatternKind::Correction => trend_leg_geometry_score(&candidate_segments),
     }
 }
 

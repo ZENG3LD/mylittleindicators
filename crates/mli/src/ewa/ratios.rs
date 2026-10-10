@@ -1,4 +1,5 @@
-use super::types::{EwaFibRelation, EwaFibRelationKind, EwaRatio, EwaSegment};
+use super::types::{EwaRatio, EwaSegment};
+use crate::fib::{FibRelation, FibRelationKind};
 
 pub const RETRACEMENT_TARGETS: &[f64] = &[0.236, 0.382, 0.5, 0.618, 0.786, 0.886];
 pub const EXTENSION_TARGETS: &[f64] = &[1.0, 1.272, 1.414, 1.618, 2.0, 2.618, 3.618];
@@ -49,14 +50,14 @@ pub fn weighted_ratio_penalty(ratios: &[EwaRatio]) -> f64 {
     ratios.iter().map(|r| r.error * r.weight).sum::<f64>() / total_weight
 }
 
-pub fn build_fib_relations(segments: &[EwaSegment]) -> Vec<EwaFibRelation> {
+pub fn build_fib_relations(segments: &[EwaSegment]) -> Vec<FibRelation> {
     build_fib_relations_from_previous(segments, 0)
 }
 
 pub fn build_fib_relations_from_previous(
     segments: &[EwaSegment],
     min_previous_segment: usize,
-) -> Vec<EwaFibRelation> {
+) -> Vec<FibRelation> {
     let mut relations = Vec::with_capacity(
         segments
             .len()
@@ -74,9 +75,9 @@ pub fn build_fib_relations_from_previous(
             }
 
             let kind = if previous.direction == current.direction {
-                EwaFibRelationKind::Extension
+                FibRelationKind::Extension
             } else {
-                EwaFibRelationKind::Retracement
+                FibRelationKind::Retracement
             };
             let ratio = current.abs_price_delta / previous.abs_price_delta;
             if !ratio.is_finite() {
@@ -84,12 +85,12 @@ pub fn build_fib_relations_from_previous(
             }
 
             let targets = match kind {
-                EwaFibRelationKind::Retracement => RETRACEMENT_TARGETS,
-                EwaFibRelationKind::Extension => EXTENSION_TARGETS,
+                FibRelationKind::Retracement => RETRACEMENT_TARGETS,
+                FibRelationKind::Extension => EXTENSION_TARGETS,
             };
             let (nearest_target, error) = nearest_target(ratio, targets);
 
-            relations.push(EwaFibRelation {
+            relations.push(FibRelation {
                 previous_segment: previous_idx,
                 current_segment: current_idx,
                 kind,

@@ -11,10 +11,11 @@ use super::engine::{
 use super::ratios::{FIB_MATRIX_MAX_GAP, build_fib_relations_from_previous};
 use super::scanner::CpuEwaScanner;
 use super::swing::{build_segments, normalize_pivots, pivot_price, resolve_pivot_index};
-use super::types::{
-    EwaAffectedRange, EwaAnalysis, EwaHypothesisSource, EwaPatternKind, EwaPivot,
-    EwaPivotKind, EwaRefreshTimings, EwaWorldAnalysis,
+use super::model::{
+    EwaAffectedRange, EwaAnalysis, EwaHypothesisSource, EwaPivot, EwaPivotKind,
+    EwaRefreshTimings, EwaWorldAnalysis,
 };
+use super::types::EwaPatternKind;
 
 #[derive(Debug, Clone)]
 pub struct EwaRuntimeHypothesis {
@@ -288,7 +289,7 @@ impl EwaRuntime {
             let world_id = world.id();
             for candidate in &mut world.candidates {
                 let candidate_id =
-                    super::types::CandidateId::new(
+                    super::model::CandidateId::new(
                         world_id,
                         candidate.pattern,
                         &candidate.pivot_indices,
@@ -384,7 +385,7 @@ fn same_pivot(left: Option<&EwaPivot>, right: Option<&EwaPivot>) -> bool {
     }
 }
 
-fn runtime_hypotheses(candidates: &[super::types::EwaCandidate]) -> Vec<EwaRuntimeHypothesis> {
+fn runtime_hypotheses(candidates: &[super::model::EwaCandidate]) -> Vec<EwaRuntimeHypothesis> {
     let mut by_pattern = HashMap::<EwaPatternKind, EwaRuntimeHypothesis>::new();
     for candidate in candidates {
         let strict = candidate.is_rule_valid() && candidate.score > 0.0;

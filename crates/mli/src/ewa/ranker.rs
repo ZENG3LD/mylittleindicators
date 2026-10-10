@@ -3,10 +3,11 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::config::EwaConfig;
 use super::grammar::is_scenario_pattern;
-use super::types::{
-    CandidateId, EwaCandidate, EwaPatternKind, EwaPivot, EwaProofStatus, EwaScenario,
-    EwaScenarioGroup, EwaScenarioStatus, EwaWorldAnalysis, ScenarioId, WorldId,
+use super::model::{
+    CandidateId, EwaCandidate, EwaPivot, EwaProofStatus, EwaScenario, EwaScenarioGroup,
+    EwaScenarioStatus, EwaWorldAnalysis, ScenarioId, WorldId,
 };
+use super::types::EwaPatternKind;
 
 pub fn rank_candidates(
     candidates: Vec<EwaCandidate>,
@@ -331,7 +332,8 @@ fn invalidation_price(candidate: &EwaCandidate, worlds: &[EwaWorldAnalysis]) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::types::{EwaPivotKind, EwaRatio};
+    use super::super::model::EwaPivotKind;
+    use super::super::types::EwaRatio;
 
     fn pivot(index: usize) -> EwaPivot {
         EwaPivot {
@@ -477,7 +479,7 @@ mod tests {
         let groups = rank_candidate_groups(
             vec![
                 candidate(4, 7, 1.0, EwaPatternKind::Correction),
-                candidate(4, 7, 1.0, EwaPatternKind::Abcd),
+                candidate(4, 7, 1.0, EwaPatternKind::Zigzag),
                 candidate(4, 7, 0.70, EwaPatternKind::Zigzag),
             ],
             &worlds,

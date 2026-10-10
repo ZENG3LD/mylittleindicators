@@ -1,7 +1,8 @@
 use crate::indicators::swing::swing_detection::SwingMode;
 
 use super::probability::EwaProbabilityModel;
-use super::types::{EwaPatternKind, EwaRuleSettings};
+use super::model::EwaRuleSettings;
+use super::types::EwaPatternKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EwaExecutionProfile {
@@ -223,11 +224,7 @@ impl EwaConfig {
         }
 
         let mut passes = Vec::new();
-        let pattern_sets = [
-            all_patterns(),
-            motive_and_corrective_patterns(),
-            harmonic_patterns(),
-        ];
+        let pattern_sets = [all_patterns()];
 
         for swing in &self.swing_passes {
             for &ratio_error_scale in ratio_error_scales {
@@ -266,58 +263,22 @@ fn all_patterns() -> Vec<EwaPatternKind> {
     EwaRuleSettings::default().enabled_patterns
 }
 
-fn motive_and_corrective_patterns() -> Vec<EwaPatternKind> {
-    vec![
-        EwaPatternKind::Impulse,
-        EwaPatternKind::ImpulseExtendedWave1,
-        EwaPatternKind::ImpulseExtendedWave3,
-        EwaPatternKind::ImpulseExtendedWave5,
-        EwaPatternKind::TruncatedImpulse,
-        EwaPatternKind::LeadingDiagonalContracting,
-        EwaPatternKind::LeadingDiagonalExpanding,
-        EwaPatternKind::EndingDiagonalContracting,
-        EwaPatternKind::EndingDiagonalExpanding,
-        EwaPatternKind::Correction,
-        EwaPatternKind::Zigzag,
-        EwaPatternKind::RunningZigzag,
-        EwaPatternKind::DoubleZigzag,
-        EwaPatternKind::TripleZigzag,
-        EwaPatternKind::Flat,
-        EwaPatternKind::RegularFlat,
-        EwaPatternKind::ExpandedFlat,
-        EwaPatternKind::RunningFlat,
-        EwaPatternKind::Triangle,
-        EwaPatternKind::ContractingTriangle,
-        EwaPatternKind::BarrierTriangle,
-        EwaPatternKind::ExpandingTriangle,
-        EwaPatternKind::RunningTriangle,
-        EwaPatternKind::DoubleThree,
-        EwaPatternKind::TripleThree,
-    ]
-}
-
-fn harmonic_patterns() -> Vec<EwaPatternKind> {
-    vec![
-        EwaPatternKind::Xabcd,
-        EwaPatternKind::Abcd,
-        EwaPatternKind::Cypher,
-        EwaPatternKind::Gartley,
-        EwaPatternKind::Bat,
-        EwaPatternKind::Butterfly,
-        EwaPatternKind::Crab,
-        EwaPatternKind::Shark,
-        EwaPatternKind::ThreeDrives,
-    ]
-}
-
 fn rule_family_label(patterns: &[EwaPatternKind]) -> &'static str {
     let has_impulse = patterns.contains(&EwaPatternKind::Impulse);
-    let has_gartley = patterns.contains(&EwaPatternKind::Gartley);
+    let has_zigzag = patterns.contains(&EwaPatternKind::Zigzag);
+    let is_full = patterns.len() == EwaRuleSettings::default().enabled_patterns.len()
+        && has_impulse
+        && has_zigzag;
 
-    match (has_impulse, has_gartley) {
-        (true, true) => "all",
-        (true, false) => "ewa",
-        (false, true) => "harmonic",
-        (false, false) => "custom",
+    if is_full {
+        "all"
+    } else if has_impulse && has_zigzag {
+        "ewa"
+    } else if has_impulse {
+        "motive"
+    } else if has_zigzag {
+        "corrective"
+    } else {
+        "custom"
     }
 }

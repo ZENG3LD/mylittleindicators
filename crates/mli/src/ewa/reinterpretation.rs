@@ -1,7 +1,7 @@
-use super::types::{
-    EwaCandidate, EwaPatternKind, EwaReinterpretation, EwaReinterpretationRule, EwaScenario,
-    EwaWorldAnalysis,
+use super::model::{
+    EwaCandidate, EwaReinterpretation, EwaReinterpretationRule, EwaScenario, EwaWorldAnalysis,
 };
+use super::types::EwaPatternKind;
 
 pub fn reinterpretation_matrix() -> &'static [EwaReinterpretationRule] {
     REINTERPRETATION_MATRIX
@@ -418,40 +418,5 @@ const REINTERPRETATION_MATRIX: &[EwaReinterpretationRule] = &[
         condition: "truncated fifth can be terminal diagonal if overlap and converging geometry appear inside the final wave",
         granularity_effect: "finer pass should reveal overlapping five-wave diagonal internals",
         required_context: "only wave 5/C terminal context",
-    },
-    EwaReinterpretationRule {
-        from: EwaPatternKind::Abcd,
-        to: EwaPatternKind::Zigzag,
-        condition: "ABCD harmonic overlay maps to A-B-C zigzag when CD is the C leg projection",
-        granularity_effect: "coarser pass may see ABCD symmetry; EWA pass labels A-B-C",
-        required_context: "requires corrective context, not motive continuation",
-    },
-    EwaReinterpretationRule {
-        from: EwaPatternKind::Xabcd,
-        to: EwaPatternKind::Flat,
-        condition: "XABCD completion near the origin can be a flat subtype rather than standalone harmonic pattern",
-        granularity_effect: "endpoint relation to A origin and A endpoint decides flat subtype",
-        required_context: "harmonics are PRZ evidence, not replacement for EWA position rules",
-    },
-    EwaReinterpretationRule {
-        from: EwaPatternKind::Gartley,
-        to: EwaPatternKind::Zigzag,
-        condition: "Gartley ratios can describe a zigzag correction with harmonic PRZ confluence",
-        granularity_effect: "EWA count should own the label; harmonic pattern boosts ratio evidence",
-        required_context: "use as confluence when A-B-C rules are also valid",
-    },
-    EwaReinterpretationRule {
-        from: EwaPatternKind::Bat,
-        to: EwaPatternKind::Flat,
-        condition: "Bat completion can coincide with flat C termination zone",
-        granularity_effect: "nearby endpoints can flip harmonic overlay while EWA structure stays corrective",
-        required_context: "prefer EWA label; keep harmonic as probability boost",
-    },
-    EwaReinterpretationRule {
-        from: EwaPatternKind::Crab,
-        to: EwaPatternKind::ExpandedFlat,
-        condition: "deep crab completion can coincide with expanded flat C extension",
-        granularity_effect: "C extension magnitude and false-break B decide expanded flat reading",
-        required_context: "requires B beyond origin and C beyond A endpoint",
     },
 ];

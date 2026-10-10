@@ -25,6 +25,21 @@ pub mod contract;
 // Elliott Wave Analysis — absorbed from the former `mli-ewa` family crate.
 pub mod ewa;
 
+pub mod harmonic;
+
+pub mod fib;
+
+pub mod events;
+
+// 0.1.8 paths. The cores are the contract cores. Not a second catalog.
+pub mod bar_indicators;
+pub mod catalog;
+pub mod data_loader;
+
+pub mod smc;
+
+pub mod orderflow;
+
 // All base types: market data (Bar/Tick/...), signal taxonomy, codegen AST.
 pub mod core;
 

@@ -685,6 +685,9 @@ pub use render::{
     RenderOutput, RenderSpec, RenderSpecBuilder,
 };
 
+pub mod gpu;
+pub use gpu::{GpuMode, GpuCube, GpuShader};
+
 pub mod axis;
 pub use axis::{sweep_f64, CubeIter, Param, ParamScalar};
 

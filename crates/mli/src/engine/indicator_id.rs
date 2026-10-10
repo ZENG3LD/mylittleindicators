@@ -286,8 +286,8 @@ pub enum IndicatorId {
     VolRegimeDetect,  // VOLATILITY_REGIME_DETECTOR (low/normal/high transitions)
     Ewa,               // EWA (Elliott Wave Analysis — pivot pattern recognition + confidence)
 
-    // Volume (27 indicators)
-    Cvd,  // CVD — Cumulative Volume Delta (rolling)
+    // Volume
+    Cvd,  // CVD — Cumulative Volume Delta (real aggressor delta, rolling)
     Mfi,  // MFI
     NviPvi,  // NVI_PVI
     Poc,  // POC
@@ -298,6 +298,7 @@ pub enum IndicatorId {
     Rvp,  // RVP — Rolling Volume Profile (POC/VAH/VAL, Triple)
     SessionVwap,  // SESSION_VWAP
     Vdelta,  // VDELTA
+    Volume,  // VOLUME — raw per-bar volume histogram
     Vfi,  // VFI
     Vo,  // VO
     Vpin,  // VPIN
@@ -685,6 +686,30 @@ impl IndicatorId {
     pub fn all() -> impl Iterator<Item = IndicatorId> {
         use strum::IntoEnumIterator;
         <IndicatorId as IntoEnumIterator>::iter()
+    }
+
+    /// Catalog spelling. `Rsi` is `rsi`, `DiPlusMinus` is `di_plus_minus`.
+    /// Saved chart presets store this string.
+    pub fn type_id(self) -> String {
+        let mut out = String::new();
+        for (i, ch) in format!("{self:?}").chars().enumerate() {
+            if ch.is_uppercase() && i > 0 {
+                out.push('_');
+            }
+            out.extend(ch.to_lowercase());
+        }
+        out
+    }
+
+    /// Legend label. Uppercase of [`Self::type_id`]: `RSI`, `DI_PLUS_MINUS`.
+    pub fn label(self) -> String {
+        self.type_id().to_ascii_uppercase()
+    }
+
+    /// Resolve a stored catalog id. Case-insensitive over [`Self::type_id`].
+    pub fn parse_type_id(raw: &str) -> Option<Self> {
+        let want = raw.to_ascii_lowercase();
+        Self::all().find(|id| id.type_id() == want)
     }
 }
 

@@ -16,7 +16,10 @@ pub mod reinterpretation;
 pub mod ratios;
 pub mod rules;
 pub mod runtime;
+pub mod model;
 pub mod scanner;
+pub mod scan;
+pub mod chart_swing;
 pub mod swing;
 pub mod types;
 
@@ -43,14 +46,14 @@ pub use runtime::{
 };
 pub use scanner::{CpuEwaScanner, EwaScanner, compose_correction_candidate};
 pub use swing::EwaSwingExtractor;
-pub use types::{
+pub use model::{
     CandidateId, CountNodeId, EwaAffectedRange, EwaAnalysis, EwaCandidate, EwaChildPattern,
-    EwaCountNode, EwaFibRelation, EwaFibRelationKind, EwaHypothesisSource,
-    EwaNestingRelation, EwaPatternKind, EwaPivot, EwaPivotKind, EwaProofStatus, EwaRatio,
-    EwaRefreshTimings, EwaReinterpretation, EwaReinterpretationRule, EwaRuleSettings,
-    EwaScenario, EwaScenarioGroup, EwaScenarioStatus, EwaSegment, EwaSegmentDirection,
+    EwaCountNode, EwaHypothesisSource, EwaNestingRelation, EwaPivot, EwaPivotKind,
+    EwaProofStatus, EwaRefreshTimings, EwaReinterpretation, EwaReinterpretationRule,
+    EwaRuleSettings, EwaScenario, EwaScenarioGroup, EwaScenarioStatus,
     EwaSemanticCountNode, EwaSemanticScenario, EwaSemanticSnapshot,
     EwaSemanticSubdivisionEdge, EwaSemanticWorld, EwaSwingCoverage, EwaSwingFailure,
     EwaSwingHypothesis, EwaTechnicalFeatures, EwaWorldAnalysis, PivotId, ScenarioId,
     SegmentId, WorldId,
 };
+pub use types::{EwaPatternKind, EwaRatio, EwaSegment, EwaSegmentDirection};

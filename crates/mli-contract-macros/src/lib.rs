@@ -1307,6 +1307,13 @@ pub fn contract_universe(input: TokenStream) -> TokenStream {
                 _ => return None,
             })
         }
+        /// GPU dispatch of an id. Every member is `GpuMode::None`; no kernel is selected.
+        pub fn gpu_of(id: crate::engine::indicator_id::IndicatorId) -> crate::contract::GpuMode {
+            match id {
+                #( crate::engine::indicator_id::IndicatorId::#variants => crate::contract::GpuMode::None, )*
+                _ => crate::contract::GpuMode::None,
+            }
+        }
         /// The dig3 stream(s) an id consumes. `None` if not contract-backed.
         pub fn inputs_of(
             id: crate::engine::indicator_id::IndicatorId,
@@ -1334,6 +1341,17 @@ pub fn contract_universe(input: TokenStream) -> TokenStream {
             Some(match id {
                 #( crate::engine::indicator_id::IndicatorId::#variants =>
                     <#tys as crate::contract::Indicator>::OUTPUTS, )*
+                _ => return None,
+            })
+        }
+        /// Draw spec for an id. `None` if not contract-backed. The chart reads this
+        /// instead of a parallel rendering table.
+        pub fn rendering_of(
+            id: crate::engine::indicator_id::IndicatorId,
+        ) -> Option<crate::contract::RenderSpec> {
+            Some(match id {
+                #( crate::engine::indicator_id::IndicatorId::#variants =>
+                    <#tys as crate::contract::Render>::rendering(), )*
                 _ => return None,
             })
         }

@@ -134,7 +134,6 @@ pub fn slots_for(pattern: EwaPatternKind) -> &'static [EwaGrammarSlot] {
         EwaPatternKind::DoubleThree | EwaPatternKind::DoubleCombo => DOUBLE_CORRECTION_SLOTS,
         EwaPatternKind::TripleZigzag => TRIPLE_ZIGZAG_SLOTS,
         EwaPatternKind::TripleThree | EwaPatternKind::TripleCombo => TRIPLE_CORRECTION_SLOTS,
-        _ => &[],
     }
 }
 
