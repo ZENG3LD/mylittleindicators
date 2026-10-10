@@ -8815,6 +8815,47 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1249..=1252.
+    #[test]
+    fn lane_matches_cpu_bar_batch15() {
+        use crate::indicators::momentum::ift_rsi::IftRsi;
+        use crate::indicators::momentum::rsi_zscore::RsiZscore;
+        use crate::indicators::momentum::stochastic_rsi::StochasticRsi;
+        use crate::indicators::regime::vhf_ma::VhfMa;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = IftRsi::new(9);
+        chk(&run_cols(CubeFormula::IftRsiBar, &bars, CubeParams::period(9)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(9);
+        p.fast = 12;
+        let mut m = RsiZscore::new(9, 12);
+        chk(&run_cols(CubeFormula::RsiZscoreBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(10);
+        p.smoother = CubeSmoother::Sma;
+        let mut m = VhfMa::new(10, SmootherId::Sma);
+        chk(&run_cols(CubeFormula::VhfMaBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(8);
+        p.fast = 7;
+        p.slow = 3;
+        p.signal = 3;
+        p.smoother = CubeSmoother::Sma;
+        p.smoother2 = CubeSmoother::Sma;
+        let mut m = StochasticRsi::new(8, 7, 3, 3);
+        chk(&run_cols(CubeFormula::StochRsiBar, &bars, p), close.iter().map(|c| { let (k, d) = m.feed(*c); vec![k, d] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

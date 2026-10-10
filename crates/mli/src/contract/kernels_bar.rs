@@ -2179,6 +2179,88 @@ fn bar_scan(
                 }
             }
             v0 = held0;
+        } else if formula == 1249u32 {
+            // inverse-fisher RSI: tanh((rsi - 0.5) * 2) with `v` = RSI series
+            let x = (v[t] - 0.5f32) * 2.0f32;
+            let ax = x.abs();
+            let th = 1.0f32 - 2.0f32 / ((2.0f32 * ax).exp() + 1.0f32);
+            if x < 0.0f32 {
+                v0 = 0.0f32 - th;
+            } else {
+                v0 = th;
+            }
+        } else if formula == 1250u32 {
+            // z-score of the RSI series (`v`) over min(t + 1, p2 >= 2) values
+            let mut w = p2 as usize;
+            if w < 2 {
+                w = 2;
+            }
+            let mut n = t + 1;
+            if n > w {
+                n = w;
+            }
+            if n >= 2usize {
+                let mut sm = 0.0f32;
+                let mut sq = 0.0f32;
+                for j in (t + 1 - n)..(t + 1) {
+                    sm = sm + v[j];
+                    sq = sq + v[j] * v[j];
+                }
+                let nf = n as f32;
+                let mean = sm / nf;
+                let var = sq / nf - mean * mean;
+                if var > 0.0f32 {
+                    let sd = var.sqrt();
+                    if sd > 1.0e-12f32 {
+                        v0 = (v[t] - mean) / sd;
+                    }
+                }
+            }
+        } else if formula == 1251u32 {
+            // VHF with a smoothed |diff| (`v`) denominator
+            let pr = period as usize;
+            if pr >= 1usize && t >= pr {
+                let mut mx = c[t + 1 - pr];
+                let mut mn = c[t + 1 - pr];
+                for j in (t + 1 - pr)..(t + 1) {
+                    if c[j] > mx {
+                        mx = c[j];
+                    }
+                    if c[j] < mn {
+                        mn = c[j];
+                    }
+                }
+                if v[t].abs() >= 1.0e-12f32 {
+                    v0 = (mx - mn) / ((pr as f32) * v[t]);
+                }
+            }
+        } else if formula == 1390u32 {
+            // stage: |close - previous close|
+            if t > 0usize {
+                v0 = (c[t] - c[t - 1]).abs();
+            }
+        } else if formula == 1391u32 {
+            // stage: raw stochastic of the RSI series (`v`), RSI ready from bar `period`,
+            // stochastic window `p2`
+            let pr = period as usize;
+            let sp = p2 as usize;
+            if sp >= 1usize && t + 1 >= pr + sp {
+                let mut hi = v[t + 1 - sp];
+                let mut lo = v[t + 1 - sp];
+                for j in (t + 1 - sp)..(t + 1) {
+                    if v[j] > hi {
+                        hi = v[j];
+                    }
+                    if v[j] < lo {
+                        lo = v[j];
+                    }
+                }
+                if (hi - lo).abs() < 1.0e-12f32 {
+                    v0 = 50.0f32;
+                } else {
+                    v0 = ((v[t] - lo) / (hi - lo)) * 100.0f32;
+                }
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -2208,6 +2290,50 @@ fn bar_map(
     flag: u32,
 ) {
     bar_scan(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+/// Launch the bar scan for a raw code (also used by the internal stage codes 1390..=1399) over the
+/// five lanes; returns the flat `5 * n` output (column `k` at `k * n`).
+pub(crate) fn bar_run(code: u32, ins: [&Vec<f32>; 5], params: CubeParams, flag: u32) -> Vec<f32> {
+    let n = ins[3].len();
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let up = |s: &Vec<f32>| client.create_from_slice(f32::as_bytes(s));
+    let out = client.empty(5 * n * core::mem::size_of::<f32>());
+    // scratch (histograms / rings / design matrices) sized from the largest window parameter
+    let scr_len = ((params.period.max(params.fast).max(params.slow).max(params.signal)) as usize * 28 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
+    let scr_buf = client.create_from_slice(f32::as_bytes(&vec![0.0f32; scr_len]));
+    unsafe {
+        bar_map::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 5 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        );
+    }
+    let bytes = client.read_one_unchecked(out);
+    f32::from_bytes(&bytes).to_vec()
+}
+
+/// One internal stage: column 0 of a stage code over the given lanes.
+pub(crate) fn bar_stage(code: u32, ins: [&Vec<f32>; 5], params: CubeParams, flag: u32) -> Vec<f32> {
+    let n = ins[3].len();
+    bar_run(code, ins, params, flag)[0..n].to_vec()
 }
 
 /// Run a bar formula of codes 1200..=1399. One `Vec` per output column.
@@ -2270,6 +2396,25 @@ pub fn launch_cube_bar(
             vec![0.0; n]
         };
     }
+    if formula == CubeFormula::IftRsiBar || formula == CubeFormula::RsiZscoreBar {
+        v = super::kernels::launch_cube(CubeFormula::Rsi, samples, params);
+    }
+    if formula == CubeFormula::VhfMaBar {
+        let ad = bar_stage(1390, [&o, &h, &l, &c, &v], params, 0);
+        v = smooth_series(&ad, params.smoother, params.period.max(1), 1, params.a, params.b);
+    }
+    if formula == CubeFormula::StochRsiBar {
+        let rsi = super::kernels::launch_cube(CubeFormula::Rsi, samples, params);
+        let raw = bar_stage(1391, [&o, &h, &l, &c, &rsi], params, 0);
+        let rp = params.period;
+        let sp = params.fast.max(1);
+        let kp = params.slow.max(1);
+        let dp = params.signal.max(1);
+        let k0 = rp + sp + kp - 2;
+        let k = smooth_series(&raw, params.smoother, kp, k0, params.a, params.b);
+        let d = smooth_series(&k, params.smoother2, dp, k0 + kp - 1, params.a, params.b);
+        return vec![k, d];
+    }
     if formula == CubeFormula::DistLevelsBar {
         let mut mp = params;
         mp.period = params.period.max(1);
@@ -2298,44 +2443,14 @@ pub fn launch_cube_bar(
             .map(|x| x.max(1e-12))
             .collect();
     }
-    let client =
-        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
-    let up = |s: &Vec<f32>| client.create_from_slice(f32::as_bytes(s));
-    let out = client.empty(5 * n * core::mem::size_of::<f32>());
-    // scratch (histograms / rings) sized per formula
-    let scr_len = ((params.period.max(params.fast).max(params.slow).max(params.signal)) as usize * 28 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
-    let scr_buf = client.create_from_slice(f32::as_bytes(&vec![0.0f32; scr_len]));
-    unsafe {
-        bar_map::launch_unchecked(
-            &client,
-            CubeCount::new_1d(1),
-            CubeDim::new_1d(1),
-            BufferArg::from_raw_parts(up(&o), n),
-            BufferArg::from_raw_parts(up(&h), n),
-            BufferArg::from_raw_parts(up(&l), n),
-            BufferArg::from_raw_parts(up(&c), n),
-            BufferArg::from_raw_parts(up(&v), n),
-            BufferArg::from_raw_parts(out.clone(), 5 * n),
-            BufferArg::from_raw_parts(scr_buf, scr_len),
-            formula.code(),
-            params.period,
-            params.fast,
-            params.slow,
-            params.signal,
-            params.a,
-            params.b,
-            params.c,
-            if formula == CubeFormula::HurstPctBar {
-                params.period.max(50)
-            } else if formula == CubeFormula::DfaPctBar {
-                params.flag.max(50)
-            } else {
-                params.flag
-            },
-        );
-    }
-    let bytes = client.read_one_unchecked(out);
-    let flat = f32::from_bytes(&bytes).to_vec();
+    let flag_arg = if formula == CubeFormula::HurstPctBar {
+        params.period.max(50)
+    } else if formula == CubeFormula::DfaPctBar {
+        params.flag.max(50)
+    } else {
+        params.flag
+    };
+    let flat = bar_run(formula.code(), [&o, &h, &l, &c, &v], params, flag_arg);
     let cols = formula.output_count() as usize;
     let mut res: Vec<Vec<f32>> = (0..cols).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect();
     if formula == CubeFormula::PriceChanBar && params.flag == 1 {

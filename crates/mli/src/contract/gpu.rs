@@ -645,6 +645,14 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: inverse fisher rsi. UNTESTED on GPU.
+    IftRsiBar = 1249,
+    /// Composite: rsi zscore. UNTESTED on GPU.
+    RsiZscoreBar = 1250,
+    /// Composite: vhf ma. UNTESTED on GPU.
+    VhfMaBar = 1251,
+    /// Composite: stochastic rsi. UNTESTED on GPU.
+    StochRsiBar = 1252,
     /// Composite: engle granger adf proxy. UNTESTED on GPU.
     EgAdfBar = 1242,
     /// Composite: cointegration proxy. UNTESTED on GPU.
@@ -1091,6 +1099,7 @@ impl CubeFormula {
             CubeFormula::DistLevelsBar => 2,
             CubeFormula::EgAdfBar => 2,
             CubeFormula::CointBar => 2,
+            CubeFormula::StochRsiBar => 2,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1357,6 +1366,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::IftRsi), Some(CubeFormula::IftRsiBar));
+        assert_eq!(formula_of(IndicatorId::RsiZscore), Some(CubeFormula::RsiZscoreBar));
+        assert_eq!(formula_of(IndicatorId::VhfMa), Some(CubeFormula::VhfMaBar));
+        assert_eq!(formula_of(IndicatorId::StochRsi), Some(CubeFormula::StochRsiBar));
         assert_eq!(formula_of(IndicatorId::EgAdf), Some(CubeFormula::EgAdfBar));
         assert_eq!(formula_of(IndicatorId::Coint), Some(CubeFormula::CointBar));
         assert_eq!(formula_of(IndicatorId::EgCoint), Some(CubeFormula::EgCointBar));
