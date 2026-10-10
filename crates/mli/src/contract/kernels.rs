@@ -2437,6 +2437,75 @@ fn bar_map_g(
     );
 }
 
+/// Awesome oscillator at bar `i`. Partial SMA(5) minus partial SMA(34) of the median.
+#[cube]
+fn ao_at(high: &[f32], low: &[f32], i: usize) -> f32 {
+    let mut c5 = i + 1;
+    if c5 > 5 {
+        c5 = 5;
+    }
+    let mut c34 = i + 1;
+    if c34 > 34 {
+        c34 = 34;
+    }
+    let s5 = i + 1 - c5;
+    let s34 = i + 1 - c34;
+    let mut a5 = 0.0f32;
+    let mut a34 = 0.0f32;
+    for k in 0..c5 {
+        a5 = a5 + 0.5f32 * (high[s5 + k] + low[s5 + k]);
+    }
+    for k in 0..c34 {
+        a34 = a34 + 0.5f32 * (high[s34 + k] + low[s34 + k]);
+    }
+    a5 / (c5 as f32) - a34 / (c34 as f32)
+}
+
+/// Bar formulas 72 and 73.
+#[cube]
+fn bar_scan_h(
+    high: &[f32],
+    low: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    formula: u32,
+) {
+    let n = high.len();
+    if formula == 72u32 {
+        for i in 0..n {
+            let mut cnt = i + 1;
+            if cnt > 5 {
+                cnt = 5;
+            }
+            let start = i + 1 - cnt;
+            let mut sum = 0.0f32;
+            for k in 0..cnt {
+                sum = sum + ao_at(high, low, start + k);
+            }
+            output[i] = ao_at(high, low, i) - sum / (cnt as f32);
+        }
+    } else if formula == 73u32 {
+        for i in 0..n {
+            if volume[i] > 0.0f32 {
+                output[i] = (high[i] - low[i]) / volume[i];
+            } else {
+                output[i] = 0.0f32;
+            }
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_h(
+    high: &[f32],
+    low: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    formula: u32,
+) {
+    bar_scan_h(high, low, volume, output, formula);
+}
+
 #[cube(launch_unchecked)]
 fn lane_map(
     open: &[f32],
@@ -2601,7 +2670,18 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     let cubes = (n as u32).div_ceil(dim);
     let book_len = c.bid_px.len();
     unsafe {
-        if formula.code() >= 69 {
+        if formula.code() >= 72 {
+            bar_map_h::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(volume_b, n),
+                BufferArg::from_raw_parts(output.clone(), n),
+                formula.code(),
+            );
+        } else if formula.code() >= 69 {
             bar_map_g::launch_unchecked(
                 &client,
                 CubeCount::new_1d(1),
@@ -2782,7 +2862,9 @@ mod tests {
     use crate::indicators::accumulation::williams_ad::WilliamsAd;
     use crate::indicators::average::vwap::Vwap;
     use crate::indicators::channels::envelope_bandwidth::EnvelopeBandwidth;
+    use crate::indicators::chaos::williams_indicators::AccelerationDeceleration;
     use crate::indicators::chaos::williams_indicators::AwesomeOscillator;
+    use crate::indicators::chaos::williams_indicators::MarketFacilitationIndex;
     use crate::indicators::momentum::dpo_percent::DpoPercent;
     use crate::indicators::momentum::rsx::Rsx;
     use crate::indicators::regime::choppiness_index::ChoppinessIndex;
@@ -3915,6 +3997,24 @@ mod tests {
         let mut env_params = CubeParams::period(wper as u32);
         env_params.a = 2.5;
         assert_close(&run(CubeFormula::Envbw, &bars, env_params), &cpu_env);
+        let mut ac = AccelerationDeceleration::new();
+        let cpu_ac: Vec<f64> = bars
+            .iter()
+            .map(|b| {
+                ac.feed(&[b.high, b.low]);
+                ac.value()
+            })
+            .collect();
+        assert_close(&run(CubeFormula::Ac, &bars, CubeParams::period(1)), &cpu_ac);
+        let mut wmfi = MarketFacilitationIndex::new();
+        let cpu_wmfi: Vec<f64> = bars
+            .iter()
+            .map(|b| wmfi.feed(&[b.high, b.low, b.volume]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::WilliamsMfi, &bars, CubeParams::period(1)),
+            &cpu_wmfi,
+        );
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
     }

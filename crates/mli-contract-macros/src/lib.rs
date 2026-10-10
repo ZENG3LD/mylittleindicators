@@ -226,6 +226,8 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "ao" => "Ao",
         "dpo_pct" => "DpoPct",
         "envbw" => "Envbw",
+        "ac" => "Ac",
+        "williams_mfi" => "WilliamsMfi",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

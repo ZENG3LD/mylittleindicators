@@ -203,6 +203,10 @@ pub enum CubeFormula {
     /// Envelope bandwidth. Zero until the SMA is full, then `2 * pct / 100`.
     /// [`CubeParams::a`] is the percent, at least `0.01`.
     Envbw = 71,
+    /// Acceleration/deceleration. Awesome oscillator minus its SMA(5), partial from bar 0.
+    Ac = 72,
+    /// Williams market facilitation index. `(high - low) / volume`, or 0 when volume is not positive.
+    WilliamsMfi = 73,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -370,6 +374,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Ao), Some(CubeFormula::Ao));
         assert_eq!(formula_of(IndicatorId::DpoPct), Some(CubeFormula::DpoPct));
         assert_eq!(formula_of(IndicatorId::Envbw), Some(CubeFormula::Envbw));
+        assert_eq!(formula_of(IndicatorId::Ac), Some(CubeFormula::Ac));
+        assert_eq!(formula_of(IndicatorId::WilliamsMfi), Some(CubeFormula::WilliamsMfi));
     }
 
     #[cfg(feature = "gpu-shader")]
