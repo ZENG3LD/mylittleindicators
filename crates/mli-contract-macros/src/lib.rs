@@ -214,6 +214,9 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "mom_z" => "MomZ",
         "percent_b" => "PercentB",
         "cfo" => "Cfo",
+        "rmid" => "Rmid",
+        "wad" => "Wad",
+        "mad_z" => "MadZ",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

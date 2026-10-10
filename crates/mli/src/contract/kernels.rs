@@ -1663,6 +1663,205 @@ fn bar_map_c(
     );
 }
 
+/// Value at `rank` (0-based) in the lane window that starts at `start`.
+#[cube]
+fn window_rank(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    start: usize,
+    win: usize,
+    rank: usize,
+    lane: u32,
+) -> f32 {
+    let mut chosen = fld(open, high, low, close, volume, start, lane);
+    for a in 0..win {
+        let v = fld(open, high, low, close, volume, start + a, lane);
+        let mut less = 0usize;
+        let mut equal = 0usize;
+        for b in 0..win {
+            let u = fld(open, high, low, close, volume, start + b, lane);
+            if u < v {
+                less = less + 1;
+            } else if u == v {
+                equal = equal + 1;
+            }
+        }
+        if less <= rank {
+            if less + equal > rank {
+                chosen = v;
+            }
+        }
+    }
+    chosen
+}
+
+/// Median of absolute deviations from `med`, at `rank`.
+#[cube]
+fn window_dev_rank(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    start: usize,
+    win: usize,
+    rank: usize,
+    lane: u32,
+    med: f32,
+) -> f32 {
+    let mut first = fld(open, high, low, close, volume, start, lane) - med;
+    if first < 0.0f32 {
+        first = -first;
+    }
+    let mut chosen = first;
+    for a in 0..win {
+        let mut v = fld(open, high, low, close, volume, start + a, lane) - med;
+        if v < 0.0f32 {
+            v = -v;
+        }
+        let mut less = 0usize;
+        let mut equal = 0usize;
+        for b in 0..win {
+            let mut u = fld(open, high, low, close, volume, start + b, lane) - med;
+            if u < 0.0f32 {
+                u = -u;
+            }
+            if u < v {
+                less = less + 1;
+            } else if u == v {
+                equal = equal + 1;
+            }
+        }
+        if less <= rank {
+            if less + equal > rank {
+                chosen = v;
+            }
+        }
+    }
+    chosen
+}
+
+/// Bar formulas 60 through 62.
+#[cube]
+fn bar_scan_d(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    formula: u32,
+) {
+    let n = open.len();
+    let mut p = period as usize;
+    if p < 1 {
+        p = 1;
+    }
+    if formula == 60u32 {
+        for i in 0..n {
+            let mut cnt = i + 1;
+            if cnt > p {
+                cnt = p;
+            }
+            let start = i + 1 - cnt;
+            let mut sum = 0.0f32;
+            for k in 0..cnt {
+                sum = sum + 0.5f32 * (high[start + k] + low[start + k]);
+            }
+            output[i] = sum / (cnt as f32);
+        }
+    } else if formula == 61u32 {
+        output[0] = 0.0f32;
+        let mut prev = close[0];
+        let mut y = 0.0f32;
+        for k in 1..n {
+            let mut trh = high[k];
+            if prev > trh {
+                trh = prev;
+            }
+            let mut trl = low[k];
+            if prev < trl {
+                trl = prev;
+            }
+            let mut ad = 0.0f32;
+            if close[k] > prev {
+                ad = close[k] - trl;
+            } else if close[k] < prev {
+                ad = close[k] - trh;
+            }
+            y = y + ad;
+            prev = close[k];
+            output[k] = y;
+        }
+    } else if formula == 62u32 {
+        let mut win = p;
+        if win < 3 {
+            win = 3;
+        }
+        for i in 0..n {
+            if i + 1 < win {
+                output[i] = 0.0f32;
+            } else {
+                let start = i + 1 - win;
+                let mut half = 0usize;
+                let mut left = win;
+                for _step in 0..win {
+                    if left >= 2 {
+                        left = left - 2;
+                        half = half + 1;
+                    }
+                }
+                let med_hi = window_rank(
+                    open, high, low, close, volume, start, win, half, lane,
+                );
+                let mut med = med_hi;
+                if left == 0 {
+                    let med_lo = window_rank(
+                        open, high, low, close, volume, start, win, half - 1, lane,
+                    );
+                    med = 0.5f32 * (med_lo + med_hi);
+                }
+                let mad_hi = window_dev_rank(
+                    open, high, low, close, volume, start, win, half, lane, med,
+                );
+                let mut mad = mad_hi;
+                if left == 0 {
+                    let mad_lo = window_dev_rank(
+                        open, high, low, close, volume, start, win, half - 1, lane, med,
+                    );
+                    mad = 0.5f32 * (mad_lo + mad_hi);
+                }
+                let mut denom = mad * 1.4826f32;
+                if denom < 1.0e-12 {
+                    denom = 1.0e-12;
+                }
+                let price = fld(open, high, low, close, volume, i, lane);
+                output[i] = (price - med) / denom;
+            }
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_d(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    formula: u32,
+) {
+    bar_scan_d(open, high, low, close, volume, output, lane, period, formula);
+}
+
 #[cube(launch_unchecked)]
 fn lane_map(
     open: &[f32],
@@ -1827,7 +2026,22 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     let cubes = (n as u32).div_ceil(dim);
     let book_len = c.bid_px.len();
     unsafe {
-        if formula.code() >= 54 {
+        if formula.code() >= 60 {
+            bar_map_d::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(open_b, n),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(volume_b, n),
+                BufferArg::from_raw_parts(output.clone(), n),
+                params.lane.code(),
+                params.period,
+                formula.code(),
+            );
+        } else if formula.code() >= 54 {
             bar_map_c::launch_unchecked(
                 &client,
                 CubeCount::new_1d(1),
@@ -1941,7 +2155,10 @@ mod tests {
     use crate::indicators::momentum::intraday_momentum_index::IntradayMomentumIndex;
     use crate::indicators::momentum::psl::Psl;
     use crate::indicators::channels::percent_b::PercentB;
+    use crate::indicators::accumulation::williams_ad::WilliamsAd;
+    use crate::indicators::levels::rolling_midline::RollingMidline;
     use crate::indicators::momentum::cfo::Cfo;
+    use crate::indicators::statistics::zscore_price_mad::PriceMadZscore;
     use crate::indicators::momentum::momentum_zscore::MomentumZscore;
     use crate::indicators::momentum::pfe::Pfe;
     use crate::indicators::momentum::pzo::Pzo;
@@ -2984,6 +3201,24 @@ mod tests {
         assert_close(
             &run(CubeFormula::Cfo, &bars, CubeParams::period(wper as u32)),
             &cpu_cfo,
+        );
+        let mut rmid = RollingMidline::new(wper);
+        let cpu_rmid: Vec<f64> = bars.iter().map(|b| rmid.feed(&[b.high, b.low])).collect();
+        assert_close(
+            &run(CubeFormula::Rmid, &bars, CubeParams::period(wper as u32)),
+            &cpu_rmid,
+        );
+        let mut wad = WilliamsAd::new();
+        let cpu_wad: Vec<f64> = bars
+            .iter()
+            .map(|b| wad.feed(&[b.high, b.low, b.close]))
+            .collect();
+        assert_close(&run(CubeFormula::Wad, &bars, CubeParams::period(1)), &cpu_wad);
+        let mut mad = PriceMadZscore::new(wper);
+        let cpu_mad: Vec<f64> = bars.iter().map(|b| mad.feed(b.close)).collect();
+        assert_close(
+            &run(CubeFormula::MadZ, &bars, CubeParams::period(wper as u32)),
+            &cpu_mad,
         );
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());

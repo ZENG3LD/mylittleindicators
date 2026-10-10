@@ -171,6 +171,13 @@ pub enum CubeFormula {
     /// Chande forecast oscillator. `100 * (price - regression endpoint) / price`.
     /// Zero until `period` samples. `period` below 2 is 2.
     Cfo = 59,
+    /// Rolling mean of `(high + low) / 2`. Partial window from the first bar.
+    Rmid = 60,
+    /// Williams accumulation/distribution. First sample is 0, then a running sum.
+    Wad = 61,
+    /// Median-absolute-deviation z-score of the lane. Zero until the window is full.
+    /// `period` below 3 is 3. Scale is `1.4826`.
+    MadZ = 62,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -326,6 +333,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::MomZscore), Some(CubeFormula::MomZ));
         assert_eq!(formula_of(IndicatorId::Percentb), Some(CubeFormula::PercentB));
         assert_eq!(formula_of(IndicatorId::Cfo), Some(CubeFormula::Cfo));
+        assert_eq!(formula_of(IndicatorId::Rmid), Some(CubeFormula::Rmid));
+        assert_eq!(formula_of(IndicatorId::Wad), Some(CubeFormula::Wad));
+        assert_eq!(formula_of(IndicatorId::Zmad), Some(CubeFormula::MadZ));
     }
 
     #[cfg(feature = "gpu-shader")]
