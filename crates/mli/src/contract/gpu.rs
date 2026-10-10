@@ -645,6 +645,14 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: approximate entropy. UNTESTED on GPU.
+    ApenBar = 1220,
+    /// Composite: sample entropy. UNTESTED on GPU.
+    SampenBar = 1221,
+    /// Composite: permutation entropy. UNTESTED on GPU.
+    PermEntBar = 1222,
+    /// Composite: conditional entropy. UNTESTED on GPU.
+    ConDenBar = 1223,
     /// Composite: shannon entropy. UNTESTED on GPU.
     ShannonBar = 1217,
     /// Composite: fisher information. UNTESTED on GPU.
@@ -1297,6 +1305,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Apen), Some(CubeFormula::ApenBar));
+        assert_eq!(formula_of(IndicatorId::Sampen), Some(CubeFormula::SampenBar));
+        assert_eq!(formula_of(IndicatorId::Pe), Some(CubeFormula::PermEntBar));
+        assert_eq!(formula_of(IndicatorId::Conden), Some(CubeFormula::ConDenBar));
         assert_eq!(formula_of(IndicatorId::Shannon), Some(CubeFormula::ShannonBar));
         assert_eq!(formula_of(IndicatorId::Fisher), Some(CubeFormula::FisherInfoBar));
         assert_eq!(formula_of(IndicatorId::Infog), Some(CubeFormula::InfoGainBar));

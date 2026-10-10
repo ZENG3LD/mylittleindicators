@@ -100,6 +100,79 @@ fn kth_dev(src: &[f32], start: usize, len: usize, k: u32, mid: f32) -> f32 {
     res
 }
 
+/// Whether the `len`-long patterns starting at `base + i` and `base + j` agree within `r`.
+#[cube]
+fn pat_match(c: &[f32], base: usize, n: usize, i: usize, j: usize, len: usize, r: f32) -> bool {
+    let mut ok = true;
+    for k in 0..len {
+        if i + k >= n || j + k >= n {
+            ok = false;
+        } else if (c[base + i + k] - c[base + j + k]).abs() > r {
+            ok = false;
+        }
+    }
+    ok
+}
+
+/// Approximate-entropy `phi` of pattern length `len` over the window `[base, base + n)`.
+#[cube]
+fn apen_phi(c: &[f32], base: usize, n: usize, len: usize, r: f32) -> f32 {
+    let mut res = 0.0f32;
+    if len < n {
+        let cnt = n - len + 1;
+        let mut sum = 0.0f32;
+        let mut valid = 0.0f32;
+        for i in 0..cnt {
+            let mut m = 0u32;
+            for j in 0..cnt {
+                if pat_match(c, base, n, i, j, len, r) {
+                    m = m + 1u32;
+                }
+            }
+            if m > 0u32 {
+                sum = sum + ((m as f32) / (cnt as f32)).ln();
+                valid = valid + 1.0f32;
+            }
+        }
+        if valid > 0.0f32 {
+            res = sum / valid;
+        }
+    }
+    res
+}
+
+/// Number of ordered matching pattern pairs `(i != j)` of length `len`.
+#[cube]
+fn sampen_count(c: &[f32], base: usize, n: usize, len: usize, r: f32) -> f32 {
+    let mut m = 0.0f32;
+    if len < n {
+        let cnt = n - len + 1;
+        for i in 0..cnt {
+            for j in 0..cnt {
+                if i != j && pat_match(c, base, n, i, j, len, r) {
+                    m = m + 1.0f32;
+                }
+            }
+        }
+    }
+    m
+}
+
+/// Population std of the window `[base, base + n)`.
+#[cube]
+fn win_std(c: &[f32], base: usize, n: usize) -> f32 {
+    let mut sm = 0.0f32;
+    for j in 0..n {
+        sm = sm + c[base + j];
+    }
+    let mean = sm / (n as f32);
+    let mut var = 0.0f32;
+    for j in 0..n {
+        var = var + (c[base + j] - mean) * (c[base + j] - mean);
+    }
+    (var / (n as f32)).sqrt()
+}
+
 /// 1200 Stochastik-D `[k, d]` (`period` %K window, `p2` %D window), 1201 Donchian stop
 /// (lower stop: `period` lower window, `p2` upper window unused in the output, `a` offset, `flag`
 /// percentage), 1202 projection bands `[upper, middle, lower]` (`period` window clamped 2..=512,
@@ -129,6 +202,7 @@ fn bar_scan(
     let mut dh = 0.0f32;
     let mut dl = 0.0f32;
     let mut cnt_a = 0usize;
+    let mut rstate = a;
     let mut vw = 0.0f32;
     let mut held0 = 0.0f32;
     let mut held1 = 0.0f32;
@@ -661,6 +735,165 @@ fn bar_scan(
                 held0 = (hy - hyx).max(0.0f32);
             }
             v0 = held0;
+        } else if formula == 1220u32 || formula == 1221u32 {
+            // approximate (1220) / sample (1221) entropy of the last `period` closes
+            let pr = period as usize;
+            let m = p2 as usize;
+            let mut n = t + 1;
+            if n > pr {
+                n = pr;
+            }
+            let base = t + 1 - n;
+            let mut need = m + 1;
+            if need < 3usize {
+                need = 3usize;
+            }
+            if need > pr {
+                need = pr;
+            }
+            if n >= need {
+                if n >= 2usize && rstate < 0.01f32 {
+                    rstate = 0.15f32 * win_std(c, base, n);
+                }
+                if n >= m + 1 {
+                    if formula == 1220u32 {
+                        held0 = apen_phi(c, base, n, m, rstate) - apen_phi(c, base, n, m + 1, rstate);
+                    } else {
+                        let m0 = sampen_count(c, base, n, m, rstate);
+                        let m1 = sampen_count(c, base, n, m + 1, rstate);
+                        if m0 > 0.0f32 && m1 > 0.0f32 {
+                            held0 = -(m1 / m0).ln();
+                        } else if m0 > 0.0f32 {
+                            held0 = 3.0f32;
+                        } else {
+                            held0 = 1.5f32;
+                        }
+                    }
+                }
+            }
+            v0 = held0;
+        } else if formula == 1222u32 {
+            // permutation entropy (normalised): period window, p2 order, p3 delay; ordinal
+            // patterns are stored as index permutations in scr[pat * order ..]
+            let pr = period as usize;
+            let od = p2 as usize;
+            let mut dl = p3 as usize;
+            if dl < 1 {
+                dl = 1;
+            }
+            let mut n = t + 1;
+            if n > pr {
+                n = pr;
+            }
+            let base = t + 1 - n;
+            let mut need = od + (od - 1) * dl;
+            if need < 10usize {
+                need = 10usize;
+            }
+            if n >= need && n >= od && n >= od * dl {
+                let np = n - od * dl + 1;
+                for i in 0..np {
+                    for j in 0..od {
+                        let vj = c[base + i + j * dl];
+                        let mut rank = 0usize;
+                        for k in 0..od {
+                            let vk = c[base + i + k * dl];
+                            if vk < vj || (vk == vj && k < j) {
+                                rank = rank + 1;
+                            }
+                        }
+                        scr[i * od + rank] = j as f32;
+                    }
+                }
+                let mut ent = 0.0f32;
+                for i in 0..np {
+                    let mut first = true;
+                    let mut cn = 0.0f32;
+                    for j in 0..np {
+                        let mut eq = true;
+                        for k in 0..od {
+                            if scr[i * od + k] != scr[j * od + k] {
+                                eq = false;
+                            }
+                        }
+                        if eq {
+                            cn = cn + 1.0f32;
+                            if j < i {
+                                first = false;
+                            }
+                        }
+                    }
+                    if first {
+                        let pb = cn / (np as f32);
+                        ent = ent - pb * pb.ln();
+                    }
+                }
+                let mut fact = 1.0f32;
+                for k in 2..(od + 1) {
+                    fact = fact * (k as f32);
+                }
+                let mxe = fact.ln();
+                if mxe > 0.0f32 {
+                    held0 = (ent / mxe).max(0.0f32).min(1.0f32);
+                } else {
+                    held0 = 0.0f32;
+                }
+            }
+            v0 = held0;
+        } else if formula == 1223u32 {
+            // conditional entropy H(y | x) of consecutive binned returns
+            let mut w = period as usize;
+            if w < 20 {
+                w = 20;
+            }
+            let mut bn = p2 as usize;
+            if bn < 4 {
+                bn = 4;
+            }
+            let mut clip = a;
+            if clip < 1.0e-6f32 {
+                clip = 1.0e-6f32;
+            }
+            if t >= w {
+                // scr: [0..bn) px, [bn..bn + bn*bn) joint[y * bn + x]
+                for b in 0..(bn + bn * bn) {
+                    scr[b] = 0.0f32;
+                }
+                for j in (t + 2 - w)..(t + 1) {
+                    let y = (c[j] / c[j - 1]).ln();
+                    let x = (c[j - 1] / c[j - 2]).ln();
+                    let yy = y.max(-clip).min(clip);
+                    let xx = x.max(-clip).min(clip);
+                    let mut by = ((((yy + clip) / (2.0f32 * clip)) * (bn as f32)).floor()) as usize;
+                    let mut bx = ((((xx + clip) / (2.0f32 * clip)) * (bn as f32)).floor()) as usize;
+                    if by > bn - 1 {
+                        by = bn - 1;
+                    }
+                    if bx > bn - 1 {
+                        bx = bn - 1;
+                    }
+                    scr[bx] = scr[bx] + 1.0f32;
+                    scr[bn + by * bn + bx] = scr[bn + by * bn + bx] + 1.0f32;
+                }
+                let total = (w - 1) as f32;
+                let mut hh = 0.0f32;
+                for bx in 0..bn {
+                    if scr[bx] > 0.0f32 {
+                        let px = scr[bx] / total;
+                        let mut hyx = 0.0f32;
+                        for by in 0..bn {
+                            let cn = scr[bn + by * bn + bx];
+                            if cn > 0.0f32 {
+                                let pyx = cn / scr[bx];
+                                hyx = hyx - pyx * pyx.ln();
+                            }
+                        }
+                        hh = hh + px * hyx;
+                    }
+                }
+                held0 = hh.max(0.0f32);
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -747,7 +980,7 @@ pub fn launch_cube_bar(
     let up = |s: &Vec<f32>| client.create_from_slice(f32::as_bytes(s));
     let out = client.empty(5 * n * core::mem::size_of::<f32>());
     // scratch (histograms / rings) sized per formula
-    let scr_len = (params.period as usize * 2 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
+    let scr_len = (params.period as usize * 12 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
     let scr_buf = client.create_from_slice(f32::as_bytes(&vec![0.0f32; scr_len]));
     unsafe {
         bar_map::launch_unchecked(

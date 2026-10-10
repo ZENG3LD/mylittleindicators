@@ -8561,6 +8561,46 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1220..=1223.
+    #[test]
+    fn lane_matches_cpu_bar_batch8() {
+        use crate::indicators::entropy::approximate_entropy::ApproximateEntropy;
+        use crate::indicators::entropy::conditional_entropy::ConditionalEntropy;
+        use crate::indicators::entropy::permutation_entropy::PermutationEntropy;
+        use crate::indicators::entropy::sample_entropy::SampleEntropy;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(40);
+        p.fast = 2;
+        p.a = 0.0;
+        let mut m = ApproximateEntropy::new(40, 2, 0.0);
+        chk(&run_cols(CubeFormula::ApenBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = SampleEntropy::new(40, 2, 0.0);
+        chk(&run_cols(CubeFormula::SampenBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(40);
+        p.fast = 4;
+        p.slow = 1;
+        let mut m = PermutationEntropy::new(40, 4, 1);
+        chk(&run_cols(CubeFormula::PermEntBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(30);
+        p.fast = 6;
+        p.a = 0.05;
+        let mut m = ConditionalEntropy::new(30, 6, 0.05);
+        chk(&run_cols(CubeFormula::ConDenBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
