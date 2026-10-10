@@ -719,6 +719,10 @@ pub enum CubeFormula {
     FvgaltBar = 1314,
     /// Composite: fvg reversion probability. UNTESTED on GPU.
     FvgrevBar = 1315,
+    /// Composite: statistical wick detector. UNTESTED on GPU.
+    WickspikeBar = 1316,
+    /// Composite: swing stop. UNTESTED on GPU.
+    TsSwingsBar = 1317,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1229,6 +1233,8 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::WickspikeBar => 2,
+            CubeFormula::TsSwingsBar => 2,
             CubeFormula::MoFisherBar => 2,
             CubeFormula::RelTrendPosBar => 2,
             CubeFormula::TheilsenchanBar => 3,
@@ -1548,6 +1554,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Fvgdur), Some(CubeFormula::FvgdurBar));
         assert_eq!(formula_of(IndicatorId::Fvgalt), Some(CubeFormula::FvgaltBar));
         assert_eq!(formula_of(IndicatorId::Fvgrev), Some(CubeFormula::FvgrevBar));
+        assert_eq!(formula_of(IndicatorId::Wickspike), Some(CubeFormula::WickspikeBar));
+        assert_eq!(formula_of(IndicatorId::TsSwings), Some(CubeFormula::TsSwingsBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

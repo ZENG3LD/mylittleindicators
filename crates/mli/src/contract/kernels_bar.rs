@@ -4197,6 +4197,105 @@ fn bar_scan(
                 }
             }
             v0 = held2;
+        } else if formula == 1316u32 {
+            // statistical wick detector `[upper_spike, lower_spike]`: percentile rank (>= 0.95) of the current
+            // wick fractions within the last max(period, 1) bars
+            let mut w = period as usize;
+            if w < 1usize {
+                w = 1usize;
+            }
+            let mut len = t + 1;
+            if len > w {
+                len = w;
+            }
+            let rg = (h[t] - l[t]).abs().max(1.0e-12f32);
+            let up = (h[t] - o[t].max(c[t])).max(0.0f32) / rg;
+            let lo = (o[t].min(c[t]) - l[t]).max(0.0f32) / rg;
+            let mut cu = 0.0f32;
+            let mut cl = 0.0f32;
+            for k2 in 0..len {
+                let q = t - k2;
+                let rq = (h[q] - l[q]).abs().max(1.0e-12f32);
+                let uq = (h[q] - o[q].max(c[q])).max(0.0f32) / rq;
+                let lq = (o[q].min(c[q]) - l[q]).max(0.0f32) / rq;
+                if uq <= up {
+                    cu = cu + 1.0f32;
+                }
+                if lq <= lo {
+                    cl = cl + 1.0f32;
+                }
+            }
+            if cu / (len as f32) >= 0.95f32 {
+                v0 = 1.0f32;
+            }
+            if cl / (len as f32) >= 0.95f32 {
+                v1 = 1.0f32;
+            }
+        } else if formula == 1317u32 {
+            // swing stop `[long_stop, short_stop]`: lookback = period, min swing size = a, offset = b,
+            // flag = percentage offset. held0 = last swing high (0 = none), held1 = last swing low (f0 = seen),
+            // held2 = long stop, f1 = short stop
+            let lb = period as usize;
+            if lb >= 1usize && t >= 2usize * lb {
+                let ci = t - lb;
+                let ch = h[ci];
+                let mut is_h = true;
+                for q in (t - 2usize * lb)..ci {
+                    if h[q] >= ch {
+                        is_h = false;
+                    }
+                }
+                for q in (ci + 1)..(t + 1) {
+                    if h[q] >= ch {
+                        is_h = false;
+                    }
+                }
+                if is_h && a > 0.0f32 && held0 > 0.0f32 {
+                    if (ch - held0).abs() < a {
+                        is_h = false;
+                    }
+                }
+                if is_h {
+                    held0 = ch;
+                }
+                let cw = l[ci];
+                let mut is_l = true;
+                for q in (t - 2usize * lb)..ci {
+                    if l[q] <= cw {
+                        is_l = false;
+                    }
+                }
+                for q in (ci + 1)..(t + 1) {
+                    if l[q] <= cw {
+                        is_l = false;
+                    }
+                }
+                if is_l && a > 0.0f32 && f0 > 0.5f32 {
+                    if (held1 - cw).abs() < a {
+                        is_l = false;
+                    }
+                }
+                if is_l {
+                    held1 = cw;
+                    f0 = 1.0f32;
+                }
+            }
+            if f0 > 0.5f32 {
+                if flag == 1u32 {
+                    held2 = held1 * (1.0f32 - b / 100.0f32);
+                } else {
+                    held2 = held1 - b;
+                }
+            }
+            if held0 > 0.0f32 {
+                if flag == 1u32 {
+                    f1 = held0 * (1.0f32 + b / 100.0f32);
+                } else {
+                    f1 = held0 + b;
+                }
+            }
+            v0 = held2;
+            v1 = f1;
         }
         out[t] = v0;
         out[n + t] = v1;

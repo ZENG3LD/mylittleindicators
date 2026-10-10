@@ -342,6 +342,8 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "comp_fvgdur_bar" => "FvgdurBar",
         "comp_fvgalt_bar" => "FvgaltBar",
         "comp_fvgrev_bar" => "FvgrevBar",
+        "comp_wickspike_bar" => "WickspikeBar",
+        "comp_ts_swings_bar" => "TsSwingsBar",
         "comp_esine_bar" => "EsineBar",
         "comp_ess_bar" => "EssBar",
         "comp_ehlersfa_bar" => "EhlersfaBar",

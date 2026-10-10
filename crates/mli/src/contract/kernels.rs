@@ -9597,6 +9597,40 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1316..=1317 (Wickspike, TsSwings).
+    #[test]
+    fn lane_matches_cpu_bar_batch35() {
+        use crate::indicators::candles::statistical_wick_detector::StatisticalWickDetector;
+        use crate::indicators::swing::swing_stop::SwingStop;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = StatisticalWickDetector::new(20);
+        chk(&run_cols(CubeFormula::WickspikeBar, &bars, CubeParams::period(20)), bars.iter().map(|b| {
+            let (u, d) = m.feed(&[b.open, b.high, b.low, b.close]);
+            vec![u as u8 as f64, d as u8 as f64]
+        }).collect());
+        for pct in [false, true] {
+            let mut p = CubeParams::period(3);
+            p.a = 0.5;
+            p.b = 0.2;
+            p.flag = pct as u32;
+            let mut m = SwingStop::with_params(3, 0.5, 0.2, pct);
+            chk(&run_cols(CubeFormula::TsSwingsBar, &bars, p), lanes.iter().map(|l| { let (a, b) = m.feed(&[l[0], l[1]]); vec![a, b] }).collect());
+        }
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
