@@ -123,6 +123,142 @@ pub(crate) fn run_post(series: &[f32], op: u32, w: u32, a: f32) -> Vec<f32> {
     f32::from_bytes(&bytes).to_vec()
 }
 
+
+/// k-th smallest (0-based, clamped to the last) of `src[start..start + len]`.
+/// O(len^2) rank count: the value `x` with `count(< x) <= k < count(<= x)`.
+#[cube]
+fn kth_in(src: &[f32], start: usize, len: usize, k: u32) -> f32 {
+    let mut kk = k;
+    if kk >= len as u32 {
+        kk = (len - 1) as u32;
+    }
+    let mut res = src[start];
+    for j in 0..len {
+        let x = src[start + j];
+        let mut lt = 0u32;
+        let mut le = 0u32;
+        for m in 0..len {
+            let y = src[start + m];
+            if y < x {
+                lt = lt + 1u32;
+            }
+            if y <= x {
+                le = le + 1u32;
+            }
+        }
+        if lt <= kk && kk < le {
+            res = x;
+        }
+    }
+    res
+}
+
+/// Second post stage with `cols` output columns (`out[c * n + i]`).
+/// Ops: 4 percentile rank 0..100 (`(below + 0.5 equal) / n * 100`, held at 50 until
+/// `i >= rf` and the window is full), 10 quartiles `[q1, q2, q3]` (`len/4, len/2, 3len/4`),
+/// 11 percentile channel `[upper, middle, lower]` with quantiles `b` (upper) and `a` (lower),
+/// 12 RSI percentile bands `[upper, middle, lower]` (20/80 percent order statistics once
+/// the window is full and `i >= rf`, else 80 / value / 20).
+#[cube]
+fn post_scan2(src: &[f32], out: &mut [f32], op: u32, w: u32, a: f32, b: f32, rf: u32) {
+    let n = src.len();
+    let mut wi = w as usize;
+    if wi < 1 {
+        wi = 1;
+    }
+    for i in 0..n {
+        let mut len = wi;
+        if len > i + 1 {
+            len = i + 1;
+        }
+        let start = i + 1 - len;
+        let cur = src[i];
+        let full = i + 1 >= wi;
+        let ready = full && (i as u32) >= rf;
+        if op == 4u32 {
+            let mut v = 50.0f32;
+            if ready {
+                let mut below = 0.0f32;
+                let mut equal = 0.0f32;
+                for j in start..(i + 1) {
+                    if src[j] < cur {
+                        below = below + 1.0f32;
+                    } else if src[j] == cur {
+                        equal = equal + 1.0f32;
+                    }
+                }
+                v = ((below + 0.5f32 * equal) / (len as f32)) * 100.0f32;
+            }
+            out[i] = v;
+        } else if op == 10u32 {
+            out[i] = kth_in(src, start, len, (len / 4) as u32);
+            out[n + i] = kth_in(src, start, len, (len / 2) as u32);
+            out[2 * n + i] = kth_in(src, start, len, ((3 * len) / 4) as u32);
+        } else if op == 11u32 {
+            let lf = (len - 1) as f32;
+            let lo_pos = (a * lf + 0.5f32) as u32;
+            let hi_pos = (b * lf + 0.5f32) as u32;
+            let lo = kth_in(src, start, len, lo_pos);
+            let hi = kth_in(src, start, len, hi_pos);
+            out[i] = hi;
+            out[n + i] = 0.5f32 * (lo + hi);
+            out[2 * n + i] = lo;
+        } else if op == 12u32 {
+            let mut up = 80.0f32;
+            let mut lo = 20.0f32;
+            if ready {
+                lo = kth_in(src, start, len, ((len * 20) / 100) as u32);
+                up = kth_in(src, start, len, ((len * 80) / 100) as u32);
+            }
+            out[i] = up;
+            out[n + i] = cur;
+            out[2 * n + i] = lo;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn post_map2(src: &[f32], out: &mut [f32], op: u32, w: u32, a: f32, b: f32, rf: u32) {
+    post_scan2(src, out, op, w, a, b, rf);
+}
+
+/// Run `post_scan2` over `series`; returns `cols` columns.
+pub(crate) fn run_post2(
+    series: &[f32],
+    op: u32,
+    w: u32,
+    a: f32,
+    b: f32,
+    rf: u32,
+    cols: usize,
+) -> Vec<Vec<f32>> {
+    let n = series.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let src = client.create_from_slice(f32::as_bytes(series));
+    let out = client.empty(n * cols * core::mem::size_of::<f32>());
+    unsafe {
+        post_map2::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(src, n),
+            BufferArg::from_raw_parts(out.clone(), n * cols),
+            op,
+            w,
+            a,
+            b,
+            rf,
+        );
+    }
+    let bytes = client.read_one_unchecked(out);
+    let flat = f32::from_bytes(&bytes).to_vec();
+    (0..cols).map(|c| flat[c * n..(c + 1) * n].to_vec()).collect()
+}
+
 fn abs_all(v: &mut [f32]) {
     for x in v.iter_mut() {
         if *x < 0.0 {
@@ -178,6 +314,53 @@ pub fn launch_cube_post(
     if samples.is_empty() {
         return Vec::new();
     }
+    if formula == CubeFormula::RsiPctRank {
+        return launch_cube_post_columns(formula, samples, params).swap_remove(0);
+    }
     let (series, op, w, a) = plan(formula, samples, params);
     run_post(&series, op, w, a)
+}
+
+/// Inner series and post-2 settings of the formulas that go through [`run_post2`].
+fn plan2(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    params: CubeParams,
+) -> (Vec<f32>, u32, u32, f32, f32, u32, usize) {
+    match formula {
+        // RSI percentile rank: RSI(`period`), window `slow` clamped to 5..=1024.
+        CubeFormula::RsiPctRank => {
+            let s = launch_cube(CubeFormula::Rsi, samples, params);
+            (s, 4, params.slow.clamp(5, 1024), 0.0, 0.0, params.period, 1)
+        }
+        // Rolling quartiles of the lane (`lane`), window `slow`.
+        CubeFormula::RollQuart => {
+            let s = launch_cube(CubeFormula::Identity, samples, params);
+            (s, 10, params.slow.max(1), 0.0, 0.0, 0, 3)
+        }
+        // Percentile channels: quantiles `a` (lower) and `b` (upper), clamped to 0..1.
+        CubeFormula::PctChannels => {
+            let s = launch_cube(CubeFormula::Identity, samples, params);
+            (s, 11, params.slow.max(1), params.a.clamp(0.0, 1.0), params.b.clamp(0.0, 1.0), 0, 3)
+        }
+        // RSI percentile bands: RSI(`period`), window `slow` clamped to 10..=1024.
+        CubeFormula::RsiPctBands => {
+            let s = launch_cube(CubeFormula::Rsi, samples, params);
+            (s, 12, params.slow.clamp(10, 1024), 0.0, 0.0, params.period, 3)
+        }
+        _ => (Vec::new(), 3, 1, 0.0, 0.0, 0, 1),
+    }
+}
+
+/// Launch a multi-column composite (codes 600..=699) or a second-stage single column.
+pub fn launch_cube_post_columns(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    params: CubeParams,
+) -> Vec<Vec<f32>> {
+    if samples.is_empty() {
+        return Vec::new();
+    }
+    let (series, op, w, a, b, rf, cols) = plan2(formula, samples, params);
+    run_post2(&series, op, w, a, b, rf, cols)
 }

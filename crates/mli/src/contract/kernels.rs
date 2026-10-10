@@ -4555,6 +4555,9 @@ pub fn launch_cube_columns(
     if formula.code() >= 300 && formula.code() < 400 {
         return launch_cube_gx_columns(formula, samples, params);
     }
+    if formula.code() >= 600 && formula.code() < 700 {
+        return super::kernels_post::launch_cube_post_columns(formula, samples, params);
+    }
     let n = samples.len();
     let cols = formula.output_count() as usize;
     let c = GpuSample::columns(samples);
@@ -6652,6 +6655,56 @@ mod tests {
             })
             .collect();
         assert_close(&run(CubeFormula::Hl2, &bars, CubeParams::period(1)), &c);
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): rank / quantile composites 505, 600..=602.
+    #[test]
+    fn lane_matches_cpu_gx_batch6() {
+        use crate::indicators::channels::percentile_channels::PercentileChannels;
+        use crate::indicators::levels::rolling_quartiles::RollingQuartiles;
+        use crate::indicators::momentum::rsi_percentile_bands::RsiPercentileBands;
+        use crate::indicators::momentum::rsi_percentile_rank::RsiPercentileRank;
+
+        let bars = bars(90);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let mut p = CubeParams::period(5);
+        p.slow = 12;
+
+        let mut m = RsiPercentileRank::new(5, 12);
+        assert_close(&run(CubeFormula::RsiPctRank, &bars, p), &cpu(&close, |v| m.feed(v)));
+
+        let mut m = RollingQuartiles::new(12);
+        let (mut q1, mut q2, mut q3) = (Vec::new(), Vec::new(), Vec::new());
+        for c in &close {
+            m.feed(*c);
+            q1.push(m.q1());
+            q2.push(m.q2());
+            q3.push(m.q3());
+        }
+        assert_cols(&run_cols(CubeFormula::RollQuart, &bars, p), &[&q1, &q2, &q3]);
+
+        let mut m = PercentileChannels::new(12, 0.2, 0.8);
+        let (mut up, mut mid, mut lo) = (Vec::new(), Vec::new(), Vec::new());
+        for c in &close {
+            let (l, md, u) = m.feed(*c);
+            up.push(u);
+            mid.push(md);
+            lo.push(l);
+        }
+        let mut pc = p;
+        pc.a = 0.2;
+        pc.b = 0.8;
+        assert_cols(&run_cols(CubeFormula::PctChannels, &bars, pc), &[&up, &mid, &lo]);
+
+        let mut m = RsiPercentileBands::new(5, 12);
+        let (mut up, mut mid, mut lo) = (Vec::new(), Vec::new(), Vec::new());
+        for c in &close {
+            let (u, md, l) = m.feed(*c);
+            up.push(u);
+            mid.push(md);
+            lo.push(l);
+        }
+        assert_cols(&run_cols(CubeFormula::RsiPctBands, &bars, p), &[&up, &mid, &lo]);
     }
 
     #[test]

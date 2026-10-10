@@ -351,6 +351,14 @@ pub enum CubeFormula {
     VovPct = 503,
     /// Composite: `p - ema(p)` of [`CubeFormula::VovPct`]. UNTESTED on GPU.
     VovPctTrend = 504,
+    /// Composite: RSI(`period`) percentile rank 0..100 over `slow` (5..=1024) bars; 50 until the window is full and `period` bars passed. UNTESTED on GPU.
+    RsiPctRank = 505,
+    /// Rolling quartiles `[q1, q2, q3]` of the lane over `slow` bars: order statistics `len/4`, `len/2`, `3len/4` of the partial window. UNTESTED on GPU.
+    RollQuart = 600,
+    /// Percentile channels `[upper, middle, lower]` of the lane over `slow` bars; lower quantile `a`, upper `b`; order statistic `round(q * (len - 1))`. UNTESTED on GPU.
+    PctChannels = 601,
+    /// RSI percentile bands `[upper, middle, lower]`: RSI(`period`), window `slow` (10..=1024), 80th / 20th order statistics once full. UNTESTED on GPU.
+    RsiPctBands = 602,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -504,6 +512,7 @@ impl CubeFormula {
             CubeFormula::HeikinAshiCols => 4,
             CubeFormula::CandleAnatomyCols => 5,
             CubeFormula::Vortex => 2,
+            CubeFormula::RollQuart | CubeFormula::PctChannels | CubeFormula::RsiPctBands => 3,
             CubeFormula::Dm => 3,
             CubeFormula::DiPlusMinus => 2,
             CubeFormula::Rwi => 2,
@@ -754,6 +763,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::RsiPctRank), Some(CubeFormula::RsiPctRank));
+        assert_eq!(formula_of(IndicatorId::Rquart), Some(CubeFormula::RollQuart));
+        assert_eq!(formula_of(IndicatorId::Percentilech), Some(CubeFormula::PctChannels));
+        assert_eq!(formula_of(IndicatorId::RsiPctBands), Some(CubeFormula::RsiPctBands));
         assert_eq!(formula_of(IndicatorId::C2cvp), Some(CubeFormula::AbsLogRet));
         assert_eq!(formula_of(IndicatorId::Hlva), Some(CubeFormula::Hl2));
         assert_eq!(formula_of(IndicatorId::Keltbw), Some(CubeFormula::KeltBw));

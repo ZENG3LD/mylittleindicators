@@ -300,6 +300,10 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "atr_z" => "AtrZ",
         "vov_pct" => "VovPct",
         "vov_pct_trend" => "VovPctTrend",
+        "rsi_pct_rank" => "RsiPctRank",
+        "roll_quart" => "RollQuart",
+        "pct_channels" => "PctChannels",
+        "rsi_pct_bands" => "RsiPctBands",
         _ => {
             return Err(syn::Error::new(
                 name.span(),
