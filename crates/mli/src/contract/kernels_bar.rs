@@ -106,7 +106,7 @@ fn kth_dev(src: &[f32], start: usize, len: usize, k: u32, mid: f32) -> f32 {
 /// `a` k, ring-storage order like the CPU).
 #[cube]
 fn bar_scan(
-    _o: &[f32],
+    o: &[f32],
     h: &[f32],
     l: &[f32],
     c: &[f32],
@@ -483,7 +483,7 @@ fn bar_scan(
             let cnt = t + 1 - st;
             let mut vol = 0.0f32;
             if flag == 1u32 {
-                vol = _o[t];
+                vol = o[t];
             } else if flag == 2u32 {
                 let mut sr = 0.0f32;
                 for j in st..(t + 1) {
@@ -503,6 +503,14 @@ fn bar_scan(
                 vol = (var / (cnt as f32)).sqrt();
             }
             v0 = v[t] - vol * a;
+        } else if formula == 1216u32 {
+            // distance to levels: `o` = rolling midline, `v` = percentile-channel middle
+            if o[t] != 0.0f32 {
+                v0 = (c[t] - o[t]) / o[t].abs().max(1.0e-9f32);
+            }
+            if v[t] != 0.0f32 {
+                v1 = (c[t] - v[t]) / v[t].abs().max(1.0e-9f32);
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -554,6 +562,15 @@ pub fn launch_cube_bar(
         dp.period = params.period.max(2);
         dp.smoother = super::CubeSmoother::Sma;
         v = super::kernels::launch_cube(CubeFormula::DpoCols, samples, dp);
+    }
+    if formula == CubeFormula::DistLevelsBar {
+        let mut mp = params;
+        mp.period = params.period.max(1);
+        o = super::kernels::launch_cube(CubeFormula::Rmid, samples, mp);
+        let mut pp = params;
+        pp.lane = OhlcvField::Close;
+        pp.slow = params.slow;
+        v = super::kernels::launch_cube_columns(CubeFormula::PctChannels, samples, pp).swap_remove(1);
     }
     if formula == CubeFormula::VoltsBar {
         let tp = lane_series(samples, params, OhlcvField::HLC3);

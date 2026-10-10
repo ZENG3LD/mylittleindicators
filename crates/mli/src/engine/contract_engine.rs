@@ -574,7 +574,7 @@ mli_contract_macros::contract_universe! {
         Ao:        Fields : _ +cube(ao) => crate::indicators::chaos::williams_indicators::AwesomeOscillator,
         ChaosOsc: Fields : _ => crate::indicators::chaos::chaos_oscillator::ChaosOscillator,
         Cusum: Field : _ +cube(cusum) => crate::indicators::statistics::cusum_break_detector::CusumBreakDetector,
-        DistLevels: Fields : _ => crate::indicators::levels::distance_to_levels::DistanceToLevels { dist mid_pct },
+        DistLevels: Fields : _ +cube(comp_dist_levels_bar) => crate::indicators::levels::distance_to_levels::DistanceToLevels { dist mid_pct },
         Hyst: Field : _ +cube(hysteresis_gate_sig) => crate::indicators::signal_logic::hysteresis_gate::HysteresisGate,
         Kcomp: Fields : _ => crate::indicators::kalman::kalman_regime_composite::KalmanRegimeComposite,
         Sbp: Field : _ +cube(comp_sbp_cols) => crate::indicators::signal_processing::spectral_bandpower::SpectralBandpower { low mid high },

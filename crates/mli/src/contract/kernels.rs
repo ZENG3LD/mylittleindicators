@@ -8502,6 +8502,32 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formula 1216.
+    #[test]
+    fn lane_matches_cpu_bar_batch6() {
+        use crate::indicators::levels::distance_to_levels::DistanceToLevels;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(7);
+        p.slow = 12;
+        p.a = 0.2;
+        p.b = 0.8;
+        let mut m = DistanceToLevels::new(7, 12, 0.2, 0.8);
+        chk(&run_cols(CubeFormula::DistLevelsBar, &bars, p), lanes.iter().zip(bars.iter()).map(|(l, b)| { let (d, dm) = m.feed(&[b.open, l[0], l[1], l[2]]); vec![d, dm] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

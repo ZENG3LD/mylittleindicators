@@ -645,6 +645,8 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: distance to levels. UNTESTED on GPU.
+    DistLevelsBar = 1216,
     /// Composite: median channels. UNTESTED on GPU.
     MedChanBar = 1212,
     /// Composite: median channel position. UNTESTED on GPU.
@@ -1022,6 +1024,7 @@ impl CubeFormula {
             CubeFormula::IchimokuBar => 5,
             CubeFormula::MedChanBar => 3,
             CubeFormula::DpoBandsBar => 3,
+            CubeFormula::DistLevelsBar => 2,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1288,6 +1291,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::DistLevels), Some(CubeFormula::DistLevelsBar));
         assert_eq!(formula_of(IndicatorId::Medchan), Some(CubeFormula::MedChanBar));
         assert_eq!(formula_of(IndicatorId::Medchanpos), Some(CubeFormula::MedChanPosBar));
         assert_eq!(formula_of(IndicatorId::Dpobands), Some(CubeFormula::DpoBandsBar));
