@@ -9848,6 +9848,40 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Fuzzy candlesticks (1327).
+    #[test]
+    fn lane_matches_cpu_bar_batch43() {
+        use crate::indicators::candles::fuzzy::FuzzyCandlesticks;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(20);
+        p.a = 0.5;
+        p.b = 1.0;
+        p.c = 1.5;
+        p.signal = 2000;
+        let mut m = FuzzyCandlesticks::new(20, 0.5, 1.0, 1.5, 2.0);
+        let rows: Vec<Vec<f64>> = bars
+            .iter()
+            .map(|b| {
+                m.feed(&[b.open, b.high, b.low, b.close]);
+                vec![m.direction(), m.size(), m.body_size(), m.upper_wick(), m.lower_wick()]
+            })
+            .collect();
+        chk(&run_cols(CubeFormula::FuzzyBar, &bars, p), rows);
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

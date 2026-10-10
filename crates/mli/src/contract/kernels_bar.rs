@@ -4891,6 +4891,122 @@ fn bar_scan(
                 held0 = te.max(0.0f32);
             }
             v0 = held0;
+        } else if formula == 1327u32 {
+            // fuzzy candlesticks `[direction, size, body_size, upper_wick, lower_wick]` as the CPU i8 codes.
+            // period = window, thresholds t1 = a, t2 = b, t3 = c, t4 = p4 / 1000. Population std over the last
+            // `period` values of range, (open - low) / range (the CPU "body percent"), upper and lower wick shares;
+            // all zero until the window is full. The Medium size test is `sd * t2` without the mean, as on the CPU.
+            let pw = period as usize;
+            if pw >= 1usize && t + 1usize >= pw {
+                let t4 = (p4 as f32) / 1000.0f32;
+                let mut m0 = 0.0f32;
+                let mut m1 = 0.0f32;
+                let mut m2 = 0.0f32;
+                let mut m3 = 0.0f32;
+                for k2 in 0..pw {
+                    let q = t - k2;
+                    let ln = (h[q] - l[q]).abs();
+                    let mut bp = 0.0f32;
+                    let mut up = 0.0f32;
+                    let mut lw = 0.0f32;
+                    if ln != 0.0f32 {
+                        bp = (o[q] - l[q]) / ln;
+                        up = (h[q] - o[q].max(c[q])) / ln;
+                        lw = (o[q].max(c[q]) - l[q]) / ln;
+                    }
+                    m0 = m0 + ln;
+                    m1 = m1 + bp;
+                    m2 = m2 + up;
+                    m3 = m3 + lw;
+                }
+                let pf = pw as f32;
+                m0 = m0 / pf;
+                m1 = m1 / pf;
+                m2 = m2 / pf;
+                m3 = m3 / pf;
+                let mut s0 = 0.0f32;
+                let mut s1 = 0.0f32;
+                let mut s2 = 0.0f32;
+                let mut s3 = 0.0f32;
+                for k2 in 0..pw {
+                    let q = t - k2;
+                    let ln = (h[q] - l[q]).abs();
+                    let mut bp = 0.0f32;
+                    let mut up = 0.0f32;
+                    let mut lw = 0.0f32;
+                    if ln != 0.0f32 {
+                        bp = (o[q] - l[q]) / ln;
+                        up = (h[q] - o[q].max(c[q])) / ln;
+                        lw = (o[q].max(c[q]) - l[q]) / ln;
+                    }
+                    s0 = s0 + (ln - m0) * (ln - m0);
+                    s1 = s1 + (bp - m1) * (bp - m1);
+                    s2 = s2 + (up - m2) * (up - m2);
+                    s3 = s3 + (lw - m3) * (lw - m3);
+                }
+                s0 = (s0 / pf).sqrt();
+                s1 = (s1 / pf).sqrt();
+                s2 = (s2 / pf).sqrt();
+                s3 = (s3 / pf).sqrt();
+                if c[t] > o[t] {
+                    v0 = 1.0f32;
+                } else if c[t] < o[t] {
+                    v0 = 0.0f32 - 1.0f32;
+                }
+                let ln = (h[t] - l[t]).abs();
+                let mut bp = 0.0f32;
+                let mut up = 0.0f32;
+                let mut lw = 0.0f32;
+                if ln != 0.0f32 {
+                    bp = (o[t] - l[t]) / ln;
+                    up = (h[t] - o[t].max(c[t])) / ln;
+                    lw = (o[t].max(c[t]) - l[t]) / ln;
+                }
+                if ln != 0.0f32 {
+                    if ln <= m0 - s0 * b {
+                        v1 = 1.0f32;
+                    } else if ln <= m0 + s0 * a {
+                        v1 = 2.0f32;
+                    } else if ln <= s0 * b {
+                        v1 = 3.0f32;
+                    } else if ln <= m0 + s0 * _cc {
+                        v1 = 4.0f32;
+                    } else if ln <= m0 + s0 * t4 {
+                        v1 = 5.0f32;
+                    } else {
+                        v1 = 6.0f32;
+                    }
+                }
+                if bp != 0.0f32 {
+                    if bp <= m1 - s1 * a {
+                        v2 = 1.0f32;
+                    } else if bp <= m1 + s1 * b {
+                        v2 = 2.0f32;
+                    } else if bp <= m1 + s1 * _cc {
+                        v2 = 3.0f32;
+                    } else {
+                        v2 = 4.0f32;
+                    }
+                }
+                if up != 0.0f32 {
+                    if up <= m2 - s2 * a {
+                        v3 = 1.0f32;
+                    } else if up <= m2 + s2 * b {
+                        v3 = 2.0f32;
+                    } else {
+                        v3 = 3.0f32;
+                    }
+                }
+                if lw != 0.0f32 {
+                    if lw <= m3 - s3 * a {
+                        v4 = 1.0f32;
+                    } else if lw <= m3 + s3 * b {
+                        v4 = 2.0f32;
+                    } else {
+                        v4 = 3.0f32;
+                    }
+                }
+            }
         }
         out[t] = v0;
         out[n + t] = v1;

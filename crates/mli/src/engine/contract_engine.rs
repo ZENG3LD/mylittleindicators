@@ -244,7 +244,7 @@ mli_contract_macros::contract_universe! {
         ThreshEdge:      Field       : _ +cube(threshold_edge)             => crate::indicators::signal_logic::threshold::Threshold,
         VolRegimeDetect: Field       : _ +cube(vol_regime_sig)             => crate::indicators::regime::volatility_regime::VolatilityRegimeDetector,
         Ewa:             Fields      : _ +time       => crate::indicators::regime::ewa::Ewa { confidence pattern },
-        Fuzzy:           Fields      : _             => crate::indicators::candles::fuzzy::FuzzyCandlesticks { direction size body_size upper_wick lower_wick },
+        Fuzzy:           Fields      : _ +cube(comp_fuzzy_bar) => crate::indicators::candles::fuzzy::FuzzyCandlesticks { direction size body_size upper_wick lower_wick },
         Dm:              Fields       : _ +cube(dm)             => crate::indicators::trend::dm::Dm { plus_di minus_di adx },
         GannHilo:        Fields       : Trend +cube(comp_gann_hilo_cols)         => crate::indicators::trend::gann_hilo_activator::GannHiLoActivator { activator side },
         Tii:             Field       : Trend +cube(comp_tii_comp)         => crate::indicators::trend::trend_intensity_index::TrendIntensityIndex,
