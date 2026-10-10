@@ -749,6 +749,8 @@ pub enum CubeFormula {
     WarnFreqEv = 995,
     /// Event: gamma squeeze detector. UNTESTED on GPU.
     GammaSqEv = 996,
+    /// Composite: FFT dominant period. UNTESTED on GPU.
+    FftBar = 1323,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1597,6 +1599,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::AdaptiveWindowSelector), Some(CubeFormula::AdaptWinEv));
         assert_eq!(formula_of(IndicatorId::WarningFrequencyFilter), Some(CubeFormula::WarnFreqEv));
         assert_eq!(formula_of(IndicatorId::GammaSqueezeDetector), Some(CubeFormula::GammaSqEv));
+        assert_eq!(formula_of(IndicatorId::Fft), Some(CubeFormula::FftBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

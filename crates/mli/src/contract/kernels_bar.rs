@@ -4534,6 +4534,46 @@ fn bar_scan(
                 }
             }
             v0 = s / (len as f32);
+        } else if formula == 1323u32 {
+            // FFT dominant period: window N = next power of two of `period` (max 256), Hamming window over the
+            // last N closes, DFT of the first N / 2 bins; dominant bin = first strict maximum of the magnitude
+            // over bins 1..N/2 (the CPU spectral smoothing never fires: it indexes the vector being built);
+            // period = N / (bin * sampling_rate in `a`), 0 when no bin. Computed from bar 2N - 1 on, 0 before.
+            let mut nn = 1usize;
+            while nn < (period as usize) {
+                nn = nn * 2usize;
+            }
+            if nn > 256usize {
+                nn = 256usize;
+            }
+            if nn >= 2usize && t + 1 >= 2usize * nn {
+                let half = nn / 2usize;
+                let mut bestm = 0.0f32;
+                let mut besti = 0usize;
+                let tp = 6.2831855f32;
+                for kb in 1..half {
+                    let mut re = 0.0f32;
+                    let mut im = 0.0f32;
+                    for j in 0..nn {
+                        let wj = 0.54f32 - 0.46f32 * (tp * (j as f32) / ((nn - 1usize) as f32)).cos();
+                        let xv = c[t + 1usize - nn + j] * wj;
+                        let ang = tp * (((kb * j) % nn) as f32) / (nn as f32);
+                        re = re + xv * ang.cos();
+                        im = im - xv * ang.sin();
+                    }
+                    let mg = re * re + im * im;
+                    if mg > bestm {
+                        bestm = mg;
+                        besti = kb;
+                    }
+                }
+                if besti > 0usize {
+                    held0 = (nn as f32) / ((besti as f32) * a);
+                } else {
+                    held0 = 0.0f32;
+                }
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;

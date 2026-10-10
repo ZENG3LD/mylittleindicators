@@ -175,7 +175,7 @@ mli_contract_macros::contract_universe! {
         Decyc:           Field       : _ +shader             => crate::indicators::signal_processing::decycler::Decycler,
         Esine:           Field       : _ +cube(comp_esine_bar)             => crate::indicators::signal_processing::ehlers_sinewave::EhlersSinewave,
         Ess:             Field       : _ +cube(comp_ess_bar)             => crate::indicators::signal_processing::ehlers_super_smoother::EhlersSuperSmoother,
-        Fft:             Field       : _             => crate::indicators::signal_processing::fft::FastFourierTransform { #spectrum_grid },
+        Fft:             Field       : _ +cube(comp_fft_bar) => crate::indicators::signal_processing::fft::FastFourierTransform { #spectrum_grid },
         Hampel:          Field       : _ +cube(hampel)             => crate::indicators::signal_processing::hampel_filter::HampelFilter,
         Hilb:            Field       : _ +cube(comp_hilb_bar)             => crate::indicators::signal_processing::hilbert::HilbertTransform { amplitude phase frequency },
         Hdc:             Field       : _ +cube(comp_hdc_bar)             => crate::indicators::signal_processing::hilbert_dominant_cycle::HilbertDominantCycle,
