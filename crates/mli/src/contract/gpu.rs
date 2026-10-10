@@ -25,7 +25,7 @@ pub enum GpuMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum CubeFormula {
-    /// `output[i] = input[i]`. Period is ignored.
+    /// `output[i]` is the selected OHLCV lane. Period is ignored.
     Identity = 0,
     /// Mean of the last `period` samples, or of the prefix while the window fills.
     WindowMean = 1,
@@ -48,13 +48,15 @@ pub enum CubeFormula {
     Tma = 9,
     /// `Hma::feed`. WMA of `2 WMA(n/2) - WMA(n)` with length `floor(sqrt(n))`.
     Hma = 10,
-    /// `Alma::new`. Offset `0.85`, sigma `6`. Zero until the window is full.
+    /// `Alma::with_params`. Offset is [`CubeParams::a`], sigma is [`CubeParams::b`].
+    /// Zero until the window is full.
     Alma = 11,
-    /// `T3::new`. Six cascaded EMAs, volume factor `0.7`.
+    /// `T3::with_alpha`. Volume factor is [`CubeParams::a`].
     T3 = 12,
     /// `McGinleyDynamic::feed`.
     Mcginley = 13,
-    /// `Roc::new(period, false)`. Zero until `period` samples, then `(x - x_lag) / x_lag`.
+    /// `Roc`. Zero until `period` samples. `flag == 0` is `(x - x_lag) / x_lag`.
+    /// `flag == 1` is `log10(x / x_lag)`.
     Roc = 14,
     /// `Rsi::new`. Wilder RMA of gains and losses. Stays `0` until that RMA is ready.
     Rsi = 15,
@@ -62,6 +64,57 @@ pub enum CubeFormula {
     Cmo = 16,
     /// `Bias::new`. `x / SMA(x) - 1` once the SMA is ready, otherwise `0`.
     Bias = 17,
+    /// `TrueRange::feed` on high, low, close. First bar is `|high - low|`.
+    TrueRange = 18,
+    /// `Atr::new_wilder`. RMA of true range. First bar is `high - low`.
+    Atr = 19,
+    /// `Bop::feed`. `(close - open) / max(|high - low|, 1e-12)`.
+    Bop = 20,
+    /// `Vwma::feed`. `sum(lane * lane2) / sum(lane2)` over `period`.
+    /// A non-positive weight sum holds the previous value.
+    Vwma = 21,
+    /// MACD line: EMA(`fast`) of `lane` minus EMA(`slow`) of `lane2`.
+    /// `signal` is an input and does not enter this line.
+    Macd = 22,
+    /// APO: EMA(`fast`) of `lane` minus EMA(`slow`) of the same lane.
+    Apo = 23,
+}
+
+/// Scalar axes a cube launch reads beside the OHLCV columns.
+///
+/// `lane` / `lane2` are [`crate::engine::ohlcv_field::OhlcvField`] codes.
+/// `a` is the ALMA offset or the T3 volume factor. `b` is the ALMA sigma.
+/// `flag == 1` selects log ROC. `signal` is the MACD signal period; the
+/// kernel's one output for MACD is still the line.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CubeParams {
+    pub lane: crate::engine::ohlcv_field::OhlcvField,
+    pub lane2: crate::engine::ohlcv_field::OhlcvField,
+    pub period: u32,
+    pub fast: u32,
+    pub slow: u32,
+    pub signal: u32,
+    pub a: f32,
+    pub b: f32,
+    pub flag: u32,
+}
+
+impl CubeParams {
+    /// Close on both lanes, ROC ratio, ALMA offset `0.85` / sigma `6`, signal `9`.
+    /// `fast` and `slow` start equal to `period`. T3 callers set `a` to the volume factor.
+    pub fn period(period: u32) -> Self {
+        Self {
+            lane: crate::engine::ohlcv_field::OhlcvField::Close,
+            lane2: crate::engine::ohlcv_field::OhlcvField::Close,
+            period,
+            fast: period,
+            slow: period,
+            signal: 9,
+            a: 0.85,
+            b: 6.0,
+            flag: 0,
+        }
+    }
 }
 
 impl CubeFormula {
@@ -117,7 +170,12 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Rsi), Some(CubeFormula::Rsi));
         assert_eq!(gpu_of(IndicatorId::Ema), GpuMode::Cube);
         assert_eq!(formula_of(IndicatorId::Ema), Some(CubeFormula::Ema));
-        assert_eq!(formula_of(IndicatorId::Macd), None);
+        assert_eq!(formula_of(IndicatorId::Macd), Some(CubeFormula::Macd));
+        assert_eq!(formula_of(IndicatorId::Apo), Some(CubeFormula::Apo));
+        assert_eq!(formula_of(IndicatorId::Atr), Some(CubeFormula::Atr));
+        assert_eq!(formula_of(IndicatorId::Tr), Some(CubeFormula::TrueRange));
+        assert_eq!(formula_of(IndicatorId::Bop), Some(CubeFormula::Bop));
+        assert_eq!(formula_of(IndicatorId::Vwma), Some(CubeFormula::Vwma));
     }
 
     #[cfg(feature = "gpu-shader")]

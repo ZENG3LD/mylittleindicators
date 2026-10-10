@@ -73,6 +73,21 @@ impl OhlcvField {
     /// assert_eq!(OhlcvField::HL2.extract(bar.0, bar.1, bar.2, bar.3, bar.4), 100.0);
     /// assert_eq!(OhlcvField::HLC3.extract(bar.0, bar.1, bar.2, bar.3, bar.4), 101.66666666666667);
     /// ```
+    /// Discriminant the cube kernel compares against. Matches [`Self::extract`].
+    #[inline]
+    pub const fn code(self) -> u32 {
+        match self {
+            Self::Open => 0,
+            Self::High => 1,
+            Self::Low => 2,
+            Self::Close => 3,
+            Self::Volume => 4,
+            Self::HL2 => 5,
+            Self::HLC3 => 6,
+            Self::OHLC4 => 7,
+        }
+    }
+
     #[inline]
     pub fn extract(&self, open: f64, high: f64, low: f64, close: f64, volume: f64) -> f64 {
         match self {

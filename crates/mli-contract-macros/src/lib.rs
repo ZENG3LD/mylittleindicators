@@ -173,6 +173,12 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "rsi" => "Rsi",
         "cmo" => "Cmo",
         "bias" => "Bias",
+        "true_range" => "TrueRange",
+        "atr" => "Atr",
+        "bop" => "Bop",
+        "vwma" => "Vwma",
+        "macd" => "Macd",
+        "apo" => "Apo",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

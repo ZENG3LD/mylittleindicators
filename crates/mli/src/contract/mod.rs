@@ -686,7 +686,7 @@ pub use render::{
 };
 
 pub mod gpu;
-pub use gpu::{CubeFormula, GpuCube, GpuMode, GpuShader};
+pub use gpu::{CubeFormula, CubeParams, GpuCube, GpuMode, GpuShader};
 
 #[cfg(feature = "gpu")]
 pub mod kernels;
