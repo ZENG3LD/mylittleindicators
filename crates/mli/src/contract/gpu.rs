@@ -645,6 +645,12 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: js divergence. UNTESTED on GPU.
+    JsdBar = 1224,
+    /// Composite: kl divergence. UNTESTED on GPU.
+    KldBar = 1225,
+    /// Composite: lempel ziv. UNTESTED on GPU.
+    LzBar = 1226,
     /// Composite: approximate entropy. UNTESTED on GPU.
     ApenBar = 1220,
     /// Composite: sample entropy. UNTESTED on GPU.
@@ -1305,6 +1311,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Jsd), Some(CubeFormula::JsdBar));
+        assert_eq!(formula_of(IndicatorId::Kld), Some(CubeFormula::KldBar));
+        assert_eq!(formula_of(IndicatorId::Lz), Some(CubeFormula::LzBar));
         assert_eq!(formula_of(IndicatorId::Apen), Some(CubeFormula::ApenBar));
         assert_eq!(formula_of(IndicatorId::Sampen), Some(CubeFormula::SampenBar));
         assert_eq!(formula_of(IndicatorId::Pe), Some(CubeFormula::PermEntBar));

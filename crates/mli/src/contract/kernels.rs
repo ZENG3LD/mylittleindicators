@@ -8601,6 +8601,37 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1224..=1226.
+    #[test]
+    fn lane_matches_cpu_bar_batch9() {
+        use crate::indicators::entropy::js_divergence::JSDivergence;
+        use crate::indicators::entropy::kl_divergence::KLDivergence;
+        use crate::indicators::entropy::lempel_ziv::LempelZivComplexity;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(30);
+        p.fast = 10;
+        p.a = 0.05;
+        let mut m = JSDivergence::new(30, 10, 0.05);
+        chk(&run_cols(CubeFormula::JsdBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = KLDivergence::new(30, 10, 0.05);
+        chk(&run_cols(CubeFormula::KldBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = LempelZivComplexity::new(40);
+        chk(&run_cols(CubeFormula::LzBar, &bars, CubeParams::period(40)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

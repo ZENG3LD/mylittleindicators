@@ -894,6 +894,126 @@ fn bar_scan(
                 held0 = hh.max(0.0f32);
             }
             v0 = held0;
+        } else if formula == 1224u32 || formula == 1225u32 {
+            // Jensen-Shannon (1224) / Kullback-Leibler (1225) divergence between the older and
+            // newer half of the last `w` returns; scr[0..bn) = p, scr[bn..2bn) = q
+            let mut w = period as usize;
+            if w < 10 {
+                w = 10;
+            }
+            if formula == 1225u32 {
+                w = w | 1usize;
+            }
+            let mut bn = p2 as usize;
+            if bn < 8 {
+                bn = 8;
+            }
+            let mut clip = a;
+            if clip < 1.0e-6f32 {
+                clip = 1.0e-6f32;
+            }
+            if t >= w {
+                let half = w / 2;
+                for b in 0..(2 * bn) {
+                    scr[b] = 1.0e-12f32;
+                }
+                for i in 0..w {
+                    let j = t + 1 - w + i;
+                    let r = (c[j] / c[j - 1]).ln();
+                    let rr = r.max(-clip).min(clip);
+                    let x = (rr + clip) / (2.0f32 * clip);
+                    let mut bi = (x * (bn as f32)).floor() as usize;
+                    if bi > bn - 1 {
+                        bi = bn - 1;
+                    }
+                    if i < half {
+                        scr[bi] = scr[bi] + 1.0f32;
+                    } else {
+                        scr[bn + bi] = scr[bn + bi] + 1.0f32;
+                    }
+                }
+                let mut ps = 0.0f32;
+                let mut qs = 0.0f32;
+                for b in 0..bn {
+                    ps = ps + scr[b];
+                    qs = qs + scr[bn + b];
+                }
+                let mut kl_pm = 0.0f32;
+                let mut kl_qm = 0.0f32;
+                let mut kl_pq = 0.0f32;
+                for b in 0..bn {
+                    let pi = scr[b] / ps;
+                    let qi = scr[bn + b] / qs;
+                    let mi = 0.5f32 * (pi + qi);
+                    if pi > 0.0f32 && mi > 0.0f32 {
+                        kl_pm = kl_pm + pi * (pi / mi).ln();
+                    }
+                    if qi > 0.0f32 && mi > 0.0f32 {
+                        kl_qm = kl_qm + qi * (qi / mi).ln();
+                    }
+                    if pi > 0.0f32 && qi > 0.0f32 {
+                        kl_pq = kl_pq + pi * (pi / qi).ln();
+                    }
+                }
+                if formula == 1224u32 {
+                    held0 = (0.5f32 * kl_pm + 0.5f32 * kl_qm).max(0.0f32);
+                } else {
+                    held0 = kl_pq.max(0.0f32);
+                }
+            }
+            v0 = held0;
+        } else if formula == 1226u32 {
+            // Lempel-Ziv complexity of the sign bits, read in ring-storage order like the CPU
+            let mut w = period as usize;
+            if w < 32 {
+                w = 32;
+            }
+            if t >= w {
+                for i in 0..w {
+                    let m = (t - 1) - ((t - 1 + w - i) % w);
+                    let j = m + 1;
+                    if c[j] - c[j - 1] >= 0.0f32 {
+                        scr[i] = 1.0f32;
+                    } else {
+                        scr[i] = 0.0f32;
+                    }
+                }
+                let mut ii = 0usize;
+                let mut cc = 1u32;
+                let mut ll = 1usize;
+                let mut kk = 1usize;
+                let mut kmax = 1usize;
+                let mut done = false;
+                while !done && ii + ll <= w {
+                    if ii + kk >= w || scr[ii + kk] != scr[kk - 1] {
+                        if kk > kmax {
+                            kmax = kk;
+                        }
+                        ii = ii + 1;
+                        if ii == kk {
+                            cc = cc + 1u32;
+                            kk = kk + kmax;
+                            if kk >= w {
+                                done = true;
+                            } else {
+                                ii = 0;
+                                ll = 1;
+                                kmax = 1;
+                            }
+                        } else {
+                            kk = 1;
+                            ll = 1;
+                        }
+                    } else {
+                        kk = kk + 1;
+                        ll = ll + 1;
+                    }
+                }
+                let nf = w as f32;
+                let norm = nf / nf.ln().max(1.0001f32);
+                held0 = (cc as f32) / norm;
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;
