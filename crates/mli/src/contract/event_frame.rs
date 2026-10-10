@@ -438,6 +438,9 @@ impl GpuEventFrame {
 pub struct MergedStream {
     pub width: usize,
     pub events: Vec<(i64, Vec<f64>)>,
+    /// Value columns that hold absolute unix-ms times (e.g. a settlement time); the merge turns
+    /// them into ms from the frame's first row, like `ts`.
+    pub time_cols: Vec<usize>,
 }
 
 impl MergedStream {
@@ -451,7 +454,14 @@ impl MergedStream {
         MergedStream {
             width,
             events: items.iter().map(|t| (ts(t), vals(t))).collect(),
+            time_cols: Vec::new(),
         }
+    }
+
+    /// Mark value columns of this stream as absolute unix-ms times (made relative on merge).
+    pub fn with_time_cols(mut self, cols: &[usize]) -> Self {
+        self.time_cols = cols.to_vec();
+        self
     }
 
     /// One value per event, e.g. `MergedStream::scalar(&funding, |f| f.timestamp, |f| f.rate)`.
@@ -483,12 +493,13 @@ impl GpuEventFrame {
             }
         }
         ev.sort_by(|a, b| (a.0, a.1, a.2).cmp(&(b.0, b.1, b.2)));
+        let t0 = ev.first().map(|e| e.0).unwrap_or(0);
         let mut cur = [0.0f64; EVENT_COLS];
         let rows: Vec<([f64; EVENT_COLS], f32, i64)> = ev
             .iter()
             .map(|&(t, si, k)| {
                 for (c, v) in streams[si].events[k].1.iter().enumerate().take(streams[si].width) {
-                    cur[offs[si] + c] = *v;
+                    cur[offs[si] + c] = if streams[si].time_cols.contains(&c) { *v - t0 as f64 } else { *v };
                 }
                 (cur, (si + 1) as f32, t)
             })

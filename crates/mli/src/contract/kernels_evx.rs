@@ -903,7 +903,7 @@ fn evx_scan(
             v0 = x[i];
             v1 = x[n + i];
             v2 = x[i] - x[n + i];
-        } else if formula == 1082u32 {
+        } else if formula == 1082u32 || formula == 1086u32 {
             // squeeze probability `[prob, direction]`: slot 1 open interest (x0), slot 2 mark
             // (x1), slot 3 liquidation (x2, counted); `a` window ms, `b` max expected
             // liquidations (>= 1). Each stream's window ends at its own latest event.
@@ -1003,7 +1003,20 @@ fn evx_scan(
                     liq_score = 1.0f32;
                 }
             }
-            v0 = 0.4f32 * oi_score + 0.3f32 * pr_score + 0.3f32 * liq_score;
+            if formula == 1086u32 {
+                // compound squeeze: slot 4 funding (x3); 1000x |rate| clamped to 1
+                let mut fa = x[3 * n + i];
+                if fa < 0.0f32 {
+                    fa = 0.0f32 - fa;
+                }
+                let mut fs = fa * 1000.0f32;
+                if fs > 1.0f32 {
+                    fs = 1.0f32;
+                }
+                v0 = 0.3f32 * oi_score + 0.25f32 * liq_score + 0.25f32 * pr_score + 0.2f32 * fs;
+            } else {
+                v0 = 0.4f32 * oi_score + 0.3f32 * pr_score + 0.3f32 * liq_score;
+            }
         } else if formula == 1083u32 {
             // risk-off detector: slots [vol index (x0), liquidation (x1), funding (x2),
             // insurance fund balance (x3)]; `a` window ms, `b` vol threshold, `period` liq count
@@ -1246,6 +1259,342 @@ fn evx_scan(
                 fnn = -1.0f32;
             }
             v0 = (lsn + fl + fnn) / 3.0f32;
+        } else if formula == 1087u32 {
+            // capitulation detector: slots [liquidation (x0 side: +1 buy / -1 sell), agg trade
+            // (x1 price, x2 quantity), mark (x3)]; `period` liq spike count, `a` window ms,
+            // `b` volume spike threshold. Every stream's window ends at its own latest event.
+            if side[i] == 1.0f32 {
+                lv = i + 1;
+            } else if side[i] == 2.0f32 {
+                lm = i + 1;
+            } else {
+                ll = i + 1;
+            }
+            let mut longs = 0.0f32;
+            let mut shorts = 0.0f32;
+            if lv > 0 {
+                let l = lv - 1;
+                let mut j = l + 1;
+                let mut go = true;
+                while go && j > 0 {
+                    j = j - 1;
+                    if side[j] == 1.0f32 {
+                        if ts[l] - ts[j] <= a {
+                            if x[j] > 0.0f32 {
+                                longs = longs + 1.0f32;
+                            } else {
+                                shorts = shorts + 1.0f32;
+                            }
+                        } else {
+                            go = false;
+                        }
+                    }
+                }
+            }
+            let mut vsum = 0.0f32;
+            if lm > 0 {
+                let l = lm - 1;
+                let mut j = l + 1;
+                let mut go = true;
+                while go && j > 0 {
+                    j = j - 1;
+                    if side[j] == 2.0f32 {
+                        if ts[l] - ts[j] <= a {
+                            vsum = vsum + x[n + j] * x[2 * n + j];
+                        } else {
+                            go = false;
+                        }
+                    }
+                }
+            }
+            let spike = vsum >= b;
+            let thr = period as f32;
+            let mut dropped = false;
+            let mut bounced = false;
+            let mut rose = false;
+            let mut fell = false;
+            if ll > 0 {
+                let l = ll - 1;
+                let mut cnt = 0usize;
+                let mut mn = x[3 * n + l];
+                let mut mx = mn;
+                let mut old = mn;
+                let mut j = l + 1;
+                let mut go = true;
+                while go && j > 0 {
+                    j = j - 1;
+                    if side[j] == 3.0f32 {
+                        if ts[l] - ts[j] <= a {
+                            cnt = cnt + 1;
+                            let pv = x[3 * n + j];
+                            old = pv;
+                            if pv < mn {
+                                mn = pv;
+                            }
+                            if pv > mx {
+                                mx = pv;
+                            }
+                        } else {
+                            go = false;
+                        }
+                    }
+                }
+                if cnt >= 3 {
+                    let nw = x[3 * n + l];
+                    dropped = old > 0.0f32 && (mn - old) / old < -0.01f32;
+                    bounced = nw > mn * 1.005f32;
+                    rose = old > 0.0f32 && (mx - old) / old > 0.01f32;
+                    fell = nw < mx * 0.995f32;
+                }
+            }
+            if longs >= thr && spike && dropped && bounced {
+                v0 = 1.0f32;
+            } else if shorts >= thr && spike && rose && fell {
+                v0 = -1.0f32;
+            }
+        } else if formula == 1088u32 {
+            // block trade volume ratio: slots [block trade (x0 price, x1 quantity, x2 is_iv),
+            // agg trade (x3 price, x4 quantity)]; `a` window ms. IV block trades are ignored
+            // entirely (the output holds). Both windows end at the current event.
+            let mut ignore = false;
+            if side[i] == 1.0f32 && x[2 * n + i] > 0.5f32 {
+                ignore = true;
+            }
+            if !ignore {
+                let mut bs = 0.0f32;
+                let mut ag = 0.0f32;
+                let mut j = i + 1;
+                let mut go = true;
+                while go && j > 0 {
+                    j = j - 1;
+                    if ts[i] - ts[j] <= a {
+                        if side[j] == 1.0f32 {
+                            if x[2 * n + j] <= 0.5f32 {
+                                bs = bs + x[j] * x[n + j];
+                            }
+                        } else {
+                            ag = ag + x[3 * n + j] * x[4 * n + j];
+                        }
+                    } else {
+                        go = false;
+                    }
+                }
+                h0 = 0.0f32;
+                if ag > 0.0f32 {
+                    h0 = bs / ag;
+                }
+            }
+            v0 = h0;
+        } else if formula == 1089u32 {
+            // stop hunt detector: slots [liquidation (x0 quote value, x1 side +1 buy / -1 sell),
+            // mark (x2)]; `a` reversal window ms, `b` spike threshold (USD). The signal is
+            // recomputed on mark events only and held between them.
+            if side[i] == 2.0f32 {
+                let mut cnt = 0usize;
+                let mut old = x[2 * n + i];
+                let mut j = i + 1;
+                let mut go = true;
+                while go && j > 0 {
+                    j = j - 1;
+                    if side[j] == 2.0f32 {
+                        if ts[i] - ts[j] <= a {
+                            cnt = cnt + 1;
+                            old = x[2 * n + j];
+                        } else {
+                            go = false;
+                        }
+                    }
+                }
+                h0 = 0.0f32;
+                if cnt >= 2 {
+                    let mut lv_ = 0.0f32;
+                    let mut sv_ = 0.0f32;
+                    let mut q = i + 1;
+                    let mut go2 = true;
+                    while go2 && q > 0 {
+                        q = q - 1;
+                        if ts[i] - ts[q] <= a {
+                            if side[q] == 1.0f32 {
+                                if x[n + q] > 0.0f32 {
+                                    lv_ = lv_ + x[q];
+                                } else {
+                                    sv_ = sv_ + x[q];
+                                }
+                            }
+                        } else {
+                            go2 = false;
+                        }
+                    }
+                    let nw = x[2 * n + i];
+                    if lv_ >= b && nw > old {
+                        h0 = 1.0f32;
+                    } else if sv_ >= b && nw < old {
+                        h0 = -1.0f32;
+                    }
+                }
+            }
+            v0 = h0;
+        } else if formula == 1090u32 {
+            // ratio vs price divergence `[score, side]`: slots [long ratio (x0), price (x1)];
+            // `period` history (>= 2) of each; recomputed on every event once both have 2
+            let mut w = period as usize;
+            if w < 2 {
+                w = 2;
+            }
+            // collect bounds of each stream's last-w rows
+            let mut rc = 0usize;
+            let mut rlo = i;
+            let mut rhi = i;
+            let mut rfound = false;
+            let mut pc = 0usize;
+            let mut plo = i;
+            let mut phi = i;
+            let mut pfound = false;
+            let mut j = i + 1;
+            while j > 0 {
+                j = j - 1;
+                if side[j] == 1.0f32 && rc < w {
+                    rc = rc + 1;
+                    rlo = j;
+                    if !rfound {
+                        rhi = j;
+                        rfound = true;
+                    }
+                }
+                if side[j] == 2.0f32 && pc < w {
+                    pc = pc + 1;
+                    plo = j;
+                    if !pfound {
+                        phi = j;
+                        pfound = true;
+                    }
+                }
+            }
+            if rc >= 2 && pc >= 2 {
+                let dr = x[rhi] - x[rlo];
+                let dp = x[n + phi] - x[n + plo];
+                let mut adr = dr;
+                if adr < 0.0f32 {
+                    adr = 0.0f32 - adr;
+                }
+                let mut adp = dp;
+                if adp < 0.0f32 {
+                    adp = 0.0f32 - adp;
+                }
+                let sr = dr >= 0.0f32;
+                let sp = dp >= 0.0f32;
+                h0 = 0.0f32;
+                h1 = 0.0f32;
+                if sr != sp && adr > 1.0e-9f32 && adp > 1.0e-9f32 {
+                    let mut rmax = x[rlo];
+                    let mut rmin = x[rlo];
+                    let mut pmax = x[n + plo];
+                    let mut pmin = x[n + plo];
+                    let mut rcnt = 0usize;
+                    let mut pcnt = 0usize;
+                    for q in 0..(i + 1) {
+                        if side[q] == 1.0f32 && q >= rlo && rcnt < rc {
+                            rcnt = rcnt + 1;
+                            if x[q] > rmax {
+                                rmax = x[q];
+                            }
+                            if x[q] < rmin {
+                                rmin = x[q];
+                            }
+                        }
+                        if side[q] == 2.0f32 && q >= plo && pcnt < pc {
+                            pcnt = pcnt + 1;
+                            if x[n + q] > pmax {
+                                pmax = x[n + q];
+                            }
+                            if x[n + q] < pmin {
+                                pmin = x[n + q];
+                            }
+                        }
+                    }
+                    let mut rn = 0.0f32;
+                    if rmax - rmin > 1.0e-9f32 {
+                        rn = adr / (rmax - rmin);
+                    }
+                    let mut pn = 0.0f32;
+                    if pmax - pmin > 1.0e-9f32 {
+                        pn = adp / (pmax - pmin);
+                    }
+                    h0 = rn * pn;
+                    if h0 > 1.0f32 {
+                        h0 = 1.0f32;
+                    }
+                    if dr > 0.0f32 {
+                        h1 = 1.0f32;
+                    } else {
+                        h1 = -1.0f32;
+                    }
+                }
+            }
+            v0 = h0;
+            v1 = h1;
+        } else if formula == 1091u32 {
+            // funding settlement impact: slots [settlement (x0 settlement time, ms from the
+            // first row), mark (x1)]; `period` mark buffer (>= 4). Impact (after - before) /
+            // before around a settlement time, pending until two marks straddle it.
+            let mut bs = period as usize;
+            if bs < 4 {
+                bs = 4;
+            }
+            let mut do_calc = false;
+            let mut st = 0.0f32;
+            if side[i] == 1.0f32 {
+                do_calc = true;
+                st = x[i];
+            } else if pa > 0.0f32 {
+                do_calc = true;
+                st = h1;
+            }
+            if do_calc {
+                let mut cnt = 0usize;
+                let mut before = 0.0f32;
+                let mut has_b = false;
+                let mut after = 0.0f32;
+                let mut has_a = false;
+                let mut j = i + 1;
+                while cnt < bs && j > 0 {
+                    j = j - 1;
+                    if side[j] == 2.0f32 {
+                        cnt = cnt + 1;
+                        if ts[j] <= st {
+                            if !has_b {
+                                before = x[n + j];
+                                has_b = true;
+                            }
+                        } else {
+                            after = x[n + j];
+                            has_a = true;
+                        }
+                    }
+                }
+                let mut imp = 0.0f32;
+                if cnt >= 2 && has_b && has_a {
+                    let mut ab = before;
+                    if ab < 0.0f32 {
+                        ab = 0.0f32 - ab;
+                    }
+                    if ab > 1.0e-15f32 {
+                        imp = (after - before) / before;
+                    }
+                }
+                let mut aimp = imp;
+                if aimp < 0.0f32 {
+                    aimp = 0.0f32 - aimp;
+                }
+                if aimp > 0.0f32 {
+                    h2 = imp;
+                    pa = 0.0f32;
+                } else if side[i] == 1.0f32 {
+                    pa = 1.0f32;
+                    h1 = st;
+                }
+            }
+            v0 = h2;
         }
         out[i] = v0;
         out[n + i] = v1;

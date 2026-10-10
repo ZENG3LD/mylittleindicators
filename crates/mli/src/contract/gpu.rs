@@ -633,6 +633,18 @@ pub enum CubeFormula {
     MarketStressMg = 1084,
     /// Composite: sentiment composite. UNTESTED on GPU.
     SentimentCompMg = 1085,
+    /// Composite: compound squeeze probability prob/dir. UNTESTED on GPU.
+    CompoundSqueezeMg = 1086,
+    /// Composite: capitulation detector. UNTESTED on GPU.
+    CapitulationMg = 1087,
+    /// Composite: block trade volume ratio. UNTESTED on GPU.
+    BlockTradeRatioMg = 1088,
+    /// Composite: stop hunt detector. UNTESTED on GPU.
+    StopHuntMg = 1089,
+    /// Composite: ratio vs price divergence score/side. UNTESTED on GPU.
+    RatioVsPriceMg = 1090,
+    /// Composite: funding settlement impact. UNTESTED on GPU.
+    FundingSettleImpactMg = 1091,
     /// Composite: book churn rate. UNTESTED on GPU.
     BookChurnEv = 980,
     /// Composite: level replenishment rate. UNTESTED on GPU.
@@ -966,6 +978,8 @@ impl CubeFormula {
             CubeFormula::PriceVsIndexMg => 3,
             CubeFormula::SettleVsMarkMg => 3,
             CubeFormula::SqueezeProbMg => 2,
+            CubeFormula::CompoundSqueezeMg => 2,
+            CubeFormula::RatioVsPriceMg => 2,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1232,6 +1246,12 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::CompoundSqueezeProbability), Some(CubeFormula::CompoundSqueezeMg));
+        assert_eq!(formula_of(IndicatorId::CapitulationDetector), Some(CubeFormula::CapitulationMg));
+        assert_eq!(formula_of(IndicatorId::BlockTradeVolumeRatio), Some(CubeFormula::BlockTradeRatioMg));
+        assert_eq!(formula_of(IndicatorId::StopHuntDetector), Some(CubeFormula::StopHuntMg));
+        assert_eq!(formula_of(IndicatorId::RatioVsPriceDivergence), Some(CubeFormula::RatioVsPriceMg));
+        assert_eq!(formula_of(IndicatorId::FundingSettlementImpact), Some(CubeFormula::FundingSettleImpactMg));
         assert_eq!(formula_of(IndicatorId::RiskOffDetector), Some(CubeFormula::RiskOffMg));
         assert_eq!(formula_of(IndicatorId::MarketStressComposite), Some(CubeFormula::MarketStressMg));
         assert_eq!(formula_of(IndicatorId::SentimentComposite), Some(CubeFormula::SentimentCompMg));

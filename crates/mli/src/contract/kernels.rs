@@ -8179,6 +8179,141 @@ mod tests {
         assert_close(&launch_cube_events(CubeFormula::SentimentCompMg, &fr, p)[0], &c);
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): merged multi-stream rows 1086..=1091.
+    #[test]
+    fn lane_matches_cpu_merged_batch4() {
+        use super::super::event_frame::{GpuEventFrame, MergedStream};
+        use super::super::kernels_ev::launch_cube_events;
+        use crate::core::types::{
+            AggTrade, BlockTrade, FundingRate, FundingSettlement, Liquidation, LongShortRatio, MarkPrice, OpenInterest, TradeSide,
+        };
+        use crate::engine::streams::agg_trade_consumer::AggTradeConsumer;
+        use crate::engine::streams::block_trade_consumer::BlockTradeConsumer;
+        use crate::engine::streams::funding_rate_consumer::FundingRateConsumer;
+        use crate::engine::streams::funding_settlement_consumer::FundingSettlementConsumer;
+        use crate::engine::streams::liquidation_consumer::LiquidationConsumer;
+        use crate::engine::streams::long_short_ratio_consumer::LongShortRatioConsumer;
+        use crate::engine::streams::mark_price_consumer::MarkPriceConsumer;
+        use crate::engine::streams::open_interest_consumer::OpenInterestConsumer;
+        use crate::indicators::composites::block_trade_volume_ratio::BlockTradeVolumeRatio;
+        use crate::indicators::composites::capitulation_detector::CapitulationDetector;
+        use crate::indicators::composites::compound_squeeze_probability::CompoundSqueezeProbability;
+        use crate::indicators::funding_advanced::funding_settlement_impact::FundingSettlementImpact;
+        use crate::indicators::liquidations::stop_hunt_detector::StopHuntDetector;
+        use crate::indicators::sentiment::ratio_vs_price_divergence::RatioVsPriceDivergence;
+
+        let n = 60usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let t0 = 1_700_000_000_000i64;
+        let mk = |lists: Vec<Vec<i64>>| -> Vec<(i64, usize, usize)> {
+            let mut v: Vec<(i64, usize, usize)> = lists.iter().enumerate().flat_map(|(s, l)| l.iter().enumerate().map(move |(k, t)| (*t, s, k))).collect();
+            v.sort();
+            v
+        };
+        let oi: Vec<OpenInterest> = (0..n).map(|i| OpenInterest { open_interest: 1000.0 + 100.0 * w(i, 0.6), timestamp: t0 + i as i64 * 1700 + 20, ..Default::default() }).collect();
+        let marks: Vec<MarkPrice> = (0..n).map(|i| MarkPrice { mark_price: 100.0 * (1.0 + 0.03 * (w(i, 0.25) - 0.5)), timestamp: t0 + i as i64 * 900 + 10, ..Default::default() }).collect();
+        let liqs: Vec<Liquidation> = (0..n).map(|i| Liquidation { price: 100.0, quantity: 1.0 + 20.0 * w(i, 0.5), timestamp: t0 + i as i64 * 700 + 40, side: if w(i, 0.9) > 0.5 { TradeSide::Buy } else { TradeSide::Sell }, ..Default::default() }).collect();
+        let fund: Vec<FundingRate> = (0..n).map(|i| FundingRate { rate: (w(i, 0.9) - 0.5) * 0.004, timestamp: t0 + i as i64 * 1900 + 3, ..Default::default() }).collect();
+        let aggs: Vec<AggTrade> = (0..n).map(|i| AggTrade { price: 100.0 + w(i, 0.3), quantity: 0.2 + 3.0 * w(i, 0.77), timestamp: t0 + i as i64 * 400, is_buy: w(i, 1.1) > 0.5, ..Default::default() }).collect();
+        let t_o: Vec<i64> = oi.iter().map(|f| f.timestamp).collect();
+        let t_m: Vec<i64> = marks.iter().map(|f| f.timestamp).collect();
+        let t_l: Vec<i64> = liqs.iter().map(|f| f.timestamp).collect();
+        let t_f: Vec<i64> = fund.iter().map(|f| f.timestamp).collect();
+        let t_a: Vec<i64> = aggs.iter().map(|f| f.timestamp).collect();
+        let pp = |p: u32, a: f32, b: f32, c: f32| { let mut x = CubeParams::period(p); x.a = a; x.b = b; x.c = c; x };
+
+        // Compound squeeze: [oi, mark, liquidation, funding].
+        let fr = GpuEventFrame::merged(&[
+            MergedStream::scalar(&oi, |f| f.timestamp, |f| f.open_interest),
+            MergedStream::scalar(&marks, |f| f.timestamp, |f| f.mark_price),
+            MergedStream::scalar(&liqs, |f| f.timestamp, |f| f.quantity),
+            MergedStream::scalar(&fund, |f| f.timestamp, |f| f.rate),
+        ]);
+        let mut m = CompoundSqueezeProbability::new(6000, 10.0);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for (_, s, k) in mk(vec![t_o.clone(), t_m.clone(), t_l.clone(), t_f.clone()]) {
+            match s { 0 => m.update_oi(&oi[k]), 1 => m.update_mark(&marks[k]), 2 => m.update_liquidation(&liqs[k]), _ => m.update_funding(&fund[k]) }
+            a.push(m.prob());
+            b.push(m.dir());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::CompoundSqueezeMg, &fr, pp(1, 6000.0, 10.0, 0.0)), &[&a, &b]);
+
+        // Capitulation: [liquidation side, agg (price, qty), mark].
+        let fr = GpuEventFrame::merged(&[
+            MergedStream::scalar(&liqs, |f| f.timestamp, |f| if f.side == TradeSide::Buy { 1.0 } else { -1.0 }),
+            MergedStream::from_fn(&aggs, 2, |f| f.timestamp, |f| vec![f.price, f.quantity]),
+            MergedStream::scalar(&marks, |f| f.timestamp, |f| f.mark_price),
+        ]);
+        let mut m = CapitulationDetector::new(3, 100.0, 5000);
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![t_l.clone(), t_a.clone(), t_m.clone()]) {
+            match s { 0 => m.update_liquidation(&liqs[k]), 1 => m.update_agg_trade(&aggs[k]), _ => m.update_mark(&marks[k]) }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::CapitulationMg, &fr, pp(3, 5000.0, 100.0, 0.0))[0], &c);
+
+        // Block trade volume ratio: [block (price, qty, is_iv), agg (price, qty)].
+        let blocks: Vec<BlockTrade> = (0..n / 3).map(|i| BlockTrade { block_id: String::new(), price: 100.0, quantity: 10.0 + 5.0 * w(i, 0.77), is_buy: i % 2 == 0, timestamp: t0 + i as i64 * 1300 + 17, is_iv: i % 5 == 4 }).collect();
+        let t_b: Vec<i64> = blocks.iter().map(|f| f.timestamp).collect();
+        let fr = GpuEventFrame::merged(&[
+            MergedStream::from_fn(&blocks, 3, |f| f.timestamp, |f| vec![f.price, f.quantity, if f.is_iv { 1.0 } else { 0.0 }]),
+            MergedStream::from_fn(&aggs, 2, |f| f.timestamp, |f| vec![f.price, f.quantity]),
+        ]);
+        let mut m = BlockTradeVolumeRatio::new(4000);
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![t_b, t_a.clone()]) {
+            if s == 0 { m.update_block_trade(&blocks[k]); } else { m.update_agg_trade(&aggs[k]); }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::BlockTradeRatioMg, &fr, pp(1, 4000.0, 0.0, 0.0))[0], &c);
+
+        // Stop hunt: [liquidation (quote value, side), mark].
+        let fr = GpuEventFrame::merged(&[
+            MergedStream::from_fn(&liqs, 2, |f| f.timestamp, |f| vec![f.quote_value(), if f.side == TradeSide::Buy { 1.0 } else { -1.0 }]),
+            MergedStream::scalar(&marks, |f| f.timestamp, |f| f.mark_price),
+        ]);
+        let mut m = StopHuntDetector::new(500.0, 3000);
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![t_l, t_m.clone()]) {
+            if s == 0 { m.update_liquidation(&liqs[k]); } else { m.update_mark(&marks[k]); }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::StopHuntMg, &fr, pp(1, 3000.0, 500.0, 0.0))[0], &c);
+
+        // Ratio vs price divergence: [long ratio, price].
+        let lsr: Vec<LongShortRatio> = (0..n).map(|i| LongShortRatio { long_ratio: 0.3 + 0.4 * w(i, 0.2), timestamp: t0 + i as i64 * 2100 + 30, ..Default::default() }).collect();
+        let prices: Vec<(i64, f64)> = (0..n).map(|i| (t0 + i as i64 * 1100 + 5, 100.0 + 4.0 * w(i, 0.17))).collect();
+        let t_ls: Vec<i64> = lsr.iter().map(|f| f.timestamp).collect();
+        let t_p: Vec<i64> = prices.iter().map(|f| f.0).collect();
+        let fr = GpuEventFrame::merged(&[
+            MergedStream::scalar(&lsr, |f| f.timestamp, |f| f.long_ratio),
+            MergedStream::scalar(&prices, |f| f.0, |f| f.1),
+        ]);
+        let mut m = RatioVsPriceDivergence::new(6);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for (_, s, k) in mk(vec![t_ls, t_p]) {
+            if s == 0 { m.update_long_short_ratio(&lsr[k]); } else { m.update_price(prices[k].1); }
+            a.push(m.score());
+            b.push(m.side());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::RatioVsPriceMg, &fr, pp(6, 0.0, 0.0, 0.0)), &[&a, &b]);
+
+        // Funding settlement impact: [settlement (settlement time), mark].
+        let sets: Vec<FundingSettlement> = (0..n / 6).map(|i| FundingSettlement { settled_rate: 0.0001, settlement_time: t0 + i as i64 * 5200 + 2500, timestamp: t0 + i as i64 * 5200 + 100 }).collect();
+        let t_s: Vec<i64> = sets.iter().map(|f| f.timestamp).collect();
+        let fr = GpuEventFrame::merged(&[
+            MergedStream::scalar(&sets, |f| f.timestamp, |f| f.settlement_time as f64).with_time_cols(&[0]),
+            MergedStream::scalar(&marks, |f| f.timestamp, |f| f.mark_price),
+        ]);
+        let mut m = FundingSettlementImpact::new(8);
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![t_s, t_m]) {
+            if s == 0 { m.update_funding_settlement(&sets[k]); } else { m.update_mark(&marks[k]); }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::FundingSettleImpactMg, &fr, pp(8, 0.0, 0.0, 0.0))[0], &c);
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
