@@ -10223,6 +10223,34 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): UKF, centred closed form (1342).
+    #[test]
+    fn lane_matches_cpu_bar_batch55() {
+        use crate::indicators::kalman::unscented_kalman_filter::UnscentedKalmanFilter;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        for (dt, q, r) in [(1.0f32, 0.05f32, 0.1f32), (1.0, 0.5, 2.0)] {
+            let mut p = CubeParams::period(1);
+            p.a = dt;
+            p.b = q;
+            p.c = r;
+            let mut m = UnscentedKalmanFilter::new(dt as f64, q as f64, r as f64, None);
+            chk(&run_cols(CubeFormula::UkfBar, &bars, p), close.iter().map(|x| vec![m.feed(*x)]).collect());
+        }
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

@@ -5629,6 +5629,78 @@ fn bar_scan(
                 }
             }
             v0 = scr[8];
+        } else if formula == 1342u32 {
+            // unscented Kalman filter (factory UT params alpha 0.001, beta 2, kappa 0 -> n + lambda = 2e-6). The
+            // sigma-point weights are +-1e6, which f32 cannot carry, so the (linear) state / observation functions are
+            // evaluated in the algebraically identical centred form: predicted mean = F x, spread terms
+            // (1 / (n + lambda)) * sum_i (F m_i)(F m_i)^T over the columns m_i of chol((n + lambda) P) (or the CPU's
+            // diagonal fallback when the Cholesky factor fails). a = dt, b = process noise std, _cc = measurement std.
+            // State s0, s1, P00, P01, P10, P11, init flag, filtered in scr[1..9].
+            if scr[7] < 0.5f32 {
+                scr[1] = c[t];
+                scr[2] = 0.0f32;
+                scr[3] = 1000.0f32;
+                scr[4] = 0.0f32;
+                scr[5] = 0.0f32;
+                scr[6] = 100.0f32;
+                scr[7] = 1.0f32;
+                scr[8] = c[t];
+            } else {
+                let sl = 2.0e-6f32;
+                let q = b * b;
+                let x0 = scr[1];
+                let x1 = scr[2];
+                let p00 = scr[3];
+                let p01 = scr[4];
+                let p11 = scr[6];
+                // columns of the sigma-point offset matrix
+                let mut c0a = sl * p00;
+                let mut c0b = 0.0f32;
+                let mut c1a = 0.0f32;
+                let mut c1b = sl * p11;
+                if sl * p00 > 0.0f32 {
+                    let l11 = (sl * p00).sqrt();
+                    let l21 = (sl * p01) / l11;
+                    let l22sq = sl * p11 - l21 * l21;
+                    if l22sq > 0.0f32 {
+                        c0a = l11;
+                        c0b = l21;
+                        c1a = 0.0f32;
+                        c1b = l22sq.sqrt();
+                    }
+                }
+                // F m for both columns
+                let f0a = c0a + a * c0b;
+                let f0b = 0.95f32 * c0b;
+                let f1a = c1a + a * c1b;
+                let f1b = 0.95f32 * c1b;
+                let a00 = (f0a * f0a + f1a * f1a) / sl;
+                let a01 = (f0a * f0b + f1a * f1b) / sl;
+                let a11 = (f0b * f0b + f1b * f1b) / sl;
+                let m0 = x0 + a * x1;
+                let m1 = 0.95f32 * x1;
+                let innov = c[t] - m0;
+                let icov = a00 + _cc * _cc;
+                if icov > 1.0e-12f32 {
+                    let k0 = a00 / icov;
+                    let k1 = a01 / icov;
+                    scr[1] = m0 + k0 * innov;
+                    scr[2] = m1 + k1 * innov;
+                    scr[3] = a00 + q - k0 * icov * k0;
+                    scr[4] = a01 - k0 * icov * k1;
+                    scr[5] = a01 - k1 * icov * k0;
+                    scr[6] = a11 + q - k1 * icov * k1;
+                    scr[8] = scr[1];
+                } else {
+                    scr[1] = m0;
+                    scr[2] = m1;
+                    scr[3] = a00 + q;
+                    scr[4] = a01;
+                    scr[5] = a01;
+                    scr[6] = a11 + q;
+                }
+            }
+            v0 = scr[8];
         }
         out[t] = v0;
         out[n + t] = v1;
