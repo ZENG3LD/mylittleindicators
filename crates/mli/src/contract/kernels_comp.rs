@@ -340,6 +340,95 @@ fn ew_scan(
                     v = 100.0f32 * x[t] / dn;
                 }
             }
+        } else if op == 42u32 {
+            // Didi ratios held while |mid| <= 1e-12: x = short, y = mid, z = long; a = 0 short, 1 long
+            let mut am = y[t];
+            if am < 0.0f32 {
+                am = -am;
+            }
+            if am > 1.0e-12f32 {
+                if a < 0.5f32 {
+                    held = x[t] / y[t];
+                } else {
+                    held = z[t] / y[t];
+                }
+            }
+            v = held;
+        } else if op == 43u32 {
+            // SSL: x = close, y = ma(high), z = ma(low); a = 0 up line, 1 down line
+            if t == 0 {
+                if a < 0.5f32 {
+                    v = y[t];
+                } else {
+                    v = z[t];
+                }
+            } else if a < 0.5f32 {
+                v = z[t];
+                if x[t] > y[t] {
+                    v = y[t];
+                }
+            } else {
+                v = y[t];
+                if x[t] < z[t] {
+                    v = z[t];
+                }
+            }
+        } else if op == 44u32 {
+            v = 0.0f32;
+            let mut ad = y[t];
+            if ad < 0.0f32 {
+                ad = -ad;
+            }
+            if ad >= 1.0e-12f32 {
+                v = x[t] / y[t];
+            }
+        } else if op == 45u32 {
+            v = x[t] - y[t];
+            if v < 1.0e-12f32 {
+                v = 1.0e-12f32;
+            }
+        } else if op == 46u32 {
+            // EMA slope: x = smoothed, lookback a, first ready bar b
+            let lb = a as usize;
+            if (t as f32) >= b {
+                v = (x[t] - x[t + 1 - lb]) / a;
+            }
+        } else if op == 47u32 {
+            // trend intensity: x = close, y = ma, window a; 50 until full
+            let p = a as usize;
+            v = 50.0f32;
+            if t + 1 >= p {
+                let mut cnt = 0.0f32;
+                for j in (t + 1 - p)..(t + 1) {
+                    if x[j] > y[t] {
+                        cnt = cnt + 1.0f32;
+                    }
+                }
+                v = 100.0f32 * cnt / a;
+            }
+        } else if op == 48u32 {
+            v = x[t] * x[t];
+        } else if op == 49u32 {
+            let mut sv = y[t];
+            if sv < 0.0f32 {
+                sv = 0.0f32;
+            }
+            let sd = sv.sqrt();
+            if sd > 0.0f32 {
+                v = x[t] / sd;
+            }
+        } else if op == 50u32 {
+            // volume price trend: x = close, y = volume
+            if t > 0 {
+                let mut pc = x[t - 1];
+                if pc < 0.0f32 {
+                    pc = -pc;
+                }
+                if pc > 1.0e-12f32 {
+                    held = held + y[t] * (x[t] - x[t - 1]) / x[t - 1];
+                }
+            }
+            v = held;
         } else if op == 29u32 {
             if z[t] != 0.0f32 {
                 v = (x[t] - y[t]) / z[t];
@@ -732,6 +821,71 @@ pub fn launch_cube_comp(
             let src = lane_series(samples, p, p.lane);
             let m = sm(&src, p.smoother, p.period.max(2), 0, p);
             vec![ew2(2, &src, &m, 0.0)]
+        }
+        // Didi index `[short, long]` ratios to the mid average (`a` unused): periods
+        // `fast` (short), `slow` (mid, at least 2), `signal` (long, at least 3), one smoother.
+        CubeFormula::DidiCols => {
+            let src = lane_series(samples, p, p.lane);
+            let sh = sm(&src, p.smoother, p.fast, 0, p);
+            let mi = sm(&src, p.smoother, p.slow.max(2), 0, p);
+            let lg = sm(&src, p.smoother, p.signal.max(3), 0, p);
+            vec![ewc(42, &sh, &mi, &lg, 0.0, 0.0), ewc(42, &sh, &mi, &lg, 1.0, 0.0)]
+        }
+        // SSL channel `[up, down]`: `smoother` over highs and lows, `period`.
+        CubeFormula::SslCols => {
+            let h = lane_series(samples, p, OhlcvField::High);
+            let l = lane_series(samples, p, OhlcvField::Low);
+            let c = lane_series(samples, p, OhlcvField::Close);
+            let mh = sm(&h, p.smoother, p.period, 0, p);
+            let ml = sm(&l, p.smoother, p.period, 0, p);
+            vec![ewc(43, &c, &mh, &ml, 0.0, 0.0), ewc(43, &c, &mh, &ml, 1.0, 0.0)]
+        }
+        // Relative vigor index `[rvgi, signal]`: SMA(close - open) / SMA(max(high - low, 1e-12))
+        // over `period`, SMA signal over `signal` fed once both are full.
+        CubeFormula::RvgiCols => {
+            let o = lane_series(samples, p, OhlcvField::Open);
+            let h = lane_series(samples, p, OhlcvField::High);
+            let l = lane_series(samples, p, OhlcvField::Low);
+            let c = lane_series(samples, p, OhlcvField::Close);
+            let pp = p.period.max(1);
+            let num = ew2(2, &c, &o, 0.0);
+            let den = ew2(45, &h, &l, 0.0);
+            let n = sm(&num, CubeSmoother::Sma, pp, 0, p);
+            let d = sm(&den, CubeSmoother::Sma, pp, 0, p);
+            let r = ew2(44, &n, &d, 0.0);
+            let sig = sm(&r, CubeSmoother::Sma, p.signal.max(1), pp - 1, p);
+            vec![r, sig]
+        }
+        // Slope of a smoother over `slow` bars (lookback), smoother `period`.
+        CubeFormula::EmaSlopeComp => {
+            let src = lane_series(samples, p, p.lane);
+            let lb = p.slow.max(1);
+            let e = sm(&src, p.smoother, p.period, 0, p);
+            let first = lb.max(p.period.max(1)) - 1;
+            vec![ewc(46, &e, &e, &e, lb as f32, first as f32)]
+        }
+        // Trend intensity index over `period` (clamped 2..=512), SMA centre.
+        CubeFormula::TiiComp => {
+            let src = lane_series(samples, p, p.lane);
+            let w = p.period.clamp(2, 512);
+            let m = sm(&src, CubeSmoother::Sma, w, 0, p);
+            vec![ewc(47, &src, &m, &src, w as f32, 0.0)]
+        }
+        // Price z-score: mean and variance smoothers (one id) over `period` (at least 2).
+        CubeFormula::PriceZComp => {
+            let src = lane_series(samples, p, p.lane);
+            let n = p.period.max(2);
+            let mean = sm(&src, p.smoother, n, 0, p);
+            let diff = ew2(2, &src, &mean, 0.0);
+            let sq = ew2(48, &diff, &diff, 0.0);
+            let var = sm(&sq, p.smoother, n, 0, p);
+            vec![ew2(49, &diff, &var, 0.0)]
+        }
+        // Volume price trend.
+        CubeFormula::VptComp => {
+            let c = lane_series(samples, p, OhlcvField::Close);
+            let v = lane_series(samples, p, OhlcvField::Volume);
+            vec![ew2(50, &c, &v, 0.0)]
         }
         _ => Vec::new(),
     }

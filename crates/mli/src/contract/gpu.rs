@@ -543,6 +543,20 @@ pub enum CubeFormula {
     RviComp = 1026,
     /// Composite: Detrended synthetic price. UNTESTED on GPU.
     DspComp = 1027,
+    /// Composite: Didi index short/long. UNTESTED on GPU.
+    DidiCols = 1028,
+    /// Composite: SSL channel up/down. UNTESTED on GPU.
+    SslCols = 1029,
+    /// Composite: Relative vigor index rvgi/signal. UNTESTED on GPU.
+    RvgiCols = 1030,
+    /// Composite: EMA slope. UNTESTED on GPU.
+    EmaSlopeComp = 1031,
+    /// Composite: Trend intensity index. UNTESTED on GPU.
+    TiiComp = 1032,
+    /// Composite: Price z-score (smoother mean/variance). UNTESTED on GPU.
+    PriceZComp = 1033,
+    /// Composite: Volume price trend. UNTESTED on GPU.
+    VptComp = 1034,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -720,6 +734,9 @@ impl CubeFormula {
             CubeFormula::AtrChanCols => 3,
             CubeFormula::StarcCols => 3,
             CubeFormula::VoKcCols => 3,
+            CubeFormula::DidiCols => 2,
+            CubeFormula::SslCols => 2,
+            CubeFormula::RvgiCols => 2,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -985,6 +1002,13 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Didi), Some(CubeFormula::DidiCols));
+        assert_eq!(formula_of(IndicatorId::Ssl), Some(CubeFormula::SslCols));
+        assert_eq!(formula_of(IndicatorId::Rvgi), Some(CubeFormula::RvgiCols));
+        assert_eq!(formula_of(IndicatorId::EmaSlope), Some(CubeFormula::EmaSlopeComp));
+        assert_eq!(formula_of(IndicatorId::Tii), Some(CubeFormula::TiiComp));
+        assert_eq!(formula_of(IndicatorId::PriceZscore), Some(CubeFormula::PriceZComp));
+        assert_eq!(formula_of(IndicatorId::Vpt), Some(CubeFormula::VptComp));
         assert_eq!(formula_of(IndicatorId::Cci), Some(CubeFormula::CciComp));
         assert_eq!(formula_of(IndicatorId::Cv), Some(CubeFormula::CvComp));
         assert_eq!(formula_of(IndicatorId::Mi), Some(CubeFormula::MiComp));

@@ -6997,6 +6997,55 @@ mod tests {
         assert_close(&run(CubeFormula::MiComp, &bars, p), &lanes.iter().map(|l| m.feed(l)).collect::<Vec<f64>>());
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): composites 1028..=1034.
+    #[test]
+    fn lane_matches_cpu_comp_batch5() {
+        use crate::indicators::momentum::ema_slope::EmaSlope;
+        use crate::indicators::momentum::rvgi::Rvgi;
+        use crate::indicators::statistics::price_zscore::PriceZScore;
+        use crate::indicators::trend::didi_index::DidiIndex;
+        use crate::indicators::trend::ssl_channel::SslChannel;
+        use crate::indicators::trend::trend_intensity_index::TrendIntensityIndex;
+        use crate::indicators::volume::vpt::VolumePriceTrend;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        for (sid, cs) in [(SmootherId::Sma, CubeSmoother::Sma), (SmootherId::Ema, CubeSmoother::Ema), (SmootherId::Wma, CubeSmoother::Wma)] {
+            let mut p = CubeParams::period(9);
+            p.smoother = cs;
+            p.fast = 3;
+            p.slow = 6;
+            p.signal = 12;
+            let mut m = DidiIndex::from_smoothers(sid, 3, 6, 12);
+            chk(&run_cols(CubeFormula::DidiCols, &bars, p), close.iter().map(|c| { m.feed(*c); vec![m.short(), m.long()] }).collect());
+            let mut m = SslChannel::from_smoother(9, sid);
+            chk(&run_cols(CubeFormula::SslCols, &bars, p), lanes.iter().map(|l| { m.feed(l); vec![m.up(), m.down()] }).collect());
+            let mut m = EmaSlope::from_smoother(9, 6, sid);
+            assert_close(&run(CubeFormula::EmaSlopeComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = PriceZScore::from_smoothers(sid, 9);
+            assert_close(&run(CubeFormula::PriceZComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        }
+        let mut p = CubeParams::period(9);
+        p.signal = 4;
+        let ohlc: Vec<[f64; 4]> = bars.iter().map(|b| [b.open, b.high, b.low, b.close]).collect();
+        let mut m = Rvgi::new(9, 4);
+        chk(&run_cols(CubeFormula::RvgiCols, &bars, p), ohlc.iter().map(|l| { let v = m.feed(l); vec![v, m.signal()] }).collect());
+        let mut m = TrendIntensityIndex::new(9);
+        assert_close(&run(CubeFormula::TiiComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut m = VolumePriceTrend::new();
+        let cv: Vec<[f64; 2]> = bars.iter().map(|b| [b.close, b.volume]).collect();
+        assert_close(&run(CubeFormula::VptComp, &bars, p), &cv.iter().map(|l| m.feed(l)).collect::<Vec<f64>>());
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
