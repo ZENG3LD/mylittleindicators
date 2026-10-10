@@ -530,6 +530,260 @@ fn evt_map(
     evt_scan(x, side, ts, out, formula, period, a, b, c);
 }
 
+/// `evt_scan` reaches these arms through `win_start` and a usize span cast.
+/// That launch stores zeros and then the device is gone. Count by adding
+/// `1.0`. Keep an event while `ts[i] - ts[j] <= w`, which is the CPU rule
+/// (evict only when the age is strictly greater than the window).
+fn uses_time_window(code: u32) -> bool {
+    matches!(
+        code,
+        920 | 922 | 923 | 924 | 925 | 927 | 928 | 932 | 933 | 934 | 935 | 936 | 942
+    )
+}
+
+#[cube]
+fn evt_win_scan(
+    x: &[f32],
+    side: &[f32],
+    ts: &[f32],
+    out: &mut [f32],
+    formula: u32,
+    period: u32,
+    a: f32,
+    b: f32,
+    c: f32,
+) {
+    let n = side.len();
+    let mut th = period as f32;
+    if th < 1.0f32 {
+        th = 1.0f32;
+    }
+    for i in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        if formula == 920u32 || formula == 942u32 {
+            let mut cnt = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    cnt = cnt + 1.0f32;
+                }
+            }
+            v0 = cnt / (a / 1000.0f32);
+        } else if formula == 922u32 {
+            let mut sum = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    sum = sum + x[2 * n + j];
+                }
+            }
+            v0 = sum / (a / 60000.0f32);
+        } else if formula == 923u32 {
+            let mut lv = 0.0f32;
+            let mut sv = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    if side[j] > 0.0f32 {
+                        lv = lv + x[2 * n + j];
+                    } else {
+                        sv = sv + x[2 * n + j];
+                    }
+                }
+            }
+            let total = lv + sv;
+            if total > 0.0f32 {
+                v0 = (sv - lv) / total;
+            }
+            v1 = lv;
+            v2 = sv;
+        } else if formula == 924u32 {
+            let mut cnt = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    cnt = cnt + 1.0f32;
+                }
+            }
+            if cnt >= th {
+                v0 = 1.0f32;
+            }
+            v1 = cnt;
+        } else if formula == 925u32 {
+            let mut buy = 0.0f32;
+            let mut sell = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    if side[j] > 0.0f32 {
+                        buy = buy + x[n + j];
+                    } else {
+                        sell = sell + x[n + j];
+                    }
+                }
+            }
+            let total = buy + sell;
+            if total > 0.0f32 {
+                v0 = (buy - sell) / total;
+            }
+        } else if formula == 927u32 {
+            let mut net = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    if side[j] > 0.0f32 {
+                        net = net + x[n + j];
+                    } else {
+                        net = net - x[n + j];
+                    }
+                }
+            }
+            v0 = net;
+        } else if formula == 928u32 || formula == 932u32 {
+            let mut cnt = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    cnt = cnt + 1.0f32;
+                }
+            }
+            v0 = cnt / (a / 60000.0f32);
+        } else if formula == 933u32 {
+            let mut long_cnt = 0.0f32;
+            let mut short_cnt = 0.0f32;
+            for j in 0..(i + 1) {
+                let age = ts[i] - ts[j];
+                if age <= b {
+                    long_cnt = long_cnt + 1.0f32;
+                    if age <= a {
+                        short_cnt = short_cnt + 1.0f32;
+                    }
+                }
+            }
+            let cur = short_cnt / (a / 1000.0f32);
+            let base = long_cnt / (b / 1000.0f32);
+            if base > 0.0f32 {
+                v0 = cur / base;
+            }
+        } else if formula == 934u32 {
+            let mut cnt = 0.0f32;
+            let mut buys = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    cnt = cnt + 1.0f32;
+                    if side[j] > 0.0f32 {
+                        buys = buys + 1.0f32;
+                    }
+                }
+            }
+            if cnt >= th {
+                let br = buys / cnt;
+                let sr = (cnt - buys) / cnt;
+                if br >= c {
+                    v0 = 1.0f32;
+                } else if sr >= c {
+                    v0 = -1.0f32;
+                }
+            }
+        } else if formula == 935u32 {
+            let mut ssum = 0.0f32;
+            let mut asum = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    if x[n + j] > b {
+                        asum = asum + x[n + j];
+                        if side[j] > 0.0f32 {
+                            ssum = ssum + x[n + j];
+                        } else {
+                            ssum = ssum - x[n + j];
+                        }
+                    }
+                }
+            }
+            if asum > 0.0f32 {
+                let mut m = ssum / asum;
+                if m > 1.0f32 {
+                    m = 1.0f32;
+                }
+                if m < -1.0f32 {
+                    m = -1.0f32;
+                }
+                v0 = m;
+            }
+        } else if formula == 936u32 {
+            let mut ssum = 0.0f32;
+            let mut asum = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    asum = asum + x[n + j];
+                    if side[j] > 0.0f32 {
+                        ssum = ssum + x[n + j];
+                    } else {
+                        ssum = ssum - x[n + j];
+                    }
+                }
+            }
+            if asum > 0.0f32 {
+                let mut m = ssum / asum;
+                if m > 1.0f32 {
+                    m = 1.0f32;
+                }
+                if m < -1.0f32 {
+                    m = -1.0f32;
+                }
+                v0 = m;
+            }
+        }
+        out[i] = v0;
+        out[n + i] = v1;
+        out[2 * n + i] = v2;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn evt_win_map(
+    x: &[f32],
+    side: &[f32],
+    ts: &[f32],
+    out: &mut [f32],
+    formula: u32,
+    period: u32,
+    a: f32,
+    b: f32,
+    c: f32,
+) {
+    evt_win_scan(x, side, ts, out, formula, period, a, b, c);
+}
+
+fn launch_events_window(
+    formula: CubeFormula,
+    frame: &GpuEventFrame,
+    params: CubeParams,
+) -> Vec<Vec<f32>> {
+    let n = frame.len();
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let xb = client.create_from_slice(f32::as_bytes(&frame.x));
+    let sb = client.create_from_slice(f32::as_bytes(&frame.side));
+    let tb = client.create_from_slice(f32::as_bytes(&frame.ts));
+    let out = client.empty(3 * n * core::mem::size_of::<f32>());
+    unsafe {
+        evt_win_map::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(xb, frame.x.len()),
+            BufferArg::from_raw_parts(sb, n),
+            BufferArg::from_raw_parts(tb, n),
+            BufferArg::from_raw_parts(out.clone(), 3 * n),
+            formula.code(),
+            params.period,
+            params.a.max(1.0),
+            params.b,
+            params.c,
+        );
+    }
+    let bytes = client.read_one_unchecked(out);
+    let flat = f32::from_bytes(&bytes).to_vec();
+    let cols = formula.output_count() as usize;
+    (0..cols).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect()
+}
+
 fn launch_events_timed(
     formula: CubeFormula,
     frame: &GpuEventFrame,
@@ -577,6 +831,9 @@ pub fn launch_cube_events(
     let n = frame.len();
     if n == 0 {
         return Vec::new();
+    }
+    if uses_time_window(formula.code()) {
+        return launch_events_window(formula, frame, params);
     }
     if formula.code() >= 940 {
         return super::kernels_evx::launch_cube_events_x(formula, frame, params);
