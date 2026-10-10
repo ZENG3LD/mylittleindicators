@@ -10251,6 +10251,37 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Particle filter, statistical agreement (1343).
+    #[test]
+    fn lane_matches_cpu_bar_batch56() {
+        use crate::indicators::kalman::particle_filter::{ParticleFilter, ResamplingStrategy};
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        // statistical comparison only: the CPU RNG cache is a process-wide static and f32 sampling diverges
+        let mut p = CubeParams::period(200);
+        p.a = 1.0;
+        p.b = 0.05;
+        p.c = 0.1;
+        let g = run_cols(CubeFormula::ParticleBar, &bars, p);
+        let mut m = ParticleFilter::new(200, 1.0, 0.05, 0.1, ResamplingStrategy::Systematic, None);
+        let cpu: Vec<f64> = close.iter().map(|x| m.feed(*x)).collect();
+        let mad = g[0].iter().zip(cpu.iter()).skip(10).map(|(a, b)| ((*a as f64) - b).abs()).sum::<f64>() / (cpu.len() - 10) as f64;
+        let scale = close.iter().map(|x| x.abs()).sum::<f64>() / close.len() as f64;
+        assert!(mad < 0.05 * scale, "particle filter drifted from the CPU filter: mad {mad}");
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

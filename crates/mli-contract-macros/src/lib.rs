@@ -500,6 +500,7 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "comp_vpin_ev" => "VpinEv",
         "comp_warnfreq_ev" => "WarnFreqEv",
         "comp_gammasq_ev" => "GammaSqEv",
+        "comp_particle_bar" => "ParticleBar",
         "comp_polyreg_bar" => "PolyRegBar",
         "comp_egarch_bar" => "EgarchBar",
         "comp_garch_bar" => "GarchBar",

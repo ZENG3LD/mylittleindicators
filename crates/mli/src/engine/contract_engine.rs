@@ -278,7 +278,7 @@ mli_contract_macros::contract_universe! {
         Abgfilter:       Field       : _ +cube(comp_abg_cols)             => crate::indicators::kalman::alpha_beta_gamma_filter::AlphaBetaGammaFilter { pos vel acc },
         Ekf:             Field       : MovingAverage +cube(comp_ekf_bar) => crate::indicators::kalman::extended_kalman_filter::ExtendedKalmanFilter,
         Ukf:             Field       : MovingAverage +cube(comp_ukf_bar) => crate::indicators::kalman::unscented_kalman_filter::UnscentedKalmanFilter,
-        Particle:        Field       : MovingAverage => crate::indicators::kalman::particle_filter::ParticleFilter,
+        Particle:        Field       : MovingAverage +cube(comp_particle_bar) => crate::indicators::kalman::particle_filter::ParticleFilter,
         Vhf:             Field       : _ +cube(vhf) => crate::indicators::regime::vhf::Vhf,
         Liqgap:          Fields      : _ +cube(comp_liqgap_bar) => crate::indicators::statistical_scoring::liquidity_gap_density::LiquidityGapDensity,
         TsSwings:        Fields      : _ +cube(comp_ts_swings_bar) => crate::indicators::swing::swing_stop::SwingStop { high low },

@@ -815,6 +815,8 @@ pub enum CubeFormula {
     EkfBar = 1341,
     /// Composite: unscented Kalman filter. UNTESTED on GPU.
     UkfBar = 1342,
+    /// Particle (keyed / profile / fit family). UNTESTED on GPU.
+    ParticleBar = 1343,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1828,6 +1830,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Garch), Some(CubeFormula::GarchBar));
         assert_eq!(formula_of(IndicatorId::Egarch), Some(CubeFormula::EgarchBar));
         assert_eq!(formula_of(IndicatorId::PolyReg), Some(CubeFormula::PolyRegBar));
+        assert_eq!(formula_of(IndicatorId::Particle), Some(CubeFormula::ParticleBar));
         assert_eq!(formula_of(IndicatorId::WallDetector), Some(CubeFormula::WallDetectorBk));
         assert_eq!(formula_of(IndicatorId::BestLevelVolatility), Some(CubeFormula::BestLevelVolBk));
         assert_eq!(formula_of(IndicatorId::PriceLevelDensity), Some(CubeFormula::PriceLevelDensityBk));

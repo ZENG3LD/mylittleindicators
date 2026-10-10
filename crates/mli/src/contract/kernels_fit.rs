@@ -11,6 +11,11 @@
 //! - `1340` PolyReg (`period` = degree 1..=8): the CPU "normal equations" are diagonal-only (`coef_i = sum(x^i y) /
 //!   sum(x^2i)`) over window positions x = 0..len-1; the forecast at x = len is evaluated in the scaled variable
 //!   x' = x / len (identical value, avoids f32 overflow of x^16). Forecast holds 0 until `max(degree + 2, 10)` points.
+//! - `1343` Particle filter (factory: Systematic resampling, seed 42; `period` = particles 10..=1000, `a` = dt,
+//!   `b` = process noise std, `c` = measurement noise std). The CPU LCG (`state * 1103515245 + 12345` mod 2^64, value =
+//!   state / u64::MAX) is reproduced with 8-bit limbs (no u64 in WGSL) and Box-Muller with the same one-value cache
+//!   (for a single instance; the CPU cache is a process-wide `static mut`). f32 sampling, weights and resampling
+//!   thresholds cannot track the f64 path sample for sample, so only the statistics of the filter agree.
 //! - `1337` Arima (`period` = p, `fast` = d, `slow` = q): differencing, OLS AR fit (normal equations + pivoted
 //!   Gaussian elimination, pivot threshold 1e-30 instead of 1e-300), constant, MA fit by Nelder-Mead (<= 8 params,
 //!   max 1500 iterations, step 0.3, ftol = xtol = 1e-10) on the conditional sum of squares, fitted residuals and
@@ -23,7 +28,7 @@ use super::gpu::CubeParams;
 use super::CubeFormula;
 
 // scratch layout (f32 indices)
-pub const FIT_SCR: usize = 4096;
+pub const FIT_SCR: usize = 8192;
 
 #[cube]
 fn reflect_into(x: f32, lo: f32, hi: f32) -> f32 {
@@ -223,6 +228,100 @@ fn arima_nm(scr: &mut [f32], dn: usize, p: usize, arn: usize, n: usize, start: u
     }
 }
 
+
+
+/// One LCG step on 8 limbs (little endian, f32-encoded small ints at `scr[off..off + 8]`); returns state / 2^64.
+#[cube]
+fn rng_next(scr: &mut [f32], off: usize) -> f32 {
+    // K = 1103515245 = 0x41C64E6D -> limbs 0x6D, 0x4E, 0xC6, 0x41; add 12345 = 0x3039 -> limbs 0x39, 0x30
+    let mut carry = 0u32;
+    let mut r0 = 0u32;
+    let mut r1 = 0u32;
+    let mut r2 = 0u32;
+    let mut r3 = 0u32;
+    let mut r4 = 0u32;
+    let mut r5 = 0u32;
+    let mut r6 = 0u32;
+    let mut r7 = 0u32;
+    for i in 0..8usize {
+        let mut acc = carry;
+        if i == 0usize {
+            acc = acc + 0x39u32;
+        }
+        if i == 1usize {
+            acc = acc + 0x30u32;
+        }
+        for j in 0..4usize {
+            if j <= i {
+                let sj = scr[off + i - j] as u32;
+                let mut kj = 0x6Du32;
+                if j == 1usize {
+                    kj = 0x4Eu32;
+                }
+                if j == 2usize {
+                    kj = 0xC6u32;
+                }
+                if j == 3usize {
+                    kj = 0x41u32;
+                }
+                acc = acc + sj * kj;
+            }
+        }
+        let limb = acc & 255u32;
+        carry = acc >> 8u32;
+        if i == 0usize {
+            r0 = limb;
+        }
+        if i == 1usize {
+            r1 = limb;
+        }
+        if i == 2usize {
+            r2 = limb;
+        }
+        if i == 3usize {
+            r3 = limb;
+        }
+        if i == 4usize {
+            r4 = limb;
+        }
+        if i == 5usize {
+            r5 = limb;
+        }
+        if i == 6usize {
+            r6 = limb;
+        }
+        if i == 7usize {
+            r7 = limb;
+        }
+    }
+    scr[off] = r0 as f32;
+    scr[off + 1usize] = r1 as f32;
+    scr[off + 2usize] = r2 as f32;
+    scr[off + 3usize] = r3 as f32;
+    scr[off + 4usize] = r4 as f32;
+    scr[off + 5usize] = r5 as f32;
+    scr[off + 6usize] = r6 as f32;
+    scr[off + 7usize] = r7 as f32;
+    (((r7 as f32) * 16777216.0f32 + (r6 as f32) * 65536.0f32 + (r5 as f32) * 256.0f32 + (r4 as f32)) / 4294967296.0f32)
+}
+
+/// Box-Muller with a one-value cache (flag at `off + 8`, value at `off + 9`).
+#[cube]
+fn rng_normal(scr: &mut [f32], off: usize) -> f32 {
+    let mut res = scr[off + 9usize];
+    if scr[off + 8usize] > 0.5f32 {
+        scr[off + 8usize] = 0.0f32;
+    } else {
+        let u1 = rng_next(scr, off);
+        let u2 = rng_next(scr, off);
+        let mag = (-2.0f32 * u1.ln()).sqrt();
+        let ang = 6.2831855f32 * u2;
+        res = mag * ang.cos();
+        scr[off + 9usize] = mag * ang.sin();
+        scr[off + 8usize] = 1.0f32;
+    }
+    res
+}
 
 #[cube]
 fn gobj(scr: &mut [f32], n_par: usize, p: usize, q: usize, nres: usize, uvar: f32, kind: u32, rawoff: usize) -> f32 {
@@ -504,7 +603,7 @@ fn garch_nm(scr: &mut [f32], n: usize, p: usize, q: usize, nres: usize, uvar: f3
 }
 
 #[cube]
-fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p: u32, d: u32, q: u32) {
+fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p: u32, d: u32, q: u32, pf_a: f32, pf_b: f32, pf_c: f32) {
     let nu = n as usize;
     let pu = p as usize;
     let du = d as usize;
@@ -896,12 +995,110 @@ fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p
             }
             out[t] = fcst;
         }
+    } else if formula == 1343u32 {
+        // particles: pos [0, 1000), vel [1000, 2000), weight [2000, 3000), resample pos / vel [3000, 5000),
+        // rng limbs at 5000.. (8 + cache flag + cache)
+        let mut np = pu;
+        if np < 10usize {
+            np = 10usize;
+        }
+        if np > 1000usize {
+            np = 1000usize;
+        }
+        let nf = np as f32;
+        let var = pf_c * pf_c;
+        let norm = 1.0f32 / (6.2831855f32 * var).sqrt();
+        let mut filtered = 0.0f32;
+        for t in 0..nu {
+            if t == 0usize {
+                // seed 42
+                scr[5000usize] = 42.0f32;
+                for i in 1..8usize {
+                    scr[5000usize + i] = 0.0f32;
+                }
+                scr[5008usize] = 0.0f32;
+                scr[5009usize] = 0.0f32;
+                for i in 0..np {
+                    scr[i] = x[t] + rng_normal(scr, 5000usize) * 10.0f32;
+                    scr[1000usize + i] = rng_normal(scr, 5000usize);
+                    scr[2000usize + i] = 1.0f32 / nf;
+                }
+                filtered = x[t];
+            } else {
+                for i in 0..np {
+                    let npos = scr[i] + pf_a * scr[1000usize + i] + rng_normal(scr, 5000usize) * pf_b;
+                    let nvel = scr[1000usize + i] * 0.95f32 + rng_normal(scr, 5000usize) * pf_b * 0.1f32;
+                    scr[i] = npos;
+                    scr[1000usize + i] = nvel;
+                }
+                let mut tot = 0.0f32;
+                for i in 0..np {
+                    let pr = scr[i] + 0.01f32 * scr[i] * scr[i];
+                    let diff = x[t] - pr;
+                    let lik = norm * (-0.5f32 * diff * diff / var).exp();
+                    scr[2000usize + i] = scr[2000usize + i] * lik;
+                    tot = tot + scr[2000usize + i];
+                }
+                if tot > 1.0e-12f32 {
+                    for i in 0..np {
+                        scr[2000usize + i] = scr[2000usize + i] / tot;
+                    }
+                } else {
+                    for i in 0..np {
+                        scr[2000usize + i] = 1.0f32 / nf;
+                    }
+                }
+                let mut sw2 = 0.0f32;
+                for i in 0..np {
+                    sw2 = sw2 + scr[2000usize + i] * scr[2000usize + i];
+                }
+                let mut ess = 0.0f32;
+                if sw2 > 0.0f32 {
+                    ess = 1.0f32 / sw2;
+                }
+                if ess < 0.5f32 * nf {
+                    // systematic resampling
+                    let r = rng_next(scr, 5000usize) / nf;
+                    let mut cum = scr[2000usize];
+                    let mut ii = 0usize;
+                    for j in 0..np {
+                        let u = r + (j as f32) / nf;
+                        let mut adv = true;
+                        while adv {
+                            if u > cum && ii < np - 1usize {
+                                ii = ii + 1usize;
+                                cum = cum + scr[2000usize + ii];
+                            } else {
+                                adv = false;
+                            }
+                        }
+                        scr[3000usize + j] = scr[ii];
+                        scr[4000usize + j] = scr[1000usize + ii];
+                    }
+                    for j in 0..np {
+                        scr[j] = scr[3000usize + j];
+                        scr[1000usize + j] = scr[4000usize + j];
+                        scr[2000usize + j] = 1.0f32 / nf;
+                    }
+                }
+                let mut wp = 0.0f32;
+                let mut tw = 0.0f32;
+                for i in 0..np {
+                    wp = wp + scr[2000usize + i] * scr[i];
+                    tw = tw + scr[2000usize + i];
+                }
+                if tw > 1.0e-12f32 {
+                    filtered = wp;
+                }
+            }
+            out[t] = filtered;
+        }
     }
 }
 
 #[cube(launch_unchecked)]
-fn fit_map(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p: u32, d: u32, q: u32) {
-    fit_scan(x, scr, out, n, formula, p, d, q);
+fn fit_map(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p: u32, d: u32, q: u32, pf_a: f32, pf_b: f32, pf_c: f32) {
+    fit_scan(x, scr, out, n, formula, p, d, q, pf_a, pf_b, pf_c);
 }
 
 /// Launch a fit formula over a single source series.
@@ -915,7 +1112,7 @@ pub fn launch_cube_fit(formula: CubeFormula, x: &[f32], params: CubeParams) -> V
     let xb = client.create_from_slice(f32::as_bytes(x));
     let scr = client.create_from_slice(f32::as_bytes(&vec![0.0f32; FIT_SCR]));
     let out = client.empty(n * 4);
-    let (p, d, q) = if formula == CubeFormula::PolyRegBar { (params.period.min(8), 0, 0) } else if formula == CubeFormula::ArimaBar { (params.period.min(16), params.fast.min(3), params.slow.min(16)) } else { (params.period.min(8), 0, params.fast.min(8)) };
+    let (p, d, q) = if formula == CubeFormula::ParticleBar { (params.period.clamp(10, 1000), 0, 0) } else if formula == CubeFormula::PolyRegBar { (params.period.min(8), 0, 0) } else if formula == CubeFormula::ArimaBar { (params.period.min(16), params.fast.min(3), params.slow.min(16)) } else { (params.period.min(8), 0, params.fast.min(8)) };
     unsafe {
         fit_map::launch_unchecked(
             &client,
@@ -929,6 +1126,9 @@ pub fn launch_cube_fit(formula: CubeFormula, x: &[f32], params: CubeParams) -> V
             p,
             d,
             q,
+            params.a,
+            params.b,
+            params.c,
         );
     }
     vec![f32::from_bytes(&client.read_one_unchecked(out)).to_vec()]
