@@ -2261,6 +2261,44 @@ fn bar_scan(
                     v0 = ((v[t] - lo) / (hi - lo)) * 100.0f32;
                 }
             }
+        } else if formula == 1392u32 {
+            // stage: Bressert raw %K over min(t + 1, period) bars
+            let mut w = period as usize;
+            if w < 1 {
+                w = 1;
+            }
+            let mut st = 0usize;
+            if t + 1 > w {
+                st = t + 1 - w;
+            }
+            let mut hi = h[st];
+            let mut lo = l[st];
+            for j in st..(t + 1) {
+                if h[j] > hi {
+                    hi = h[j];
+                }
+                if l[j] < lo {
+                    lo = l[j];
+                }
+            }
+            let range = (hi - lo).abs().max(1.0e-12f32);
+            v0 = (c[t] - lo) / range * 100.0f32;
+        } else if formula == 1393u32 {
+            // stage: SMI numerator (close - mid) and range
+            v0 = c[t] - 0.5f32 * (h[t] + l[t]);
+            v1 = (h[t] - l[t]).max(1.0e-12f32);
+        } else if formula == 1394u32 {
+            // stage: SMI value from the double-smoothed numerator (o) and range (v)
+            v0 = 100.0f32 * o[t] / (0.5f32 * v[t]).max(1.0e-12f32);
+        } else if formula == 1395u32 {
+            // stage: 50 + 50 tanh(v)
+            let ax = v[t].abs();
+            let th = 1.0f32 - 2.0f32 / ((2.0f32 * ax).exp() + 1.0f32);
+            if v[t] < 0.0f32 {
+                v0 = 50.0f32 - 50.0f32 * th;
+            } else {
+                v0 = 50.0f32 + 50.0f32 * th;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -2413,6 +2451,39 @@ pub fn launch_cube_bar(
         let k0 = rp + sp + kp - 2;
         let k = smooth_series(&raw, params.smoother, kp, k0, params.a, params.b);
         let d = smooth_series(&k, params.smoother2, dp, k0 + kp - 1, params.a, params.b);
+        return vec![k, d];
+    }
+    if formula == CubeFormula::DssBar {
+        let k = bar_stage(1392, [&o, &h, &l, &c, &v], params, 0);
+        let sp = params.fast.max(1);
+        let s1 = smooth_series(&k, params.smoother, sp, 0, params.a, params.b);
+        let s2 = smooth_series(&s1, params.smoother, sp, 0, params.a, params.b);
+        return vec![s2];
+    }
+    if formula == CubeFormula::SmiBar {
+        let dr = bar_run(1393, [&o, &h, &l, &c, &v], params, 0);
+        let diff = dr[0..n].to_vec();
+        let range = dr[n..2 * n].to_vec();
+        let p = params.period.max(1);
+        let d1 = smooth_series(&diff, params.smoother, p, 0, params.a, params.b);
+        let d2 = smooth_series(&d1, params.smoother, p, 0, params.a, params.b);
+        let r1 = smooth_series(&range, params.smoother, p, 0, params.a, params.b);
+        let r2 = smooth_series(&r1, params.smoother, p, 0, params.a, params.b);
+        let line = bar_stage(1394, [&d2, &h, &l, &c, &r2], params, 0);
+        let sig = smooth_series(&line, params.smoother2, params.signal.max(1), p - 1, params.a, params.b);
+        return vec![line, sig];
+    }
+    if formula == CubeFormula::StcBar {
+        let fast = super::kernels_comp::sm(&c, params.smoother, params.fast, 0, params);
+        let slow = super::kernels_comp::sm(&c, params.smoother2, params.slow, 0, params);
+        let line = super::kernels_comp::ew2(2, &fast, &slow, 0.0);
+        let rdy = params.fast.max(1).max(params.slow.max(1)) - 1;
+        let sig = super::kernels_comp::sm(&line, params.smoother3, 9, rdy, params);
+        let raw = super::kernels_comp::ew2(2, &line, &sig, 0.0);
+        let ks = smooth_series(&raw, params.smoother, params.period.max(1), 0, params.a, params.b);
+        let ds = smooth_series(&ks, params.smoother2, params.smooth_period.max(1), 0, params.a, params.b);
+        let k = bar_stage(1395, [&o, &h, &l, &c, &ks], params, 0);
+        let d = bar_stage(1395, [&o, &h, &l, &c, &ds], params, 0);
         return vec![k, d];
     }
     if formula == CubeFormula::DistLevelsBar {

@@ -1153,7 +1153,7 @@ fn run_buf(x: &[f32], extra: &[&[f32]], which: u32, u: &[u32], f: &[f32]) -> Vec
     f32::from_bytes(&client.read_one_unchecked(ob)).to_vec()
 }
 
-fn ew2(op: u32, x: &[f32], y: &[f32], a: f32) -> Vec<f32> {
+pub(crate) fn ew2(op: u32, x: &[f32], y: &[f32], a: f32) -> Vec<f32> {
     ew(op, x, y, x, x, a)
 }
 
@@ -1183,7 +1183,7 @@ pub(crate) fn lane_series(samples: &[GpuSample], params: CubeParams, lane: Ohlcv
     launch_cube(CubeFormula::Identity, samples, p)
 }
 
-fn sm(s: &[f32], which: CubeSmoother, period: u32, skip: u32, p: CubeParams) -> Vec<f32> {
+pub(crate) fn sm(s: &[f32], which: CubeSmoother, period: u32, skip: u32, p: CubeParams) -> Vec<f32> {
     smooth_series(s, which, period.max(1), skip, p.a, p.b)
 }
 

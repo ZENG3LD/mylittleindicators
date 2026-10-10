@@ -8856,6 +8856,48 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1253..=1255.
+    #[test]
+    fn lane_matches_cpu_bar_batch16() {
+        use crate::indicators::momentum::dss_bressert::DssBressert;
+        use crate::indicators::momentum::smi::Smi;
+        use crate::indicators::momentum::stc::Stc;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(8);
+        p.fast = 5;
+        p.smoother = CubeSmoother::Ema;
+        let mut m = DssBressert::new(8, 5);
+        chk(&run_cols(CubeFormula::DssBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]])]).collect());
+        let mut p = CubeParams::period(6);
+        p.signal = 4;
+        p.smoother = CubeSmoother::Ema;
+        p.smoother2 = CubeSmoother::Ema;
+        let mut m = Smi::new(6, 4);
+        chk(&run_cols(CubeFormula::SmiBar, &bars, p), lanes.iter().map(|l| { let v = m.feed(&[l[0], l[1], l[2]]); vec![v, m.signal()] }).collect());
+        let mut p = CubeParams::period(5);
+        p.fast = 6;
+        p.slow = 13;
+        p.smooth_period = 4;
+        p.smoother = CubeSmoother::Ema;
+        p.smoother2 = CubeSmoother::Ema;
+        p.smoother3 = CubeSmoother::Ema;
+        let mut m = Stc::new(6, 13, 5, 4);
+        chk(&run_cols(CubeFormula::StcBar, &bars, p), close.iter().map(|c| { let (k, d) = m.feed(*c); vec![k, d] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
