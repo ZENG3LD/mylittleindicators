@@ -10194,6 +10194,35 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): EKF, Linear observation (1341).
+    #[test]
+    fn lane_matches_cpu_bar_batch54() {
+        use crate::indicators::kalman::extended_kalman_filter::{ExtendedKalmanFilter, ObservationType};
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        for (dt, q, r, fr) in [(1.0f32, 0.05f32, 0.1f32, 0.01f32), (1.0, 0.5, 2.0, 0.02)] {
+            let mut p = CubeParams::period(1);
+            p.a = dt;
+            p.b = q;
+            p.c = r;
+            p.ext[0] = (fr * 1.0e6) as u32;
+            let mut m = ExtendedKalmanFilter::new(dt as f64, q as f64, r as f64, fr as f64, ObservationType::Linear);
+            chk(&run_cols(CubeFormula::EkfBar, &bars, p), close.iter().map(|x| vec![m.feed(*x)]).collect());
+        }
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

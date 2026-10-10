@@ -362,6 +362,7 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "comp_chaososc_bar" => "ChaosOscBar",
         "comp_candle_pattern_bar" => "CandlePatternBar",
         "comp_divergence_bar" => "DivergenceBar",
+        "comp_ekf_bar" => "EkfBar",
         "comp_esine_bar" => "EsineBar",
         "comp_ess_bar" => "EssBar",
         "comp_ehlersfa_bar" => "EhlersfaBar",

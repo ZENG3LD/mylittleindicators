@@ -276,7 +276,7 @@ mli_contract_macros::contract_universe! {
         WilliamsMfi:     Fields      : _ +cube(williams_mfi) => crate::indicators::chaos::williams_indicators::MarketFacilitationIndex,
         Kalman:          Field       : MovingAverage +cube(comp_kalman_comp) => crate::indicators::kalman::basic_kalman_filter::BasicKalmanFilter,
         Abgfilter:       Field       : _ +cube(comp_abg_cols)             => crate::indicators::kalman::alpha_beta_gamma_filter::AlphaBetaGammaFilter { pos vel acc },
-        Ekf:             Field       : MovingAverage => crate::indicators::kalman::extended_kalman_filter::ExtendedKalmanFilter,
+        Ekf:             Field       : MovingAverage +cube(comp_ekf_bar) => crate::indicators::kalman::extended_kalman_filter::ExtendedKalmanFilter,
         Ukf:             Field       : MovingAverage => crate::indicators::kalman::unscented_kalman_filter::UnscentedKalmanFilter,
         Particle:        Field       : MovingAverage => crate::indicators::kalman::particle_filter::ParticleFilter,
         Vhf:             Field       : _ +cube(vhf) => crate::indicators::regime::vhf::Vhf,

@@ -5562,6 +5562,73 @@ fn bar_scan(
             v0 = o[t];
             v1 = sig;
             v2 = stg;
+        } else if formula == 1341u32 {
+            // extended Kalman filter (factory: Linear observation, no adaptive noise). a = dt, b = process noise std,
+            // _cc = measurement noise std, friction in scr[0] (extra). State s0, s1, P00, P01, P10, P11, init flag in
+            // scr[1..8]. Output = filtered value (kept while the innovation variance is <= 1e-12)
+            let fr = scr[0];
+            if scr[7] < 0.5f32 {
+                scr[1] = c[t];
+                scr[2] = 0.0f32;
+                scr[3] = 1000.0f32;
+                scr[4] = 0.0f32;
+                scr[5] = 0.0f32;
+                scr[6] = 100.0f32;
+                scr[7] = 1.0f32;
+                scr[8] = c[t];
+            } else {
+                let q = b * b;
+                let pos = scr[1];
+                let vel = scr[2];
+                let mut fe = 1.0f32 - fr * vel.abs();
+                fe = fe.max(0.1f32);
+                let nv = vel * fe;
+                let np = pos + nv * a;
+                let mut fd = 1.0f32 + 2.0f32 * fr * vel;
+                if vel >= 0.0f32 {
+                    fd = 1.0f32 - 2.0f32 * fr * vel;
+                }
+                // F = [[1, 0], [dt*fd, fd]]
+                let f10 = a * fd;
+                let f11 = fd;
+                let p00 = scr[3];
+                let p01 = scr[4];
+                let p10 = scr[5];
+                let p11 = scr[6];
+                // FP
+                let a00 = p00;
+                let a01 = p01;
+                let a10 = f10 * p00 + f11 * p10;
+                let a11 = f10 * p01 + f11 * p11;
+                // (FP) F^T + Q
+                let n00 = a00 + q * a * a * a / 3.0f32;
+                let n01 = a00 * f10 + a01 * f11 + q * a * a / 2.0f32;
+                let n10 = a10 + q * a * a / 2.0f32;
+                let n11 = a10 * f10 + a11 * f11 + q * a;
+                scr[1] = np;
+                scr[2] = nv;
+                // correct (observation h = [1, 0])
+                let innov = c[t] - np;
+                let s = n00 + _cc * _cc;
+                if s > 1.0e-12f32 {
+                    let k0 = n00 / s;
+                    let k1 = n01 / s;
+                    scr[1] = np + k0 * innov;
+                    scr[2] = nv + k1 * innov;
+                    // P = (I - K H) P ; KH = [[k0, 0], [k1, 0]]
+                    scr[3] = (1.0f32 - k0) * n00;
+                    scr[4] = (1.0f32 - k0) * n01;
+                    scr[5] = (0.0f32 - k1) * n00 + n10;
+                    scr[6] = (0.0f32 - k1) * n01 + n11;
+                    scr[8] = scr[1];
+                } else {
+                    scr[3] = n00;
+                    scr[4] = n01;
+                    scr[5] = n10;
+                    scr[6] = n11;
+                }
+            }
+            v0 = scr[8];
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -6051,6 +6118,13 @@ fn launch_cube_bar_x(
         let p = CubeParams { period: params.period.max(2), fast: (params.ext[0].max(2)).min(4), ..params };
         let flat = bar_run(formula.code(), [&osc, &atr, &l, &c, &v], p, params.flag);
         return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec(), flat[2 * n..3 * n].to_vec()];
+    }
+    if formula == CubeFormula::EkfBar {
+        // a = dt, b = process noise std, c = measurement noise std, slow (as f32 bits via ext[0] / 1e6) = friction
+        let p = CubeParams { a: params.a, b: params.b, ..params };
+        let fr = params.ext[0] as f32 / 1.0e6;
+        let flat = bar_run_x(formula.code(), [&o, &h, &l, &c, &v], &[fr], p, 0);
+        return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

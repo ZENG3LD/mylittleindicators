@@ -811,6 +811,8 @@ pub enum CubeFormula {
     EgarchBar = 1339,
     /// PolyReg (keyed / profile / fit family). UNTESTED on GPU.
     PolyRegBar = 1340,
+    /// Composite: extended Kalman filter. UNTESTED on GPU.
+    EkfBar = 1341,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1682,6 +1684,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::ChaosOsc), Some(CubeFormula::ChaosOscBar));
         assert_eq!(formula_of(IndicatorId::CandlePattern), Some(CubeFormula::CandlePatternBar));
         assert_eq!(formula_of(IndicatorId::Divergence), Some(CubeFormula::DivergenceBar));
+        assert_eq!(formula_of(IndicatorId::Ekf), Some(CubeFormula::EkfBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
