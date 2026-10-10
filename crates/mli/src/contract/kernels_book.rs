@@ -581,8 +581,8 @@ pub fn launch_cube_book(
     if n == 0 {
         return Vec::new();
     }
-    if formula == CubeFormula::MarketMicroBk {
-        return super::kernels_hybrid::launch_market_micro(frame);
+    if formula == CubeFormula::MarketMicroBk || formula == CubeFormula::OrderFlowImbBk {
+        return super::kernels_hybrid::launch_market_micro(frame, formula.code());
     }
     let client =
         cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());

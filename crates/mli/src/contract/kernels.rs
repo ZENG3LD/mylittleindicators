@@ -12287,6 +12287,10 @@ mod tests {
         let mut m = MarketMicrostructure::new(14);
         let c: Vec<f64> = books.iter().map(|b| { m.update_orderbook(b); m.value() }).collect();
         assert_close(&launch_cube_book(CubeFormula::MarketMicroBk, &fr, CubeParams::period(14))[0], &c);
+        use crate::indicators::clusters::order_flow_imbalance::OrderFlowImbalance;
+        let mut o = OrderFlowImbalance::new(14, 0.01);
+        let c: Vec<f64> = books.iter().map(|b| { o.update_orderbook(b); o.value() }).collect();
+        assert_close(&launch_cube_book(CubeFormula::OrderFlowImbBk, &fr, CubeParams::period(14))[0], &c);
     }
 
     /// UNTESTED on GPU (no GPU on the authoring box): footprint rows (1405-1407). Tie-free data: the CPU

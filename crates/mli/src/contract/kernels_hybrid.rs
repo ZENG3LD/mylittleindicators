@@ -212,10 +212,12 @@ pub fn launch_cube_hybrid(formula: CubeFormula, fr: &GpuHybridFrame, params: Cub
 /// `0.4 * liquidity + 0.3`. `spread_pct` keeps its last value while a side is empty. The frame must hold
 /// at least 10 levels per side.
 #[cube]
-fn mm_scan(bpx: &[f32], bsz: &[f32], apx: &[f32], asz: &[f32], nb: &[f32], na: &[f32], out: &mut [f32], n: u32, depth: u32) {
+fn mm_scan(bpx: &[f32], bsz: &[f32], apx: &[f32], asz: &[f32], nb: &[f32], na: &[f32], out: &mut [f32], n: u32, depth: u32, formula: u32) {
     let nu = n as usize;
     let du = depth as usize;
     let mut spct = 0.0f32;
+    let mut pbd = 0.0f32;
+    let mut pad = 0.0f32;
     for i in 0..nu {
         let kb = nb[i] as usize;
         let ka = na[i] as usize;
@@ -235,21 +237,41 @@ fn mm_scan(bpx: &[f32], bsz: &[f32], apx: &[f32], asz: &[f32], nb: &[f32], na: &
                 dep = dep + asz[i * du + l];
             }
         }
+        if formula == 1410u32 {
+            // order-flow imbalance on the book stream: normalised change of 10-level depth (prev depth starts at 0)
+            let mut bd = 0.0f32;
+            let mut ad = 0.0f32;
+            for l in 0..10usize {
+                if l < kb {
+                    bd = bd + bsz[i * du + l];
+                }
+                if l < ka {
+                    ad = ad + asz[i * du + l];
+                }
+            }
+            let db = bd - pbd;
+            let da = ad - pad;
+            let nm = (db.abs() + da.abs()).max(1.0e-12f32);
+            out[i] = (db - da) / nm;
+            pbd = bd;
+            pad = ad;
+        } else {
         let ss = (1.0f32 - spct.min(1.0f32)).max(0.0f32);
         let ds = (dep / 10000.0f32).min(1.0f32);
         let pi = (spct / 0.1f32).min(1.0f32);
         let is = (1.0f32 - pi).max(0.0f32);
         let liq = (ss + ds + is) / 3.0f32;
         out[i] = liq * 0.4f32 + 0.3f32;
+        }
     }
 }
 
 #[cube(launch_unchecked)]
-fn mm_map(bpx: &[f32], bsz: &[f32], apx: &[f32], asz: &[f32], nb: &[f32], na: &[f32], out: &mut [f32], n: u32, depth: u32) {
-    mm_scan(bpx, bsz, apx, asz, nb, na, out, n, depth);
+fn mm_map(bpx: &[f32], bsz: &[f32], apx: &[f32], asz: &[f32], nb: &[f32], na: &[f32], out: &mut [f32], n: u32, depth: u32, formula: u32) {
+    mm_scan(bpx, bsz, apx, asz, nb, na, out, n, depth, formula);
 }
 
-pub fn launch_market_micro(bk: &super::book_frame::GpuBookFrame) -> Vec<Vec<f32>> {
+pub fn launch_market_micro(bk: &super::book_frame::GpuBookFrame, formula: u32) -> Vec<Vec<f32>> {
     let n = bk.n;
     if n == 0 {
         return Vec::new();
@@ -272,6 +294,7 @@ pub fn launch_market_micro(bk: &super::book_frame::GpuBookFrame) -> Vec<Vec<f32>
             BufferArg::from_raw_parts(out.clone(), n),
             n as u32,
             bk.depth as u32,
+            formula,
         );
     }
     vec![f32::from_bytes(&client.read_one_unchecked(out)).to_vec()]

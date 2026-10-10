@@ -498,6 +498,7 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "comp_vpin_ev" => "VpinEv",
         "comp_warnfreq_ev" => "WarnFreqEv",
         "comp_gammasq_ev" => "GammaSqEv",
+        "comp_ofi_bk" => "OrderFlowImbBk",
         "comp_value_area_tk" => "ValueAreaTrackerTk",
         "comp_tpo_balance_tk" => "TpoSessionBalanceTk",
         "comp_footprint_chart_tk" => "FootprintChartTk",

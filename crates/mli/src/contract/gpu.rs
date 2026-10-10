@@ -801,6 +801,8 @@ pub enum CubeFormula {
     TpoSessionBalanceTk = 1408,
     /// ValueAreaTracker (keyed / profile / fit family). UNTESTED on GPU.
     ValueAreaTrackerTk = 1409,
+    /// OrderFlowImb (keyed / profile / fit family). UNTESTED on GPU.
+    OrderFlowImbBk = 1410,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1807,6 +1809,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::FootprintChart), Some(CubeFormula::FootprintChartTk));
         assert_eq!(formula_of(IndicatorId::TpoSessionBalance), Some(CubeFormula::TpoSessionBalanceTk));
         assert_eq!(formula_of(IndicatorId::ValueAreaTracker), Some(CubeFormula::ValueAreaTrackerTk));
+        assert_eq!(formula_of(IndicatorId::OrderFlowImb), Some(CubeFormula::OrderFlowImbBk));
         assert_eq!(formula_of(IndicatorId::WallDetector), Some(CubeFormula::WallDetectorBk));
         assert_eq!(formula_of(IndicatorId::BestLevelVolatility), Some(CubeFormula::BestLevelVolBk));
         assert_eq!(formula_of(IndicatorId::PriceLevelDensity), Some(CubeFormula::PriceLevelDensityBk));
