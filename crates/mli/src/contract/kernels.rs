@@ -9167,6 +9167,40 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1282..=1285 (Pgry, Rcb, PvCoherence, Di).
+    #[test]
+    fn lane_matches_cpu_bar_batch24() {
+        use crate::indicators::accumulation::demand_index::DemandIndex;
+        use crate::indicators::statistics::price_volume_coherence_proxy::PriceVolumeCoherenceProxy;
+        use crate::indicators::volatility::park_gk_rs_yz::VolatilityEstimators;
+        use crate::indicators::volatility::range_compression_burst::RangeCompressionBurst;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = VolatilityEstimators::new(20);
+        chk(&run_cols(CubeFormula::PgryBar, &bars, CubeParams::period(20)), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]]).parkinson]).collect());
+        let mut m = RangeCompressionBurst::new(20);
+        chk(&run_cols(CubeFormula::RcbBar, &bars, CubeParams::period(20)), lanes.iter().map(|l| {
+            m.feed(&[l[0], l[1]]);
+            vec![m.value()]
+        }).collect());
+        let mut m = PriceVolumeCoherenceProxy::new(50);
+        chk(&run_cols(CubeFormula::PvCoherenceBar, &bars, CubeParams::period(50)), lanes.iter().map(|l| vec![m.feed(&[l[2], l[3]])]).collect());
+        let mut m = DemandIndex::with_period(14);
+        chk(&run_cols(CubeFormula::DiBar, &bars, CubeParams::period(14)), bars.iter().map(|b| vec![m.feed(&[b.open, b.high, b.low, b.close, b.volume])]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

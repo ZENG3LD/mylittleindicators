@@ -3158,6 +3158,130 @@ fn bar_scan(
                 cnt_a = cnt_a + 1usize;
             }
             v0 = held0;
+        } else if formula == 1282u32 {
+            // Parkinson estimator: sqrt of the running (non-windowed) mean of ln(H/L)^2 / (4 ln 2)
+            let mut hl = 1.0e-12f32;
+            if l[t] > 0.0f32 {
+                hl = (h[t] / l[t]).max(1.0e-12f32);
+            }
+            let lg = hl.ln();
+            held0 = held0 + lg * lg / (4.0f32 * 0.6931472f32);
+            v0 = (held0 / ((t + 1) as f32)).sqrt();
+        } else if formula == 1283u32 {
+            // range compression burst: 1.0 burst, 0.5 compressed, 0.0 otherwise; window = max(period, 2)
+            let mut w = period as usize;
+            if w < 2usize {
+                w = 2usize;
+            }
+            if t + 1 >= w {
+                let mut mn = 3.4e38f32;
+                let mut mx = 0.0f32;
+                for k in 0..w {
+                    let r = (h[t - k] - l[t - k]).max(0.0f32);
+                    mn = mn.min(r);
+                    mx = mx.max(r);
+                }
+                let cur = (h[t] - l[t]).max(0.0f32);
+                let prv = (h[t - 1] - l[t - 1]).max(0.0f32);
+                let thr = mn + 0.1f32 * (mx - mn).max(1.0e-12f32);
+                let was = held0 > 0.5f32;
+                let comp = cur <= thr;
+                let burst = was && cur > prv && cur > thr;
+                if comp {
+                    held0 = 1.0f32;
+                } else {
+                    held0 = 0.0f32;
+                }
+                if burst {
+                    v0 = 1.0f32;
+                } else if comp {
+                    v0 = 0.5f32;
+                }
+            }
+        } else if formula == 1284u32 {
+            // price/volume coherence proxy: |corr| of log price / log volume changes over the window;
+            // lanes: c = close, v = volume
+            let mut w = period as usize;
+            if w < 2usize {
+                w = 2usize;
+            }
+            let mut n = t + 1;
+            if n > w {
+                n = w;
+            }
+            if n >= 2usize {
+                let mut sx = 0.0f32;
+                let mut sy = 0.0f32;
+                let mut sxx = 0.0f32;
+                let mut syy = 0.0f32;
+                let mut sxy = 0.0f32;
+                for k in 0..n {
+                    let q = t - k;
+                    let mut x = 0.0f32;
+                    let mut y = 0.0f32;
+                    if q >= 1usize {
+                        x = (c[q] / c[q - 1].max(1.0e-12f32)).ln();
+                        y = (v[q] / v[q - 1].max(1.0e-9f32)).ln();
+                        if v[q - 1].max(1.0e-9f32) <= 0.0f32 {
+                            y = 0.0f32;
+                        }
+                    }
+                    sx = sx + x;
+                    sy = sy + y;
+                    sxx = sxx + x * x;
+                    syy = syy + y * y;
+                    sxy = sxy + x * y;
+                }
+                let nn = n as f32;
+                let num = nn * sxy - sx * sy;
+                let den = ((nn * sxx - sx * sx) * (nn * syy - sy * sy)).max(1.0e-24f32).sqrt();
+                if den > 0.0f32 {
+                    held0 = (num / den).abs().min(1.0f32);
+                } else {
+                    held0 = 0.0f32;
+                }
+            }
+            v0 = held0;
+        } else if formula == 1285u32 {
+            // demand index (lanes o,h,l,c,v), volume mean over the last `period` bars
+            let mut pr = period as usize;
+            if pr < 1usize {
+                pr = 1usize;
+            }
+            if t >= 1usize {
+                let mut cntv = t + 1;
+                if cntv > pr {
+                    cntv = pr;
+                }
+                let mut vs = 0.0f32;
+                for k in 0..cntv {
+                    vs = vs + v[t - k];
+                }
+                let avg = vs / (cntv as f32);
+                let mut vf = 1.0f32;
+                if avg > 1.0e-10f32 {
+                    vf = v[t] / avg;
+                }
+                let pc = c[t - 1];
+                let tr = (h[t].max(pc) - l[t].min(pc)).max(1.0e-10f32);
+                let bp = (h[t] - o[t]) + (c[t] - l[t]);
+                let sp = (h[t] - c[t]) + (o[t] - l[t]);
+                let range = h[t] - l[t];
+                if range > 1.0e-10f32 {
+                    let cp = (c[t] - l[t]) / range;
+                    let tp = bp + sp;
+                    let mut prr = 0.0f32;
+                    if tp > 1.0e-10f32 {
+                        prr = (bp - sp) / tp;
+                    }
+                    let pf = (c[t] - pc) / tr;
+                    let pos = (cp - 0.5f32) * 2.0f32;
+                    held0 = (pf * vf * (1.0f32 + pos) + prr * vf * 0.5f32) * 100.0f32;
+                } else {
+                    held0 = 0.0f32;
+                }
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;

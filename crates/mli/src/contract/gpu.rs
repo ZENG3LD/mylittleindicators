@@ -653,6 +653,14 @@ pub enum CubeFormula {
     NrBar = 1280,
     /// Composite: ehlers instantaneous trendline. UNTESTED on GPU.
     EitBar = 1281,
+    /// Composite: parkinson estimator. UNTESTED on GPU.
+    PgryBar = 1282,
+    /// Composite: range compression burst. UNTESTED on GPU.
+    RcbBar = 1283,
+    /// Composite: price volume coherence. UNTESTED on GPU.
+    PvCoherenceBar = 1284,
+    /// Composite: demand index. UNTESTED on GPU.
+    DiBar = 1285,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1437,6 +1445,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Uo), Some(CubeFormula::UoBar));
         assert_eq!(formula_of(IndicatorId::Nr), Some(CubeFormula::NrBar));
         assert_eq!(formula_of(IndicatorId::Eit), Some(CubeFormula::EitBar));
+        assert_eq!(formula_of(IndicatorId::Pgry), Some(CubeFormula::PgryBar));
+        assert_eq!(formula_of(IndicatorId::Rcb), Some(CubeFormula::RcbBar));
+        assert_eq!(formula_of(IndicatorId::PvCoherence), Some(CubeFormula::PvCoherenceBar));
+        assert_eq!(formula_of(IndicatorId::Di), Some(CubeFormula::DiBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
