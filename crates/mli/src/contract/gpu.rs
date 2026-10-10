@@ -1,9 +1,13 @@
 //! GPU bottom of the indicator contract — sibling of [`super::Indicator`]
 //! (compute) and [`super::Render`] (draw).
 //!
-//! `gpu_of` reports the mode from the manifest flag. The CubeCL kernel lives
-//! in `contract::kernels` under feature `gpu`. The WGSL text is on the
-//! [`GpuShader`] impl. Feature `gpu-shader` is the wgpu submitter.
+//! `+cube(formula)` in the manifest is the cube registry. One kernel in
+//! `contract::kernels` (feature `gpu`) runs every formula. An indicator does
+//! not implement [`GpuCube`] to join that table.
+//!
+//! [`GpuShader`] is the escape hatch for a formula the cube subset cannot
+//! express. No catalog member uses it. Feature `gpu-shader` is the wgpu
+//! submitter for that text.
 
 /// How an indicator may leave the CPU.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,8 +20,33 @@ pub enum GpuMode {
     Shader,
 }
 
-/// GPU+ only when this trait is implemented. An unmarked `feed` is not a kernel.
-/// Loop-carried bar state is not rewritten into a parallel map.
+/// Closed set behind `+cube(name)`. The manifest name is the snake_case of
+/// the variant (`window_mean`). One kernel switches on [`CubeFormula::code`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum CubeFormula {
+    /// `output[i] = input[i]`. Period is ignored.
+    Identity = 0,
+    /// Mean of the last `period` samples, or of the prefix while the window fills.
+    WindowMean = 1,
+    /// Max of that same window.
+    WindowMax = 2,
+    /// Min of that same window.
+    WindowMin = 3,
+    /// Linear weights, newest = `period`. Until the window is full the sample
+    /// itself is the value, matching `Wma::feed`.
+    WindowWeighted = 4,
+}
+
+impl CubeFormula {
+    /// Discriminant the kernel compares against.
+    pub const fn code(self) -> u32 {
+        self as u32
+    }
+}
+
+/// A hand-written `#[cube]` kernel that is not one of the shared formulas.
+/// The catalog does not consult this trait. `+cube(formula)` is the registry.
 pub trait GpuCube: super::Indicator {}
 
 /// Compile `source` as a wgpu shader module. The device is the caller's.
@@ -33,7 +62,7 @@ pub fn create_shader_module<'a>(
     })
 }
 
-/// WGSL text. `include_str!` is how a file becomes that `&'static str`.
+/// Hand-written WGSL. Use this only when the update is not a [`CubeFormula`].
 /// The submitter is not linked in the default build.
 pub trait GpuShader: super::Indicator {
     /// Shader source. A file becomes this `&'static str` via `include_str!`.
@@ -46,22 +75,28 @@ pub trait GpuShader: super::Indicator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::contract_engine::gpu_of;
+    use crate::engine::contract_engine::{formula_of, gpu_of};
     use crate::engine::indicator_id::IndicatorId;
-    use crate::indicators::average::sma::Sma;
 
     #[test]
     fn catalog_names_the_written_paths() {
         assert_eq!(gpu_of(IndicatorId::Volume), GpuMode::Cube);
-        assert_eq!(gpu_of(IndicatorId::Sma), GpuMode::Shader);
+        assert_eq!(formula_of(IndicatorId::Volume), Some(CubeFormula::Identity));
+        assert_eq!(gpu_of(IndicatorId::Sma), GpuMode::Cube);
+        assert_eq!(formula_of(IndicatorId::Sma), Some(CubeFormula::WindowMean));
+        assert_eq!(formula_of(IndicatorId::Wma), Some(CubeFormula::WindowWeighted));
+        assert_eq!(formula_of(IndicatorId::Highest), Some(CubeFormula::WindowMax));
+        assert_eq!(formula_of(IndicatorId::Lowest), Some(CubeFormula::WindowMin));
         assert_eq!(gpu_of(IndicatorId::Rsi), GpuMode::None);
-        assert!(Sma::shader_source().contains("fn sma_main"));
-        assert_eq!(Sma::shader_entry(), "sma_main");
+        assert_eq!(formula_of(IndicatorId::Rsi), None);
+        assert_eq!(gpu_of(IndicatorId::Ema), GpuMode::None);
+        assert_eq!(formula_of(IndicatorId::Ema), None);
     }
 
     #[cfg(feature = "gpu-shader")]
     #[test]
-    fn sma_wgsl_parses() {
-        naga::front::wgsl::parse_str(Sma::shader_source()).expect("sma shader");
+    fn shader_hatch_parses() {
+        let src = "@compute @workgroup_size(1)\nfn hatch() {}\n";
+        naga::front::wgsl::parse_str(src).expect("shader hatch");
     }
 }

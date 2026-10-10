@@ -52,9 +52,9 @@ use crate::engine::streams::hybrid_tick_book_consumer::HybridTickBookConsumer;
 
 mli_contract_macros::contract_universe! {
     members {
-        Sma:             Field     : MovingAverage +smoother +shader => crate::indicators::average::sma::Sma,
+        Sma:             Field     : MovingAverage +smoother +cube(window_mean) => crate::indicators::average::sma::Sma,
         Ema:             Field        : MovingAverage +smoother => crate::indicators::average::ema::Ema,
-        Wma:             Field          : MovingAverage +smoother => crate::indicators::average::wma::Wma,
+        Wma:             Field          : MovingAverage +smoother +cube(window_weighted) => crate::indicators::average::wma::Wma,
         Rma:             Field          : MovingAverage +smoother => crate::indicators::average::rma::Rma,
         Dema:            Field          : MovingAverage +smoother => crate::indicators::average::dema::Dema,
         Tema:            Field          : MovingAverage +smoother => crate::indicators::average::tema::Tema,
@@ -109,8 +109,8 @@ mli_contract_macros::contract_universe! {
         Stoch:           Fields       : Oscillator    => crate::indicators::momentum::stochastics::Stochastics { k d },
         Bop:             Fields      : Oscillator    => crate::indicators::momentum::bop::Bop,
         Psl:             Field     : Oscillator +oscillator => crate::indicators::momentum::psl::Psl,
-        Highest:         Field        : _             => crate::indicators::swing::highest::Highest,
-        Lowest:          Field        : _             => crate::indicators::swing::lowest::Lowest,
+        Highest:         Field        : _ +cube(window_max) => crate::indicators::swing::highest::Highest,
+        Lowest:          Field        : _ +cube(window_min) => crate::indicators::swing::lowest::Lowest,
         SwingAge:        Fields      : _             => crate::indicators::swing::swing_age::SwingAge { since_high since_low },
         Swingstr:        Fields      : _             => crate::indicators::swing::swing_strength_score::SwingStrengthScore,
         Fractals:        Fields      : _             => crate::indicators::swing::williams_fractals::WilliamsFractals { up down },
@@ -213,7 +213,7 @@ mli_contract_macros::contract_universe! {
         SessionVwap:     Fields      : _             => crate::indicators::volume::session_vwap::SessionVwap,
         Vzo:             Fields      : _             => crate::indicators::volume::vzo::Vzo,
         Vdelta:          Tick        : _             => crate::indicators::volume::volume_delta::VolumeDelta,
-        Volume:          Field       : _ +cube       => crate::indicators::volume::volume::Volume,
+        Volume:          Field       : _ +cube(identity) => crate::indicators::volume::volume::Volume,
         Rvp:             Fields      : _             => crate::indicators::volume::rolling_volume_profile::RollingVolumeProfile { poc vah val #profile_grid },
         Shannon:         Field       : _             => crate::indicators::entropy::shannon_entropy::ShannonEntropy,
         Apen:            Field       : _             => crate::indicators::entropy::approximate_entropy::ApproximateEntropy,

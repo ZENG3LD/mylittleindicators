@@ -150,16 +150,6 @@ impl Indicator for Sma {
 }
 
 
-impl crate::contract::GpuShader for Sma {
-    fn shader_source() -> &'static str {
-        include_str!("../../contract/shaders/sma_window.wgsl")
-    }
-
-    fn shader_entry() -> &'static str {
-        "sma_main"
-    }
-}
-
 impl Render for Sma {
     fn rendering() -> RenderSpec {
         RenderSpec::builder(Self::ID)

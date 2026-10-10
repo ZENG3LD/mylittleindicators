@@ -79,8 +79,6 @@ impl crate::contract::Config for VolumeConfig {
     }
 }
 
-impl crate::contract::GpuCube for Volume {}
-
 impl Render for Volume {
     fn rendering() -> RenderSpec {
         RenderSpec::builder(Self::ID)

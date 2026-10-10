@@ -43,7 +43,7 @@ use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::{braced, Ident, Path, Token};
+use syn::{braced, parenthesized, Ident, Path, Token};
 
 /// One contracted indicator: `Variant : Flavor : Family [+flag…] => ConcreteType`.
 /// `Family` is a `Family` variant ident — or `_` for an atomic producer that belongs
@@ -63,6 +63,9 @@ struct Member {
     streams: Vec<Ident>,
     family: Option<Ident>,
     flags: Vec<Ident>,
+    /// Pascal variant of [`crate::contract::CubeFormula`] when the member is
+    /// `+cube(name)`. The name in the manifest is snake_case (`window_mean`).
+    cube_formula: Option<Ident>,
     ty: Path,
     outputs: Vec<Ident>,
     /// Brace entries prefixed with `#` — TABLE outputs (read whole as a `MatrixGrid` via the
@@ -93,9 +96,23 @@ impl Parse for Member {
             Some(input.parse()?)
         };
         let mut flags = Vec::new();
+        let mut cube_formula = None;
         while input.peek(Token![+]) {
             input.parse::<Token![+]>()?;
-            flags.push(input.parse::<Ident>()?);
+            let name: Ident = input.parse()?;
+            if name == "cube" {
+                if !input.peek(syn::token::Paren) {
+                    return Err(syn::Error::new(
+                        name.span(),
+                        "+cube requires a formula, for example +cube(window_mean)",
+                    ));
+                }
+                let content;
+                parenthesized!(content in input);
+                let formula: Ident = content.parse()?;
+                cube_formula = Some(cube_formula_variant(&formula)?);
+            }
+            flags.push(name);
         }
         input.parse::<Token![=>]>()?;
         let ty: Path = input.parse()?;
@@ -120,8 +137,37 @@ impl Parse for Member {
         if outputs.is_empty() {
             outputs.push(Ident::new("value", Span::call_site()));
         }
-        Ok(Member { variant, flavor, streams, family, flags, ty, outputs, matrix_outputs })
+        Ok(Member {
+            variant,
+            flavor,
+            streams,
+            family,
+            flags,
+            cube_formula,
+            ty,
+            outputs,
+            matrix_outputs,
+        })
     }
+}
+
+/// Manifest names the formula in snake_case. The generated match uses the
+/// Pascal variant of `CubeFormula`.
+fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
+    let mapped = match name.to_string().as_str() {
+        "identity" => "Identity",
+        "window_mean" => "WindowMean",
+        "window_max" => "WindowMax",
+        "window_min" => "WindowMin",
+        "window_weighted" => "WindowWeighted",
+        _ => {
+            return Err(syn::Error::new(
+                name.span(),
+                "unknown cube formula; expected identity, window_mean, window_max, window_min, or window_weighted",
+            ));
+        }
+    };
+    Ok(Ident::new(mapped, name.span()))
 }
 
 /// One slot-runtime registration: `Family => EnumName`.
@@ -1298,11 +1344,14 @@ pub fn contract_universe(input: TokenStream) -> TokenStream {
         .to_compile_error()
         .into();
     }
-    let cube_variants: Vec<&Ident> = members
-        .iter()
-        .filter(|m| m.flags.iter().any(|f| f == "cube"))
-        .map(|m| &m.variant)
-        .collect();
+    let mut cube_ids: Vec<&Ident> = Vec::new();
+    let mut cube_formulas: Vec<&Ident> = Vec::new();
+    for member in members.iter() {
+        if let Some(formula) = &member.cube_formula {
+            cube_ids.push(&member.variant);
+            cube_formulas.push(formula);
+        }
+    }
     let shader_variants: Vec<&Ident> = members
         .iter()
         .filter(|m| m.flags.iter().any(|f| f == "shader"))
@@ -1334,15 +1383,26 @@ pub fn contract_universe(input: TokenStream) -> TokenStream {
                 _ => return None,
             })
         }
-        /// GPU dispatch of an id. `+cube` is a CubeCL kernel, `+shader` is
-        /// hand-written WGSL. An unmarked member stays `GpuMode::None`.
+        /// GPU dispatch of an id. `+cube(formula)` is one shared CubeCL kernel.
+        /// `+shader` is hand-written WGSL, and only when no formula fits.
+        /// An unmarked member stays `GpuMode::None`.
         pub fn gpu_of(id: crate::engine::indicator_id::IndicatorId) -> crate::contract::GpuMode {
             match id {
-                #( crate::engine::indicator_id::IndicatorId::#cube_variants =>
+                #( crate::engine::indicator_id::IndicatorId::#cube_ids =>
                     crate::contract::GpuMode::Cube, )*
                 #( crate::engine::indicator_id::IndicatorId::#shader_variants =>
                     crate::contract::GpuMode::Shader, )*
                 _ => crate::contract::GpuMode::None,
+            }
+        }
+        /// The cube formula behind `+cube(name)`. `None` when the id is not a cube lane.
+        pub fn formula_of(
+            id: crate::engine::indicator_id::IndicatorId,
+        ) -> Option<crate::contract::CubeFormula> {
+            match id {
+                #( crate::engine::indicator_id::IndicatorId::#cube_ids =>
+                    Some(crate::contract::CubeFormula::#cube_formulas), )*
+                _ => None,
             }
         }
         /// The dig3 stream(s) an id consumes. `None` if not contract-backed.
