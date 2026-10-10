@@ -6939,6 +6939,175 @@ mod tests {
         assert_close(&run(CubeFormula::BosSig, &bars, CubeParams::period(8)), &c);
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): event-frame formulas 900..=917.
+    #[test]
+    fn lane_matches_cpu_event_batch() {
+        use super::super::event_frame::GpuEventFrame;
+        use super::super::kernels_ev::launch_cube_events;
+        use crate::core::types::{
+            AuctionEvent, BlockTrade, FundingRate, HistoricalVolatility, InsuranceFund,
+            OptionGreeks, RiskLimit, Tick, Ticker,
+        };
+        use crate::engine::streams::auction_event_consumer::AuctionEventConsumer;
+        use crate::engine::streams::block_trade_consumer::BlockTradeConsumer;
+        use crate::engine::streams::funding_rate_consumer::FundingRateConsumer;
+        use crate::engine::streams::historical_volatility_consumer::HistoricalVolatilityConsumer;
+        use crate::engine::streams::insurance_fund_consumer::InsuranceFundConsumer;
+        use crate::engine::streams::option_greeks_consumer::OptionGreeksConsumer;
+        use crate::engine::streams::risk_limit_consumer::RiskLimitConsumer;
+        use crate::engine::streams::tick_consumer::TickConsumer;
+        use crate::engine::streams::ticker_consumer::TickerConsumer;
+
+        let n = 60usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let ev = |f: CubeFormula, fr: &GpuEventFrame, p: CubeParams| launch_cube_events(f, fr, p);
+        let t0 = 1_700_000_000_000i64;
+
+        // Ticker.
+        let tickers: Vec<Ticker> = (0..n)
+            .map(|i| Ticker {
+                last_price: 100.0 + 10.0 * w(i, 0.3),
+                bid_price: Some(99.5 + 10.0 * w(i, 0.3)),
+                ask_price: Some(100.5 + 10.0 * w(i, 0.3)),
+                high_24h: Some(110.0 + w(i, 0.2)),
+                low_24h: Some(95.0 - w(i, 0.5)),
+                price_change_percent_24h: Some(5.0 * (w(i, 0.7) - 0.5)),
+                timestamp: t0 + i as i64 * 1000,
+                ..Default::default()
+            })
+            .collect();
+        let fr = GpuEventFrame::from_tickers(&tickers);
+        let mut m = crate::indicators::ticker_advanced::high_low_range_ratio::HighLowRangeRatio::new();
+        let c: Vec<f64> = tickers.iter().map(|t| { m.update_ticker(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::HlRangeRatio, &fr, CubeParams::period(1))[0], &c);
+        let mut m = crate::indicators::ticker_advanced::ticker_spread_ratio::TickerSpreadRatio::new();
+        let c: Vec<f64> = tickers.iter().map(|t| { m.update_ticker(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::TickerSpread, &fr, CubeParams::period(1))[0], &c);
+        let mut m = crate::indicators::ticker_advanced::price_change_24h_z_score::PriceChange24hZScore::new(8);
+        let c: Vec<f64> = tickers.iter().map(|t| { m.update_ticker(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::PctChangeZ, &fr, CubeParams::period(8))[0], &c);
+
+        // Funding.
+        let fund: Vec<FundingRate> = (0..n)
+            .map(|i| FundingRate { rate: (w(i, 0.9) - 0.5) * 0.002, timestamp: t0 + i as i64 * 1000, ..Default::default() })
+            .collect();
+        let fr = GpuEventFrame::from_funding(&fund);
+        let mut m = crate::indicators::funding_advanced::funding_direction_shift::FundingDirectionShift::new();
+        let c: Vec<f64> = fund.iter().map(|t| { m.update_funding(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::FundingDirShift, &fr, CubeParams::period(1))[0], &c);
+
+        // Greeks.
+        let greeks: Vec<OptionGreeks> = (0..n)
+            .map(|i| OptionGreeks {
+                delta: w(i, 0.4) - 0.5,
+                gamma: 0.01 * w(i, 0.8),
+                vega: 1.0,
+                theta: -2.0 * w(i, 0.6),
+                rho: 0.1,
+                mark_iv: 0.5,
+                bid_iv: Some(0.4 + 0.1 * w(i, 0.3)),
+                ask_iv: Some(0.5 + 0.1 * w(i, 0.5)),
+                timestamp: t0 + i as i64 * 1000,
+            })
+            .collect();
+        let fr = GpuEventFrame::from_greeks(&greeks);
+        let mut m = crate::indicators::greeks::iv_skew::IvSkew::new();
+        let c: Vec<f64> = greeks.iter().map(|t| { m.update_option_greeks(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::IvSkewEv, &fr, CubeParams::period(1))[0], &c);
+        let mut m = crate::indicators::greeks::theta_decay_tracker::ThetaDecayTracker::new(7);
+        let c: Vec<f64> = greeks.iter().map(|t| { m.update_option_greeks(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::ThetaDecay, &fr, CubeParams::period(7))[0], &c);
+        let mut m = crate::indicators::greeks::pin_risk_detector::PinRiskDetector::new(0.5, 0.1, 0.5);
+        let c: Vec<f64> = greeks.iter().map(|t| { m.update_option_greeks(t); m.value() }).collect();
+        let mut pp = CubeParams::period(1);
+        pp.a = 0.5;
+        pp.b = 0.1;
+        pp.c = 0.5;
+        assert_close(&ev(CubeFormula::PinRisk, &fr, pp)[0], &c);
+
+        // Risk limits.
+        let risks: Vec<RiskLimit> = (0..n)
+            .map(|i| RiskLimit {
+                tier: (i % 5) as u32,
+                max_leverage: 50.0 - 5.0 * w(i, 0.35).round(),
+                max_position_value: 1.0e6,
+                mmr: 0.005 + 0.01 * w(i, 0.2),
+                imr: 0.01 + 0.01 * w(i, 0.2),
+                timestamp: t0 + i as i64 * 1000,
+            })
+            .collect();
+        let fr = GpuEventFrame::from_risk_limits(&risks);
+        let mut m = crate::indicators::risk::mmr_tracker::MmrTracker::new();
+        let c: Vec<f64> = risks.iter().map(|t| { m.update_risk_limit(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::MmrTrack, &fr, CubeParams::period(1))[0], &c);
+        let mut m = crate::indicators::risk::risk_limit_proximity::RiskLimitProximity::new();
+        let c: Vec<f64> = risks.iter().map(|t| { m.update_risk_limit(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::RiskProximity, &fr, CubeParams::period(1))[0], &c);
+        let mut m = crate::indicators::risk::leverage_reduction_warning::LeverageReductionWarning::new();
+        let c: Vec<f64> = risks.iter().map(|t| { m.update_risk_limit(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::LeverageReduction, &fr, CubeParams::period(1))[0], &c);
+
+        // Ticks.
+        let ticks: Vec<Tick> = (0..n)
+            .map(|i| Tick::new(t0 + i as i64 * 100, 100.0 + w(i, 0.3), 1.0 + w(i, 0.1), w(i, 1.3) > 0.45))
+            .collect();
+        let fr = GpuEventFrame::from_ticks(&ticks);
+        let mut m = crate::indicators::volume::aggressor_imbalance::AggressorImbalance::new(9);
+        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::AggressorImb, &fr, CubeParams::period(9))[0], &c);
+        let mut m = crate::indicators::tick_advanced::trade_run_detector::TradeRunDetector::new(3);
+        let (mut cs, mut cr) = (Vec::new(), Vec::new());
+        for t in &ticks {
+            m.update_tick(t);
+            cs.push(m.side());
+            cr.push(m.run_length());
+        }
+        assert_cols(&ev(CubeFormula::TradeRun, &fr, CubeParams::period(1)), &[&cs, &cr]);
+
+        // Insurance fund, historical vol, block trades, auctions.
+        let ins: Vec<InsuranceFund> = (0..n)
+            .map(|i| InsuranceFund { balance: 1.0e6 - 1.0e4 * i as f64 * w(i, 0.2), timestamp: t0 + i as i64 * 1000 })
+            .collect();
+        let fr = GpuEventFrame::from_insurance(&ins);
+        let mut m = crate::indicators::stress::fund_stress_detector::FundStressDetector::new(6, 1000.0);
+        let c: Vec<f64> = ins.iter().map(|t| { m.update_insurance_fund(t); m.value() }).collect();
+        let mut ip = CubeParams::period(6);
+        ip.a = 1000.0;
+        assert_close(&ev(CubeFormula::FundStress, &fr, ip)[0], &c);
+
+        let hv: Vec<HistoricalVolatility> = (0..n)
+            .map(|i| HistoricalVolatility { volatility: 0.5 + w(i, 0.6) * (1.0 + (i % 9 == 0) as u8 as f64), timestamp: t0 + i as i64 * 1000 })
+            .collect();
+        let fr = GpuEventFrame::from_historical_vol(&hv);
+        let mut m = crate::indicators::volatility_advanced::hv_spike::HvSpike::new(8, 1.3);
+        let c: Vec<f64> = hv.iter().map(|t| { m.update_historical_volatility(t); m.value() }).collect();
+        let mut hp = CubeParams::period(8);
+        hp.a = 1.3;
+        assert_close(&ev(CubeFormula::HvSpikeEv, &fr, hp)[0], &c);
+
+        let blocks: Vec<BlockTrade> = (0..n)
+            .map(|i| BlockTrade { block_id: String::new(), price: 100.0, quantity: 10.0 + 50.0 * w(i, 0.77), is_buy: i % 2 == 0, timestamp: t0 + i as i64 * 1000, is_iv: false })
+            .collect();
+        let fr = GpuEventFrame::from_block_trades(&blocks);
+        let mut m = crate::indicators::microstructure::block_trade_size_anomaly::BlockTradeSizeAnomaly::new(10);
+        let c: Vec<f64> = blocks.iter().map(|t| { m.update_block_trade(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::BlockSizeZ, &fr, CubeParams::period(10))[0], &c);
+
+        let auctions: Vec<AuctionEvent> = (0..n)
+            .map(|i| AuctionEvent {
+                auction_id: String::new(),
+                indicative_price: 100.0,
+                indicative_qty: 5.0 + 20.0 * w(i, 0.45),
+                state: String::new(),
+                timestamp: t0 + i as i64 * 1000,
+            })
+            .collect();
+        let fr = GpuEventFrame::from_auctions(&auctions);
+        let mut m = crate::indicators::auction::auction_liquidity_score::AuctionLiquidityScore::new(6);
+        let c: Vec<f64> = auctions.iter().map(|t| { m.update_auction(t); m.value() }).collect();
+        assert_close(&ev(CubeFormula::AuctionLiq, &fr, CubeParams::period(6))[0], &c);
+    }
+
     #[test]
     fn lane_matches_cpu() {
         let bars = bars(70);

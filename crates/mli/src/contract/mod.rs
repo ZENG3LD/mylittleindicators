@@ -691,6 +691,9 @@ pub use gpu::{shader_of, CubeFormula, CubeParams, CubeSmoother, GpuCube, GpuMode
 pub mod gpu_sample;
 pub use gpu_sample::{GpuColumns, GpuLevel, GpuSample, GpuTimes};
 
+pub mod event_frame;
+pub use event_frame::{GpuEventFrame, EVENT_COLS};
+
 #[cfg(feature = "gpu")]
 pub mod kernels;
 
@@ -702,6 +705,10 @@ pub mod kernels_post;
 /// Calendar formulas, codes 700..=709. UNTESTED on GPU.
 #[cfg(feature = "gpu")]
 pub mod kernels_cal;
+
+/// Event-frame formulas, codes 900..=999. UNTESTED on GPU.
+#[cfg(feature = "gpu")]
+pub mod kernels_ev;
 
 pub mod axis;
 pub use axis::{sweep_f64, CubeIter, Param, ParamScalar};

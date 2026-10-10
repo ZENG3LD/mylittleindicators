@@ -1,0 +1,348 @@
+//! Packed event columns for the stream (non-bar) formulas.
+//!
+//! [`super::GpuSample`] keeps four scalar slots per event and drops timestamps and the
+//! optional fields several consumers read. The event formulas (codes 900..=999) use this
+//! richer frame instead: one `f32` matrix of [`EVENT_COLS`] columns, a `side` column and a
+//! `ts` column. Layout, per stream (absent `Option` fields are `0.0`; where a CPU consumer
+//! only uses a pair when BOTH halves are present, the constructor zeroes both otherwise):
+//!
+//! | stream            | x0         | x1          | x2        | x3        | x4       | x5          | x6         | x7        |
+//! |-------------------|------------|-------------|-----------|-----------|----------|-------------|------------|-----------|
+//! | Tick              | price      | size        | bid       | ask       |          |             |            |           |
+//! | Ticker            | last       | bid         | ask       | high_24h  | low_24h  | volume_24h  | pct_24h    | chg_24h   |
+//! | OptionGreeks      | delta      | gamma       | vega      | theta     | rho      | mark_iv     | bid_iv     | ask_iv    |
+//! | RiskLimit         | tier       | max_leverage| max_pos   | mmr       | imr      |             |            |           |
+//! | Funding           | rate       | mark        | index     | realized  | estimated| premium     | prev_index |           |
+//! | PredictedFunding  | rate       |             |           |           |          |             |            |           |
+//! | LongShortRatio    | long       | short       | ratio     | buy_ratio | sell_ratio|            |            |           |
+//! | Liquidation       | price      | quantity    | value     |           |          |             |            |           |
+//! | OpenInterest      | oi         | oi_value    |           |           |          |             |            |           |
+//! | MarkPrice         | mark       | index       | funding   |           |          |             |            |           |
+//! | AggTrade          | price      | quantity    | quote_qty |           |          |             |            |           |
+//! | BlockTrade        | price      | quantity    | is_iv     |           |          |             |            |           |
+//! | Auction           | indicative | qty         |           |           |          |             |            |           |
+//! | InsuranceFund     | balance    |             |           |           |          |             |            |           |
+//! | HistoricalVol     | volatility |             |           |           |          |             |            |           |
+//! | VolatilityIndex   | value      | open        | high      | low       | close    |             |            |           |
+//! | Settlement        | price      | time_s      |           |           |          |             |            |           |
+//!
+//! `side` is `1` buy / `-1` sell (ticks, agg trades, block trades, liquidations: the
+//! `TradeSide`), `0` when the stream has no side. `ts` is seconds since the first event of the
+//! frame as `f32` (milliseconds do not fit f32; relative seconds keep 1 ms resolution for about
+//! 4.6 hours of span and 0.25 s resolution out to a week). UNTESTED on GPU.
+
+use crate::core::types::{
+    AggTrade, AuctionEvent, BlockTrade, FundingRate, HistoricalVolatility, InsuranceFund,
+    Liquidation, LongShortRatio, MarkPrice, OpenInterest, OptionGreeks, PredictedFunding,
+    RiskLimit, Ticker, TradeSide, VolatilityIndex,
+};
+use crate::core::types::Tick;
+
+/// Matrix columns in a frame.
+pub const EVENT_COLS: usize = 8;
+
+/// Column-major event frame: `x[c * n + i]`.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct GpuEventFrame {
+    pub n: usize,
+    pub x: Vec<f32>,
+    pub side: Vec<f32>,
+    pub ts: Vec<f32>,
+}
+
+fn o(v: Option<f64>) -> f64 {
+    v.unwrap_or(0.0)
+}
+
+impl GpuEventFrame {
+    /// Build from rows of up to eight values, a side and a unix-ms timestamp.
+    pub fn from_rows(rows: &[([f64; EVENT_COLS], f32, i64)]) -> Self {
+        let n = rows.len();
+        let t0 = rows.first().map(|r| r.2).unwrap_or(0);
+        let mut f = GpuEventFrame {
+            n,
+            x: vec![0.0; n * EVENT_COLS],
+            side: Vec::with_capacity(n),
+            ts: Vec::with_capacity(n),
+        };
+        for (i, (v, s, t)) in rows.iter().enumerate() {
+            for c in 0..EVENT_COLS {
+                f.x[c * n + i] = v[c] as f32;
+            }
+            f.side.push(*s);
+            f.ts.push(((*t - t0) as f64 / 1000.0) as f32);
+        }
+        f
+    }
+
+    pub fn len(&self) -> usize {
+        self.n
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.n == 0
+    }
+
+    pub fn from_ticks(v: &[Tick]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|t| {
+                (
+                    [t.price, t.size, o(t.bid), o(t.ask), 0.0, 0.0, 0.0, 0.0],
+                    if t.is_buy { 1.0 } else { -1.0 },
+                    t.time,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_tickers(v: &[Ticker]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|t| {
+                let (h, l) = match (t.high_24h, t.low_24h) {
+                    (Some(h), Some(l)) => (h, l),
+                    _ => (0.0, 0.0),
+                };
+                let (b, a) = match (t.bid_price, t.ask_price) {
+                    (Some(b), Some(a)) => (b, a),
+                    _ => (0.0, 0.0),
+                };
+                (
+                    [
+                        t.last_price,
+                        b,
+                        a,
+                        h,
+                        l,
+                        o(t.volume_24h),
+                        o(t.price_change_percent_24h),
+                        o(t.price_change_24h),
+                    ],
+                    0.0,
+                    t.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_greeks(v: &[OptionGreeks]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                let (b, a) = match (g.bid_iv, g.ask_iv) {
+                    (Some(b), Some(a)) => (b, a),
+                    _ => (0.0, 0.0),
+                };
+                (
+                    [g.delta, g.gamma, g.vega, g.theta, g.rho, g.mark_iv, b, a],
+                    0.0,
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_risk_limits(v: &[RiskLimit]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                (
+                    [
+                        g.tier as f64,
+                        g.max_leverage,
+                        g.max_position_value,
+                        g.mmr,
+                        g.imr,
+                        0.0,
+                        0.0,
+                        0.0,
+                    ],
+                    0.0,
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_funding(v: &[FundingRate]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                (
+                    [
+                        g.rate,
+                        o(g.mark_price),
+                        o(g.index_price),
+                        o(g.realized_rate),
+                        o(g.estimated_rate),
+                        o(g.premium),
+                        o(g.prev_index_price),
+                        0.0,
+                    ],
+                    0.0,
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_predicted_funding(v: &[PredictedFunding]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| ([g.predicted_rate, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 0.0, g.timestamp))
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_long_short(v: &[LongShortRatio]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                (
+                    [
+                        g.long_ratio,
+                        g.short_ratio,
+                        o(g.ratio),
+                        o(g.buy_ratio),
+                        o(g.sell_ratio),
+                        0.0,
+                        0.0,
+                        0.0,
+                    ],
+                    0.0,
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_liquidations(v: &[Liquidation]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                (
+                    [g.price, g.quantity, o(g.value), 0.0, 0.0, 0.0, 0.0, 0.0],
+                    if matches!(g.side, TradeSide::Buy) { 1.0 } else { -1.0 },
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_open_interest(v: &[OpenInterest]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                (
+                    [g.open_interest, o(g.open_interest_value), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    0.0,
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_mark(v: &[MarkPrice]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                (
+                    [g.mark_price, o(g.index_price), o(g.funding_rate), 0.0, 0.0, 0.0, 0.0, 0.0],
+                    0.0,
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_agg_trades(v: &[AggTrade]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                (
+                    [g.price, g.quantity, o(g.quote_qty), 0.0, 0.0, 0.0, 0.0, 0.0],
+                    if g.is_buy { 1.0 } else { -1.0 },
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_block_trades(v: &[BlockTrade]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                (
+                    [g.price, g.quantity, if g.is_iv { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    if g.is_buy { 1.0 } else { -1.0 },
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_auctions(v: &[AuctionEvent]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                (
+                    [g.indicative_price, g.indicative_qty, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    0.0,
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_insurance(v: &[InsuranceFund]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| ([g.balance, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 0.0, g.timestamp))
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_historical_vol(v: &[HistoricalVolatility]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| ([g.volatility, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 0.0, g.timestamp))
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_vol_index(v: &[VolatilityIndex]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                (
+                    [
+                        g.value,
+                        o(g.open),
+                        o(g.high),
+                        o(g.low),
+                        o(g.close),
+                        0.0,
+                        0.0,
+                        0.0,
+                    ],
+                    0.0,
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+}

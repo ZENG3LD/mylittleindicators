@@ -417,6 +417,42 @@ pub enum CubeFormula {
     NbarPivotSig = 832,
     /// Break of structure over `period` (at least 2) bars: 1 / -1 / 0. UNTESTED on GPU.
     BosSig = 833,
+    /// Event frame: sign flip of the funding rate. UNTESTED on GPU.
+    FundingDirShift = 900,
+    /// Event frame: long ratio above `a` / below `b`. UNTESTED on GPU.
+    LsExtreme = 901,
+    /// Event frame: predicted rate beyond `+-a`. UNTESTED on GPU.
+    PredFundingExtreme = 902,
+    /// Event frame: max leverage down vs previous. UNTESTED on GPU.
+    LeverageReduction = 903,
+    /// Event frame: (high_24h - low_24h) / last. UNTESTED on GPU.
+    HlRangeRatio = 904,
+    /// Event frame: (ask - bid) / last. UNTESTED on GPU.
+    TickerSpread = 905,
+    /// Event frame: bid_iv - ask_iv. UNTESTED on GPU.
+    IvSkewEv = 906,
+    /// Event frame: (mmr + imr) / 2. UNTESTED on GPU.
+    RiskProximity = 907,
+    /// Event frame: mmr. UNTESTED on GPU.
+    MmrTrack = 908,
+    /// Event frame: sum of theta over `period` events. UNTESTED on GPU.
+    ThetaDecay = 909,
+    /// Event frame: z-score of the 24h percent change over `period` (at least 2). UNTESTED on GPU.
+    PctChangeZ = 910,
+    /// Event frame: HV above `a` times its mean over `period`. UNTESTED on GPU.
+    HvSpikeEv = 911,
+    /// Event frame: insurance balance slope below `-|a|` over `period`. UNTESTED on GPU.
+    FundStress = 912,
+    /// Event frame: |delta| within `b` of `a` and |theta| >= `c`. UNTESTED on GPU.
+    PinRisk = 913,
+    /// Event frame: (buys - sells) / count over `period` ticks. UNTESTED on GPU.
+    AggressorImb = 914,
+    /// Event frame: indicative qty / mean over `period`. UNTESTED on GPU.
+    AuctionLiq = 915,
+    /// Event frame: z-score of block trade size over `period` (at least 2). UNTESTED on GPU.
+    BlockSizeZ = 916,
+    /// Event frame: `[side, run_length]` of the current same-side run. UNTESTED on GPU.
+    TradeRun = 917,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -571,6 +607,7 @@ impl CubeFormula {
             CubeFormula::CandleAnatomyCols => 5,
             CubeFormula::Vortex => 2,
             CubeFormula::Fractals => 2,
+            CubeFormula::TradeRun => 2,
             CubeFormula::StartEndMonth
             | CubeFormula::StartEndQuarter
             | CubeFormula::StartEndWeek
@@ -826,6 +863,24 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::FundingDirectionShift), Some(CubeFormula::FundingDirShift));
+        assert_eq!(formula_of(IndicatorId::LongShortExtremeDetector), Some(CubeFormula::LsExtreme));
+        assert_eq!(formula_of(IndicatorId::PredictedFundingExtreme), Some(CubeFormula::PredFundingExtreme));
+        assert_eq!(formula_of(IndicatorId::LeverageReductionWarning), Some(CubeFormula::LeverageReduction));
+        assert_eq!(formula_of(IndicatorId::HighLowRangeRatio), Some(CubeFormula::HlRangeRatio));
+        assert_eq!(formula_of(IndicatorId::TickerSpreadRatio), Some(CubeFormula::TickerSpread));
+        assert_eq!(formula_of(IndicatorId::IvSkew), Some(CubeFormula::IvSkewEv));
+        assert_eq!(formula_of(IndicatorId::RiskLimitProximity), Some(CubeFormula::RiskProximity));
+        assert_eq!(formula_of(IndicatorId::MmrTracker), Some(CubeFormula::MmrTrack));
+        assert_eq!(formula_of(IndicatorId::ThetaDecayTracker), Some(CubeFormula::ThetaDecay));
+        assert_eq!(formula_of(IndicatorId::PriceChange24hZScore), Some(CubeFormula::PctChangeZ));
+        assert_eq!(formula_of(IndicatorId::HvSpike), Some(CubeFormula::HvSpikeEv));
+        assert_eq!(formula_of(IndicatorId::FundStressDetector), Some(CubeFormula::FundStress));
+        assert_eq!(formula_of(IndicatorId::PinRiskDetector), Some(CubeFormula::PinRisk));
+        assert_eq!(formula_of(IndicatorId::AggressorImbalance), Some(CubeFormula::AggressorImb));
+        assert_eq!(formula_of(IndicatorId::AuctionLiquidityScore), Some(CubeFormula::AuctionLiq));
+        assert_eq!(formula_of(IndicatorId::BlockTradeSizeAnomaly), Some(CubeFormula::BlockSizeZ));
+        assert_eq!(formula_of(IndicatorId::TradeRunDetector), Some(CubeFormula::TradeRun));
         assert_eq!(formula_of(IndicatorId::Fractals), Some(CubeFormula::Fractals));
         assert_eq!(formula_of(IndicatorId::Fvg), Some(CubeFormula::FvgSig));
         assert_eq!(formula_of(IndicatorId::NbarPivot), Some(CubeFormula::NbarPivotSig));
