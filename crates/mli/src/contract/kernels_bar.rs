@@ -3354,6 +3354,130 @@ fn bar_scan(
             } else if !slope_up && !macd_up {
                 v0 = 0.0f32 - 1.0f32;
             }
+        } else if formula == 1290u32 {
+            // ATR-RSI: ATR in lane v, its baseline smoother in lane o; inline Wilder RSI over `period`
+            let rp = period as usize;
+            let mut raw = 50.0f32;
+            if t >= 1usize && rp >= 1usize && t >= rp {
+                let chg = c[t] - c[t - 1];
+                let mut gain = 0.0f32;
+                let mut loss = 0.0f32;
+                if chg > 0.0f32 {
+                    gain = chg;
+                }
+                if chg < 0.0f32 {
+                    loss = 0.0f32 - chg;
+                }
+                if held0 == 0.0f32 && held1 == 0.0f32 {
+                    let mut sg = 0.0f32;
+                    let mut sl = 0.0f32;
+                    for k2 in 0..rp {
+                        let q = t - k2;
+                        let cc2 = c[q] - c[q - 1];
+                        if cc2 > 0.0f32 {
+                            sg = sg + cc2;
+                        }
+                        if cc2 < 0.0f32 {
+                            sl = sl - cc2;
+                        }
+                    }
+                    held0 = sg / (rp as f32);
+                    held1 = sl / (rp as f32);
+                } else {
+                    let al = 1.0f32 / (rp as f32);
+                    held0 = al * gain + (1.0f32 - al) * held0;
+                    held1 = al * loss + (1.0f32 - al) * held1;
+                }
+                if held1 == 0.0f32 {
+                    raw = 100.0f32;
+                } else {
+                    raw = 100.0f32 - 100.0f32 / (1.0f32 + held0 / held1);
+                }
+            }
+            let mut ratio = 1.0f32;
+            if o[t] > 0.0f32 {
+                ratio = v[t] / o[t];
+            }
+            v0 = (raw * ratio.sqrt()).max(0.0f32).min(100.0f32);
+        } else if formula == 1291u32 {
+            // volume-weighted RSI (lanes c = close, v = volume); period = rsi period, p2 = volume period
+            let rp = period as usize;
+            let vp = p2 as usize;
+            v0 = 50.0f32;
+            if t >= 1usize && rp >= 1usize && vp >= 1usize && t >= rp {
+                let mut vcnt = t + 1;
+                if vcnt > vp {
+                    vcnt = vp;
+                }
+                let mut vsum = 0.0f32;
+                for k2 in 0..vcnt {
+                    vsum = vsum + v[t - k2];
+                }
+                // regular state: held0 / held1, volume-weighted state: f0 / f1
+                if held0 == 0.0f32 && held1 == 0.0f32 {
+                    let mut sg = 0.0f32;
+                    let mut sl = 0.0f32;
+                    let mut wg = 0.0f32;
+                    let mut wl = 0.0f32;
+                    for k2 in 0..rp {
+                        let q = t - k2;
+                        let cc2 = c[q] - c[q - 1];
+                        let mut vc2 = 0usize;
+                        if q + 1 > vp {
+                            vc2 = q + 1 - vp;
+                        }
+                        let mut vs2 = 0.0f32;
+                        for j in vc2..(q + 1) {
+                            vs2 = vs2 + v[j];
+                        }
+                        let avg2 = vs2 / ((q + 1 - vc2) as f32);
+                        let mut wt = 1.0f32;
+                        if avg2 > 0.0f32 {
+                            wt = v[q] / avg2;
+                        }
+                        if cc2 > 0.0f32 {
+                            sg = sg + cc2;
+                            wg = wg + cc2 * wt;
+                        }
+                        if cc2 < 0.0f32 {
+                            sl = sl - cc2;
+                            wl = wl - cc2 * wt;
+                        }
+                    }
+                    held0 = sg / (rp as f32);
+                    held1 = sl / (rp as f32);
+                    f0 = wg / (rp as f32);
+                    f1 = wl / (rp as f32);
+                } else {
+                    let chg = c[t] - c[t - 1];
+                    let avg = vsum / (vcnt as f32);
+                    let mut wt = 1.0f32;
+                    if avg > 0.0f32 {
+                        wt = v[t] / avg;
+                    }
+                    let mut gain = 0.0f32;
+                    let mut loss = 0.0f32;
+                    if chg > 0.0f32 {
+                        gain = chg;
+                    }
+                    if chg < 0.0f32 {
+                        loss = 0.0f32 - chg;
+                    }
+                    let al = 1.0f32 / (rp as f32);
+                    held0 = al * gain + (1.0f32 - al) * held0;
+                    held1 = al * loss + (1.0f32 - al) * held1;
+                    f0 = al * gain * wt + (1.0f32 - al) * f0;
+                    f1 = al * loss * wt + (1.0f32 - al) * f1;
+                }
+                if f1 == 0.0f32 {
+                    v0 = 100.0f32;
+                } else {
+                    v0 = 100.0f32 - 100.0f32 / (1.0f32 + f0 / f1);
+                }
+                held2 = v0;
+            } else if held2 > 0.0f32 {
+                v0 = held2;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -3586,6 +3710,18 @@ pub fn launch_cube_bar(
     if formula == CubeFormula::ElderImpulseBar {
         let ema = smooth_series(&c, params.smoother, params.period.max(2), 0, params.a, params.b);
         let flat = bar_run(formula.code(), [&o, &h, &l, &c, &ema], params, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::UoSmoothBar {
+        let mut up = params;
+        up.fast = params.fast;
+        let u = bar_stage(1279, [&o, &h, &l, &c, &v], up, 0);
+        return vec![smooth_series(&u, params.smoother, params.signal.max(1), 0, params.a, params.b)];
+    }
+    if formula == CubeFormula::AtrRsiBar {
+        let atr = super::kernels_comp::atr_series(samples, params, super::CubeSmoother::Rma, params.fast.max(1), 0);
+        let base = smooth_series(&atr, params.smoother, params.slow.max(1), 0, params.a, params.b);
+        let flat = bar_run(formula.code(), [&base, &h, &l, &c, &atr], params, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {

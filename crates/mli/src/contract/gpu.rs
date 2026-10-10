@@ -667,6 +667,12 @@ pub enum CubeFormula {
     AmatBar = 1287,
     /// Composite: elder impulse. UNTESTED on GPU.
     ElderImpulseBar = 1288,
+    /// Composite: smoothed ultimate oscillator. UNTESTED on GPU.
+    UoSmoothBar = 1289,
+    /// Composite: atr rsi. UNTESTED on GPU.
+    AtrRsiBar = 1290,
+    /// Composite: volume weighted rsi. UNTESTED on GPU.
+    VwrsiBar = 1291,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1458,6 +1464,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Kregime), Some(CubeFormula::KregimeBar));
         assert_eq!(formula_of(IndicatorId::Amat), Some(CubeFormula::AmatBar));
         assert_eq!(formula_of(IndicatorId::ElderImpulse), Some(CubeFormula::ElderImpulseBar));
+        assert_eq!(formula_of(IndicatorId::UoSmooth), Some(CubeFormula::UoSmoothBar));
+        assert_eq!(formula_of(IndicatorId::AtrRsi), Some(CubeFormula::AtrRsiBar));
+        assert_eq!(formula_of(IndicatorId::Vwrsi), Some(CubeFormula::VwrsiBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

@@ -9241,6 +9241,46 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1289..=1291 (UoSmooth, AtrRsi, Vwrsi).
+    #[test]
+    fn lane_matches_cpu_bar_batch26() {
+        use crate::indicators::momentum::atr_rsi::AtrRsi;
+        use crate::indicators::momentum::ultimate_oscillator_smooth::UltimateOscillatorSmooth;
+        use crate::indicators::momentum::volume_weighted_rsi::VolumeWeightedRsi;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(7);
+        p.fast = 14;
+        p.slow = 28;
+        p.signal = 5;
+        p.smoother = CubeSmoother::Ema;
+        let mut m = UltimateOscillatorSmooth::new(7, 14, 28, 5);
+        chk(&run_cols(CubeFormula::UoSmoothBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]])]).collect());
+        // UoSmooth uses p.fast / p.slow as period2 / period3; AtrRsi uses period (rsi), fast (atr), slow (atr ma)
+        let mut p = CubeParams::period(14);
+        p.fast = 14;
+        p.slow = 50;
+        p.smoother = CubeSmoother::Ema;
+        let mut m = AtrRsi::from_smoother(14, 14, crate::engine::contract_engine::SmootherId::Ema, 50);
+        chk(&run_cols(CubeFormula::AtrRsiBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]]).atr_rsi]).collect());
+        let mut p = CubeParams::period(14);
+        p.fast = 20;
+        let mut m = VolumeWeightedRsi::with_periods(14, 20);
+        chk(&run_cols(CubeFormula::VwrsiBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[2], l[3]])]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
