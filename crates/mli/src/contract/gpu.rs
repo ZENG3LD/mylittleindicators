@@ -269,6 +269,20 @@ pub enum CubeFormula {
     EaseOfMovementSmoothed = 126,
     /// Normalized ATR: `100 * smoother(true range) / |close|`. The first true range is `high - low`.
     NatrSmoothed = 127,
+    /// Volume rate of change in percent: `(v - v[period]) / v[period] * 100`. Zero until `period` bars or when the old volume is ~0. The signal smoother of the core is not part of the output.
+    Vroc = 91,
+    /// Donchian breakout signal packed as f32: `+1` close above the upper band, `-1` below the lower band, else `0`. The band is 0 / 0 until `period` bars (at least 2), as the feed.
+    DonchianBreakout = 92,
+    /// Heikin Ashi trend packed as f32: `+1` HA close above HA open, `-1` below, else `0`.
+    HeikinAshiTrend = 93,
+    /// Weekday effect: running mean log return of the current weekday bucket (`GpuTimes::weekday`). Calendar formula: use `launch_cube_timed`. Zero on the first bar.
+    WeekdayEffect = 140,
+    /// Session effect: running mean log return of the current session bucket (hour < 6 overnight, < 12 Asia, < 18 Europe, else US). Use `launch_cube_timed`.
+    SessionEffect = 141,
+    /// Month/quarter effect readout: mean of the non-zero monthly mean returns (the `month` output of the feed). Use `launch_cube_timed`.
+    MonthEffect = 142,
+    /// Day-of-month / week-of-quarter effect readout: mean of the non-zero day-of-month mean returns (the feed's `woq()` value). Use `launch_cube_timed`.
+    DayOfMonthEffect = 143,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -402,6 +416,12 @@ impl CubeFormula {
             | CubeFormula::IntradayIntensitySmoothed => 2,
             _ => 1,
         }
+    }
+
+    /// `true` for the calendar formulas (code 140..=149). They need the time
+    /// adapter and run through `launch_cube_timed`.
+    pub const fn needs_time(self) -> bool {
+        self.code() >= 140 && self.code() < 150
     }
 
     pub const fn output_count(self) -> u32 {
@@ -578,6 +598,13 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Ii), Some(CubeFormula::IntradayIntensitySmoothed));
         assert_eq!(formula_of(IndicatorId::Eom), Some(CubeFormula::EaseOfMovementSmoothed));
         assert_eq!(formula_of(IndicatorId::Natr), Some(CubeFormula::NatrSmoothed));
+        assert_eq!(formula_of(IndicatorId::Vroc), Some(CubeFormula::Vroc));
+        assert_eq!(formula_of(IndicatorId::Donbo), Some(CubeFormula::DonchianBreakout));
+        assert_eq!(formula_of(IndicatorId::HaTrend), Some(CubeFormula::HeikinAshiTrend));
+        assert_eq!(formula_of(IndicatorId::Weekday), Some(CubeFormula::WeekdayEffect));
+        assert_eq!(formula_of(IndicatorId::Session), Some(CubeFormula::SessionEffect));
+        assert_eq!(formula_of(IndicatorId::MonthQtr), Some(CubeFormula::MonthEffect));
+        assert_eq!(formula_of(IndicatorId::DomWoq), Some(CubeFormula::DayOfMonthEffect));
     }
 
     #[cfg(feature = "gpu-shader")]

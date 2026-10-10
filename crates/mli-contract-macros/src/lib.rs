@@ -259,6 +259,13 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "intraday_intensity_smoothed" => "IntradayIntensitySmoothed",
         "ease_of_movement_smoothed" => "EaseOfMovementSmoothed",
         "natr_smoothed" => "NatrSmoothed",
+        "vroc" => "Vroc",
+        "donchian_breakout" => "DonchianBreakout",
+        "heikin_ashi_trend" => "HeikinAshiTrend",
+        "weekday_effect" => "WeekdayEffect",
+        "session_effect" => "SessionEffect",
+        "month_effect" => "MonthEffect",
+        "day_of_month_effect" => "DayOfMonthEffect",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

@@ -11,7 +11,7 @@ use cubecl::prelude::*;
 use cubecl::__private::Runtime;
 
 use super::gpu::CubeParams;
-use super::gpu_sample::GpuSample;
+use super::gpu_sample::{GpuSample, GpuTimes};
 use super::CubeFormula;
 #[cfg(test)]
 use super::ResearchBar;
@@ -3814,6 +3814,201 @@ fn comb_map_s(
     comb_scan_s(close, sm0, sm1, output, formula);
 }
 
+/// Bar formulas 91 through 93. Signal outputs are packed as f32: `i8` -1 / 0 / +1.
+/// 91 volume rate of change (percent, `lane` is volume, `period` is the lookback),
+/// 92 Donchian breakout (`period` at least 2; the channel is 0 / 0 until it is full,
+/// as the feed), 93 Heikin Ashi trend.
+#[cube]
+fn bar_scan_n(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    formula: u32,
+) {
+    let n = open.len();
+    let mut p = period as usize;
+    if p < 1 {
+        p = 1;
+    }
+    if formula == 91u32 {
+        for i in 0..n {
+            let mut res = 0.0f32;
+            if i >= p {
+                let past = fld(open, high, low, close, volume, i - p, lane);
+                let cur = fld(open, high, low, close, volume, i, lane);
+                let mut ap = past;
+                if ap < 0.0f32 {
+                    ap = -ap;
+                }
+                if ap > 1.0e-12f32 {
+                    res = (cur - past) / past * 100.0f32;
+                }
+            }
+            output[i] = res;
+        }
+    } else if formula == 92u32 {
+        if p < 2 {
+            p = 2;
+        }
+        for i in 0..n {
+            let mut up = 0.0f32;
+            let mut lo = 0.0f32;
+            if i + 1 >= p {
+                let start = i + 1 - p;
+                up = high[start];
+                lo = low[start];
+                for k in 0..p {
+                    if high[start + k] > up {
+                        up = high[start + k];
+                    }
+                    if low[start + k] < lo {
+                        lo = low[start + k];
+                    }
+                }
+            }
+            let mut sig = 0.0f32;
+            if close[i] > up {
+                sig = 1.0f32;
+            } else if close[i] < lo {
+                sig = -1.0f32;
+            }
+            output[i] = sig;
+        }
+    } else if formula == 93u32 {
+        let mut ha_o = (open[0] + close[0]) / 2.0f32;
+        let mut ha_c = (open[0] + high[0] + low[0] + close[0]) / 4.0f32;
+        for i in 0..n {
+            let c_new = (open[i] + high[i] + low[i] + close[i]) / 4.0f32;
+            let mut o_new = (open[i] + close[i]) / 2.0f32;
+            if i > 0 {
+                o_new = (ha_o + ha_c) / 2.0f32;
+            }
+            ha_o = o_new;
+            ha_c = c_new;
+            let mut sig = 0.0f32;
+            if c_new > o_new {
+                sig = 1.0f32;
+            } else if c_new < o_new {
+                sig = -1.0f32;
+            }
+            output[i] = sig;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_n(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    formula: u32,
+) {
+    bar_scan_n(open, high, low, close, volume, output, lane, period, formula);
+}
+
+/// Calendar-effect formulas (codes 140..=143). The time adapter supplies the
+/// calendar columns of each bar (`GpuTimes`); `state` is 128 zeroed f32 of bucket
+/// counts, sums and means. Each output is the feed's mean-return readout.
+/// 140 weekday effect, 141 session effect, 142 month/quarter effect (month mean),
+/// 143 day-of-month / week-of-quarter effect (day-of-month mean).
+#[cube]
+fn bar_scan_t(
+    close: &[f32],
+    weekday: &[f32],
+    hour: &[f32],
+    month: &[f32],
+    dom: &[f32],
+    state: &mut [f32],
+    output: &mut [f32],
+    formula: u32,
+) {
+    let n = close.len();
+    for i in 0..n {
+        if i == 0 {
+            output[i] = 0.0f32;
+        } else {
+            let r = (close[i] / close[i - 1]).ln();
+            if formula == 140u32 {
+                let b = weekday[i] as usize;
+                state[b] = state[b] + 1.0f32;
+                state[8 + b] = state[8 + b] + r;
+                output[i] = state[8 + b] / state[b];
+            } else if formula == 141u32 {
+                let h = hour[i];
+                let mut b = 2usize;
+                if h < 6.0f32 {
+                    b = 3usize;
+                } else if h < 12.0f32 {
+                    b = 0usize;
+                } else if h < 18.0f32 {
+                    b = 1usize;
+                }
+                state[b] = state[b] + 1.0f32;
+                state[8 + b] = state[8 + b] + r;
+                output[i] = state[8 + b] / state[b];
+            } else if formula == 142u32 {
+                let mi = (month[i] as usize) - 1;
+                state[mi] = state[mi] + 1.0f32;
+                state[16 + mi] = state[16 + mi] + r;
+                state[32 + mi] = state[16 + mi] / state[mi];
+                let mut sum = 0.0f32;
+                let mut cnt = 0.0f32;
+                for m in 0..12 {
+                    if state[32 + m] != 0.0f32 {
+                        sum = sum + state[32 + m];
+                        cnt = cnt + 1.0f32;
+                    }
+                }
+                if cnt < 1.0f32 {
+                    cnt = 1.0f32;
+                }
+                output[i] = sum / cnt;
+            } else if formula == 143u32 {
+                let di = (dom[i] as usize) - 1;
+                state[di] = state[di] + 1.0f32;
+                state[32 + di] = state[32 + di] + r;
+                state[64 + di] = state[32 + di] / state[di];
+                let mut sum = 0.0f32;
+                let mut cnt = 0.0f32;
+                for d in 0..31 {
+                    if state[64 + d] != 0.0f32 {
+                        sum = sum + state[64 + d];
+                        cnt = cnt + 1.0f32;
+                    }
+                }
+                if cnt < 1.0f32 {
+                    cnt = 1.0f32;
+                }
+                output[i] = sum / cnt;
+            }
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_t(
+    close: &[f32],
+    weekday: &[f32],
+    hour: &[f32],
+    month: &[f32],
+    dom: &[f32],
+    state: &mut [f32],
+    output: &mut [f32],
+    formula: u32,
+) {
+    bar_scan_t(close, weekday, hour, month, dom, state, output, formula);
+}
+
 #[cube(launch_unchecked)]
 fn lane_map(
     open: &[f32],
@@ -3953,6 +4148,10 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     if samples.is_empty() {
         return Vec::new();
     }
+    assert!(
+        !formula.needs_time(),
+        "calendar formulas need the time adapter: use launch_cube_timed"
+    );
     if formula.is_smoothed() {
         return launch_cube_smoothed(formula, samples, params);
     }
@@ -3985,7 +4184,22 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     let cubes = (n as u32).div_ceil(dim);
     let book_len = c.bid_px.len();
     unsafe {
-        if formula.code() >= 89 {
+        if formula.code() >= 91 {
+            bar_map_n::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(open_b, n),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(volume_b, n),
+                BufferArg::from_raw_parts(output.clone(), n),
+                params.lane.code(),
+                params.period,
+                formula.code(),
+            );
+        } else if formula.code() >= 89 {
             bar_map_l::launch_unchecked(
                 &client,
                 CubeCount::new_1d(1),
@@ -4348,11 +4562,62 @@ fn launch_cube_smoothed(formula: CubeFormula, samples: &[GpuSample], params: Cub
     f32::from_bytes(&bytes).to_vec()
 }
 
+/// Run a calendar formula (code 140..=143). `times` is the per-bar calendar
+/// adapter built from the bar timestamps; it must have one row per sample.
+pub fn launch_cube_timed(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    times: &GpuTimes,
+    _params: CubeParams,
+) -> Vec<f32> {
+    if samples.is_empty() {
+        return Vec::new();
+    }
+    assert!(formula.needs_time(), "launch_cube_timed needs a calendar formula (code 140..=149)");
+    assert_eq!(times.len(), samples.len(), "one GpuTimes row per sample");
+    let n = samples.len();
+    let c = GpuSample::columns(samples);
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let close_b = client.create_from_slice(f32::as_bytes(&c.close));
+    let weekday_b = client.create_from_slice(f32::as_bytes(&times.weekday));
+    let hour_b = client.create_from_slice(f32::as_bytes(&times.hour));
+    let month_b = client.create_from_slice(f32::as_bytes(&times.month));
+    let dom_b = client.create_from_slice(f32::as_bytes(&times.dom));
+    let state_b = client.create_from_slice(f32::as_bytes(&[0.0f32; 128]));
+    let output = client.empty(n * core::mem::size_of::<f32>());
+    unsafe {
+        bar_map_t::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(close_b, n),
+            BufferArg::from_raw_parts(weekday_b, n),
+            BufferArg::from_raw_parts(hour_b, n),
+            BufferArg::from_raw_parts(month_b, n),
+            BufferArg::from_raw_parts(dom_b, n),
+            BufferArg::from_raw_parts(state_b, 128),
+            BufferArg::from_raw_parts(output.clone(), n),
+            formula.code(),
+        );
+    }
+    let bytes = client.read_one_unchecked(output);
+    f32::from_bytes(&bytes).to_vec()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::engine::ohlcv_field::OhlcvField;
     use crate::indicators::accumulation::accumulation_distribution::AccumulationDistribution;
+    use crate::contract::gpu_sample::GpuTimes;
+    use crate::indicators::volume::vroc::VolumeRateOfChange;
+    use crate::indicators::channels::donchian_breakout::DonchianBreakout;
+    use crate::indicators::trend::heikin_ashi_trend::HeikinAshiTrend;
+    use crate::indicators::calendar::weekday_effect::WeekdayEffect;
+    use crate::indicators::calendar::session_effect::SessionEffect;
+    use crate::indicators::calendar::month_quarter_effect::MonthQuarterEffect;
+    use crate::indicators::calendar::dayofmonth_weekofquarter_effect::DayOfMonthWeekOfQuarterEffect;
     use crate::contract::gpu::CubeSmoother;
     use crate::engine::contract_engine::SmootherId;
     use crate::indicators::momentum::qstick::Qstick;
@@ -5871,6 +6136,96 @@ mod tests {
         let mut ep = CubeParams::period(wper as u32);
         ep.a = 1000.0;
         assert_close(&run(CubeFormula::EaseOfMovementSmoothed, &bars, ep), &cpu_eom);
+
+        // UNTESTED on GPU (no GPU on the authoring box): batch N (codes 91..=93) and the
+        // calendar adapter (codes 140..=143).
+        let mut vroc = VolumeRateOfChange::with_params(5, 3);
+        let cpu_vroc: Vec<f64> = bars.iter().map(|b| vroc.feed(b.volume)).collect();
+        let mut vroc_params = CubeParams::period(5);
+        vroc_params.lane = OhlcvField::Volume;
+        assert_close(&run(CubeFormula::Vroc, &bars, vroc_params), &cpu_vroc);
+        let mut donbo = DonchianBreakout::new(wper);
+        let cpu_donbo: Vec<f64> = bars
+            .iter()
+            .map(|b| donbo.feed(&[b.high, b.low, b.close]) as f64)
+            .collect();
+        assert_close(
+            &run(CubeFormula::DonchianBreakout, &bars, CubeParams::period(wper as u32)),
+            &cpu_donbo,
+        );
+        let mut hat = HeikinAshiTrend::new();
+        let cpu_hat: Vec<f64> = bars
+            .iter()
+            .map(|b| hat.feed(&[b.open, b.high, b.low, b.close]) as f64)
+            .collect();
+        assert_close(&run(CubeFormula::HeikinAshiTrend, &bars, CubeParams::period(1)), &cpu_hat);
+
+        // Calendar bars: 17 h apart from 2024-01-01 UTC, so weekdays, sessions, months
+        // and days of month all vary.
+        let timed: Vec<ResearchBar> = bars
+            .iter()
+            .enumerate()
+            .map(|(i, b)| {
+                ResearchBar::new(
+                    1_704_067_200_000 + i as i64 * 17 * 3_600_000,
+                    b.open,
+                    b.high,
+                    b.low,
+                    b.close,
+                    b.volume,
+                )
+            })
+            .collect();
+        let tsamples: Vec<GpuSample> = timed.iter().map(GpuSample::from).collect();
+        let tcols = GpuTimes::from_bars(&timed);
+        let mut wk = WeekdayEffect::new();
+        let cpu_wk: Vec<f64> = timed
+            .iter()
+            .map(|b| {
+                wk.feed(b.time, b.close);
+                wk.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube_timed(CubeFormula::WeekdayEffect, &tsamples, &tcols, CubeParams::period(1)),
+            &cpu_wk,
+        );
+        let mut se = SessionEffect::new();
+        let cpu_se: Vec<f64> = timed
+            .iter()
+            .map(|b| {
+                se.feed(b.time, b.close);
+                se.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube_timed(CubeFormula::SessionEffect, &tsamples, &tcols, CubeParams::period(1)),
+            &cpu_se,
+        );
+        let mut mq = MonthQuarterEffect::new();
+        let cpu_mq: Vec<f64> = timed
+            .iter()
+            .map(|b| {
+                mq.feed(b.time, b.close);
+                mq.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube_timed(CubeFormula::MonthEffect, &tsamples, &tcols, CubeParams::period(1)),
+            &cpu_mq,
+        );
+        let mut dw = DayOfMonthWeekOfQuarterEffect::new();
+        let cpu_dw: Vec<f64> = timed
+            .iter()
+            .map(|b| {
+                dw.feed(b.time, b.close);
+                dw.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube_timed(CubeFormula::DayOfMonthEffect, &tsamples, &tcols, CubeParams::period(1)),
+            &cpu_dw,
+        );
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
     }

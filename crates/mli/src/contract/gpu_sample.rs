@@ -577,3 +577,53 @@ impl GpuSample {
         cols
     }
 }
+
+/// Per-bar calendar columns for the time adapter. Bar timestamps are unix
+/// milliseconds and do not fit f32, so the host reduces each one to the small
+/// exact integers the calendar formulas need. Rows are in the same order as the
+/// samples of the launch. The values are the ones `CalendarService` gives the
+/// CPU feeds, so a calendar formula and its feed agree on every bucket.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct GpuTimes {
+    /// `0` Monday .. `6` Sunday.
+    pub weekday: Vec<f32>,
+    /// UTC hour, `0..=23`.
+    pub hour: Vec<f32>,
+    /// `1..=12`.
+    pub month: Vec<f32>,
+    /// Day of month, `1..=31`.
+    pub dom: Vec<f32>,
+}
+
+impl GpuTimes {
+    /// Build the columns from bar times in unix milliseconds.
+    pub fn from_ms(times_ms: &[i64]) -> Self {
+        use crate::core::types::CalendarService;
+        let mut out = GpuTimes::default();
+        for &ms in times_ms {
+            let secs = ms.div_euclid(1000);
+            let (_y, m, d) = CalendarService::ymd_from_timestamp(secs);
+            out.weekday.push((CalendarService::weekday_from_timestamp(secs) as usize).min(6) as f32);
+            out.hour.push((secs.rem_euclid(86_400) / 3600) as f32);
+            out.month.push(m.clamp(1, 12) as f32);
+            out.dom.push(d.clamp(1, 31) as f32);
+        }
+        out
+    }
+
+    /// Build the columns from research bars.
+    pub fn from_bars(bars: &[ResearchBar]) -> Self {
+        let times: Vec<i64> = bars.iter().map(|b| b.time).collect();
+        Self::from_ms(&times)
+    }
+
+    /// Rows in the adapter.
+    pub fn len(&self) -> usize {
+        self.weekday.len()
+    }
+
+    /// `true` when there are no rows.
+    pub fn is_empty(&self) -> bool {
+        self.weekday.is_empty()
+    }
+}

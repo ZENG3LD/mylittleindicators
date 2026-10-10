@@ -689,7 +689,7 @@ pub mod gpu;
 pub use gpu::{CubeFormula, CubeParams, CubeSmoother, GpuCube, GpuMode, GpuShader};
 
 pub mod gpu_sample;
-pub use gpu_sample::{GpuColumns, GpuLevel, GpuSample};
+pub use gpu_sample::{GpuColumns, GpuLevel, GpuSample, GpuTimes};
 
 #[cfg(feature = "gpu")]
 pub mod kernels;
