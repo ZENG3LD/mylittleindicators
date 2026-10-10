@@ -645,6 +645,12 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
+    HilbBar = 1275,
+    /// Composite: hilbert dominant cycle. UNTESTED on GPU.
+    HdcBar = 1276,
+    /// Composite: MESA adaptive MA. UNTESTED on GPU.
+    MamaBar = 1277,
     /// Composite: ehlers sinewave. UNTESTED on GPU.
     EsineBar = 1272,
     /// Composite: ehlers super smoother. UNTESTED on GPU.
@@ -1418,6 +1424,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
+        assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
+        assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
         assert_eq!(formula_of(IndicatorId::Esine), Some(CubeFormula::EsineBar));
         assert_eq!(formula_of(IndicatorId::Ess), Some(CubeFormula::EssBar));
         assert_eq!(formula_of(IndicatorId::Ehlersfa), Some(CubeFormula::EhlersfaBar));

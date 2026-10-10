@@ -9094,6 +9094,42 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1275..=1277 (Hilb, Hdc, Mama).
+    #[test]
+    fn lane_matches_cpu_bar_batch22() {
+        use crate::indicators::average::mesa_adaptive_ma::MesaAdaptiveMA;
+        use crate::indicators::signal_processing::hilbert::HilbertTransform;
+        use crate::indicators::signal_processing::hilbert_dominant_cycle::HilbertDominantCycle;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(1);
+        p.a = 8.0;
+        p.b = 50.0;
+        let mut m = HilbertDominantCycle::new();
+        chk(&run_cols(CubeFormula::HdcBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = MesaAdaptiveMA::with_periods(8.0, 50.0);
+        chk(&run_cols(CubeFormula::MamaBar, &bars, p), close.iter().map(|c| vec![m.feed(*c).value]).collect());
+        let mut p = CubeParams::period(16);
+        p.a = 1.0;
+        let mut m = HilbertTransform::new(16, 1.0);
+        chk(&run_cols(CubeFormula::HilbBar, &bars, p), close.iter().map(|c| {
+            let s = m.update(*c);
+            vec![s.instantaneous_amplitude, s.instantaneous_phase, s.instantaneous_frequency]
+        }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

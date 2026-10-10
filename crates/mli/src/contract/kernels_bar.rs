@@ -495,7 +495,7 @@ fn bar_scan(
     p3: u32,
     p4: u32,
     a: f32,
-    _b: f32,
+    b: f32,
     _cc: f32,
     flag: u32,
 ) {
@@ -2904,6 +2904,177 @@ fn bar_scan(
                 held0 = alpha * c[t] + (1.0f32 - alpha) * held0;
             }
             v0 = held0;
+        } else if formula == 1275u32 {
+            // Hilbert transform `[amplitude, phase, frequency]`: Hamming-windowed Hilbert kernel
+            // at the newest sample; period = window (16..=256), a = sampling rate
+            let mut ws = period as usize;
+            if ws < 16 {
+                ws = 16;
+            }
+            if ws > 256 {
+                ws = 256;
+            }
+            let pi = 3.1415927f32;
+            if t + 1 >= 2 * ws {
+                let mut len = t + 1;
+                if len > 512usize {
+                    len = 512usize;
+                }
+                let i = len - 1;
+                let mut wstart = 0usize;
+                if i > ws / 2 {
+                    wstart = i - ws / 2;
+                }
+                let nw = len - wstart;
+                let base = t + 1 - len;
+                let mut hv = 0.0f32;
+                let mut wsum = 0.0f32;
+                for j in wstart..len {
+                    if i != j {
+                        let tau = (i as f32) - (j as f32);
+                        let wgt = 1.0f32 / (pi * tau);
+                        let mut hc = 1.0f32;
+                        if nw > 1usize {
+                            hc = 0.54f32 - 0.46f32 * (2.0f32 * pi * ((j - wstart) as f32) / ((nw - 1) as f32)).cos();
+                        }
+                        hv = hv + wgt * c[base + j] * hc;
+                        wsum = wsum + wgt.abs();
+                    }
+                }
+                if wsum > 0.0f32 {
+                    hv = hv / wsum;
+                }
+                let re = c[t];
+                let amp = (re * re + hv * hv).sqrt();
+                let ph = hv.atan2(re);
+                let mut fq = 0.0f32;
+                if cnt_a >= 2usize {
+                    let mut pd = ph - held0;
+                    for _ in 0..4 {
+                        if pd > pi {
+                            pd = pd - 2.0f32 * pi;
+                        }
+                        if pd < 0.0f32 - pi {
+                            pd = pd + 2.0f32 * pi;
+                        }
+                    }
+                    let raw = pd * a / (2.0f32 * pi);
+                    if cnt_a < 5usize {
+                        fq = raw;
+                    } else {
+                        let mut sm5 = 0.0f32;
+                        for q in 0..5 {
+                            sm5 = sm5 + scr[q];
+                        }
+                        fq = 0.7f32 * (sm5 / 5.0f32) + 0.3f32 * raw;
+                    }
+                }
+                scr[cnt_a % 5usize] = fq;
+                cnt_a = cnt_a + 1usize;
+                held0 = ph;
+                v0 = amp;
+                v1 = ph;
+                v2 = fq;
+            }
+        } else if formula == 1276u32 {
+            // Hilbert dominant cycle period (smoothed); a = min period, b = max period
+            let pi = 3.1415927f32;
+            if t >= 7usize {
+                let ic = (c[t - 3] + c[t - 2] + c[t - 1] + c[t]) / 4.0f32;
+                let qc = (c[t - 6] + 2.0f32 * c[t - 4] + 3.0f32 * c[t - 2] + 3.0f32 * c[t]) / 9.0f32;
+                let mut phase = 0.0f32;
+                if ic != 0.0f32 {
+                    phase = (qc / ic).atan();
+                } else if qc > 0.0f32 {
+                    phase = pi / 2.0f32;
+                } else if qc < 0.0f32 {
+                    phase = 0.0f32 - pi / 2.0f32;
+                }
+                let mut lastp = held1;
+                if cnt_a == 0usize {
+                    lastp = 0.0f32;
+                }
+                let mut dp = phase - lastp;
+                if dp < 0.0f32 - pi {
+                    dp = dp + 2.0f32 * pi;
+                } else if dp > pi {
+                    dp = dp - 2.0f32 * pi;
+                }
+                let mut ip = held0;
+                if dp.abs() > 0.01f32 {
+                    ip = (2.0f32 * pi / dp.abs()).max(a).min(b);
+                }
+                held0 = 0.2f32 * ip + 0.8f32 * held0;
+                held1 = phase;
+                cnt_a = cnt_a + 1usize;
+            }
+            v0 = held0;
+        } else if formula == 1277u32 {
+            // MESA adaptive MA (EMA 6 / 12 quadrature stage, EMA 10 period smoother):
+            // a = min period, b = max period.
+            // scr: 0 fast ema, 1 slow ema, 2 i(t-1), 3 i(t-2), 4 q(t-1), 5 period ema, 6 current period, 7 mama, 8 period-ema seeded
+            let pi = 3.1415927f32;
+            let minp = a;
+            let maxp = b;
+            if t >= 6usize {
+                if t == 6usize {
+                    scr[0] = c[t];
+                    scr[1] = c[t];
+                    scr[2] = 0.0f32;
+                    scr[3] = 0.0f32;
+                    scr[4] = 0.0f32;
+                    scr[5] = 0.0f32;
+                    scr[6] = 0.5f32 * (minp + maxp);
+                    scr[7] = 0.0f32;
+                    scr[8] = 0.0f32;
+                } else {
+                    scr[0] = (2.0f32 / 7.0f32) * c[t] + (1.0f32 - 2.0f32 / 7.0f32) * scr[0];
+                    scr[1] = (2.0f32 / 13.0f32) * c[t] + (1.0f32 - 2.0f32 / 13.0f32) * scr[1];
+                }
+                let ic = scr[0] - scr[1];
+                let kk = t - 6;
+                let mut qc = ic;
+                if kk >= 2usize {
+                    qc = (ic + scr[3]) / 2.0f32;
+                }
+                if kk >= 1usize {
+                    let mut phc = 0.0f32;
+                    if ic != 0.0f32 {
+                        phc = (qc / ic).atan();
+                    }
+                    let mut php = 0.0f32;
+                    if scr[2] != 0.0f32 {
+                        php = (scr[4] / scr[2]).atan();
+                    }
+                    let mut dp = phc - php;
+                    if dp < 0.0f32 - pi {
+                        dp = dp + 2.0f32 * pi;
+                    } else if dp > pi {
+                        dp = dp - 2.0f32 * pi;
+                    }
+                    let mut ip = scr[6];
+                    if dp.abs() > 0.01f32 {
+                        ip = (2.0f32 * pi / dp.abs()).max(minp).min(maxp);
+                    }
+                    if scr[8] < 0.5f32 {
+                        scr[5] = ip;
+                        scr[8] = 1.0f32;
+                    } else {
+                        scr[5] = (2.0f32 / 11.0f32) * ip + (1.0f32 - 2.0f32 / 11.0f32) * scr[5];
+                    }
+                    scr[6] = scr[5].max(minp).min(maxp);
+                }
+                scr[3] = scr[2];
+                scr[2] = ic;
+                scr[4] = qc;
+                let al = (2.0f32 / (scr[6] + 1.0f32)).max(0.0f32).min(1.0f32);
+                if t == 6usize {
+                    scr[7] = c[t];
+                } else {
+                    scr[7] = al * c[t] + (1.0f32 - al) * scr[7];
+                }
+                v0 = scr[7];
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
