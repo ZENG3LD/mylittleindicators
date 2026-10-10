@@ -2884,6 +2884,312 @@ fn bar_map_j(
     bar_scan_j(open, high, low, close, volume, output, lane, period, formula);
 }
 
+/// Bar formulas 86 through 88. 86 Ehlers cyber cycle (`a` is alpha), 87 Kaufman-style
+/// AMA over an ER ring window (`period` ER window, `fast` / `slow` periods),
+/// 88 volatility break flag (`a` is alpha, `b` is the sigma threshold).
+#[cube]
+fn bar_scan_k(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    fast: u32,
+    slow: u32,
+    a: f32,
+    b: f32,
+    formula: u32,
+) {
+    let n = open.len();
+    let mut p = period as usize;
+    if p < 1 {
+        p = 1;
+    }
+    if formula == 86u32 {
+        let mut al = a;
+        if al < 0.0f32 {
+            al = 0.0f32;
+        }
+        if al > 1.0f32 {
+            al = 1.0f32;
+        }
+        let k1 = (1.0f32 - al / 2.0f32) * (1.0f32 - al / 2.0f32);
+        let k2 = 2.0f32 * (1.0f32 - al);
+        let k3 = (1.0f32 - al) * (1.0f32 - al);
+        let mut prev1 = 0.0f32;
+        let mut prev2 = 0.0f32;
+        for i in 0..n {
+            let c = fld(open, high, low, close, volume, i, lane);
+            let val = k1 * (c - 2.0f32 * prev1 + prev2) + k2 * prev1 - k3 * prev2;
+            prev2 = prev1;
+            prev1 = c;
+            output[i] = val;
+        }
+    } else if formula == 87u32 {
+        if p < 2 {
+            p = 2;
+        }
+        let af = 2.0f32 / ((fast as f32) + 1.0f32);
+        let asl = 2.0f32 / ((slow as f32) + 1.0f32);
+        let mut prior = fld(open, high, low, close, volume, 0, lane);
+        output[0] = prior;
+        for i in 1..n {
+            let mut cnt = i + 1;
+            if cnt > p {
+                cnt = p;
+            }
+            let start = i + 1 - cnt;
+            let mut sum = 0.0f32;
+            for k in 1..cnt {
+                let mut d = fld(open, high, low, close, volume, start + k, lane)
+                    - fld(open, high, low, close, volume, start + k - 1, lane);
+                if d < 0.0f32 {
+                    d = -d;
+                }
+                sum = sum + d;
+            }
+            let x = fld(open, high, low, close, volume, i, lane);
+            let mut net = x - fld(open, high, low, close, volume, start, lane);
+            if net < 0.0f32 {
+                net = -net;
+            }
+            let mut er = 0.0f32;
+            if sum != 0.0f32 {
+                er = net / sum;
+            }
+            let base = er * (af - asl) + asl;
+            prior = prior + base * base * (x - prior);
+            output[i] = prior;
+        }
+    } else if formula == 88u32 {
+        let mut al = a;
+        if al < 0.01f32 {
+            al = 0.01f32;
+        }
+        if al > 1.0f32 {
+            al = 1.0f32;
+        }
+        let mut thr = b;
+        if thr < 0.5f32 {
+            thr = 0.5f32;
+        }
+        let mut ema = fld(open, high, low, close, volume, 0, lane);
+        output[0] = 0.0f32;
+        let mut last = 0.0f32;
+        for i in 1..n {
+            let x = fld(open, high, low, close, volume, i, lane);
+            let prev = ema;
+            ema = al * x + (1.0f32 - al) * ema;
+            let mut sigma = x - prev;
+            if sigma < 0.0f32 {
+                sigma = -sigma;
+            }
+            if sigma < 1.0e-9f32 {
+                sigma = 1.0e-9f32;
+            }
+            let mut dev = x - ema;
+            if dev < 0.0f32 {
+                dev = -dev;
+            }
+            if dev > thr * sigma {
+                last = 1.0f32;
+            } else {
+                last = 0.0f32;
+            }
+            output[i] = last;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_k(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    fast: u32,
+    slow: u32,
+    a: f32,
+    b: f32,
+    formula: u32,
+) {
+    bar_scan_k(
+        open, high, low, close, volume, output, lane, period, fast, slow, a, b, formula,
+    );
+}
+
+/// Log return `ln(close[t] / close[t - 1])` of the lane, `t >= 1`.
+#[cube]
+fn lane_lr(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    t: usize,
+    lane: u32,
+) -> f32 {
+    let c1 = fld(open, high, low, close, volume, t - 1, lane);
+    let c2 = fld(open, high, low, close, volume, t, lane);
+    (c2 / c1).ln()
+}
+
+/// Bar formulas 89 and 90. 89 return autocorrelation (`period` window, `fast` lag),
+/// 90 variance ratio (`period` window, at least 20; `fast` aggregation m, 2..=window/2).
+#[cube]
+fn bar_scan_l(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    fast: u32,
+    formula: u32,
+) {
+    let n = open.len();
+    if formula == 89u32 {
+        let mut w = period as usize;
+        if w < 2 {
+            w = 2;
+        }
+        let mut lag = fast as usize;
+        if lag < 1 {
+            lag = 1;
+        }
+        let mut last = 0.0f32;
+        for i in 0..n {
+            if i >= w + lag {
+                let mut sx = 0.0f32;
+                let mut sy = 0.0f32;
+                let mut sx2 = 0.0f32;
+                let mut sy2 = 0.0f32;
+                let mut sxy = 0.0f32;
+                for k in 0..w {
+                    let t = i - k;
+                    let rt = lane_lr(open, high, low, close, volume, t, lane);
+                    let rl = lane_lr(open, high, low, close, volume, t - lag, lane);
+                    sx = sx + rt;
+                    sy = sy + rl;
+                    sx2 = sx2 + rt * rt;
+                    sy2 = sy2 + rl * rl;
+                    sxy = sxy + rt * rl;
+                }
+                let nf = w as f32;
+                let mx = sx / nf;
+                let my = sy / nf;
+                let cov = sxy / nf - mx * my;
+                let mut vx = sx2 / nf - mx * mx;
+                let mut vy = sy2 / nf - my * my;
+                if vx < 0.0f32 {
+                    vx = 0.0f32;
+                }
+                if vy < 0.0f32 {
+                    vy = 0.0f32;
+                }
+                let denom = sqrt_f(vx * vy);
+                if denom > 1.0e-12f32 {
+                    last = cov / denom;
+                } else {
+                    last = 0.0f32;
+                }
+            }
+            output[i] = last;
+        }
+    } else if formula == 90u32 {
+        let mut w = period as usize;
+        if w < 20 {
+            w = 20;
+        }
+        let mut half = 0usize;
+        let mut left = w;
+        for _step in 0..w {
+            if left >= 2 {
+                left = left - 2;
+                half = half + 1;
+            }
+        }
+        let mut m = fast as usize;
+        if m < 2 {
+            m = 2;
+        }
+        if m > half {
+            m = half;
+        }
+        let wf = w as f32;
+        let mf = m as f32;
+        let mut last = 1.0f32;
+        for i in 0..n {
+            if i >= w {
+                let first = i + 1 - w;
+                let mut mean = 0.0f32;
+                for k in 0..w {
+                    mean = mean + lane_lr(open, high, low, close, volume, first + k, lane);
+                }
+                mean = mean / wf;
+                let mut var1 = 0.0f32;
+                for k in 0..w {
+                    let d = lane_lr(open, high, low, close, volume, first + k, lane) - mean;
+                    var1 = var1 + d * d;
+                }
+                var1 = var1 / wf;
+                if var1 <= 1.0e-12f32 {
+                    last = 1.0f32;
+                } else {
+                    let count = w - m + 1;
+                    let cf = count as f32;
+                    let mut smean = 0.0f32;
+                    for s in 0..count {
+                        let mut acc = 0.0f32;
+                        for k in 0..m {
+                            acc = acc + lane_lr(open, high, low, close, volume, first + s + k, lane);
+                        }
+                        smean = smean + acc;
+                    }
+                    smean = smean / cf;
+                    let mut varm = 0.0f32;
+                    for s in 0..count {
+                        let mut acc = 0.0f32;
+                        for k in 0..m {
+                            acc = acc + lane_lr(open, high, low, close, volume, first + s + k, lane);
+                        }
+                        let d = acc - smean;
+                        varm = varm + d * d;
+                    }
+                    varm = varm / cf;
+                    last = (varm / var1) / mf;
+                }
+            }
+            output[i] = last;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_l(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    fast: u32,
+    formula: u32,
+) {
+    bar_scan_l(open, high, low, close, volume, output, lane, period, fast, formula);
+}
+
 #[cube(launch_unchecked)]
 fn lane_map(
     open: &[f32],
@@ -3048,7 +3354,42 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     let cubes = (n as u32).div_ceil(dim);
     let book_len = c.bid_px.len();
     unsafe {
-        if formula.code() >= 80 {
+        if formula.code() >= 89 {
+            bar_map_l::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(open_b, n),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(volume_b, n),
+                BufferArg::from_raw_parts(output.clone(), n),
+                params.lane.code(),
+                params.period,
+                params.fast,
+                formula.code(),
+            );
+        } else if formula.code() >= 86 {
+            bar_map_k::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(open_b, n),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(volume_b, n),
+                BufferArg::from_raw_parts(output.clone(), n),
+                params.lane.code(),
+                params.period,
+                params.fast,
+                params.slow,
+                params.a,
+                params.b,
+                formula.code(),
+            );
+        } else if formula.code() >= 80 {
             bar_map_j::launch_unchecked(
                 &client,
                 CubeCount::new_1d(1),
@@ -3244,6 +3585,11 @@ mod tests {
     use super::*;
     use crate::engine::ohlcv_field::OhlcvField;
     use crate::indicators::accumulation::accumulation_distribution::AccumulationDistribution;
+    use crate::indicators::signal_processing::cyber_cycle::CyberCycle;
+    use crate::indicators::average::ama::Ama;
+    use crate::indicators::volatility::volatility_break_exp::VolatilityBreakExp;
+    use crate::indicators::signal_processing::autocorr::Autocorr;
+    use crate::indicators::statistics::variance_ratio::VarianceRatio;
     use crate::indicators::channels::price_channel_oscillator::PriceChannelOscillator;
     use crate::indicators::channels::price_channel_width::PriceChannelWidth;
     use crate::indicators::ratio::efficiency_ratio::EfficiencyRatioFullHistory;
@@ -4530,6 +4876,35 @@ mod tests {
             &run(CubeFormula::VwapDistance, &bars, CubeParams::period(wper as u32)),
             &cpu_vdist,
         );
+
+        // UNTESTED on GPU (no GPU on the authoring box): batches K and L, codes 86..=90.
+        let mut cyber = CyberCycle::new(0.2);
+        let cpu_cyber: Vec<f64> = bars.iter().map(|b| cyber.feed(b.close)).collect();
+        let mut cyber_params = CubeParams::period(1);
+        cyber_params.a = 0.2;
+        assert_close(&run(CubeFormula::CyberCycle, &bars, cyber_params), &cpu_cyber);
+        let mut ama = Ama::new(5, 2, 30);
+        let cpu_ama: Vec<f64> = bars.iter().map(|b| ama.feed(b.close)).collect();
+        let mut ama_params = CubeParams::period(5);
+        ama_params.fast = 2;
+        ama_params.slow = 30;
+        assert_close(&run(CubeFormula::Ama, &bars, ama_params), &cpu_ama);
+        let mut vbexp = VolatilityBreakExp::new(0.1, 2.0);
+        let cpu_vbexp: Vec<f64> = bars.iter().map(|b| vbexp.feed(b.close)).collect();
+        let mut vbexp_params = CubeParams::period(1);
+        vbexp_params.a = 0.1;
+        vbexp_params.b = 2.0;
+        assert_close(&run(CubeFormula::VolBreak, &bars, vbexp_params), &cpu_vbexp);
+        let mut acorr = Autocorr::new(2, wper);
+        let cpu_acorr: Vec<f64> = bars.iter().map(|b| acorr.feed(b.close)).collect();
+        let mut acorr_params = CubeParams::period(wper as u32);
+        acorr_params.fast = 2;
+        assert_close(&run(CubeFormula::Autocorr, &bars, acorr_params), &cpu_acorr);
+        let mut vr = VarianceRatio::new(20, 5);
+        let cpu_vr: Vec<f64> = bars.iter().map(|b| vr.feed(b.close)).collect();
+        let mut vr_params = CubeParams::period(20);
+        vr_params.fast = 5;
+        assert_close(&run(CubeFormula::VarianceRatio, &bars, vr_params), &cpu_vr);
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
     }

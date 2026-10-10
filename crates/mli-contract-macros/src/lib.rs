@@ -240,6 +240,11 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "er_ring" => "ErRing",
         "r_squared" => "RSquared",
         "vwap_distance" => "VwapDistance",
+        "cyber_cycle" => "CyberCycle",
+        "ama" => "Ama",
+        "vol_break" => "VolBreak",
+        "autocorr" => "Autocorr",
+        "variance_ratio" => "VarianceRatio",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

@@ -231,6 +231,16 @@ pub enum CubeFormula {
     RSquared = 84,
     /// `(close - rolling VWAP) / VWAP` with the same rolling VWAP as [`CubeFormula::Vwap`]. Zero when the VWAP is ~0.
     VwapDistance = 85,
+    /// Ehlers cyber cycle of the lane. [`CubeParams::a`] is alpha, clamped to `[0, 1]`. Previous inputs start at 0.
+    CyberCycle = 86,
+    /// `Ama::feed`: ER over a ring window of `period` (at least 2), smoothing constant `(er * (fast_alpha - slow_alpha) + slow_alpha)^2`. [`CubeParams::fast`] and [`CubeParams::slow`] are the fast and slow periods. Seed is the first sample.
+    Ama = 87,
+    /// `VolatilityBreakExp`: 1 when `|x - ema| > threshold * max(|x - prev_ema|, 1e-9)`. [`CubeParams::a`] is alpha (0.01..=1), [`CubeParams::b`] the sigma threshold (at least 0.5). Zero on the first sample.
+    VolBreak = 88,
+    /// Autocorrelation of log returns of the lane. `period` is the window (at least 2), [`CubeParams::fast`] the lag (at least 1). Holds 0 until `period + lag + 1` samples.
+    Autocorr = 89,
+    /// Variance ratio of log returns. `period` is the window (at least 20), [`CubeParams::fast`] the aggregation (2..=window/2). `1` until a window of returns exists.
+    VarianceRatio = 90,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -412,6 +422,11 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::ErRing), Some(CubeFormula::ErRing));
         assert_eq!(formula_of(IndicatorId::RSquared), Some(CubeFormula::RSquared));
         assert_eq!(formula_of(IndicatorId::VwapDist), Some(CubeFormula::VwapDistance));
+        assert_eq!(formula_of(IndicatorId::Cyber), Some(CubeFormula::CyberCycle));
+        assert_eq!(formula_of(IndicatorId::Ama), Some(CubeFormula::Ama));
+        assert_eq!(formula_of(IndicatorId::Vbexp), Some(CubeFormula::VolBreak));
+        assert_eq!(formula_of(IndicatorId::Autocorr), Some(CubeFormula::Autocorr));
+        assert_eq!(formula_of(IndicatorId::Vr), Some(CubeFormula::VarianceRatio));
     }
 
     #[cfg(feature = "gpu-shader")]
