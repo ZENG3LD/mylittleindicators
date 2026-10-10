@@ -112,6 +112,7 @@ fn bar_scan(
     c: &[f32],
     v: &[f32],
     out: &mut [f32],
+    scr: &mut [f32],
     formula: u32,
     period: u32,
     p2: u32,
@@ -127,6 +128,7 @@ fn bar_scan(
     let mut d = 0.0f32;
     let mut dh = 0.0f32;
     let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
     let mut vw = 0.0f32;
     let mut held0 = 0.0f32;
     let mut held1 = 0.0f32;
@@ -511,6 +513,154 @@ fn bar_scan(
             if v[t] != 0.0f32 {
                 v1 = (c[t] - v[t]) / v[t].abs().max(1.0e-9f32);
             }
+        } else if formula == 1217u32 {
+            // Shannon entropy (normalised): ring of accepted log returns in scr[0..period]
+            let pr = period as usize;
+            let mut bins = p2 as usize;
+            if bins < 2 {
+                bins = 2;
+            }
+            if t > 0usize {
+                let lr = (c[t] / c[t - 1]).ln();
+                if lr.abs() < 1.0f32 {
+                    let wp = cnt_a % pr;
+                    scr[wp] = lr;
+                    cnt_a = cnt_a + 1usize;
+                    let mut len = cnt_a;
+                    if len > pr {
+                        len = pr;
+                    }
+                    let mut need = pr;
+                    if need > 10usize {
+                        need = 10usize;
+                    }
+                    if len >= need {
+                        let mut mn = scr[0];
+                        let mut mx = scr[0];
+                        for j in 0..len {
+                            if scr[j] < mn {
+                                mn = scr[j];
+                            }
+                            if scr[j] > mx {
+                                mx = scr[j];
+                            }
+                        }
+                        if (mx - mn).abs() < 1.0e-10f32 {
+                            held0 = 0.0f32;
+                        } else {
+                            let bw = (mx - mn) / (bins as f32);
+                            for b in 0..bins {
+                                scr[pr + b] = 0.0f32;
+                            }
+                            for j in 0..len {
+                                let mut bi = ((scr[j] - mn) / bw) as usize;
+                                if bi > bins - 1 {
+                                    bi = bins - 1;
+                                }
+                                scr[pr + bi] = scr[pr + bi] + 1.0f32;
+                            }
+                            let mut ent = 0.0f32;
+                            for b in 0..bins {
+                                let cn = scr[pr + b];
+                                if cn > 0.0f32 {
+                                    let pb = cn / (len as f32);
+                                    ent = ent - pb * pb.ln() / 0.6931472f32;
+                                }
+                            }
+                            let mxe = (bins as f32).ln() / 0.6931472f32;
+                            held0 = (ent / mxe).max(0.0f32).min(1.0f32);
+                        }
+                    }
+                }
+            }
+            v0 = held0;
+        } else if formula == 1218u32 {
+            // rolling Fisher information: n / variance of the last `period` (>= 10) log returns
+            let mut w = period as usize;
+            if w < 10 {
+                w = 10;
+            }
+            if t >= w {
+                let mut sm = 0.0f32;
+                for j in (t + 1 - w)..(t + 1) {
+                    sm = sm + (c[j] / c[j - 1]).ln();
+                }
+                let mean = sm / (w as f32);
+                let mut var = 0.0f32;
+                for j in (t + 1 - w)..(t + 1) {
+                    let d = (c[j] / c[j - 1]).ln() - mean;
+                    var = var + d * d;
+                }
+                var = var / (w as f32);
+                if var <= 1.0e-12f32 {
+                    held0 = 0.0f32;
+                } else {
+                    held0 = (w as f32) / var;
+                }
+            }
+            v0 = held0;
+        } else if formula == 1219u32 {
+            // information gain between consecutive binned returns, window >= 20, bins >= 4
+            let mut w = period as usize;
+            if w < 20 {
+                w = 20;
+            }
+            let mut bn = p2 as usize;
+            if bn < 4 {
+                bn = 4;
+            }
+            let mut clip = a;
+            if clip < 1.0e-6f32 {
+                clip = 1.0e-6f32;
+            }
+            let mn = -clip;
+            let mx = clip;
+            if t >= w {
+                // scr layout: [0..bn) hy, [bn..bn + bn*bn) hxy (index by * bn + bx)
+                for b in 0..(bn + bn * bn) {
+                    scr[b] = 0.0f32;
+                }
+                for j in (t + 2 - w)..(t + 1) {
+                    let y = (c[j] / c[j - 1]).ln();
+                    let x = (c[j - 1] / c[j - 2]).ln();
+                    let mut bx = (((x.min(mx).max(mn) - mn) / (mx - mn)) * (bn as f32)) as usize;
+                    let mut by = (((y.min(mx).max(mn) - mn) / (mx - mn)) * (bn as f32)) as usize;
+                    if bx > bn - 1 {
+                        bx = bn - 1;
+                    }
+                    if by > bn - 1 {
+                        by = bn - 1;
+                    }
+                    scr[by] = scr[by] + 1.0f32;
+                    scr[bn + by * bn + bx] = scr[bn + by * bn + bx] + 1.0f32;
+                }
+                let total = (w - 1) as f32;
+                let mut hy = 0.0f32;
+                for b in 0..bn {
+                    if scr[b] > 0.0f32 {
+                        let pb = scr[b] / total;
+                        hy = hy - pb * pb.ln();
+                    }
+                }
+                let mut hyx = 0.0f32;
+                for by in 0..bn {
+                    let mut rs = 0.0f32;
+                    for bx in 0..bn {
+                        rs = rs + scr[bn + by * bn + bx];
+                    }
+                    if rs > 0.0f32 {
+                        for bx in 0..bn {
+                            let cn = scr[bn + by * bn + bx];
+                            if cn > 0.0f32 {
+                                let pb = cn / rs;
+                                hyx = hyx - (rs / total) * pb * pb.ln();
+                            }
+                        }
+                    }
+                }
+                held0 = (hy - hyx).max(0.0f32);
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -528,6 +678,7 @@ fn bar_map(
     c: &[f32],
     v: &[f32],
     out: &mut [f32],
+    scr: &mut [f32],
     formula: u32,
     period: u32,
     p2: u32,
@@ -538,7 +689,7 @@ fn bar_map(
     cc: f32,
     flag: u32,
 ) {
-    bar_scan(o, h, l, c, v, out, formula, period, p2, p3, p4, a, b, cc, flag);
+    bar_scan(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
 }
 
 /// Run a bar formula of codes 1200..=1399. One `Vec` per output column.
@@ -595,6 +746,9 @@ pub fn launch_cube_bar(
         cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
     let up = |s: &Vec<f32>| client.create_from_slice(f32::as_bytes(s));
     let out = client.empty(5 * n * core::mem::size_of::<f32>());
+    // scratch (histograms / rings) sized per formula
+    let scr_len = (params.period as usize * 2 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
+    let scr_buf = client.create_from_slice(f32::as_bytes(&vec![0.0f32; scr_len]));
     unsafe {
         bar_map::launch_unchecked(
             &client,
@@ -606,6 +760,7 @@ pub fn launch_cube_bar(
             BufferArg::from_raw_parts(up(&c), n),
             BufferArg::from_raw_parts(up(&v), n),
             BufferArg::from_raw_parts(out.clone(), 5 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
             formula.code(),
             params.period,
             params.fast,

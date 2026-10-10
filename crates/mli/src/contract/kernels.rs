@@ -8528,6 +8528,39 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1217..=1219.
+    #[test]
+    fn lane_matches_cpu_bar_batch7() {
+        use crate::indicators::entropy::fisher_information::RollingFisherInformation;
+        use crate::indicators::entropy::information_gain::InformationGain;
+        use crate::indicators::entropy::shannon_entropy::ShannonEntropy;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(30);
+        p.fast = 8;
+        let mut m = ShannonEntropy::new(30, 8);
+        chk(&run_cols(CubeFormula::ShannonBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = RollingFisherInformation::new(20);
+        chk(&run_cols(CubeFormula::FisherInfoBar, &bars, CubeParams::period(20)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(30);
+        p.fast = 6;
+        p.a = 0.05;
+        let mut m = InformationGain::new(30, 6, 0.05);
+        chk(&run_cols(CubeFormula::InfoGainBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

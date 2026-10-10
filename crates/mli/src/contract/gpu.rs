@@ -645,6 +645,12 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: shannon entropy. UNTESTED on GPU.
+    ShannonBar = 1217,
+    /// Composite: fisher information. UNTESTED on GPU.
+    FisherInfoBar = 1218,
+    /// Composite: information gain. UNTESTED on GPU.
+    InfoGainBar = 1219,
     /// Composite: distance to levels. UNTESTED on GPU.
     DistLevelsBar = 1216,
     /// Composite: median channels. UNTESTED on GPU.
@@ -1291,6 +1297,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Shannon), Some(CubeFormula::ShannonBar));
+        assert_eq!(formula_of(IndicatorId::Fisher), Some(CubeFormula::FisherInfoBar));
+        assert_eq!(formula_of(IndicatorId::Infog), Some(CubeFormula::InfoGainBar));
         assert_eq!(formula_of(IndicatorId::DistLevels), Some(CubeFormula::DistLevelsBar));
         assert_eq!(formula_of(IndicatorId::Medchan), Some(CubeFormula::MedChanBar));
         assert_eq!(formula_of(IndicatorId::Medchanpos), Some(CubeFormula::MedChanPosBar));
