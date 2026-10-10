@@ -645,6 +645,20 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: engle granger adf proxy. UNTESTED on GPU.
+    EgAdfBar = 1242,
+    /// Composite: cointegration proxy. UNTESTED on GPU.
+    CointBar = 1243,
+    /// Composite: engle granger proxy. UNTESTED on GPU.
+    EgCointBar = 1244,
+    /// Composite: adf kpss composite. UNTESTED on GPU.
+    AdfKpssBar = 1245,
+    /// Composite: kpss z. UNTESTED on GPU.
+    KpssZBar = 1246,
+    /// Composite: arch lm r2. UNTESTED on GPU.
+    ArchLmBar = 1247,
+    /// Composite: arch lm p value. UNTESTED on GPU.
+    ArchLmPvalBar = 1248,
     /// Composite: adf proxy. UNTESTED on GPU.
     AdfBar = 1238,
     /// Composite: phillips perron proxy. UNTESTED on GPU.
@@ -1075,6 +1089,8 @@ impl CubeFormula {
             CubeFormula::MedChanBar => 3,
             CubeFormula::DpoBandsBar => 3,
             CubeFormula::DistLevelsBar => 2,
+            CubeFormula::EgAdfBar => 2,
+            CubeFormula::CointBar => 2,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1341,6 +1357,13 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::EgAdf), Some(CubeFormula::EgAdfBar));
+        assert_eq!(formula_of(IndicatorId::Coint), Some(CubeFormula::CointBar));
+        assert_eq!(formula_of(IndicatorId::EgCoint), Some(CubeFormula::EgCointBar));
+        assert_eq!(formula_of(IndicatorId::AdfKpss), Some(CubeFormula::AdfKpssBar));
+        assert_eq!(formula_of(IndicatorId::KpssZ), Some(CubeFormula::KpssZBar));
+        assert_eq!(formula_of(IndicatorId::ArchLm), Some(CubeFormula::ArchLmBar));
+        assert_eq!(formula_of(IndicatorId::ArchLmPval), Some(CubeFormula::ArchLmPvalBar));
         assert_eq!(formula_of(IndicatorId::Adf), Some(CubeFormula::AdfBar));
         assert_eq!(formula_of(IndicatorId::Pp), Some(CubeFormula::PpBar));
         assert_eq!(formula_of(IndicatorId::Za), Some(CubeFormula::ZaBar));

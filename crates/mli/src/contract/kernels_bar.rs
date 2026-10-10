@@ -273,13 +273,14 @@ fn nw_lrv(scr: &mut [f32], off: usize, n: usize) -> f32 {
 /// (`xo` / `yo`), reporting the coefficient and t-statistic of column `gc`. Non-constant columns are
 /// centred and scaled in place first (the t-statistic is invariant; it keeps `f32` normal
 /// equations usable). Work area at `wo` (needs `k * k + 4 * k` floats). Writes `scr[wo] = gamma`,
-/// `scr[wo + 1] = t` and returns 1.0 on success, 0.0 when singular / degenerate.
+/// `scr[wo + 1] = t`, `scr[wo + 2] = sse` (-1 when singular) and returns 1.0 on success, 0.0 when singular / degenerate.
 #[cube]
 fn ols_gamma(scr: &mut [f32], xo: usize, yo: usize, rows: usize, k: usize, wo: usize, gc: usize) -> f32 {
     let mut ok = 1.0f32;
     let rf = rows as f32;
     // column scaling: sd stored at wo + 2 + k*k + j (j >= 1)
-    let so = wo + 2;
+    let so = wo + 3;
+    scr[wo + 2] = 0.0f32 - 1.0f32;
     let a_o = so + k;
     let b1 = a_o + k * k;
     let b2 = b1 + k;
@@ -385,6 +386,7 @@ fn ols_gamma(scr: &mut [f32], xo: usize, yo: usize, rows: usize, k: usize, wo: u
             let e = scr[yo + r] - yh;
             sse = sse + e * e;
         }
+        scr[wo + 2] = sse;
         if rows <= k {
             ok = 0.0f32;
         } else {
@@ -401,6 +403,77 @@ fn ols_gamma(scr: &mut [f32], xo: usize, yo: usize, rows: usize, k: usize, wo: u
     scr[wo] = gamma;
     scr[wo + 1] = tst;
     ok
+}
+
+/// ln Gamma(x) (Lanczos, Numerical Recipes `gammln`).
+#[cube]
+fn lngam(x: f32) -> f32 {
+    let ser = 1.000000000190015f32
+        + 76.18009172947146f32 / (x + 1.0f32)
+        - 86.50532032941677f32 / (x + 2.0f32)
+        + 24.01409824083091f32 / (x + 3.0f32)
+        - 1.231739572450155f32 / (x + 4.0f32)
+        + 0.001208650973866179f32 / (x + 5.0f32)
+        - 0.000005395239384953f32 / (x + 6.0f32);
+    (x - 0.5f32) * (x + 4.5f32).ln() - (x + 4.5f32) + (2.5066282746310005f32 * ser / x).ln()
+}
+
+/// Chi-square survival function `1 - cdf(x; k)` (regularised incomplete gamma, series / continued fraction).
+#[cube]
+fn chi2_sf_k(xv: f32, kk: f32) -> f32 {
+    let mut res = 1.0f32;
+    if xv > 0.0f32 {
+        let s = kk * 0.5f32;
+        let x = xv * 0.5f32;
+        let lg = lngam(s);
+        let pref = (0.0f32 - x + s * x.ln() - lg).exp();
+        if x < s + 1.0f32 {
+            let mut ap = s;
+            let mut sum = 1.0f32 / s;
+            let mut del = sum;
+            let mut go = true;
+            for _ in 0..200 {
+                if go {
+                    ap = ap + 1.0f32;
+                    del = del * x / ap;
+                    sum = sum + del;
+                    if del.abs() < sum.abs() * 1.0e-7f32 {
+                        go = false;
+                    }
+                }
+            }
+            res = 1.0f32 - sum * pref;
+        } else {
+            let mut b = x + 1.0f32 - s;
+            let mut cc = (b / b) * 1.0e30f32;
+            let mut d = 1.0f32 / b;
+            let mut h = d;
+            let mut go = true;
+            for i in 1..200 {
+                if go {
+                    let fi = i as f32;
+                    let an = 0.0f32 - fi * (fi - s);
+                    b = b + 2.0f32;
+                    d = an * d + b;
+                    if d.abs() < 1.0e-30f32 {
+                        d = 1.0e-30f32;
+                    }
+                    cc = b + an / cc;
+                    if cc.abs() < 1.0e-30f32 {
+                        cc = 1.0e-30f32;
+                    }
+                    d = 1.0f32 / d;
+                    let del = d * cc;
+                    h = h * del;
+                    if (del - 1.0f32).abs() < 1.0e-7f32 {
+                        go = false;
+                    }
+                }
+            }
+            res = pref * h;
+        }
+    }
+    res
 }
 
 /// 1200 Stochastik-D `[k, d]` (`period` %K window, `p2` %D window), 1201 Donchian stop
@@ -1963,6 +2036,149 @@ fn bar_scan(
                 }
             }
             v0 = held0;
+        } else if formula >= 1242u32 && formula <= 1244u32 {
+            // AR(1) fit of (close - SMA) over the last `w` residuals; `v` carries the SMA series
+            let mut w = period as usize;
+            if formula == 1242u32 {
+                if w < 32 {
+                    w = 32;
+                }
+            } else if w < 20 {
+                w = 20;
+            }
+            if t + 1 >= w {
+                let mut sx = 0.0f32;
+                let mut sy = 0.0f32;
+                let mut sxx = 0.0f32;
+                let mut sxy = 0.0f32;
+                let mut cn = 0.0f32;
+                for i in 1..w {
+                    let j = t + 1 - w + i;
+                    let y = c[j] - v[j];
+                    let x = c[j - 1] - v[j - 1];
+                    sx = sx + x;
+                    sy = sy + y;
+                    sxx = sxx + x * x;
+                    sxy = sxy + x * y;
+                    cn = cn + 1.0f32;
+                }
+                let den = cn * sxx - sx * sx;
+                let mut phi = 0.0f32;
+                if den.abs() > 1.0e-12f32 {
+                    phi = (cn * sxy - sx * sy) / den;
+                }
+                let mut ss = 0.0f32;
+                for i in 1..w {
+                    let j = t + 1 - w + i;
+                    let y = c[j] - v[j];
+                    let x = c[j - 1] - v[j - 1];
+                    let e = y - phi * x;
+                    ss = ss + e * e;
+                }
+                let var = ss.max(1.0e-12f32) / (cn - 1.0f32).max(1.0f32);
+                let sadj = (sxx - sx * sx / cn).max(1.0e-12f32);
+                let sphi = (var / sadj).sqrt();
+                held0 = phi;
+                if sphi > 0.0f32 {
+                    held1 = (phi - 1.0f32) / sphi;
+                } else {
+                    held1 = 0.0f32;
+                }
+            }
+            if formula == 1244u32 {
+                v0 = held1;
+            } else {
+                v0 = held0;
+                v1 = held1;
+            }
+        } else if formula == 1245u32 {
+            // ADF/KPSS composite: o = EG-ADF t-stat, h = KPSS level, l = KPSS trend (0 when unused)
+            let adf_score = 1.0f32 / (1.0f32 + o[t].abs().exp());
+            let kscore = 1.0f32 / (1.0f32 + h[t].max(l[t]));
+            v0 = 0.5f32 * (adf_score + kscore);
+        } else if formula == 1246u32 {
+            // z-score of the inner KPSS series (`v`) over the last `p2` (>= 20) values
+            let mut w = p2 as usize;
+            if w < 20 {
+                w = 20;
+            }
+            if t + 1 >= w {
+                let mut mean = 0.0f32;
+                for j in (t + 1 - w)..(t + 1) {
+                    mean = mean + v[j];
+                }
+                mean = mean / (w as f32);
+                let mut var = 0.0f32;
+                for j in (t + 1 - w)..(t + 1) {
+                    let d = v[j] - mean;
+                    var = var + d * d;
+                }
+                let sdv = (var / (w as f32)).sqrt().max(1.0e-9f32);
+                held0 = (v[t] - mean) / sdv;
+            }
+            v0 = held0;
+        } else if formula == 1247u32 || formula == 1248u32 {
+            // ARCH-LM R^2 (1247) / chi-square p-value (1248) of squared returns on their lags
+            let mut n = period as usize;
+            if n < 50 {
+                n = 50;
+            }
+            if n > 1024 {
+                n = 1024;
+            }
+            let mut l = p2 as usize;
+            if l < 1usize {
+                l = 1usize;
+            }
+            if l > 10usize {
+                l = 10usize;
+            }
+            if formula == 1248u32 && hset == 0u32 {
+                held0 = 1.0f32;
+                hset = 1u32;
+            }
+            if t >= n {
+                let rows = n - l - 1;
+                let k = l + 1;
+                for i in 0..n {
+                    let j = t + 1 - n + i;
+                    let r = (c[j] / c[j - 1]).ln();
+                    scr[i] = r * r;
+                }
+                let xo = n;
+                let yo = xo + rows * k;
+                let wo = yo + rows;
+                let mut ym = 0.0f32;
+                for r in 0..rows {
+                    scr[xo + r * k] = 1.0f32;
+                    for jj in 1..(l + 1) {
+                        scr[xo + r * k + jj] = scr[r + l - jj];
+                    }
+                    scr[yo + r] = scr[r + l];
+                    ym = ym + scr[r + l];
+                }
+                ym = ym / (rows as f32);
+                let mut tss = 0.0f32;
+                for r in 0..rows {
+                    let d = scr[yo + r] - ym;
+                    tss = tss + d * d;
+                }
+                let okk = ols_gamma(scr, xo, yo, rows, k, wo, 1usize);
+                let sse = scr[wo + 2];
+                let mut r2 = 0.0f32;
+                if sse >= 0.0f32 && tss > 1.0e-12f32 {
+                    r2 = (1.0f32 - sse / tss).max(0.0f32).min(1.0f32);
+                }
+                if okk < 0.0f32 {
+                    r2 = 0.0f32;
+                }
+                if formula == 1247u32 {
+                    held0 = r2;
+                } else {
+                    held0 = chi2_sf_k((rows as f32) * r2, l as f32).max(0.0f32).min(1.0f32);
+                }
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -2005,8 +2221,8 @@ pub fn launch_cube_bar(
         return Vec::new();
     }
     let o = lane_series(samples, params, OhlcvField::Open);
-    let h = lane_series(samples, params, OhlcvField::High);
-    let l = lane_series(samples, params, OhlcvField::Low);
+    let mut h = lane_series(samples, params, OhlcvField::High);
+    let mut l = lane_series(samples, params, OhlcvField::Low);
     let c = lane_series(samples, params, params.lane);
     let mut v = lane_series(samples, params, OhlcvField::Volume);
     let mut o = o;
@@ -2026,6 +2242,33 @@ pub fn launch_cube_bar(
             CubeFormula::DfaBar
         };
         v = launch_cube_bar(inner, samples, ip).swap_remove(0);
+    }
+    if matches!(formula, CubeFormula::EgAdfBar | CubeFormula::CointBar | CubeFormula::EgCointBar) {
+        let w = match formula {
+            CubeFormula::EgAdfBar => params.period.max(32),
+            _ => params.period.max(20),
+        };
+        let ma = match formula {
+            CubeFormula::EgAdfBar => params.fast.max(5),
+            _ => w,
+        };
+        v = smooth_series(&c, super::CubeSmoother::Sma, ma, 0, params.a, params.b);
+    }
+    if formula == CubeFormula::KpssZBar {
+        let mut ip = params;
+        ip.period = params.period;
+        v = launch_cube_bar(CubeFormula::KpssBar, samples, ip).swap_remove(0);
+    }
+    if formula == CubeFormula::AdfKpssBar {
+        let mut ap = params;
+        ap.period = params.period;
+        o = launch_cube_bar(CubeFormula::EgAdfBar, samples, ap).swap_remove(1);
+        h = launch_cube_bar(CubeFormula::KpssBar, samples, params).swap_remove(0);
+        l = if params.flag == 1 {
+            launch_cube_bar(CubeFormula::KpssTrendBar, samples, params).swap_remove(0)
+        } else {
+            vec![0.0; n]
+        };
     }
     if formula == CubeFormula::DistLevelsBar {
         let mut mp = params;

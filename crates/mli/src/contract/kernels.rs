@@ -8763,6 +8763,58 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1242..=1248.
+    #[test]
+    fn lane_matches_cpu_bar_batch14() {
+        use crate::indicators::statistics::adf_kpss_composite::AdfKpssComposite;
+        use crate::indicators::statistics::arch_lm_proxy::ArchLmProxy;
+        use crate::indicators::statistics::arch_lm_pvalue_proxy::ArchLmPvalueProxy;
+        use crate::indicators::statistics::cointegration_proxy::CointegrationProxy;
+        use crate::indicators::statistics::engle_granger_adf_proxy::EngleGrangerAdfProxy;
+        use crate::indicators::statistics::engle_granger_proxy::EngleGrangerProxy;
+        use crate::indicators::statistics::kpss_z_proxy::KpssZProxy;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(40);
+        p.fast = 10;
+        p.smoother = CubeSmoother::Sma;
+        let mut m = EngleGrangerAdfProxy::new(40, 10);
+        chk(&run_cols(CubeFormula::EgAdfBar, &bars, p), close.iter().map(|c| { let (a, b) = m.feed(*c); vec![a, b] }).collect());
+        let mut m = CointegrationProxy::new(40);
+        chk(&run_cols(CubeFormula::CointBar, &bars, p), close.iter().map(|c| { let (a, b) = m.feed(*c); vec![a, b] }).collect());
+        let mut m = EngleGrangerProxy::new(40);
+        chk(&run_cols(CubeFormula::EgCointBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        for tr in [false, true] {
+            let mut pa = p;
+            pa.period = 50;
+            pa.flag = tr as u32;
+            let mut m = AdfKpssComposite::new(50, 10, tr);
+            chk(&run_cols(CubeFormula::AdfKpssBar, &bars, pa), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        }
+        let mut pz = CubeParams::period(50);
+        pz.fast = 30;
+        let mut m = KpssZProxy::new(50, 30);
+        chk(&run_cols(CubeFormula::KpssZBar, &bars, pz), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut pl = CubeParams::period(60);
+        pl.fast = 3;
+        let mut m = ArchLmProxy::new(60, 3);
+        chk(&run_cols(CubeFormula::ArchLmBar, &bars, pl), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = ArchLmPvalueProxy::new(60, 3);
+        chk(&run_cols(CubeFormula::ArchLmPvalBar, &bars, pl), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
