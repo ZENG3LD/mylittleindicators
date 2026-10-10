@@ -4242,6 +4242,9 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     if formula.is_smoothed() {
         return launch_cube_smoothed(formula, samples, params);
     }
+    if formula.code() >= 1200 && formula.code() < 1400 {
+        return super::kernels_bar::launch_cube_bar(formula, samples, params).swap_remove(0);
+    }
     if formula.code() >= 200 && formula.code() < 300 {
         return launch_cube_gx(formula, samples, params);
     }
@@ -4579,6 +4582,9 @@ pub fn launch_cube_columns(
     }
     if formula.code() >= 600 && formula.code() < 700 {
         return super::kernels_post::launch_cube_post_columns(formula, samples, params);
+    }
+    if formula.code() >= 1200 && formula.code() < 1400 {
+        return super::kernels_bar::launch_cube_bar(formula, samples, params);
     }
     if formula.code() >= 1000 && formula.code() < 1100 {
         return super::kernels_comp::launch_cube_comp(formula, samples, params);
@@ -8312,6 +8318,43 @@ mod tests {
             c.push(m.indicator_value());
         }
         assert_close(&launch_cube_events(CubeFormula::FundingSettleImpactMg, &fr, pp(8, 0.0, 0.0, 0.0))[0], &c);
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1200..=1202.
+    #[test]
+    fn lane_matches_cpu_bar_batch1() {
+        use crate::indicators::channels::projection_bands::ProjectionBands;
+        use crate::indicators::momentum::stochastikd::StochastikD;
+        use crate::indicators::trend_stop::donchian_stop::DonchianStop;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(6);
+        p.fast = 4;
+        let mut m = StochastikD::new(6, 4);
+        chk(&run_cols(CubeFormula::StochKdBar, &bars, p), lanes.iter().map(|l| { let (k, d) = m.feed(&[l[0], l[1], l[2]]); vec![k, d] }).collect());
+        for (pct, off) in [(false, 0.5f64), (true, 1.5)] {
+            let mut p = CubeParams::period(7);
+            p.a = off as f32;
+            p.flag = pct as u32;
+            let mut m = DonchianStop::with_different_periods(9, 7, off, pct);
+            chk(&run_cols(CubeFormula::DonchianStopBar, &bars, p), lanes.iter().map(|l| { let (lo, _, _) = m.feed(&[l[0], l[1], l[2]]); vec![lo] }).collect());
+        }
+        let mut p = CubeParams::period(10);
+        p.a = 2.0;
+        let mut m = ProjectionBands::new(10, 2.0);
+        chk(&run_cols(CubeFormula::ProjBandsBar, &bars, p), close.iter().map(|c| { let (u, mi, l) = m.feed(*c); vec![u, mi, l] }).collect());
+
     }
 
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.

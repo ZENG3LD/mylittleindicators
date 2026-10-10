@@ -1177,7 +1177,7 @@ fn atr_series(
     sm(&tr, which, period, start, p)
 }
 
-fn lane_series(samples: &[GpuSample], params: CubeParams, lane: OhlcvField) -> Vec<f32> {
+pub(crate) fn lane_series(samples: &[GpuSample], params: CubeParams, lane: OhlcvField) -> Vec<f32> {
     let mut p = params;
     p.lane = lane;
     launch_cube(CubeFormula::Identity, samples, p)

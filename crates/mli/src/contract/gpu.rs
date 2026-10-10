@@ -645,6 +645,12 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: Stochastik-D k/d. UNTESTED on GPU.
+    StochKdBar = 1200,
+    /// Composite: Donchian stop lower. UNTESTED on GPU.
+    DonchianStopBar = 1201,
+    /// Composite: projection bands. UNTESTED on GPU.
+    ProjBandsBar = 1202,
     /// Composite: book churn rate. UNTESTED on GPU.
     BookChurnEv = 980,
     /// Composite: level replenishment rate. UNTESTED on GPU.
@@ -980,6 +986,8 @@ impl CubeFormula {
             CubeFormula::SqueezeProbMg => 2,
             CubeFormula::CompoundSqueezeMg => 2,
             CubeFormula::RatioVsPriceMg => 2,
+            CubeFormula::StochKdBar => 2,
+            CubeFormula::ProjBandsBar => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1246,6 +1254,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Stochkd), Some(CubeFormula::StochKdBar));
+        assert_eq!(formula_of(IndicatorId::Dons), Some(CubeFormula::DonchianStopBar));
+        assert_eq!(formula_of(IndicatorId::Projbands), Some(CubeFormula::ProjBandsBar));
         assert_eq!(formula_of(IndicatorId::CompoundSqueezeProbability), Some(CubeFormula::CompoundSqueezeMg));
         assert_eq!(formula_of(IndicatorId::CapitulationDetector), Some(CubeFormula::CapitulationMg));
         assert_eq!(formula_of(IndicatorId::BlockTradeVolumeRatio), Some(CubeFormula::BlockTradeRatioMg));

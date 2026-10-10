@@ -725,6 +725,8 @@ pub mod kernels_ev;
 #[cfg(feature = "gpu")]
 pub mod kernels_evx;
 #[cfg(feature = "gpu")]
+pub mod kernels_bar;
+#[cfg(feature = "gpu")]
 pub mod kernels_book;
 
 pub mod axis;
