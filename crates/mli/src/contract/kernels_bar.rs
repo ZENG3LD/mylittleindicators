@@ -230,6 +230,179 @@ fn dfa_f(c: &[f32], t: usize, n: usize, f_prev: f32, scr: &mut [f32]) -> f32 {
     (rss / nf).sqrt()
 }
 
+/// Newey-West long-run variance (automatic bandwidth) of `scr[off..off + n]`.
+#[cube]
+fn nw_lrv(scr: &mut [f32], off: usize, n: usize) -> f32 {
+    let nf = n as f32;
+    let mut res = 0.0f32;
+    if n >= 2usize {
+        let mut em = 0.0f32;
+        for i in 0..n {
+            em = em + scr[off + i];
+        }
+        em = em / nf;
+        let bwf = 4.0f32 * ((nf / 100.0f32).ln() * 0.22222222f32).exp();
+        let mut l = bwf.floor() as usize;
+        if l < 1usize {
+            l = 1usize;
+        }
+        if l > n - 1 {
+            l = n - 1;
+        }
+        let mut g0 = 0.0f32;
+        for i in 0..n {
+            let d = scr[off + i] - em;
+            g0 = g0 + d * d;
+        }
+        let mut lrv = g0 / nf;
+        for lag in 1..(l + 1) {
+            let mut g = 0.0f32;
+            for k in lag..n {
+                g = g + (scr[off + k] - em) * (scr[off + k - lag] - em);
+            }
+            g = g / nf;
+            let wgt = 1.0f32 - (lag as f32) / ((l as f32) + 1.0f32);
+            lrv = lrv + 2.0f32 * wgt * g;
+        }
+        res = lrv.max(0.0f32);
+    }
+    res
+}
+
+/// OLS of `y` on the design `X` (row-major `rows x k`, column 0 a constant) held in `scr`
+/// (`xo` / `yo`), reporting the coefficient and t-statistic of column `gc`. Non-constant columns are
+/// centred and scaled in place first (the t-statistic is invariant; it keeps `f32` normal
+/// equations usable). Work area at `wo` (needs `k * k + 4 * k` floats). Writes `scr[wo] = gamma`,
+/// `scr[wo + 1] = t` and returns 1.0 on success, 0.0 when singular / degenerate.
+#[cube]
+fn ols_gamma(scr: &mut [f32], xo: usize, yo: usize, rows: usize, k: usize, wo: usize, gc: usize) -> f32 {
+    let mut ok = 1.0f32;
+    let rf = rows as f32;
+    // column scaling: sd stored at wo + 2 + k*k + j (j >= 1)
+    let so = wo + 2;
+    let a_o = so + k;
+    let b1 = a_o + k * k;
+    let b2 = b1 + k;
+    scr[so] = 1.0f32;
+    for j in 1..k {
+        let mut m = 0.0f32;
+        for r in 0..rows {
+            m = m + scr[xo + r * k + j];
+        }
+        m = m / rf;
+        let mut v = 0.0f32;
+        for r in 0..rows {
+            let d = scr[xo + r * k + j] - m;
+            v = v + d * d;
+        }
+        let mut sd = (v / rf).sqrt();
+        if sd < 1.0e-20f32 {
+            sd = 1.0f32;
+        }
+        scr[so + j] = sd;
+        for r in 0..rows {
+            scr[xo + r * k + j] = (scr[xo + r * k + j] - m) / sd;
+        }
+    }
+    for i in 0..k {
+        scr[b1 + i] = 0.0f32;
+        scr[b2 + i] = 0.0f32;
+        for j in 0..k {
+            scr[a_o + i * k + j] = 0.0f32;
+        }
+    }
+    scr[b2 + gc] = 1.0f32;
+    for r in 0..rows {
+        for i in 0..k {
+            let xi = scr[xo + r * k + i];
+            scr[b1 + i] = scr[b1 + i] + xi * scr[yo + r];
+            for j in 0..k {
+                scr[a_o + i * k + j] = scr[a_o + i * k + j] + xi * scr[xo + r * k + j];
+            }
+        }
+    }
+    // Gaussian elimination with partial pivoting, two right-hand sides
+    for col in 0..k {
+        let mut pr = col;
+        let mut pv = scr[a_o + col * k + col].abs();
+        for r in (col + 1)..k {
+            let v = scr[a_o + r * k + col].abs();
+            if v > pv {
+                pv = v;
+                pr = r;
+            }
+        }
+        if pv < 1.0e-20f32 {
+            ok = 0.0f32;
+        } else {
+            if pr != col {
+                for c in 0..k {
+                    let tmp = scr[a_o + col * k + c];
+                    scr[a_o + col * k + c] = scr[a_o + pr * k + c];
+                    scr[a_o + pr * k + c] = tmp;
+                }
+                let t1 = scr[b1 + col];
+                scr[b1 + col] = scr[b1 + pr];
+                scr[b1 + pr] = t1;
+                let t2 = scr[b2 + col];
+                scr[b2 + col] = scr[b2 + pr];
+                scr[b2 + pr] = t2;
+            }
+            let diag = scr[a_o + col * k + col];
+            for r in (col + 1)..k {
+                let f = scr[a_o + r * k + col] / diag;
+                if f != 0.0f32 {
+                    for c in col..k {
+                        scr[a_o + r * k + c] = scr[a_o + r * k + c] - f * scr[a_o + col * k + c];
+                    }
+                    scr[b1 + r] = scr[b1 + r] - f * scr[b1 + col];
+                    scr[b2 + r] = scr[b2 + r] - f * scr[b2 + col];
+                }
+            }
+        }
+    }
+    let mut gamma = 0.0f32;
+    let mut tst = 0.0f32;
+    if ok > 0.5f32 {
+        // back substitution (solutions overwrite b1 / b2)
+        for ci in 0..k {
+            let col = k - 1 - ci;
+            let mut s1 = scr[b1 + col];
+            let mut s2 = scr[b2 + col];
+            for c in (col + 1)..k {
+                s1 = s1 - scr[a_o + col * k + c] * scr[b1 + c];
+                s2 = s2 - scr[a_o + col * k + c] * scr[b2 + c];
+            }
+            scr[b1 + col] = s1 / scr[a_o + col * k + col];
+            scr[b2 + col] = s2 / scr[a_o + col * k + col];
+        }
+        let mut sse = 0.0f32;
+        for r in 0..rows {
+            let mut yh = 0.0f32;
+            for j in 0..k {
+                yh = yh + scr[xo + r * k + j] * scr[b1 + j];
+            }
+            let e = scr[yo + r] - yh;
+            sse = sse + e * e;
+        }
+        if rows <= k {
+            ok = 0.0f32;
+        } else {
+            let sigma2 = sse / ((rows - k) as f32);
+            let se = (sigma2 * scr[b2 + gc]).sqrt();
+            if se == 0.0f32 || se != se {
+                ok = 0.0f32;
+            } else {
+                gamma = scr[b1 + gc] / scr[so + gc];
+                tst = scr[b1 + gc] / se;
+            }
+        }
+    }
+    scr[wo] = gamma;
+    scr[wo + 1] = tst;
+    ok
+}
+
 /// 1200 Stochastik-D `[k, d]` (`period` %K window, `p2` %D window), 1201 Donchian stop
 /// (lower stop: `period` lower window, `p2` upper window unused in the output, `a` offset, `flag`
 /// percentage), 1202 projection bands `[upper, middle, lower]` (`period` window clamped 2..=512,
@@ -1577,6 +1750,219 @@ fn bar_scan(
                 }
             }
             v0 = held0;
+        } else if formula == 1238u32 {
+            // ADF proxy t-statistic (constant, Schwert lag rule) over the last `period` closes
+            let mut n = period as usize;
+            if n < 20 {
+                n = 20;
+            }
+            if t + 1 >= n {
+                let base = t + 1 - n;
+                let m = n - 1;
+                let pf = 12.0f32 * ((((n as f32) / 100.0f32).ln()) * 0.25f32).exp();
+                let mut p = pf.floor() as usize;
+                if p > m / 3 {
+                    p = m / 3;
+                }
+                if m > p + 2 {
+                    let k = 2 + p;
+                    let rows = m - p;
+                    if rows > k {
+                        let xo = 0usize;
+                        let yo = rows * k;
+                        let wo = yo + rows;
+                        for r in 0..rows {
+                            let tt = p + r;
+                            scr[xo + r * k] = 1.0f32;
+                            scr[xo + r * k + 1] = c[base + tt];
+                            for i in 1..(p + 1) {
+                                scr[xo + r * k + 1 + i] = c[base + tt - i + 1] - c[base + tt - i];
+                            }
+                            scr[yo + r] = c[base + tt + 1] - c[base + tt];
+                        }
+                        let ok = ols_gamma(scr, xo, yo, rows, k, wo, 1usize);
+                        if ok > 0.5f32 {
+                            held0 = scr[wo + 1];
+                            held1 = 1.0f32 + scr[wo];
+                        }
+                    }
+                }
+            }
+            v0 = held0;
+            v1 = held1;
+        } else if formula == 1239u32 {
+            // Phillips-Perron proxy z-statistic
+            let mut n = period as usize;
+            if n < 20 {
+                n = 20;
+            }
+            if t + 1 >= n {
+                let base = t + 1 - n;
+                let rows = n - 1;
+                let rf = rows as f32;
+                let mut xb = 0.0f32;
+                let mut yb = 0.0f32;
+                for i in 0..rows {
+                    xb = xb + c[base + i];
+                    yb = yb + c[base + i + 1];
+                }
+                xb = xb / rf;
+                yb = yb / rf;
+                let mut sxx = 0.0f32;
+                let mut sxy = 0.0f32;
+                for i in 0..rows {
+                    let dx = c[base + i] - xb;
+                    sxx = sxx + dx * dx;
+                    sxy = sxy + dx * (c[base + i + 1] - yb);
+                }
+                held0 = 0.0f32;
+                if sxx > 0.0f32 {
+                    let rho = sxy / sxx;
+                    let b0 = yb - rho * xb;
+                    let mut sse = 0.0f32;
+                    for i in 0..rows {
+                        let e = c[base + i + 1] - (b0 + rho * c[base + i]);
+                        scr[i] = e;
+                        sse = sse + e * e;
+                    }
+                    let dof = (rows - 2) as f32;
+                    let sigma2 = sse / dof;
+                    let se = (sigma2 / sxx).sqrt();
+                    if se > 0.0f32 {
+                        let trho = (rho - 1.0f32) / se;
+                        let lam2 = nw_lrv(scr, 0usize, rows);
+                        let s2h = sse / rf;
+                        if s2h <= 0.0f32 || lam2 <= 0.0f32 {
+                            held0 = trho;
+                        } else {
+                            let lam = lam2.sqrt();
+                            let sg = s2h.sqrt();
+                            let sh = sigma2.sqrt();
+                            let z = (sg / lam) * trho - (lam2 - s2h) * (rf * se) / (2.0f32 * lam * sh);
+                            if z == z {
+                                held0 = z;
+                            } else {
+                                held0 = trho;
+                            }
+                        }
+                    }
+                }
+            }
+            v0 = held0;
+        } else if formula == 1240u32 {
+            // Zivot-Andrews proxy: minimum break-dummy ADF t-statistic (one lag)
+            let mut n = period as usize;
+            if n < 30 {
+                n = 30;
+            }
+            if t + 1 >= n {
+                let base = t + 1 - n;
+                let m = n - 1;
+                let pl = 1usize;
+                let lo = ((0.15f32 * (n as f32)) as usize);
+                let hi = ((0.85f32 * (n as f32)) as usize);
+                let mut min_t = 3.4e38f32;
+                let mut any = 0.0f32;
+                if m > pl + 6 {
+                    let k = 4 + pl;
+                    let rows = m - pl;
+                    if rows > k + 2 {
+                        for tb in lo..(hi + 1) {
+                            let xo = 0usize;
+                            let yo = rows * k;
+                            let wo = yo + rows;
+                            for r in 0..rows {
+                                let tt = pl + r;
+                                scr[xo + r * k] = 1.0f32;
+                                scr[xo + r * k + 1] = (tt + 1) as f32;
+                                if tt + 1 > tb {
+                                    scr[xo + r * k + 2] = 1.0f32;
+                                } else {
+                                    scr[xo + r * k + 2] = 0.0f32;
+                                }
+                                scr[xo + r * k + 3] = c[base + tt];
+                                scr[xo + r * k + 4] = c[base + tt] - c[base + tt - 1];
+                                scr[yo + r] = c[base + tt + 1] - c[base + tt];
+                            }
+                            let ok = ols_gamma(scr, xo, yo, rows, k, wo, 3usize);
+                            if ok > 0.5f32 {
+                                if scr[wo + 1] < min_t {
+                                    min_t = scr[wo + 1];
+                                }
+                                any = 1.0f32;
+                            }
+                        }
+                    }
+                }
+                if any > 0.5f32 {
+                    held0 = min_t;
+                } else {
+                    held0 = 0.0f32;
+                }
+            }
+            v0 = held0;
+        } else if formula == 1241u32 {
+            // Engle-Granger trend proxy: AR(1) t-statistic of the detrended closes
+            let mut n = period as usize;
+            if n < 32 {
+                n = 32;
+            }
+            if t + 1 >= n {
+                let base = t + 1 - n;
+                let cnt = n as f32;
+                let mut st = 0.0f32;
+                let mut stt = 0.0f32;
+                let mut sy = 0.0f32;
+                let mut syt = 0.0f32;
+                for i in 0..n {
+                    let y = c[base + i];
+                    let tt = i as f32;
+                    st = st + tt;
+                    stt = stt + tt * tt;
+                    sy = sy + y;
+                    syt = syt + y * tt;
+                }
+                let den = cnt * stt - st * st;
+                let mut cc = 0.0f32;
+                if den.abs() > 1.0e-12f32 {
+                    cc = (cnt * syt - st * sy) / den;
+                }
+                let a0 = (sy - cc * st) / cnt;
+                let mut rx = 0.0f32;
+                let mut ry = 0.0f32;
+                let mut rxx = 0.0f32;
+                let mut rxy = 0.0f32;
+                let rc = (n - 1) as f32;
+                for i in 0..n {
+                    scr[i] = c[base + i] - (a0 + cc * (i as f32));
+                }
+                for i in 1..n {
+                    let y = scr[i];
+                    let x = scr[i - 1];
+                    rx = rx + x;
+                    ry = ry + y;
+                    rxx = rxx + x * x;
+                    rxy = rxy + x * y;
+                }
+                let d = rc * rxx - rx * rx;
+                let mut phi = 0.0f32;
+                if d.abs() > 1.0e-12f32 {
+                    phi = (rc * rxy - rx * ry) / d;
+                }
+                let mut se = 0.0f32;
+                for i in 1..n {
+                    let e = scr[i] - phi * scr[i - 1];
+                    se = se + e * e;
+                }
+                let var = se.max(1.0e-12f32) / (rc - 1.0f32).max(1.0f32);
+                let sphi = (var / (rxx - rx * rx / rc).max(1.0e-12f32)).sqrt();
+                if sphi > 0.0f32 {
+                    held0 = (phi - 1.0f32) / sphi;
+                } else {
+                    held0 = 0.0f32;
+                }
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -1674,7 +2060,7 @@ pub fn launch_cube_bar(
     let up = |s: &Vec<f32>| client.create_from_slice(f32::as_bytes(s));
     let out = client.empty(5 * n * core::mem::size_of::<f32>());
     // scratch (histograms / rings) sized per formula
-    let scr_len = ((params.period.max(params.fast).max(params.slow).max(params.signal)) as usize * 12 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
+    let scr_len = ((params.period.max(params.fast).max(params.slow).max(params.signal)) as usize * 28 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
     let scr_buf = client.create_from_slice(f32::as_bytes(&vec![0.0f32; scr_len]));
     unsafe {
         bar_map::launch_unchecked(

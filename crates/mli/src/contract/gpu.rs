@@ -645,6 +645,14 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: adf proxy. UNTESTED on GPU.
+    AdfBar = 1238,
+    /// Composite: phillips perron proxy. UNTESTED on GPU.
+    PpBar = 1239,
+    /// Composite: zivot andrews proxy. UNTESTED on GPU.
+    ZaBar = 1240,
+    /// Composite: engle granger trend proxy. UNTESTED on GPU.
+    EgTrendBar = 1241,
     /// Composite: kpss proxy. UNTESTED on GPU.
     KpssBar = 1236,
     /// Composite: kpss trend proxy. UNTESTED on GPU.
@@ -1333,6 +1341,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Adf), Some(CubeFormula::AdfBar));
+        assert_eq!(formula_of(IndicatorId::Pp), Some(CubeFormula::PpBar));
+        assert_eq!(formula_of(IndicatorId::Za), Some(CubeFormula::ZaBar));
+        assert_eq!(formula_of(IndicatorId::EgTrend), Some(CubeFormula::EgTrendBar));
         assert_eq!(formula_of(IndicatorId::Kpss), Some(CubeFormula::KpssBar));
         assert_eq!(formula_of(IndicatorId::KpssTrend), Some(CubeFormula::KpssTrendBar));
         assert_eq!(formula_of(IndicatorId::Hurst), Some(CubeFormula::HurstBar));

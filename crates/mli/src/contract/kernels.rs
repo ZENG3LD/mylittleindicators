@@ -8732,6 +8732,37 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1238..=1241.
+    #[test]
+    fn lane_matches_cpu_bar_batch13() {
+        use crate::indicators::statistics::adf_proxy::AdfProxy;
+        use crate::indicators::statistics::engle_granger_trend_proxy::EngleGrangerTrendProxy;
+        use crate::indicators::statistics::phillips_perron_proxy::PhillipsPerronProxy;
+        use crate::indicators::statistics::zivot_andrews_proxy::ZivotAndrewsProxy;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = AdfProxy::new(60);
+        chk(&run_cols(CubeFormula::AdfBar, &bars, CubeParams::period(60)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = PhillipsPerronProxy::new(60);
+        chk(&run_cols(CubeFormula::PpBar, &bars, CubeParams::period(60)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = ZivotAndrewsProxy::new(60);
+        chk(&run_cols(CubeFormula::ZaBar, &bars, CubeParams::period(60)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = EngleGrangerTrendProxy::new(40);
+        chk(&run_cols(CubeFormula::EgTrendBar, &bars, CubeParams::period(40)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
