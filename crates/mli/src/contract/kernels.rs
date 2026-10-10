@@ -12288,4 +12288,33 @@ mod tests {
         let c: Vec<f64> = books.iter().map(|b| { m.update_orderbook(b); m.value() }).collect();
         assert_close(&launch_cube_book(CubeFormula::MarketMicroBk, &fr, CubeParams::period(14))[0], &c);
     }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): footprint rows (1405-1407). Tie-free data: the CPU
+    /// HashMap order is random on exact ties, the kernel resolves ties to the lowest price bucket.
+    #[test]
+    fn footprint_rows_match_cpu() {
+        use crate::core::types::Tick;
+        use crate::indicators::clusters::footprint_chart::FootprintChart;
+        use crate::indicators::clusters::footprint_imbalance::FootprintImbalance;
+        use crate::indicators::clusters::footprint_poc::FootprintPoc;
+        use super::super::kernels_profile::{launch_cube_profile, GpuProfileFrame};
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let ticks: Vec<Tick> = (0..260usize)
+            .map(|i| Tick::new(1_000 + i as i64, 100.0 + 6.0 * w(i, 0.173), 0.1 + 3.0 * w(i, 0.911) + i as f64 * 1e-4, w(i, 0.37) > 0.45))
+            .collect();
+        let fr = GpuProfileFrame::from_ticks(&ticks, 0.5);
+        let mut m = FootprintPoc::new(0.5);
+        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
+        assert_close(&launch_cube_profile(CubeFormula::FootprintPocTk, &fr, CubeParams::period(1))[0], &c);
+        let mut m = FootprintImbalance::new(0.5, 60.0);
+        let rows: Vec<[f64; 3]> = ticks.iter().map(|t| { m.update_tick(t); [m.direction(), m.imb_price(), m.imb_pct()] }).collect();
+        let mut p = CubeParams::period(1);
+        p.a = 60.0;
+        let g = launch_cube_profile(CubeFormula::FootprintImbTk, &fr, p);
+        for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
+        let mut m = FootprintChart::new(0.5);
+        let rows: Vec<[f64; 3]> = ticks.iter().map(|t| { m.update_tick(t); [m.net_delta(), m.poc_price(), m.total_volume()] }).collect();
+        let g = launch_cube_profile(CubeFormula::FootprintChartTk, &fr, CubeParams::period(1));
+        for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
+    }
 }

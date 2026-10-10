@@ -791,6 +791,12 @@ pub enum CubeFormula {
     CandlePatternBar = 1335,
     /// Composite: divergence. UNTESTED on GPU.
     DivergenceBar = 1336,
+    /// FootprintPoc (keyed / profile / fit family). UNTESTED on GPU.
+    FootprintPocTk = 1405,
+    /// FootprintImbalance (keyed / profile / fit family). UNTESTED on GPU.
+    FootprintImbTk = 1406,
+    /// FootprintChart (keyed / profile / fit family). UNTESTED on GPU.
+    FootprintChartTk = 1407,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1257,6 +1263,8 @@ impl CubeFormula {
             CubeFormula::VwapDevEv => 3,
             CubeFormula::BookDepthChangeBk => 2,
             CubeFormula::WallDetectorBk => 3,
+            CubeFormula::FootprintChartTk => 3,
+            CubeFormula::FootprintImbTk => 3,
             CubeFormula::IcebergLv => 3,
             CubeFormula::HiddenLiqHy | CubeFormula::TbAbsorbHy | CubeFormula::SweepImpactHy => 3,
             CubeFormula::BestLevelVolBk => 3,
@@ -1788,6 +1796,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::QuoteLifecycleTracker), Some(CubeFormula::QuoteLifecycleEv));
         assert_eq!(formula_of(IndicatorId::IcebergDetector), Some(CubeFormula::IcebergLv));
         assert_eq!(formula_of(IndicatorId::MarketMicro), Some(CubeFormula::MarketMicroBk));
+        assert_eq!(formula_of(IndicatorId::FootprintPoc), Some(CubeFormula::FootprintPocTk));
+        assert_eq!(formula_of(IndicatorId::FootprintImbalance), Some(CubeFormula::FootprintImbTk));
+        assert_eq!(formula_of(IndicatorId::FootprintChart), Some(CubeFormula::FootprintChartTk));
         assert_eq!(formula_of(IndicatorId::WallDetector), Some(CubeFormula::WallDetectorBk));
         assert_eq!(formula_of(IndicatorId::BestLevelVolatility), Some(CubeFormula::BestLevelVolBk));
         assert_eq!(formula_of(IndicatorId::PriceLevelDensity), Some(CubeFormula::PriceLevelDensityBk));
