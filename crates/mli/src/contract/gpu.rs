@@ -777,6 +777,10 @@ pub enum CubeFormula {
     RcBar = 1333,
     /// Composite: chaos oscillator. UNTESTED on GPU.
     ChaosOscBar = 1334,
+    /// CompositeWeightDrift (keyed / profile / fit family). UNTESTED on GPU.
+    WeightDriftKy = 1400,
+    /// IndexCorrelationBreakdown (keyed / profile / fit family). UNTESTED on GPU.
+    IndexCorrBreakKy = 1401,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1764,6 +1768,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::HiddenLiquidityDetector), Some(CubeFormula::HiddenLiqHy));
         assert_eq!(formula_of(IndicatorId::TradeBookAbsorption), Some(CubeFormula::TbAbsorbHy));
         assert_eq!(formula_of(IndicatorId::SweepImpactAnalyzer), Some(CubeFormula::SweepImpactHy));
+        assert_eq!(formula_of(IndicatorId::CompositeWeightDrift), Some(CubeFormula::WeightDriftKy));
+        assert_eq!(formula_of(IndicatorId::IndexComponentDrift), Some(CubeFormula::WeightDriftKy));
+        assert_eq!(formula_of(IndicatorId::IndexCorrelationBreakdown), Some(CubeFormula::IndexCorrBreakKy));
         assert_eq!(formula_of(IndicatorId::WallDetector), Some(CubeFormula::WallDetectorBk));
         assert_eq!(formula_of(IndicatorId::BestLevelVolatility), Some(CubeFormula::BestLevelVolBk));
         assert_eq!(formula_of(IndicatorId::PriceLevelDensity), Some(CubeFormula::PriceLevelDensityBk));

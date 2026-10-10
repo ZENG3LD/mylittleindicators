@@ -733,6 +733,11 @@ pub mod kernels_lines;
 
 /// Tick + book-before-trade frame for the hybrid formulas.
 pub mod hybrid_frame;
+/// Interned-key snapshot frame.
+pub mod keyed_frame;
+/// Keyed-state kernels (1400..).
+#[cfg(feature = "gpu")]
+pub mod kernels_keyed;
 /// Hybrid tick + book kernels (997..=999).
 #[cfg(feature = "gpu")]
 pub mod kernels_hybrid;

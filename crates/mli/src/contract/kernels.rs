@@ -12118,4 +12118,35 @@ mod tests {
         let g = launch_cube_hybrid(CubeFormula::SweepImpactHy, &fr, CubeParams::period(10));
         for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
     }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): keyed composite-index rows (1400, 1401).
+    #[test]
+    fn keyed_composite_index_rows_match_cpu() {
+        use crate::core::types::CompositeIndex;
+        use crate::engine::streams::CompositeIndexConsumer;
+        use crate::indicators::composite_index::composite_weight_drift::CompositeWeightDrift;
+        use crate::indicators::composite_index::index_component_drift::IndexComponentDrift;
+        use crate::indicators::composite_index::index_correlation_breakdown::IndexCorrelationBreakdown;
+        use super::super::keyed_frame::GpuKeyedFrame;
+        use super::super::kernels_keyed::launch_cube_keyed;
+        let names = ["BTC", "ETH", "SOL", "ADA", "XRP"];
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let ci: Vec<CompositeIndex> = (0..90usize)
+            .map(|i| CompositeIndex {
+                price: 100.0,
+                components: names.iter().enumerate().filter(|(j, _)| (i + j) % 7 != 0).map(|(j, s)| (s.to_string(), 0.1 + w(i, 0.1 + j as f64 * 0.07))).collect(),
+                timestamp: 1_000 + i as i64,
+            })
+            .collect();
+        let fr = GpuKeyedFrame::from_composite_index(&ci);
+        let mut a = CompositeWeightDrift::new(10);
+        let ca: Vec<f64> = ci.iter().map(|c| { a.update_composite_index(c); a.value() }).collect();
+        assert_close(&launch_cube_keyed(CubeFormula::WeightDriftKy, &fr, CubeParams::period(10))[0], &ca);
+        let mut b = IndexComponentDrift::new();
+        let cb: Vec<f64> = ci.iter().map(|c| { b.update_composite_index(c); b.value() }).collect();
+        assert_close(&launch_cube_keyed(CubeFormula::WeightDriftKy, &fr, CubeParams::period(10))[0], &cb);
+        let mut c = IndexCorrelationBreakdown::new(12);
+        let cc: Vec<f64> = ci.iter().map(|x| { c.update_composite_index(x); c.value() }).collect();
+        assert_close(&launch_cube_keyed(CubeFormula::IndexCorrBreakKy, &fr, CubeParams::period(12))[0], &cc);
+    }
 }
