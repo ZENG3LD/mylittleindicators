@@ -10023,6 +10023,32 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Chaos oscillator (1334).
+    #[test]
+    fn lane_matches_cpu_bar_batch48() {
+        use crate::indicators::chaos::chaos_oscillator::ChaosOscillator;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(40);
+        p.a = 0.4;
+        p.b = 0.4;
+        p.c = 0.2;
+        let mut m = ChaosOscillator::new_with_weights(40, 0.4, 0.4, 0.2);
+        chk(&run_cols(CubeFormula::ChaosOscBar, &bars, p), bars.iter().map(|b| { m.feed(&[b.high, b.low, b.close]); vec![m.value()] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

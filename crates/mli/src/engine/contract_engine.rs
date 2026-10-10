@@ -572,7 +572,7 @@ mli_contract_macros::contract_universe! {
         Ac:        Fields : _ +cube(ac) => crate::indicators::chaos::williams_indicators::AccelerationDeceleration,
         Alligator: Fields : _ +cube(comp_alligator_bar) => crate::indicators::chaos::williams_indicators::Alligator { jaw teeth lips },
         Ao:        Fields : _ +cube(ao) => crate::indicators::chaos::williams_indicators::AwesomeOscillator,
-        ChaosOsc: Fields : _ => crate::indicators::chaos::chaos_oscillator::ChaosOscillator,
+        ChaosOsc: Fields : _ +cube(comp_chaososc_bar) => crate::indicators::chaos::chaos_oscillator::ChaosOscillator,
         Cusum: Field : _ +cube(cusum) => crate::indicators::statistics::cusum_break_detector::CusumBreakDetector,
         DistLevels: Fields : _ +cube(comp_dist_levels_bar) => crate::indicators::levels::distance_to_levels::DistanceToLevels { dist mid_pct },
         Hyst: Field : _ +cube(hysteresis_gate_sig) => crate::indicators::signal_logic::hysteresis_gate::HysteresisGate,

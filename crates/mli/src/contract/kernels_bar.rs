@@ -5155,6 +5155,47 @@ fn bar_scan(
             let vs = (scr[t] * 2.0f32 - 1.0f32).max(-1.0f32).min(1.0f32);
             let at = (scr[n + t] * 2.0f32 - 1.0f32).max(-1.0f32).min(1.0f32);
             v0 = 0.25f32 * tr + 0.15f32 * pe + 0.2f32 * sp + 0.15f32 * lb + 0.15f32 * vs + 0.1f32 * at;
+        } else if formula == 1334u32 {
+            // chaos oscillator: scratch [0, n) = fractal dimension (window = period, max k = period / 8),
+            // [n, 2n) = Hurst (window = period) (host-resolved); window = min(period, 512), weights a / b / c
+            // = complexity / persistence / volatility. 0.5 until window / 2 closes have been seen
+            let mut w = period as usize;
+            if w > 512usize {
+                w = 512usize;
+            }
+            v0 = 0.5f32;
+            let mut ln = t + 1usize;
+            if ln > w {
+                ln = w;
+            }
+            if t + 1usize >= w / 2usize {
+                let cx = scr[t] - 1.0f32;
+                let ps = 1.0f32 - (scr[n + t] - 0.5f32).abs() * 2.0f32;
+                let mut sv = 0.0f32;
+                let mut sp = 0.0f32;
+                for q in 0..ln {
+                    let s = t - q;
+                    let mut tr = h[s] - l[s];
+                    if s >= 1usize {
+                        tr = tr.max((h[s] - c[s - 1]).abs()).max((l[s] - c[s - 1]).abs());
+                    }
+                    sv = sv + tr;
+                    sp = sp + c[s];
+                }
+                let av = sv / (ln as f32);
+                let ap = sp / (ln as f32);
+                let mut vc = 0.0f32;
+                if ap > 0.0f32 {
+                    vc = (av / ap).min(1.0f32);
+                }
+                v0 = (cx * a + ps * b + vc * _cc).max(0.0f32).min(1.0f32);
+            }
+            // chaos index persists once computed: carried through held0 on the last computed bar
+            if t + 1usize >= w / 2usize {
+                held0 = v0;
+            } else {
+                held0 = 0.5f32;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -5484,6 +5525,16 @@ fn launch_cube_bar_x(
         }
         let p = CubeParams { fast: cnt as u32, slow: ready, ..params };
         let flat = bar_run(formula.code(), [&series[0], &series[1], &series[2], &series[3], &series[4]], p, params.flag);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::ChaosOscBar {
+        // period = window; fractal dimension uses max k = period / 8
+        let fp = CubeParams { fast: params.period / 8, ..params };
+        let fd = bar_run(CubeFormula::FractalDimBar.code(), [&o, &h, &l, &c, &v], fp, 0);
+        let hu = bar_run(CubeFormula::HurstBar.code(), [&o, &h, &l, &c, &v], CubeParams::period(params.period), 0);
+        let mut extra = fd[0..n].to_vec();
+        extra.extend_from_slice(&hu[0..n]);
+        let flat = bar_run_x(formula.code(), [&o, &h, &l, &c, &v], &extra, params, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::RcBar {
