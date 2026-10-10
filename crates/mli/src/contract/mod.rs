@@ -744,6 +744,9 @@ pub mod kernels_level;
 /// Tick volume-profile / footprint kernels (1405..).
 #[cfg(feature = "gpu")]
 pub mod kernels_profile;
+/// Fixed-iteration sequential model-fit kernels (1337..).
+#[cfg(feature = "gpu")]
+pub mod kernels_fit;
 /// Hybrid tick + book kernels (997..=999).
 #[cfg(feature = "gpu")]
 pub mod kernels_hybrid;

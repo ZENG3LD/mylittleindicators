@@ -5725,6 +5725,9 @@ fn launch_cube_bar_x(
     let mut h = lane_series(samples, params, OhlcvField::High);
     let mut l = lane_series(samples, params, OhlcvField::Low);
     let c = lane_series(samples, params, params.lane);
+    if formula == CubeFormula::ArimaBar {
+        return super::kernels_fit::launch_cube_fit(formula, &c, params);
+    }
     let mut v = lane_series(samples, params, OhlcvField::Volume);
     let mut o = o;
     if formula == CubeFormula::DpoBandsBar {

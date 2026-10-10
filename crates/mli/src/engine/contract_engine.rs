@@ -265,7 +265,7 @@ mli_contract_macros::contract_universe! {
         Iir:             Fields      : _ +cube(intraday_ratio)             => crate::indicators::accumulation::intraday_intensity_ratio::IntradayIntensityRatio,
         Tmf:             Fields      : _ +cube(tmf)             => crate::indicators::accumulation::tmf::Tmf,
         Wad:             Fields      : _ +cube(wad) => crate::indicators::accumulation::williams_ad::WilliamsAd,
-        Arima:           Field       : _             => crate::indicators::regression::arima::Arima,
+        Arima:           Field       : _ +cube(comp_arima_bar) => crate::indicators::regression::arima::Arima,
         Garch:           Field       : Volatility    => crate::indicators::regression::garch::Garch,
         Egarch:          Field       : Volatility    => crate::indicators::regression::garch::EGarch,
         PolyReg:         Field       : _             => crate::indicators::regression::polynomial::PolynomialRegression,
