@@ -178,6 +178,31 @@ pub enum CubeFormula {
     /// Median-absolute-deviation z-score of the lane. Zero until the window is full.
     /// `period` below 3 is 3. Scale is `1.4826`.
     MadZ = 62,
+    /// Chaikin money flow. Zero until `period` bars, then rolling money-flow volume over volume.
+    Cmf = 63,
+    /// Rolling VWAP of typical price. Partial from the first bar.
+    /// Holds the previous value when window volume is not positive.
+    Vwap = 64,
+    /// Jurik RSX in `[0, 1]`. First sample is 0. Wilder gain/loss, then three
+    /// EMA passes at alpha `0.0625`.
+    Rsx = 65,
+    /// Accumulative swing index. First sample is 0. Limit move is `close * 0.03`.
+    Asi = 66,
+    /// Historical VaR of the lane, as a positive loss. Zero until `period` log returns.
+    /// `period` below 2 is 2. [`CubeParams::a`] is the confidence, clamped to `[0.5, 0.9999]`.
+    Var = 67,
+    /// Choppiness index. Stays at 50 until `period` true ranges exist.
+    /// Then `100 * log10(sum(TR) / range) / log10(period)`, clamped to `[0, 100]`.
+    /// Holds the previous value when the range or the sum is ~0.
+    Chop = 68,
+    /// Awesome oscillator. SMA(5) minus SMA(34) of `(high + low) / 2`, partial from bar 0.
+    Ao = 69,
+    /// DPO divided by the current lane. Zero until `period + period/2 + 1` samples.
+    /// `period` below 2 is 2.
+    DpoPct = 70,
+    /// Envelope bandwidth. Zero until the SMA is full, then `2 * pct / 100`.
+    /// [`CubeParams::a`] is the percent, at least `0.01`.
+    Envbw = 71,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -336,6 +361,15 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Rmid), Some(CubeFormula::Rmid));
         assert_eq!(formula_of(IndicatorId::Wad), Some(CubeFormula::Wad));
         assert_eq!(formula_of(IndicatorId::Zmad), Some(CubeFormula::MadZ));
+        assert_eq!(formula_of(IndicatorId::Cmf), Some(CubeFormula::Cmf));
+        assert_eq!(formula_of(IndicatorId::Vwap), Some(CubeFormula::Vwap));
+        assert_eq!(formula_of(IndicatorId::Rsx), Some(CubeFormula::Rsx));
+        assert_eq!(formula_of(IndicatorId::Asi), Some(CubeFormula::Asi));
+        assert_eq!(formula_of(IndicatorId::Var), Some(CubeFormula::Var));
+        assert_eq!(formula_of(IndicatorId::Chop), Some(CubeFormula::Chop));
+        assert_eq!(formula_of(IndicatorId::Ao), Some(CubeFormula::Ao));
+        assert_eq!(formula_of(IndicatorId::DpoPct), Some(CubeFormula::DpoPct));
+        assert_eq!(formula_of(IndicatorId::Envbw), Some(CubeFormula::Envbw));
     }
 
     #[cfg(feature = "gpu-shader")]

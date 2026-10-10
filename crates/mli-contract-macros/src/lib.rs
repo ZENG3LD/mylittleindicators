@@ -217,6 +217,15 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "rmid" => "Rmid",
         "wad" => "Wad",
         "mad_z" => "MadZ",
+        "cmf" => "Cmf",
+        "vwap" => "Vwap",
+        "rsx" => "Rsx",
+        "asi" => "Asi",
+        "var" => "Var",
+        "chop" => "Chop",
+        "ao" => "Ao",
+        "dpo_pct" => "DpoPct",
+        "envbw" => "Envbw",
         _ => {
             return Err(syn::Error::new(
                 name.span(),
