@@ -8357,6 +8357,43 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1203..=1205.
+    #[test]
+    fn lane_matches_cpu_bar_batch2() {
+        use crate::indicators::channels::darvas_box::DarvasBox;
+        use crate::indicators::channels::price_channels::PriceChannels;
+        use crate::indicators::channels::quantile_regression_channels::QuantileRegressionChannels;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = PriceChannels::new_raw(8);
+        chk(&run_cols(CubeFormula::PriceChanBar, &bars, CubeParams::period(8)), lanes.iter().map(|l| { let (u, mi, lo) = m.feed(&[l[0], l[1], l[2]]); vec![u, mi, lo] }).collect());
+        for (sid, cs) in [(SmootherId::Sma, CubeSmoother::Sma), (SmootherId::Ema, CubeSmoother::Ema)] {
+            let mut p = CubeParams::period(8);
+            p.flag = 1;
+            p.smoother = cs;
+            let mut m = PriceChannels::new_smoothed(8, sid);
+            chk(&run_cols(CubeFormula::PriceChanBar, &bars, p), lanes.iter().map(|l| { let (u, mi, lo) = m.feed(&[l[0], l[1], l[2]]); vec![u, mi, lo] }).collect());
+        }
+        let mut m = DarvasBox::new(10);
+        chk(&run_cols(CubeFormula::DarvasBar, &bars, CubeParams::period(10)), lanes.iter().map(|l| { let (h, lo) = m.feed(&[l[0], l[1], l[2]]); vec![h, lo] }).collect());
+        let mut p = CubeParams::period(11);
+        p.a = 2.0;
+        let mut m = QuantileRegressionChannels::new(11, 2.0);
+        chk(&run_cols(CubeFormula::QrChanBar, &bars, p), close.iter().map(|c| { let (u, mi, lo) = m.feed(*c); vec![u, mi, lo] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

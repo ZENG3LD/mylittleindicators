@@ -9,8 +9,10 @@ use cubecl::prelude::*;
 use cubecl::__private::Runtime;
 
 use super::gpu::CubeParams;
+use super::kernels::smooth_series;
 use super::gpu_sample::GpuSample;
 use super::kernels_comp::lane_series;
+use super::kernels_post::kth_in;
 use super::CubeFormula;
 use crate::engine::ohlcv_field::OhlcvField;
 
@@ -38,6 +40,30 @@ fn stoch_win(h: &[f32], l: &[f32], c: &[f32], t: usize, pk: usize, which: u32) -
     r
 }
 
+/// Median (`len / 2` order statistic) of `|c[j] - mid|` over a window, by rank counting.
+#[cube]
+fn kth_dev(src: &[f32], start: usize, len: usize, k: u32, mid: f32) -> f32 {
+    let mut res = (src[start] - mid).abs();
+    for j in 0..len {
+        let x = (src[start + j] - mid).abs();
+        let mut lt = 0u32;
+        let mut le = 0u32;
+        for m in 0..len {
+            let y = (src[start + m] - mid).abs();
+            if y < x {
+                lt = lt + 1u32;
+            }
+            if y <= x {
+                le = le + 1u32;
+            }
+        }
+        if lt <= k && k < le {
+            res = x;
+        }
+    }
+    res
+}
+
 /// 1200 Stochastik-D `[k, d]` (`period` %K window, `p2` %D window), 1201 Donchian stop
 /// (lower stop: `period` lower window, `p2` upper window unused in the output, `a` offset, `flag`
 /// percentage), 1202 projection bands `[upper, middle, lower]` (`period` window clamped 2..=512,
@@ -61,6 +87,11 @@ fn bar_scan(
     let n = c.len();
     let mut k = 0.0f32;
     let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
     for t in 0..n {
         let mut v0 = 0.0f32;
         let mut v1 = 0.0f32;
@@ -165,6 +196,68 @@ fn bar_scan(
                 v1 = mid;
                 v2 = mid - kk * sd;
             }
+        } else if formula == 1203u32 {
+            // raw price channel: rolling max high / min low over min(t+1, period) bars
+            let mut w = period as usize;
+            if w < 1 {
+                w = 1;
+            }
+            let mut st = 0usize;
+            if t + 1 > w {
+                st = t + 1 - w;
+            }
+            let mut hi = h[st];
+            let mut lo = l[st];
+            for j in st..(t + 1) {
+                if h[j] > hi {
+                    hi = h[j];
+                }
+                if l[j] < lo {
+                    lo = l[j];
+                }
+            }
+            v0 = hi;
+            v1 = (hi + lo) / 2.0f32;
+            v2 = lo;
+        } else if formula == 1204u32 {
+            // Darvas box: cumulative extremes since the first bar
+            if t == 0usize {
+                dh = h[0];
+                dl = l[0];
+            } else {
+                if h[t] > dh {
+                    dh = h[t];
+                }
+                if l[t] < dl {
+                    dl = l[t];
+                }
+            }
+            v0 = dh;
+            v1 = dl;
+        } else if formula == 1205u32 {
+            // quantile-regression channel: median +- k * 1.4826 * MAD over the window
+            let mut w = period as usize;
+            if w < 2 {
+                w = 2;
+            }
+            if w > 512 {
+                w = 512;
+            }
+            let mut kk = a;
+            if kk <= 0.0f32 {
+                kk = 2.0f32;
+            }
+            if t + 1 >= w {
+                let mid = kth_in(c, t + 1 - w, w, (w / 2) as u32);
+                let mad = kth_dev(c, t + 1 - w, w, (w / 2) as u32, mid);
+                let sg = 1.4826f32 * mad;
+                held0 = mid + kk * sg;
+                held1 = mid;
+                held2 = mid - kk * sg;
+            }
+            v0 = held0;
+            v1 = held1;
+            v2 = held2;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -233,5 +326,15 @@ pub fn launch_cube_bar(
     let bytes = client.read_one_unchecked(out);
     let flat = f32::from_bytes(&bytes).to_vec();
     let cols = formula.output_count() as usize;
-    (0..cols).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect()
+    let mut res: Vec<Vec<f32>> = (0..cols).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect();
+    if formula == CubeFormula::PriceChanBar && params.flag == 1 {
+        // smoothed mode: device smoother passes over the rolling extremes; middle is their mean
+        let sp = params.period.max(1);
+        let up = smooth_series(&res[0], params.smoother, sp, 0, params.a, params.b);
+        let lo = smooth_series(&res[2], params.smoother, sp, 0, params.a, params.b);
+        res[1] = up.iter().zip(lo.iter()).map(|(u, l)| (u + l) / 2.0).collect();
+        res[0] = up;
+        res[2] = lo;
+    }
+    res
 }

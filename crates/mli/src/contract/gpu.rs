@@ -645,6 +645,12 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: price channels. UNTESTED on GPU.
+    PriceChanBar = 1203,
+    /// Composite: darvas box. UNTESTED on GPU.
+    DarvasBar = 1204,
+    /// Composite: quantile regression channels. UNTESTED on GPU.
+    QrChanBar = 1205,
     /// Composite: Stochastik-D k/d. UNTESTED on GPU.
     StochKdBar = 1200,
     /// Composite: Donchian stop lower. UNTESTED on GPU.
@@ -988,6 +994,9 @@ impl CubeFormula {
             CubeFormula::RatioVsPriceMg => 2,
             CubeFormula::StochKdBar => 2,
             CubeFormula::ProjBandsBar => 3,
+            CubeFormula::PriceChanBar => 3,
+            CubeFormula::DarvasBar => 2,
+            CubeFormula::QrChanBar => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1254,6 +1263,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Pricechan), Some(CubeFormula::PriceChanBar));
+        assert_eq!(formula_of(IndicatorId::Darvas), Some(CubeFormula::DarvasBar));
+        assert_eq!(formula_of(IndicatorId::Qrchan), Some(CubeFormula::QrChanBar));
         assert_eq!(formula_of(IndicatorId::Stochkd), Some(CubeFormula::StochKdBar));
         assert_eq!(formula_of(IndicatorId::Dons), Some(CubeFormula::DonchianStopBar));
         assert_eq!(formula_of(IndicatorId::Projbands), Some(CubeFormula::ProjBandsBar));
