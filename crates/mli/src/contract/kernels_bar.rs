@@ -4434,6 +4434,106 @@ fn bar_scan(
                     v0 = ((c[t] - ll) / (hh - ll)) * 100.0f32;
                 }
             }
+        } else if formula == 1320u32 {
+            // pivot anchored VWAP: cumulative close * volume restarts whenever the high is at least the previous
+            // lookback - 1 highs (or the low at most their lows); lookback = max(period, 3), only once the ring is full
+            let mut lb = period as usize;
+            if lb < 3usize {
+                lb = 3usize;
+            }
+            if t >= lb {
+                let mut pmax = h[t - 1];
+                let mut pmin = l[t - 1];
+                for k2 in 1..lb {
+                    pmax = pmax.max(h[t - k2]);
+                    pmin = pmin.min(l[t - k2]);
+                }
+                if h[t] >= pmax || l[t] <= pmin {
+                    held0 = 0.0f32;
+                    held1 = 0.0f32;
+                }
+            }
+            held0 = held0 + c[t] * v[t];
+            held1 = held1 + v[t].max(1.0e-12f32);
+            v0 = held0 / held1;
+        } else if formula == 1321u32 {
+            // swing strength score: left = period (1..=10), right = p2 (1..=10); once the 16+ slot ring is full
+            // the pivot is the bar `right` back; tanh of (up strength - down strength) / mean range
+            let mut lf = period as usize;
+            let mut rt = p2 as usize;
+            if lf < 1usize {
+                lf = 1usize;
+            }
+            if lf > 10usize {
+                lf = 10usize;
+            }
+            if rt < 1usize {
+                rt = 1usize;
+            }
+            if rt > 10usize {
+                rt = 10usize;
+            }
+            let mut cap = lf + rt + 2usize;
+            if cap < 16usize {
+                cap = 16usize;
+            }
+            if t + 1 >= cap {
+                let pv = t - rt;
+                let ph = h[pv];
+                let pl = l[pv];
+                let mut lmax = h[pv - 1];
+                let mut lmin = l[pv - 1];
+                for i in 1..(lf + 1) {
+                    lmax = lmax.max(h[pv - i]);
+                    lmin = lmin.min(l[pv - i]);
+                }
+                let mut rmax = h[pv + 1];
+                let mut rmin = l[pv + 1];
+                for i in 1..(rt + 1) {
+                    rmax = rmax.max(h[pv + i]);
+                    rmin = rmin.min(l[pv + i]);
+                }
+                let upk = (ph - lmax).max(0.0f32) + (ph - rmax).max(0.0f32);
+                let dnk = (lmin - pl).max(0.0f32) + (rmin - pl).max(0.0f32);
+                let raw = upk - dnk;
+                let mut rs = 0.0f32;
+                for i in 0..(lf + rt + 1) {
+                    let q = pv - lf + i;
+                    rs = rs + (h[q] - l[q]);
+                }
+                let den = (rs / ((lf + rt + 1) as f32)).max(1.0e-6f32);
+                let z = raw / den;
+                let e2 = (2.0f32 * z).exp();
+                held0 = (e2 - 1.0f32) / (e2 + 1.0f32);
+            }
+            v0 = held0;
+        } else if formula == 1322u32 {
+            // liquidity gap density: mean over the last clamp(period, 20, 512) bars of the capped gap score
+            // (gap / threshold in `a`, capped at 5, 0 when the gap does not exceed the threshold)
+            let mut w = period as usize;
+            if w < 20usize {
+                w = 20usize;
+            }
+            if w > 512usize {
+                w = 512usize;
+            }
+            let mut len = t + 1;
+            if len > w {
+                len = w;
+            }
+            let mut s = 0.0f32;
+            for k2 in 0..len {
+                let q = t - k2;
+                if q >= 1usize {
+                    let ug = (l[q] - h[q - 1]).max(0.0f32);
+                    let dg = (l[q - 1] - h[q]).max(0.0f32);
+                    let amp = ug.max(dg);
+                    if amp > a {
+                        s = s + (amp / a).min(5.0f32);
+                    }
+                }
+            }
+            v0 = s / (len as f32);
         }
         out[t] = v0;
         out[n + t] = v1;

@@ -727,6 +727,12 @@ pub enum CubeFormula {
     ConnorsRsiBar = 1318,
     /// Composite: adaptive stochastic. UNTESTED on GPU.
     AdaptiveStochBar = 1319,
+    /// Composite: pivot anchored vwap. UNTESTED on GPU.
+    PivavwapBar = 1320,
+    /// Composite: swing strength score. UNTESTED on GPU.
+    SwingstrBar = 1321,
+    /// Composite: liquidity gap density. UNTESTED on GPU.
+    LiqgapBar = 1322,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1563,6 +1569,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::TsSwings), Some(CubeFormula::TsSwingsBar));
         assert_eq!(formula_of(IndicatorId::ConnorsRsi), Some(CubeFormula::ConnorsRsiBar));
         assert_eq!(formula_of(IndicatorId::AdaptiveStoch), Some(CubeFormula::AdaptiveStochBar));
+        assert_eq!(formula_of(IndicatorId::Pivavwap), Some(CubeFormula::PivavwapBar));
+        assert_eq!(formula_of(IndicatorId::Swingstr), Some(CubeFormula::SwingstrBar));
+        assert_eq!(formula_of(IndicatorId::Liqgap), Some(CubeFormula::LiqgapBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

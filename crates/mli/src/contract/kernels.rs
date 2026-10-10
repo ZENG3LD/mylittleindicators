@@ -9684,6 +9684,57 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formula 1320 (Pivavwap).
+    #[test]
+    fn lane_matches_cpu_bar_batch38() {
+        use crate::indicators::levels::pivot_anchored_vwap::PivotAnchoredVwap;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = PivotAnchoredVwap::new(10);
+        chk(&run_cols(CubeFormula::PivavwapBar, &bars, CubeParams::period(10)), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2], l[3]])]).collect());
+
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1321..=1322 (Swingstr, Liqgap).
+    #[test]
+    fn lane_matches_cpu_bar_batch39() {
+        use crate::indicators::statistical_scoring::liquidity_gap_density::LiquidityGapDensity;
+        use crate::indicators::swing::swing_strength_score::SwingStrengthScore;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(3);
+        p.fast = 2;
+        let mut m = SwingStrengthScore::new(3, 2);
+        chk(&run_cols(CubeFormula::SwingstrBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1]])]).collect());
+        let mut p = CubeParams::period(20);
+        p.a = 0.3;
+        let mut m = LiquidityGapDensity::new(20, 0.3);
+        chk(&run_cols(CubeFormula::LiqgapBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1]])]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
