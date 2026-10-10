@@ -8898,6 +8898,61 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1256..=1261.
+    #[test]
+    fn lane_matches_cpu_bar_batch17() {
+        use crate::indicators::momentum::ewmac_robust::EwmacRobust;
+        use crate::indicators::momentum::tdi::Tdi;
+        use crate::indicators::trend::gmma_compression::GmmaCompression;
+        use crate::indicators::trend_stop::keltner_stop::KeltnerStop;
+        use crate::indicators::trend_stop::supertrend_stop::SuperTrendStop;
+        use crate::indicators::volume::nvi_pvi::NegativePositiveVolumeIndex;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(10);
+        p.a = 3.0;
+        let mut m = SuperTrendStop::with_params(10, 3.0);
+        chk(&run_cols(CubeFormula::SuptsBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]])]).collect());
+        let mut p = CubeParams::period(20);
+        p.a = 2.0;
+        p.smoother = CubeSmoother::Ema;
+        p.smoother2 = CubeSmoother::Rma;
+        let mut m = KeltnerStop::new();
+        chk(&run_cols(CubeFormula::KeltsBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]])]).collect());
+        let mut m = NegativePositiveVolumeIndex::new();
+        chk(&run_cols(CubeFormula::NviPviBar, &bars, CubeParams::period(255)), lanes.iter().map(|l| { let (a, b) = m.feed(&[l[2], l[3]]); vec![a, b] }).collect());
+        let mut p = CubeParams::period(1);
+        p.smoother = CubeSmoother::Ema;
+        let mut m = GmmaCompression::new();
+        chk(&run_cols(CubeFormula::GmmaBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(1);
+        p.fast = 5;
+        p.slow = 12;
+        p.signal = 20;
+        p.smoother = CubeSmoother::Ema;
+        p.smoother2 = CubeSmoother::Ema;
+        let mut m = EwmacRobust::new(5, 12, 20);
+        chk(&run_cols(CubeFormula::EwmacRobustBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(8);
+        p.signal = 5;
+        p.fast = 10;
+        p.smoother = CubeSmoother::Ema;
+        let mut m = Tdi::new(8, 5, 10);
+        chk(&run_cols(CubeFormula::TdiBar, &bars, p), close.iter().map(|c| { let (a, b, d) = m.feed(*c); vec![a, b, d] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

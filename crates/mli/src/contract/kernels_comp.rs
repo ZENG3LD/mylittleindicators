@@ -1157,13 +1157,13 @@ pub(crate) fn ew2(op: u32, x: &[f32], y: &[f32], a: f32) -> Vec<f32> {
     ew(op, x, y, x, x, a)
 }
 
-fn ewc(op: u32, x: &[f32], y: &[f32], z: &[f32], a: f32, b: f32) -> Vec<f32> {
+pub(crate) fn ewc(op: u32, x: &[f32], y: &[f32], z: &[f32], a: f32, b: f32) -> Vec<f32> {
     ewb(op, x, y, z, x, a, b)
 }
 
 /// ATR series: true range from bar `start` smoothed by `which` over `period` (first TR is
 /// `high - low`, like `Atr::feed`).
-fn atr_series(
+pub(crate) fn atr_series(
     samples: &[GpuSample],
     p: CubeParams,
     which: CubeSmoother,

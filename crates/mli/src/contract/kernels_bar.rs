@@ -2299,6 +2299,92 @@ fn bar_scan(
             } else {
                 v0 = 50.0f32 + 50.0f32 * th;
             }
+        } else if formula == 1258u32 {
+            // negative / positive volume index (close, volume lanes), both start at 1000
+            if t == 0usize {
+                held0 = 1000.0f32;
+                held1 = 1000.0f32;
+            } else {
+                let mut pc = 0.0f32;
+                if c[t - 1].abs() > 1.0e-12f32 {
+                    pc = (c[t] - c[t - 1]) / c[t - 1];
+                }
+                if v[t] < v[t - 1] {
+                    held0 = held0 * (1.0f32 + pc);
+                }
+                if v[t] > v[t - 1] {
+                    held1 = held1 * (1.0f32 + pc);
+                }
+            }
+            v0 = held0;
+            v1 = held1;
+        } else if formula == 1259u32 {
+            // GMMA compression score over 12 smoothed series (scr[s * n + t], s = 0..6 fast, 6..12 slow)
+            let nn = c.len();
+            if t >= 59usize {
+                let mut fmin = scr[t];
+                let mut fmax = scr[t];
+                let mut fsum = 0.0f32;
+                for s in 0..6 {
+                    let x = scr[s * nn + t];
+                    if x < fmin {
+                        fmin = x;
+                    }
+                    if x > fmax {
+                        fmax = x;
+                    }
+                    fsum = fsum + x;
+                }
+                let mut smin = scr[6 * nn + t];
+                let mut smax = scr[6 * nn + t];
+                let mut ssum = 0.0f32;
+                for s in 6..12 {
+                    let x = scr[s * nn + t];
+                    if x < smin {
+                        smin = x;
+                    }
+                    if x > smax {
+                        smax = x;
+                    }
+                    ssum = ssum + x;
+                }
+                let inter = (fsum / 6.0f32 - ssum / 6.0f32).abs();
+                held0 = inter / (1.0e-9f32 + (fmax - fmin) + (smax - smin));
+            }
+            v0 = held0;
+        } else if formula == 1260u32 {
+            // robust EWMAC: tanh((fast - slow) / (1.4826 MAD)); o = slow, v = fast, window in p4
+            let mut w = p4 as usize;
+            if w < 15 {
+                w = 15;
+            }
+            if t + 1 >= w {
+                let med = kth_in(c, t + 1 - w, w, (w / 2) as u32);
+                let scale = (1.4826f32 * kth_dev(c, t + 1 - w, w, (w / 2) as u32, med)).max(1.0e-9f32);
+                let x = (v[t] - o[t]) / scale;
+                let ax = x.abs();
+                let th = 1.0f32 - 2.0f32 / ((2.0f32 * ax).exp() + 1.0f32);
+                if x < 0.0f32 {
+                    v0 = 0.0f32 - th;
+                } else {
+                    v0 = th;
+                }
+            }
+        } else if formula == 1261u32 {
+            // TDI basis: mean of the RSI series (`v`) over min(t + 1, period p2) bars
+            let mut bp = p2 as usize;
+            if bp < 1 {
+                bp = 1;
+            }
+            let mut n = t + 1;
+            if n > bp {
+                n = bp;
+            }
+            let mut sm = 0.0f32;
+            for j in (t + 1 - n)..(t + 1) {
+                sm = sm + v[j];
+            }
+            v0 = sm / (n as f32);
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -2333,6 +2419,12 @@ fn bar_map(
 /// Launch the bar scan for a raw code (also used by the internal stage codes 1390..=1399) over the
 /// five lanes; returns the flat `5 * n` output (column `k` at `k * n`).
 pub(crate) fn bar_run(code: u32, ins: [&Vec<f32>; 5], params: CubeParams, flag: u32) -> Vec<f32> {
+    bar_run_x(code, ins, &[], params, flag)
+}
+
+/// [`bar_run`] with extra input series copied to the start of the scratch buffer (read-only for the
+/// formula): series `s` of length `n` sits at `s * n`.
+pub(crate) fn bar_run_x(code: u32, ins: [&Vec<f32>; 5], extra: &[f32], params: CubeParams, flag: u32) -> Vec<f32> {
     let n = ins[3].len();
     let client =
         cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
@@ -2340,7 +2432,10 @@ pub(crate) fn bar_run(code: u32, ins: [&Vec<f32>; 5], params: CubeParams, flag: 
     let out = client.empty(5 * n * core::mem::size_of::<f32>());
     // scratch (histograms / rings / design matrices) sized from the largest window parameter
     let scr_len = ((params.period.max(params.fast).max(params.slow).max(params.signal)) as usize * 28 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
-    let scr_buf = client.create_from_slice(f32::as_bytes(&vec![0.0f32; scr_len]));
+    let scr_len = scr_len.max(extra.len() + 64);
+    let mut scr_init = vec![0.0f32; scr_len];
+    scr_init[..extra.len()].copy_from_slice(extra);
+    let scr_buf = client.create_from_slice(f32::as_bytes(&scr_init));
     unsafe {
         bar_map::launch_unchecked(
             &client,
@@ -2485,6 +2580,37 @@ pub fn launch_cube_bar(
         let k = bar_stage(1395, [&o, &h, &l, &c, &ks], params, 0);
         let d = bar_stage(1395, [&o, &h, &l, &c, &ds], params, 0);
         return vec![k, d];
+    }
+    if formula == CubeFormula::SuptsBar {
+        return vec![super::kernels::launch_cube(CubeFormula::Supertrend, samples, params)];
+    }
+    if formula == CubeFormula::KeltsBar {
+        let tp = lane_series(samples, params, OhlcvField::HLC3);
+        let mid = smooth_series(&tp, params.smoother, params.period.max(1), 0, params.a, params.b);
+        let atr = super::kernels_comp::atr_series(samples, params, params.smoother2, params.period.max(1), 0);
+        return vec![super::kernels_comp::ewc(14, &mid, &atr, &mid, params.a, 0.0)];
+    }
+    if formula == CubeFormula::GmmaBar {
+        let mut extra: Vec<f32> = Vec::with_capacity(12 * n);
+        for per in [3u32, 5, 8, 10, 12, 15, 30, 35, 40, 45, 50, 60] {
+            extra.extend(smooth_series(&c, params.smoother, per, 0, params.a, params.b));
+        }
+        let flat = bar_run_x(formula.code(), [&o, &h, &l, &c, &v], &extra, params, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::EwmacRobustBar {
+        let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);
+        let slow = smooth_series(&c, params.smoother2, params.slow.max(1), 0, params.a, params.b);
+        let flat = bar_run(formula.code(), [&slow, &h, &l, &c, &fast], params, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::TdiBar {
+        let rsi = super::kernels::launch_cube(CubeFormula::Rsi, samples, params);
+        let sig = smooth_series(&rsi, params.smoother, params.signal.max(1), 0, params.a, params.b);
+        let mut bp = params;
+        bp.fast = params.fast.max(1);
+        let basis = bar_stage(1261, [&o, &h, &l, &c, &rsi], CubeParams { slow: params.fast, ..params }, 0);
+        return vec![rsi, sig, basis];
     }
     if formula == CubeFormula::DistLevelsBar {
         let mut mp = params;

@@ -645,6 +645,18 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: supertrend stop. UNTESTED on GPU.
+    SuptsBar = 1256,
+    /// Composite: keltner stop. UNTESTED on GPU.
+    KeltsBar = 1257,
+    /// Composite: nvi pvi. UNTESTED on GPU.
+    NviPviBar = 1258,
+    /// Composite: gmma compression. UNTESTED on GPU.
+    GmmaBar = 1259,
+    /// Composite: robust ewmac. UNTESTED on GPU.
+    EwmacRobustBar = 1260,
+    /// Composite: tdi. UNTESTED on GPU.
+    TdiBar = 1261,
     /// Composite: dss bressert. UNTESTED on GPU.
     DssBar = 1253,
     /// Composite: stochastic momentum index. UNTESTED on GPU.
@@ -1108,6 +1120,8 @@ impl CubeFormula {
             CubeFormula::StochRsiBar => 2,
             CubeFormula::SmiBar => 2,
             CubeFormula::StcBar => 2,
+            CubeFormula::NviPviBar => 2,
+            CubeFormula::TdiBar => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1374,6 +1388,12 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Supts), Some(CubeFormula::SuptsBar));
+        assert_eq!(formula_of(IndicatorId::Kelts), Some(CubeFormula::KeltsBar));
+        assert_eq!(formula_of(IndicatorId::NviPvi), Some(CubeFormula::NviPviBar));
+        assert_eq!(formula_of(IndicatorId::Gmma), Some(CubeFormula::GmmaBar));
+        assert_eq!(formula_of(IndicatorId::EwmacRobust), Some(CubeFormula::EwmacRobustBar));
+        assert_eq!(formula_of(IndicatorId::Tdi), Some(CubeFormula::TdiBar));
         assert_eq!(formula_of(IndicatorId::Dss), Some(CubeFormula::DssBar));
         assert_eq!(formula_of(IndicatorId::Smi), Some(CubeFormula::SmiBar));
         assert_eq!(formula_of(IndicatorId::Stc), Some(CubeFormula::StcBar));
