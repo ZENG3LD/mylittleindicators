@@ -266,6 +266,179 @@ fn evx_scan(
                     v0 = 1.0f32;
                 }
             }
+        } else if formula == 949u32 {
+            // tick volume analyzer value: cumulative buy minus sell volume
+            if side[i] > 0.0f32 {
+                h0 = h0 + x[n + i];
+            } else {
+                h0 = h0 - x[n + i];
+            }
+            v0 = h0;
+        } else if formula == 950u32 || formula == 951u32 {
+            // trade flow imbalance `[imbalance, volume]` / uptick-downtick volume `[up, down]`
+            // over the last `period` ticks (at least 1)
+            let mut w = period as usize;
+            if w < 1 {
+                w = 1;
+            }
+            let mut lo = 0usize;
+            if i + 1 > w {
+                lo = i + 1 - w;
+            }
+            let mut bv = 0.0f32;
+            let mut sv = 0.0f32;
+            for j in lo..(i + 1) {
+                if side[j] > 0.0f32 {
+                    bv = bv + x[n + j];
+                } else {
+                    sv = sv + x[n + j];
+                }
+            }
+            if formula == 950u32 {
+                let tot = bv + sv;
+                v1 = tot;
+                if tot > 0.0f32 {
+                    v0 = (bv - sv) / tot;
+                }
+            } else {
+                v0 = bv;
+                v1 = sv;
+            }
+        } else if formula == 952u32 {
+            // funding extreme alert `[signal, magnitude]`: window `period` >= 2, sigma `a`,
+            // value = x0, history includes the current value
+            let mut w = period as usize;
+            if w < 2 {
+                w = 2;
+            }
+            let mut lo = 0usize;
+            if i + 1 > w {
+                lo = i + 1 - w;
+            }
+            let cnt = i + 1 - lo;
+            if cnt >= 2 {
+                let nn = cnt as f32;
+                let mut sum = 0.0f32;
+                for j in lo..(i + 1) {
+                    sum = sum + x[j];
+                }
+                let mean = sum / nn;
+                let mut ss = 0.0f32;
+                for j in lo..(i + 1) {
+                    let dd = x[j] - mean;
+                    ss = ss + dd * dd;
+                }
+                let sd = (ss / nn).sqrt();
+                if sd >= 1.0e-15f32 {
+                    let dev = x[i] - mean;
+                    let mut mag = dev / sd;
+                    if mag < 0.0f32 {
+                        mag = 0.0f32 - mag;
+                    }
+                    v1 = mag;
+                    if mag > a {
+                        if dev > 0.0f32 {
+                            v0 = 1.0f32;
+                        } else {
+                            v0 = -1.0f32;
+                        }
+                    }
+                }
+            }
+        } else if formula == 953u32 || formula == 954u32 {
+            // EMA momentum `[ema, slope]` of funding rate (x0) or index price (x1, mark when
+            // absent / 0): alpha = 2 / (period + 1), seeded by the first value
+            let mut p = period as f32;
+            if p < 1.0f32 {
+                p = 1.0f32;
+            }
+            let mut price = x[i];
+            if formula == 954u32 && x[n + i] != 0.0f32 {
+                price = x[n + i];
+            }
+            let prev = h0;
+            if i == 0 {
+                h0 = price;
+            } else {
+                h0 = h0 + (2.0f32 / (p + 1.0f32)) * (price - h0);
+            }
+            v0 = h0;
+            v1 = h0 - prev;
+        } else if formula == 955u32 {
+            // mark price gap detector `[signal, jump, sigma ratio]`: window `period` >= 2,
+            // sigma `a`, mark = x0
+            let mut w = period as usize;
+            if w < 2 {
+                w = 2;
+            }
+            let mut lo = 0usize;
+            if i + 1 > w {
+                lo = i + 1 - w;
+            }
+            let mut jump = 0.0f32;
+            let mut dir = 0.0f32;
+            if i > 0 {
+                jump = x[i] - x[i - 1];
+                if jump > 0.0f32 {
+                    dir = 1.0f32;
+                } else if jump < 0.0f32 {
+                    dir = -1.0f32;
+                    jump = 0.0f32 - jump;
+                }
+            }
+            let cnt = i + 1 - lo;
+            let mut sd = 0.0f32;
+            if cnt >= 2 {
+                let nn = cnt as f32;
+                let mut sum = 0.0f32;
+                for j in lo..(i + 1) {
+                    sum = sum + x[j];
+                }
+                let mean = sum / nn;
+                let mut ss = 0.0f32;
+                for j in lo..(i + 1) {
+                    let dd = x[j] - mean;
+                    ss = ss + dd * dd;
+                }
+                sd = (ss / nn).sqrt();
+            }
+            if sd > 1.0e-15f32 {
+                v2 = jump / sd;
+            }
+            if v2 > a {
+                v0 = dir;
+            }
+            v1 = jump;
+        } else if formula == 956u32 {
+            // adaptive threshold `[mean, std, threshold]`: window `period` >= 2 of prices (x0),
+            // sample std, `a` multiplier
+            let mut w = period as usize;
+            if w < 2 {
+                w = 2;
+            }
+            let mut lo = 0usize;
+            if i + 1 > w {
+                lo = i + 1 - w;
+            }
+            let cnt = i + 1 - lo;
+            let nn = cnt as f32;
+            let mut sum = 0.0f32;
+            for j in lo..(i + 1) {
+                sum = sum + x[j];
+            }
+            let mean = sum / nn;
+            let mut sd = 0.0f32;
+            if cnt >= 2 {
+                let mut ss = 0.0f32;
+                for j in lo..(i + 1) {
+                    let dd = x[j] - mean;
+                    ss = ss + dd * dd;
+                }
+                sd = (ss / (nn - 1.0f32)).sqrt();
+            }
+            v0 = mean;
+            v1 = sd;
+            v2 = mean + a * sd;
         }
         out[i] = v0;
         out[n + i] = v1;

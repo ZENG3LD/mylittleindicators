@@ -601,6 +601,22 @@ pub enum CubeFormula {
     PressureComp = 1059,
     /// Composite: MACD histogram z-score. UNTESTED on GPU.
     MacdHistZComp = 1060,
+    /// Composite: tick volume delta. UNTESTED on GPU.
+    TickVolumeEv = 949,
+    /// Composite: trade flow imbalance/volume. UNTESTED on GPU.
+    TradeFlowImbEv = 950,
+    /// Composite: uptick/downtick volume. UNTESTED on GPU.
+    UpDownTickVolEv = 951,
+    /// Composite: funding extreme alert. UNTESTED on GPU.
+    FundingExtremeEv = 952,
+    /// Composite: funding momentum ema/slope. UNTESTED on GPU.
+    FundingMomEv = 953,
+    /// Composite: index price momentum ema/slope. UNTESTED on GPU.
+    IndexPriceMomEv = 954,
+    /// Composite: mark price gap signal/jump/sigma. UNTESTED on GPU.
+    MarkGapEv = 955,
+    /// Composite: adaptive threshold mean/std/threshold. UNTESTED on GPU.
+    AdaptiveThresholdEv = 956,
     /// Composite: bid/ask bounce rate. UNTESTED on GPU.
     BidAskBounceBk = 960,
     /// Composite: mid price velocity. UNTESTED on GPU.
@@ -878,6 +894,13 @@ impl CubeFormula {
             CubeFormula::BestLevelVolBk => 3,
             CubeFormula::PriceLevelDensityBk => 3,
             CubeFormula::LiquiditySweepBk => 2,
+            CubeFormula::TradeFlowImbEv => 2,
+            CubeFormula::UpDownTickVolEv => 2,
+            CubeFormula::FundingExtremeEv => 2,
+            CubeFormula::FundingMomEv => 2,
+            CubeFormula::IndexPriceMomEv => 2,
+            CubeFormula::MarkGapEv => 3,
+            CubeFormula::AdaptiveThresholdEv => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1144,6 +1167,14 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::TickVolume), Some(CubeFormula::TickVolumeEv));
+        assert_eq!(formula_of(IndicatorId::TradeFlowImbalance), Some(CubeFormula::TradeFlowImbEv));
+        assert_eq!(formula_of(IndicatorId::UptickDowntickVolume), Some(CubeFormula::UpDownTickVolEv));
+        assert_eq!(formula_of(IndicatorId::FundingExtremeAlert), Some(CubeFormula::FundingExtremeEv));
+        assert_eq!(formula_of(IndicatorId::FundingMomentum), Some(CubeFormula::FundingMomEv));
+        assert_eq!(formula_of(IndicatorId::IndexPriceMomentum), Some(CubeFormula::IndexPriceMomEv));
+        assert_eq!(formula_of(IndicatorId::MarkPriceGapDetector), Some(CubeFormula::MarkGapEv));
+        assert_eq!(formula_of(IndicatorId::AdaptiveThreshold), Some(CubeFormula::AdaptiveThresholdEv));
         assert_eq!(formula_of(IndicatorId::BidAskBounceRate), Some(CubeFormula::BidAskBounceBk));
         assert_eq!(formula_of(IndicatorId::MidPriceVelocity), Some(CubeFormula::MidPriceVelBk));
         assert_eq!(formula_of(IndicatorId::BookDepthChange), Some(CubeFormula::BookDepthChangeBk));

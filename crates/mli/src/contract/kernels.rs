@@ -7581,6 +7581,105 @@ mod tests {
         assert_cols(&launch_cube_book(CubeFormula::LiquiditySweepBk, &fr, p), &[&a, &b2]);
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): tick / funding / mark event rows 949..=956.
+    #[test]
+    fn lane_matches_cpu_event_batch3() {
+        use super::super::event_frame::GpuEventFrame;
+        use super::super::kernels_ev::launch_cube_events;
+        use crate::core::types::{FundingRate, MarkPrice, Tick};
+        use crate::engine::streams::funding_rate_consumer::FundingRateConsumer;
+        use crate::engine::streams::mark_price_consumer::MarkPriceConsumer;
+        use crate::engine::streams::tick_consumer::TickConsumer;
+        use crate::indicators::clusters::tick_volume_analyzer::TickVolumeAnalyzer;
+        use crate::indicators::composites::adaptive_threshold::AdaptiveThreshold;
+        use crate::indicators::funding_advanced::funding_extreme_alert::FundingExtremeAlert;
+        use crate::indicators::funding_advanced::funding_momentum::FundingMomentum;
+        use crate::indicators::mark_price_advanced::index_price_momentum::IndexPriceMomentum;
+        use crate::indicators::mark_price_advanced::mark_price_gap_detector::MarkPriceGapDetector;
+        use crate::indicators::volume::trade_flow_imbalance::TradeFlowImbalance;
+        use crate::indicators::volume::uptick_downtick_volume::UptickDowntickVolume;
+
+        let n = 80usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let t0 = 1_700_000_000_000i64;
+        let pp = |p: u32, a: f32| { let mut c = CubeParams::period(p); c.a = a; c };
+        let ticks: Vec<Tick> = (0..n)
+            .map(|i| Tick::new(t0 + i as i64 * 100, 100.0 + 3.0 * w(i, 0.3), 1.0 + w(i, 0.1), w(i, 1.3) > 0.45))
+            .collect();
+        let fr = GpuEventFrame::from_ticks(&ticks);
+        let mut m = TickVolumeAnalyzer::new(10);
+        let c: Vec<f64> = ticks.iter().map(|t| { m.update(t); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::TickVolumeEv, &fr, pp(10, 0.0))[0], &c);
+        let mut m = TradeFlowImbalance::new(9);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for t in &ticks {
+            m.update_tick(t);
+            a.push(m.imbalance());
+            b.push(m.volume());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::TradeFlowImbEv, &fr, pp(9, 0.0)), &[&a, &b]);
+        let mut m = UptickDowntickVolume::new(9);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for t in &ticks {
+            m.update_tick(t);
+            a.push(m.uptick());
+            b.push(m.downtick());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::UpDownTickVolEv, &fr, pp(9, 0.0)), &[&a, &b]);
+        let mut m = AdaptiveThreshold::new(12, 1.5);
+        let (mut a, mut b, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        for t in &ticks {
+            m.update_tick(t);
+            a.push(m.mean());
+            b.push(m.std());
+            c3.push(m.threshold());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::AdaptiveThresholdEv, &fr, pp(12, 1.5)), &[&a, &b, &c3]);
+
+        let fund: Vec<FundingRate> = (0..n)
+            .map(|i| FundingRate { rate: (w(i, 0.9) - 0.5) * 0.002, timestamp: t0 + i as i64 * 1000, ..Default::default() })
+            .collect();
+        let fr = GpuEventFrame::from_funding(&fund);
+        let mut m = FundingExtremeAlert::new(10, 1.2);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for f in &fund {
+            m.update_funding(f);
+            a.push(m.signal());
+            b.push(m.magnitude());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::FundingExtremeEv, &fr, pp(10, 1.2)), &[&a, &b]);
+        let mut m = FundingMomentum::new(6);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for f in &fund {
+            m.update_funding(f);
+            a.push(m.ema());
+            b.push(m.slope());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::FundingMomEv, &fr, pp(6, 0.0)), &[&a, &b]);
+
+        let marks: Vec<MarkPrice> = (0..n)
+            .map(|i| MarkPrice { mark_price: 100.0 + 3.0 * w(i, 0.5) + if i % 17 == 0 { 4.0 } else { 0.0 }, index_price: if i % 5 == 0 { None } else { Some(100.0 + 3.0 * w(i, 0.45)) }, timestamp: t0 + i as i64 * 1000, ..Default::default() })
+            .collect();
+        let fr = GpuEventFrame::from_mark(&marks);
+        let mut m = IndexPriceMomentum::new(6);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for k in &marks {
+            m.update_mark(k);
+            a.push(m.ema());
+            b.push(m.slope());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::IndexPriceMomEv, &fr, pp(6, 0.0)), &[&a, &b]);
+        let mut m = MarkPriceGapDetector::new(10, 2.0);
+        let (mut a, mut b, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        for k in &marks {
+            m.update_mark(k);
+            a.push(m.signal());
+            b.push(m.jump_size());
+            c3.push(m.sigma_ratio());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::MarkGapEv, &fr, pp(10, 2.0)), &[&a, &b, &c3]);
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
