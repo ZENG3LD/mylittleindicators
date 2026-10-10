@@ -229,7 +229,7 @@ mli_contract_macros::contract_universe! {
         Heikinashi:      Fields      : _ +cube(heikin_ashi_cols)             => crate::indicators::candles::heikin_ashi::HeikinAshi { open high low close },
         Candleanatomy:   Fields      : _ +cube(candle_anatomy_cols)             => crate::indicators::candles::candle_anatomy::CandleAnatomy { body upper_wick lower_wick long_upper long_lower },
         Wickspike:       Fields      : _ +cube(comp_wickspike_bar) => crate::indicators::candles::statistical_wick_detector::StatisticalWickDetector { upper_spike lower_spike },
-        CandlePattern:   Fields      : _             => crate::indicators::candles::candle_pattern::CandlePatternDetector,
+        CandlePattern:   Fields      : _ +cube(comp_candle_pattern_bar) => crate::indicators::candles::candle_pattern::CandlePatternDetector,
         DirDetect:       Field       : _ +cube(dir_detect)             => crate::indicators::signal_logic::direction_detector::DirectionDetector,
         NbarPivot:       Field       : _ +cube(nbar_pivot_sig)             => crate::indicators::structure::pivot::Pivot,
         VolEvent:        Fields      : _ +cube(vol_event_sig)             => crate::indicators::volume::volume_event::VolumeEventDetector,

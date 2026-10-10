@@ -5196,6 +5196,206 @@ fn bar_scan(
             } else {
                 held0 = 0.5f32;
             }
+        } else if formula == 1335u32 {
+            // candlestick pattern signal (+1 / -1 / 0). `flag` = pattern index in the CPU enum order (0 Doji ..
+            // 33 DownsideGapThreeMethods); signal 0 until the pattern's bar count has been seen. Bars are loaded
+            // oldest first into (o, h, l, c)0..4 (unused slots repeat the current bar).
+            let mut nd = 1usize;
+            if flag >= 12u32 && flag <= 19u32 {
+                nd = 2usize;
+            } else if flag >= 20u32 && flag <= 29u32 {
+                nd = 3usize;
+            } else if flag == 30u32 || flag == 31u32 || flag == 33u32 {
+                nd = 5usize;
+            } else if flag == 32u32 {
+                nd = 3usize;
+            }
+            if t + 1usize >= nd {
+                let i0 = if 0usize < nd { t + 1usize - nd } else { t };
+                let i1 = if 1usize < nd { t + 2usize - nd } else { t };
+                let i2 = if 2usize < nd { t + 3usize - nd } else { t };
+                let i3 = if 3usize < nd { t + 4usize - nd } else { t };
+                let i4 = t;
+                let o0 = o[i0]; let h0 = h[i0]; let l0 = l[i0]; let c0 = c[i0];
+                let o1 = o[i1]; let h1 = h[i1]; let l1 = l[i1]; let c1 = c[i1];
+                let o2 = o[i2]; let h2 = h[i2]; let l2 = l[i2]; let c2 = c[i2];
+                let o3 = o[i3]; let h3 = h[i3]; let l3 = l[i3]; let c3 = c[i3];
+                let o4 = o[i4]; let h4 = h[i4]; let l4 = l[i4]; let c4 = c[i4];
+                let mut r = 0.0f32;
+                if flag == 0u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && (((c0 - o0).abs() / (h0 - l0) <= 0.10f32)) {
+                        r = if c0 >= o0 { 1.0f32 } else { -1.0f32 };
+                    }
+                } else if flag == 1u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && (((c0 - o0).abs() / (h0 - l0) <= 0.10f32) && (h0 - c0.max(o0)) > 3.0f32 * (c0 - o0).abs().max(2.220446e-16f32) && (c0.min(o0) - l0) < (c0 - o0).abs().max(2.220446e-16f32)) {
+                        r = -1.0f32;
+                    }
+                } else if flag == 2u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && (((c0 - o0).abs() / (h0 - l0) <= 0.10f32) && (c0.min(o0) - l0) > 3.0f32 * (c0 - o0).abs().max(2.220446e-16f32) && (h0 - c0.max(o0)) < (c0 - o0).abs().max(2.220446e-16f32)) {
+                        r = 1.0f32;
+                    }
+                } else if flag == 3u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && (((c0 - o0).abs() / (h0 - l0) <= 0.10f32) && (h0 - c0.max(o0)) > 2.0f32 * (c0 - o0).abs().max(2.220446e-16f32) && (c0.min(o0) - l0) > 2.0f32 * (c0 - o0).abs().max(2.220446e-16f32)) {
+                        r = if c0 >= o0 { 1.0f32 } else { -1.0f32 };
+                    }
+                } else if flag == 4u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && ((c0.min(o0) - l0) >= (c0 - o0).abs().max(2.220446e-16f32) * 2.0f32 && (h0 - c0.max(o0)) <= (c0 - o0).abs().max(2.220446e-16f32) * 0.5f32 && (c0.min(o0) - l0) / (h0 - l0) >= 0.6f32) {
+                        r = 1.0f32;
+                    }
+                } else if flag == 5u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && (c0 > o0 && (h0 - c0.max(o0)) >= (c0 - o0).abs().max(2.220446e-16f32) * 2.0f32 && (c0.min(o0) - l0) <= (c0 - o0).abs().max(2.220446e-16f32) * 0.5f32 && (h0 - c0.max(o0)) / (h0 - l0) >= 0.6f32) {
+                        r = 1.0f32;
+                    }
+                } else if flag == 6u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && (c0 < o0 && (h0 - c0.max(o0)) >= (c0 - o0).abs().max(2.220446e-16f32) * 2.0f32 && (c0.min(o0) - l0) <= (c0 - o0).abs().max(2.220446e-16f32) * 0.5f32 && (h0 - c0.max(o0)) / (h0 - l0) >= 0.6f32) {
+                        r = -1.0f32;
+                    }
+                } else if flag == 7u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && (c0 < o0 && (c0.min(o0) - l0) >= (c0 - o0).abs().max(2.220446e-16f32) * 2.0f32 && (h0 - c0.max(o0)) <= (c0 - o0).abs().max(2.220446e-16f32) * 0.5f32 && (c0.min(o0) - l0) / (h0 - l0) >= 0.6f32) {
+                        r = -1.0f32;
+                    }
+                } else if flag == 8u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && ((c0 - o0).abs() / (h0 - l0) >= 0.95f32) {
+                        r = if c0 > o0 { 1.0f32 } else { -1.0f32 };
+                    }
+                } else if flag == 9u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && (c0 > o0 && (c0 - o0).abs() / (h0 - l0) >= 0.95f32) {
+                        r = 1.0f32;
+                    }
+                } else if flag == 10u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && (c0 < o0 && (c0 - o0).abs() / (h0 - l0) >= 0.95f32) {
+                        r = -1.0f32;
+                    }
+                } else if flag == 11u32 {
+                    if ((h0 - l0)) >= 2.220446e-16f32 && ((c0 - o0).abs() / (h0 - l0) < 0.3f32 && ((h0 - c0.max(o0)) + (c0.min(o0) - l0)) / (h0 - l0) > 0.6f32 && (h0 - c0.max(o0)) > (c0 - o0).abs() && (c0.min(o0) - l0) > (c0 - o0).abs()) {
+                        r = if c0 >= o0 { 1.0f32 } else { -1.0f32 };
+                    }
+                } else if flag == 12u32 {
+                    if (c0 - o0).abs() * 1.2f32 <= (c1 - o1).abs() && c0 < o0 && c1 > o1 && o1 <= c0 && c1 >= o0 {
+                        r = 1.0f32;
+                    }
+                } else if flag == 13u32 {
+                    if (c0 - o0).abs() * 1.2f32 <= (c1 - o1).abs() && c0 > o0 && c1 < o1 && o1 >= c0 && c1 <= o0 {
+                        r = -1.0f32;
+                    }
+                } else if flag == 14u32 {
+                    if c0 < o0 && o1.max(c1) <= o0.max(c0) && o1.min(c1) >= o0.min(c0) {
+                        r = 1.0f32;
+                    }
+                } else if flag == 15u32 {
+                    if c0 > o0 && o1.max(c1) <= o0.max(c0) && o1.min(c1) >= o0.min(c0) {
+                        r = -1.0f32;
+                    }
+                } else if flag == 16u32 {
+                    if c0 < o0 && c1 > o1 && o1 < c0 && c1 > (o0 + c0) / 2.0f32 && c1 < o0 {
+                        r = 1.0f32;
+                    }
+                } else if flag == 17u32 {
+                    if c0 > o0 && c1 < o1 && o1 > c0 && c1 < (o0 + c0) / 2.0f32 && c1 > o0 {
+                        r = -1.0f32;
+                    }
+                } else if flag == 18u32 {
+                    let ar = ((h0 - l0) + (h1 - l1)) / 2.0f32;
+                    if ar >= 2.220446e-16f32 && (h0 - h1).abs() / ar < 0.02f32 && c0 > o0 && c1 < o1 {
+                        r = -1.0f32;
+                    }
+                } else if flag == 19u32 {
+                    let ar = ((h0 - l0) + (h1 - l1)) / 2.0f32;
+                    if ar >= 2.220446e-16f32 && (l0 - l1).abs() / ar < 0.02f32 && c0 < o0 && c1 > o1 {
+                        r = 1.0f32;
+                    }
+                } else if flag == 20u32 {
+                    let fo = o0;
+                    let fc = c0;
+                    let ar = ((h0 - l0) + (h1 - l1) + (h2 - l2)) / 3.0f32;
+                    let mut ok = ar >= 2.220446e-16f32 && (c1 - o1).abs() / ar <= 0.30f32;
+                    
+                    if ok && fc < fo && c2 > o2 && h1 < fc.min(fo) && c2 > (fo + fc) / 2.0f32 {
+                        r = 1.0f32;
+                    }
+                } else if flag == 21u32 {
+                    let fo = o0;
+                    let fc = c0;
+                    let ar = ((h0 - l0) + (h1 - l1) + (h2 - l2)) / 3.0f32;
+                    let mut ok = ar >= 2.220446e-16f32 && (c1 - o1).abs() / ar <= 0.30f32;
+                    
+                    if ok && fc > fo && c2 < o2 && l1 > fc.max(fo) && c2 < (fo + fc) / 2.0f32 {
+                        r = -1.0f32;
+                    }
+                } else if flag == 22u32 {
+                    let fo = o0;
+                    let fc = c0;
+                    let ar = ((h0 - l0) + (h1 - l1) + (h2 - l2)) / 3.0f32;
+                    let mut ok = ar >= 2.220446e-16f32 && (c1 - o1).abs() / ar <= 0.30f32;
+                    if ok && !((c1 - o1).abs() / (h1 - l1) <= 0.10f32 && (h1 - l1) > 2.220446e-16f32) { ok = false; }
+                    if ok && fc < fo && c2 > o2 && h1 < fc.min(fo) && c2 > (fo + fc) / 2.0f32 {
+                        r = 1.0f32;
+                    }
+                } else if flag == 23u32 {
+                    let fo = o0;
+                    let fc = c0;
+                    let ar = ((h0 - l0) + (h1 - l1) + (h2 - l2)) / 3.0f32;
+                    let mut ok = ar >= 2.220446e-16f32 && (c1 - o1).abs() / ar <= 0.30f32;
+                    if ok && !((c1 - o1).abs() / (h1 - l1) <= 0.10f32 && (h1 - l1) > 2.220446e-16f32) { ok = false; }
+                    if ok && fc > fo && c2 < o2 && l1 > fc.max(fo) && c2 < (fo + fc) / 2.0f32 {
+                        r = -1.0f32;
+                    }
+                } else if flag == 24u32 {
+                    if !(c0 <= o0 || (c0 - o0).abs() / (h0 - l0) < 0.6f32 || (h0 - l0) < 2.220446e-16f32) && !(c1 <= o1 || (c1 - o1).abs() / (h1 - l1) < 0.6f32 || (h1 - l1) < 2.220446e-16f32) && !(c2 <= o2 || (c2 - o2).abs() / (h2 - l2) < 0.6f32 || (h2 - l2) < 2.220446e-16f32) && !(o1 <= c0 || c1 <= c0 * 1.05f32) && !(o2 <= c1 || c2 <= c1 * 1.05f32) {
+                        r = 1.0f32;
+                    }
+                } else if flag == 25u32 {
+                    if !(c0 >= o0 || (c0 - o0).abs() / (h0 - l0) < 0.6f32 || (h0 - l0) < 2.220446e-16f32) && !(c1 >= o1 || (c1 - o1).abs() / (h1 - l1) < 0.6f32 || (h1 - l1) < 2.220446e-16f32) && !(c2 >= o2 || (c2 - o2).abs() / (h2 - l2) < 0.6f32 || (h2 - l2) < 2.220446e-16f32) && !(o1 >= c0 || c1 >= c0 / 1.05f32) && !(o2 >= c1 || c2 >= c1 / 1.05f32) {
+                        r = -1.0f32;
+                    }
+                } else if flag == 26u32 {
+                    if c0 < o0 && o1.max(c1) <= o0.max(c0) && o1.min(c1) >= o0.min(c0) && c2 > o0 {
+                        r = 1.0f32;
+                    }
+                } else if flag == 27u32 {
+                    if c0 > o0 && o1.max(c1) <= o0.max(c0) && o1.min(c1) >= o0.min(c0) && c2 < o0 {
+                        r = -1.0f32;
+                    }
+                } else if flag == 28u32 {
+                    if (c0 - o0).abs() * 1.2f32 <= (c1 - o1).abs() && c0 < o0 && c1 > o1 && o1 <= c0 && c1 >= o0 && c2 > c1 {
+                        r = 1.0f32;
+                    }
+                } else if flag == 29u32 {
+                    if (c0 - o0).abs() * 1.2f32 <= (c1 - o1).abs() && c0 > o0 && c1 < o1 && o1 >= c0 && c1 <= o0 && c2 < c1 {
+                        r = -1.0f32;
+                    }
+                } else if flag == 30u32 || flag == 31u32 {
+                    let fr = h0 - l0;
+                    let lr = h4 - l4;
+                    if fr >= 2.220446e-16f32 && lr >= 2.220446e-16f32 {
+                        let mut ok = true;
+                        let mut dirr = 1.0f32;
+                        if flag == 30u32 {
+                            if !(c0 > o0 && (c0 - o0) / fr > 0.6f32) { ok = false; }
+                            if !(c4 > o4 && (c4 - o4) / lr > 0.6f32) { ok = false; }
+                            if c4 <= c0 { ok = false; }
+                        } else {
+                            dirr = -1.0f32;
+                            if !(c0 < o0 && (o0 - c0) / fr > 0.6f32) { ok = false; }
+                            if !(c4 < o4 && (o4 - c4) / lr > 0.6f32) { ok = false; }
+                            if c4 >= c0 { ok = false; }
+                        }
+                        if h1 > h0 || l1 < l0 || h2 > h0 || l2 < l0 || h3 > h0 || l3 < l0 { ok = false; }
+                        if ok {
+                            r = dirr;
+                        }
+                    }
+                } else if flag == 32u32 {
+                    if c0 > o0 && c1 < o1 && o1 > c0 && c2 < o2 && o2 >= o1 && c2 <= c1 {
+                        r = -1.0f32;
+                    }
+                } else {
+                    if c0 < o0 && o1 < c0 && c1 < o1 && c4 < c1 {
+                        r = -1.0f32;
+                    }
+                }
+                v0 = r;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;

@@ -787,6 +787,8 @@ pub enum CubeFormula {
     IcebergLv = 1403,
     /// MarketMicro (keyed / profile / fit family). UNTESTED on GPU.
     MarketMicroBk = 1404,
+    /// Composite: candle pattern. UNTESTED on GPU.
+    CandlePatternBar = 1335,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1651,6 +1653,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Kcomp), Some(CubeFormula::KcompBar));
         assert_eq!(formula_of(IndicatorId::Rc), Some(CubeFormula::RcBar));
         assert_eq!(formula_of(IndicatorId::ChaosOsc), Some(CubeFormula::ChaosOscBar));
+        assert_eq!(formula_of(IndicatorId::CandlePattern), Some(CubeFormula::CandlePatternBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
