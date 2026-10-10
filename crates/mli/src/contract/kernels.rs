@@ -126,6 +126,60 @@ fn sqrt_f(x: f32) -> f32 {
     y
 }
 
+/// OLS slope of cumulative size against absolute distance from `mid`.
+/// Non-negative. Zero when the side has fewer than two levels.
+#[cube]
+fn side_slope(
+    px: &[f32],
+    sz: &[f32],
+    nside: &[f32],
+    i: usize,
+    depth: usize,
+    levels: usize,
+    mid: f32,
+) -> f32 {
+    let mut n = nside[i] as usize;
+    if n > depth {
+        n = depth;
+    }
+    if n > levels {
+        n = levels;
+    }
+    let mut slope = 0.0f32;
+    if n >= 2 {
+        let base = i * depth;
+        let mut cum = 0.0f32;
+        let mut sum_x = 0.0f32;
+        let mut sum_y = 0.0f32;
+        let mut sum_xy = 0.0f32;
+        let mut sum_x2 = 0.0f32;
+        for k in 0..n {
+            cum = cum + sz[base + k];
+            let mut y = px[base + k] - mid;
+            if y < 0.0f32 {
+                y = -y;
+            }
+            sum_x = sum_x + cum;
+            sum_y = sum_y + y;
+            sum_xy = sum_xy + cum * y;
+            sum_x2 = sum_x2 + cum * cum;
+        }
+        let nf = n as f32;
+        let denom = nf * sum_x2 - sum_x * sum_x;
+        let mut ad = denom;
+        if ad < 0.0f32 {
+            ad = -ad;
+        }
+        if ad >= 1.0e-12 {
+            slope = (nf * sum_xy - sum_x * sum_y) / denom;
+            if slope < 0.0f32 {
+                slope = 0.0f32;
+            }
+        }
+    }
+    slope
+}
+
 /// `slot` 0..3 reads `s0`..`s3`. Anything else is `s0`.
 #[cube]
 fn slot_at(s0: &[f32], s1: &[f32], s2: &[f32], s3: &[f32], i: usize, slot: u32) -> f32 {
@@ -735,6 +789,25 @@ fn scan_lane(
             output[k] = ema - prev;
             prev = ema;
         }
+    } else if formula == 35u32 {
+        let d = depth as usize;
+        let mut lv = levels as usize;
+        if lv < 2 {
+            lv = 2;
+        }
+        let mut y = 0.0f32;
+        for i in 0..n {
+            let bn = bid_n[i] as usize;
+            let an = ask_n[i] as usize;
+            if bn >= 1 && an >= 1 {
+                let base = i * d;
+                let mid = (bid_px[base] + ask_px[base]) / 2.0f32;
+                let bid = side_slope(bid_px, bid_sz, bid_n, i, d, lv, mid);
+                let ask = side_slope(ask_px, ask_sz, ask_n, i, d, lv, mid);
+                y = (bid + ask) / 2.0f32;
+            }
+            output[i] = y;
+        }
     }
 }
 
@@ -967,6 +1040,7 @@ mod tests {
     use crate::indicators::momentum::roc::Roc;
     use crate::indicators::momentum::rsi::Rsi;
     use crate::indicators::book::book_pressure::BookPressure;
+    use crate::indicators::book::order_book_slope::OrderBookSlope;
     use crate::indicators::book::imbalance::BookImbalanceRatio;
     use crate::indicators::book::microprice::Microprice;
     use crate::indicators::book_advanced::bid_ask_asymmetry::BidAskAsymmetry;
@@ -1340,6 +1414,22 @@ mod tests {
             &launch_cube(CubeFormula::BookPressure, &book_samples, pressure_params),
             &cpu_pressure,
         );
+        for depth in [2u32, 3u32] {
+            let mut book_slope = OrderBookSlope::with_levels(depth as usize);
+            let cpu_slope: Vec<f64> = books
+                .iter()
+                .map(|b| {
+                    book_slope.update_orderbook(b);
+                    book_slope.value()
+                })
+                .collect();
+            let mut slope_params = CubeParams::period(1);
+            slope_params.levels = depth;
+            assert_close(
+                &launch_cube(CubeFormula::BookSlope, &book_samples, slope_params),
+                &cpu_slope,
+            );
+        }
 
         let mut rates = Vec::new();
         let funding: Vec<GpuSample> = (0..8)

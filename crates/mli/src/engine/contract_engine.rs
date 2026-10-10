@@ -288,7 +288,7 @@ mli_contract_macros::contract_universe! {
         BookPressure:        OrderBook     : OrderBook +cube(book_pressure)  => crate::indicators::book::book_pressure::BookPressure,
         LiquiditySweep:      OrderBook     : OrderBook  => crate::indicators::book::liquidity_sweep::LiquiditySweep { direction magnitude },
         BookMicroprice:      OrderBook     : OrderBook +cube(microprice)  => crate::indicators::book::microprice::Microprice,
-        BookSlope:           OrderBook     : OrderBook  => crate::indicators::book::order_book_slope::OrderBookSlope,
+        BookSlope:           OrderBook     : OrderBook +cube(book_slope)  => crate::indicators::book::order_book_slope::OrderBookSlope,
         OrderBookVelocity:   OrderBook     : OrderBook  => crate::indicators::book::order_book_velocity::OrderBookVelocity,
         SpreadDistribution:  OrderBook     : OrderBook  => crate::indicators::book::spread_distribution::SpreadDistribution { spread percentile },
         WallDetector:        OrderBook     : OrderBook  => crate::indicators::book::wall_detector::WallDetector { bid_price ask_price total_size },

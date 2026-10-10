@@ -109,6 +109,10 @@ pub enum CubeFormula {
     /// One-step change of an EMA. Alpha is `2 / (period + 1)`. The first
     /// sample is zero. `period` below 2 is 2.
     EmaStep = 34,
+    /// Mean of the bid and ask OLS slopes. Cumulative size against absolute
+    /// distance from mid, over [`CubeParams::levels`] (at least 2). Holds the
+    /// previous value when either side is missing.
+    BookSlope = 35,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -239,6 +243,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::OiPercentile), Some(CubeFormula::PercentileRank));
         assert_eq!(formula_of(IndicatorId::AuctionImbalance), Some(CubeFormula::RatioToMean));
         assert_eq!(formula_of(IndicatorId::InsuranceFundMomentum), Some(CubeFormula::EmaStep));
+        assert_eq!(formula_of(IndicatorId::BookSlope), Some(CubeFormula::BookSlope));
     }
 
     #[cfg(feature = "gpu-shader")]

@@ -189,6 +189,7 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "percentile_rank" => "PercentileRank",
         "ratio_to_mean" => "RatioToMean",
         "ema_step" => "EmaStep",
+        "book_slope" => "BookSlope",
         _ => {
             return Err(syn::Error::new(
                 name.span(),
