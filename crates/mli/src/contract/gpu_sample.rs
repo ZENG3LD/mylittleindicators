@@ -600,6 +600,8 @@ pub struct GpuTimes {
     /// Days to the nearest quarter boundary when that is `<= 15`, else `99`
     /// (read from `QuarterTurnEffect` with a 15 day window, so it agrees with the CPU feed).
     pub qnear: Vec<f32>,
+    /// Monthly anchor key of `AnchoredVwap::calc_month_key` (`(unix_days / 30.436875) as i64`), exact in f32.
+    pub mkey: Vec<f32>,
 }
 
 impl GpuTimes {
@@ -621,6 +623,7 @@ impl GpuTimes {
             );
             let qv = crate::indicators::calendar::quarter_turn_effect::QuarterTurnEffect::new(15)
                 .feed(ms);
+            out.mkey.push(((secs / 86_400) as f64 / 30.436875) as i64 as f32);
             out.qnear.push(if qv > 0.0 { ((1.0 - qv) * 15.0).round() as f32 } else { 99.0 });
         }
         out

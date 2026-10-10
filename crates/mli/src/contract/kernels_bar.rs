@@ -3906,6 +3906,62 @@ fn bar_scan(
             v0 = held0;
             v1 = held1;
             v2 = held2;
+        } else if formula >= 1303u32 && formula <= 1306u32 {
+            // anchored VWAP family on the monthly anchor key in lane o (`GpuTimes::mkey`), one effective
+            // anchor (the CPU params are ignored: every anchor is monthly). Cumulative sums reset when the key changes.
+            // 1303 value, 1304 (close - vwap) / vwap, 1305 reversion z-score (window = max(period, 20)),
+            // 1306 touch probability over max(period, 20) bars (threshold in `a`).
+            if t == 0usize || o[t] != o[t - 1] {
+                held0 = 0.0f32;
+                held1 = 0.0f32;
+            }
+            let tp = (h[t] + l[t] + c[t]) / 3.0f32;
+            let vv = v[t].max(0.0f32);
+            held0 = held0 + tp * vv;
+            held1 = held1 + vv;
+            if held1 > 0.0f32 {
+                vw = held0 / held1;
+            }
+            if formula == 1303u32 {
+                v0 = vw;
+            } else if formula == 1304u32 {
+                if vw != 0.0f32 {
+                    v0 = (c[t] - vw) / vw;
+                }
+            } else {
+                let mut w = period as usize;
+                if w < 20usize {
+                    w = 20usize;
+                }
+                if formula == 1305u32 {
+                    scr[t % w] = (c[t] - vw).abs();
+                } else {
+                    let mut tch = 0.0f32;
+                    if (c[t] - vw).abs() / vw.max(1.0e-9f32) <= a.max(0.0f32) {
+                        tch = 1.0f32;
+                    }
+                    scr[t % w] = tch;
+                }
+                if t + 1 >= w {
+                    let mut mean = 0.0f32;
+                    for k2 in 0..w {
+                        mean = mean + scr[k2];
+                    }
+                    mean = mean / (w as f32);
+                    if formula == 1306u32 {
+                        held2 = mean;
+                    } else {
+                        let mut var = 0.0f32;
+                        for k2 in 0..w {
+                            let dd = scr[k2] - mean;
+                            var = var + dd * dd;
+                        }
+                        let sd = (var / (w as f32)).sqrt().max(1.0e-9f32);
+                        held2 = 0.0f32 - (scr[t % w] - mean) / sd;
+                    }
+                }
+                v0 = held2;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -4001,11 +4057,35 @@ pub fn launch_cube_bar(
     samples: &[GpuSample],
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
+    launch_cube_bar_x(formula, samples, params, None)
+}
+
+/// Bar formulas that read the calendar adapter: the open lane carries `GpuTimes::mkey` (the monthly
+/// anchor key). Codes 1303..=1306. UNTESTED on GPU.
+pub fn launch_cube_bar_timed(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    times: &super::gpu_sample::GpuTimes,
+    params: CubeParams,
+) -> Vec<Vec<f32>> {
+    assert_eq!(times.mkey.len(), samples.len(), "one GpuTimes row per sample");
+    launch_cube_bar_x(formula, samples, params, Some(&times.mkey))
+}
+
+fn launch_cube_bar_x(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    params: CubeParams,
+    okey: Option<&Vec<f32>>,
+) -> Vec<Vec<f32>> {
     let n = samples.len();
     if n == 0 {
         return Vec::new();
     }
-    let o = lane_series(samples, params, OhlcvField::Open);
+    let o = match okey {
+        Some(k) => k.clone(),
+        None => lane_series(samples, params, OhlcvField::Open),
+    };
     let mut h = lane_series(samples, params, OhlcvField::High);
     let mut l = lane_series(samples, params, OhlcvField::Low);
     let c = lane_series(samples, params, params.lane);

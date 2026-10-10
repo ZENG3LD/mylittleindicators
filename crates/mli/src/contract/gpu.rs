@@ -693,6 +693,14 @@ pub enum CubeFormula {
     PivotchanBar = 1301,
     /// Composite: theil-sen channels. UNTESTED on GPU.
     TheilsenchanBar = 1302,
+    /// Composite: monthly anchored vwap. UNTESTED on GPU.
+    AvwapBar = 1303,
+    /// Composite: avwap distance. UNTESTED on GPU.
+    AvwapDistBar = 1304,
+    /// Composite: avwap reversion z-score. UNTESTED on GPU.
+    AvwapMrevBar = 1305,
+    /// Composite: avwap touch probability. UNTESTED on GPU.
+    AvwapTprobBar = 1306,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1116,7 +1124,7 @@ impl CubeFormula {
     /// `true` for the calendar formulas (code 140..=149). They need the time
     /// adapter and run through `launch_cube_timed`.
     pub const fn needs_time(self) -> bool {
-        (self.code() >= 140 && self.code() < 150) || (self.code() >= 700 && self.code() < 710)
+        (self.code() >= 140 && self.code() < 150) || (self.code() >= 700 && self.code() < 710) || (self.code() >= 1303 && self.code() < 1307)
     }
 
     pub const fn output_count(self) -> u32 {
@@ -1507,6 +1515,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Alligator), Some(CubeFormula::AlligatorBar));
         assert_eq!(formula_of(IndicatorId::Pivotchan), Some(CubeFormula::PivotchanBar));
         assert_eq!(formula_of(IndicatorId::Theilsenchan), Some(CubeFormula::TheilsenchanBar));
+        assert_eq!(formula_of(IndicatorId::Avwap), Some(CubeFormula::AvwapBar));
+        assert_eq!(formula_of(IndicatorId::AvwapDist), Some(CubeFormula::AvwapDistBar));
+        assert_eq!(formula_of(IndicatorId::AvwapMrev), Some(CubeFormula::AvwapMrevBar));
+        assert_eq!(formula_of(IndicatorId::AvwapTprob), Some(CubeFormula::AvwapTprobBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

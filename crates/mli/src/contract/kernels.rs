@@ -4741,6 +4741,9 @@ pub fn launch_cube_timed(
     }
     assert!(formula.needs_time(), "launch_cube_timed needs a calendar formula (code 140..=149)");
     assert_eq!(times.len(), samples.len(), "one GpuTimes row per sample");
+    if formula.code() >= 1200 {
+        return super::kernels_bar::launch_cube_bar_timed(formula, samples, times, _params).swap_remove(0);
+    }
     if formula.code() >= 700 {
         return super::kernels_cal::launch_cube_calendar(formula, times, _params).swap_remove(0);
     }
@@ -9435,6 +9438,49 @@ mod tests {
         p.a = 2.0;
         let mut m = TheilSenChannels::new(12, 2.0);
         chk(&run_cols(CubeFormula::TheilsenchanBar, &bars, p), close.iter().map(|c| { let (u, mi, lo) = m.feed(*c); vec![u, mi, lo] }).collect());
+
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): timed bar formulas 1303..=1306 (Avwap, AvwapDist, AvwapMrev, AvwapTprob).
+    #[test]
+    fn lane_matches_cpu_bar_batch31() {
+        use crate::contract::gpu_sample::GpuTimes;
+        use crate::contract::kernels_bar::launch_cube_bar_timed;
+        use crate::indicators::levels::anchored_vwap::{AnchoredVwap, AnchoredVwapParams};
+        use crate::indicators::levels::avwap_distance::AvwapDistance;
+        use crate::indicators::levels::avwap_multi_anchor_reversion::AvwapMultiAnchorReversion;
+        use crate::indicators::levels::avwap_touch_probability::AvwapTouchProbability;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        // 29 hour spacing: spans several calendar months, so the monthly anchor resets
+        let bars: Vec<ResearchBar> = bars.iter().enumerate().map(|(i, b)| {
+            ResearchBar::new(1_704_067_200_000 + i as i64 * 29 * 3_600_000, b.open, b.high, b.low, b.close, b.volume)
+        }).collect();
+        let samples: Vec<GpuSample> = bars.iter().map(GpuSample::from).collect();
+        let times = GpuTimes::from_bars(&bars);
+        let tcol = |f: CubeFormula, p: CubeParams| launch_cube_bar_timed(f, &samples, &times, p);
+        let ln: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let mut m = AnchoredVwap::new(AnchoredVwapParams::default());
+        chk(&tcol(CubeFormula::AvwapBar, CubeParams::period(1)), bars.iter().zip(&ln).map(|(b, l)| vec![m.feed(b.time, l)]).collect());
+        let mut m = AvwapDistance::new();
+        chk(&tcol(CubeFormula::AvwapDistBar, CubeParams::period(1)), bars.iter().zip(&ln).map(|(b, l)| vec![m.feed(b.time, l)]).collect());
+        let mut m = AvwapMultiAnchorReversion::new(vec![AnchoredVwapParams::default()], 20);
+        chk(&tcol(CubeFormula::AvwapMrevBar, CubeParams::period(20)), bars.iter().zip(&ln).map(|(b, l)| vec![m.feed(b.time, l)]).collect());
+        let mut p = CubeParams::period(20);
+        p.a = 0.01;
+        let mut m = AvwapTouchProbability::new(vec![AnchoredVwapParams::default()], 20, 0.01);
+        chk(&tcol(CubeFormula::AvwapTprobBar, p), bars.iter().zip(&ln).map(|(b, l)| vec![m.feed(b.time, l)]).collect());
 
     }
 
