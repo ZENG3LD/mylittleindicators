@@ -3679,6 +3679,111 @@ fn bar_scan(
                 v8 = scr[7];
                 v9 = scr[8];
             }
+        } else if formula == 1300u32 {
+            // Alligator: SMA 13 / 8 / 5 of the median price in lanes o / h / l, shifted back by 8 / 5 / 3 bars
+            // (the shifted value appears once the offset buffer is full, before that the live smoother value)
+            v0 = o[t];
+            if t + 1 >= 8usize {
+                v0 = o[t - 7];
+            }
+            v1 = h[t];
+            if t + 1 >= 5usize {
+                v1 = h[t - 4];
+            }
+            v2 = l[t];
+            if t + 1 >= 3usize {
+                v2 = l[t - 2];
+            }
+        } else if formula == 1301u32 {
+            // classic daily pivot channels with adaptive width: levels from the first bar, then
+            // recomputed every `period` bars (default 1440); lanes o,h,l,c; outputs [upper, pivot, lower]
+            let mut pp = period as usize;
+            if pp < 1usize {
+                pp = 1usize;
+            }
+            let mut recompute = t == 0usize;
+            let mut hh = h[t];
+            let mut ll = l[t];
+            if (t + 1) % pp == 0usize {
+                recompute = true;
+                for k2 in 0..pp {
+                    hh = hh.max(h[t - k2]);
+                    ll = ll.min(l[t - k2]);
+                }
+            }
+            if recompute {
+                let cl = c[t];
+                let pv = (hh + ll + cl) / 3.0f32;
+                scr[0] = hh + 2.0f32 * (pv - ll);
+                scr[1] = pv + (hh - ll);
+                scr[2] = 2.0f32 * pv - ll;
+                scr[3] = pv;
+                scr[4] = 2.0f32 * pv - hh;
+                scr[5] = pv - (hh - ll);
+                scr[6] = ll - 2.0f32 * (hh - pv);
+            }
+            // volatility ring (last 100 ranges) -> width multiplier
+            let mut vc = t + 1;
+            if vc > 100usize {
+                vc = 100usize;
+            }
+            let mut vs = 0.0f32;
+            for k2 in 0..vc {
+                vs = vs + (h[t - k2] - l[t - k2]);
+            }
+            let avgv = vs / (vc as f32);
+            if avgv > 0.0f32 {
+                held0 = ((h[t] - l[t]) / avgv).max(0.5f32).min(2.0f32);
+            } else if t == 0usize {
+                held0 = 1.0f32;
+            }
+            let px = c[t];
+            let mut res = 0.0f32;
+            let mut sup = 0.0f32;
+            let mut has_r = 0u32;
+            let mut has_s = 0u32;
+            for k2 in 0..7usize {
+                let lv = scr[k2];
+                if lv > px {
+                    if has_r == 0u32 || lv < res {
+                        res = lv;
+                        has_r = 1u32;
+                    }
+                }
+                if lv < px {
+                    if has_s == 0u32 || lv > sup {
+                        sup = lv;
+                        has_s = 1u32;
+                    }
+                }
+            }
+            let mut rng = scr[0] - scr[6];
+            if rng < 0.0f32 {
+                rng = 0.0f32;
+            }
+            if has_r == 0u32 {
+                if rng > 0.0f32 {
+                    res = px + rng * 0.5f32;
+                } else {
+                    res = px;
+                }
+            }
+            if has_s == 0u32 {
+                if rng > 0.0f32 {
+                    sup = px - rng * 0.5f32;
+                } else {
+                    sup = px;
+                }
+            }
+            if held0 != 1.0f32 {
+                let ctr = (res + sup) / 2.0f32;
+                let hw = (res - sup) / 2.0f32 * held0;
+                res = ctr + hw;
+                sup = ctr - hw;
+            }
+            v0 = res;
+            v1 = scr[3];
+            v2 = sup;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -3942,6 +4047,14 @@ pub fn launch_cube_bar(
         let atr = super::kernels_comp::atr_series(samples, params, super::CubeSmoother::Sma, params.fast.max(1), 1);
         let flat = bar_run(formula.code(), [&bb, &kc, &atr, &c, &c], CubeParams { fast: params.fast.max(1), slow: params.slow.max(1), ..params }, 0);
         return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec()];
+    }
+    if formula == CubeFormula::AlligatorBar {
+        let mid = lane_series(samples, params, OhlcvField::HL2);
+        let jaw = smooth_series(&mid, super::CubeSmoother::Sma, 13, 0, params.a, params.b);
+        let teeth = smooth_series(&mid, super::CubeSmoother::Sma, 8, 0, params.a, params.b);
+        let lips = smooth_series(&mid, super::CubeSmoother::Sma, 5, 0, params.a, params.b);
+        let flat = bar_run(formula.code(), [&jaw, &teeth, &lips, &c, &c], params, 0);
+        return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec(), flat[2 * n..3 * n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

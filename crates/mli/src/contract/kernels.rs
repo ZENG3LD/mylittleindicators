@@ -9381,6 +9381,39 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1300..=1301 (Alligator, Pivotchan).
+    #[test]
+    fn lane_matches_cpu_bar_batch29() {
+        use crate::indicators::chaos::williams_indicators::Alligator;
+        use crate::indicators::levels::pivot_channels::{PivotChannels, PivotPeriod, PivotType};
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = Alligator::new();
+        chk(&run_cols(CubeFormula::AlligatorBar, &bars, CubeParams::period(1)), lanes.iter().map(|l| {
+            m.feed(&[l[0], l[1]]);
+            let (j, t2, l2) = m.get_values();
+            vec![j, t2, l2]
+        }).collect());
+        let mut m = PivotChannels::new_custom(PivotType::Classic, PivotPeriod::Hourly, true);
+        chk(&run_cols(CubeFormula::PivotchanBar, &bars, CubeParams::period(60)), bars.iter().map(|b| {
+            m.feed(&[b.open, b.high, b.low, b.close]);
+            let (u, mi, lo) = m.value_tuple();
+            vec![u, mi, lo]
+        }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

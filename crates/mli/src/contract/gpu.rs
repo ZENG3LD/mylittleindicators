@@ -687,6 +687,10 @@ pub enum CubeFormula {
     WoodieBar = 1298,
     /// Composite: demark pivots. UNTESTED on GPU.
     DemarkBar = 1299,
+    /// Composite: alligator. UNTESTED on GPU.
+    AlligatorBar = 1300,
+    /// Composite: pivot channels. UNTESTED on GPU.
+    PivotchanBar = 1301,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1197,6 +1201,8 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::AlligatorBar => 3,
+            CubeFormula::PivotchanBar => 3,
             CubeFormula::PivotBar => 10,
             CubeFormula::FloorpivotBar => 8,
             CubeFormula::CamarillaBar => 10,
@@ -1495,6 +1501,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Camarilla), Some(CubeFormula::CamarillaBar));
         assert_eq!(formula_of(IndicatorId::Woodie), Some(CubeFormula::WoodieBar));
         assert_eq!(formula_of(IndicatorId::Demark), Some(CubeFormula::DemarkBar));
+        assert_eq!(formula_of(IndicatorId::Alligator), Some(CubeFormula::AlligatorBar));
+        assert_eq!(formula_of(IndicatorId::Pivotchan), Some(CubeFormula::PivotchanBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
