@@ -12077,4 +12077,45 @@ mod tests {
         p.a = 20_000.0;
         assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::WarnFreqEv, &fr, p)[0], &c);
     }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): hybrid tick + book rows (997..=999).
+    #[test]
+    fn hybrid_tick_book_rows_match_cpu() {
+        use crate::core::types::{OrderBook, Tick};
+        use crate::engine::streams::hybrid_tick_book_consumer::HybridTickBookConsumer;
+        use crate::indicators::book::hidden_liquidity_detector::HiddenLiquidityDetector;
+        use crate::indicators::book::sweep_impact_analyzer::SweepImpactAnalyzer;
+        use crate::indicators::book::trade_book_absorption::TradeBookAbsorption;
+        use super::super::hybrid_frame::GpuHybridFrame;
+        use super::super::kernels_hybrid::launch_cube_hybrid;
+        let n = 120usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let pairs: Vec<(Tick, OrderBook)> = (0..n)
+            .map(|i| {
+                let mid = 100.0 + 2.0 * w(i, 0.21);
+                let bids: Vec<(f64, f64)> = (0..6).map(|l| (((mid - 0.1 * (l as f64 + 1.0)) * 10.0).round() / 10.0, 1.0 + 5.0 * w(i + l, 0.9))).collect();
+                let asks: Vec<(f64, f64)> = (0..6).map(|l| (((mid + 0.1 * (l as f64 + 1.0)) * 10.0).round() / 10.0, 1.0 + 5.0 * w(i + l, 1.1))).collect();
+                let buy = (i % 3) != 0;
+                let px = if buy { asks[(i / 2) % 2].0 } else { bids[(i / 2) % 2].0 };
+                (Tick::new(1_000 + i as i64 * 100, px, 0.5 + 12.0 * w(i, 0.7), buy), OrderBook::simple(bids, asks, 1_000 + i as i64 * 100))
+            })
+            .collect();
+        let fr = GpuHybridFrame::from_pairs(&pairs, 8);
+        let mut p = CubeParams::period(10);
+        p.a = 0.15;
+        let mut m = HiddenLiquidityDetector::new(0.15, 10);
+        let rows: Vec<[f64; 3]> = pairs.iter().map(|(t, b)| { m.update_tick_with_book(t, b); [m.side(), m.last_hidden_vol(), m.cumulative_hidden_vol()] }).collect();
+        let g = launch_cube_hybrid(CubeFormula::HiddenLiqHy, &fr, p);
+        for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
+        let mut p = CubeParams::period(10);
+        p.b = 0.5;
+        let mut m = TradeBookAbsorption::with_ratio(10, 0.5);
+        let rows: Vec<[f64; 3]> = pairs.iter().map(|(t, b)| { m.update_tick_with_book(t, b); [m.side(), m.last_absorbed_vol(), m.cumulative_absorbed_vol()] }).collect();
+        let g = launch_cube_hybrid(CubeFormula::TbAbsorbHy, &fr, p);
+        for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
+        let mut m = SweepImpactAnalyzer::new(10);
+        let rows: Vec<[f64; 3]> = pairs.iter().map(|(t, b)| { m.update_tick_with_book(t, b); [m.side(), m.levels_swept(), m.slippage()] }).collect();
+        let g = launch_cube_hybrid(CubeFormula::SweepImpactHy, &fr, CubeParams::period(10));
+        for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
+    }
 }

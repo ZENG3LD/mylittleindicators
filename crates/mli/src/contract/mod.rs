@@ -730,6 +730,12 @@ pub mod kernels_bar;
 /// Cross-line combiner kernels (`LineCross`, `PriceLineCross`).
 #[cfg(feature = "gpu")]
 pub mod kernels_lines;
+
+/// Tick + book-before-trade frame for the hybrid formulas.
+pub mod hybrid_frame;
+/// Hybrid tick + book kernels (997..=999).
+#[cfg(feature = "gpu")]
+pub mod kernels_hybrid;
 #[cfg(feature = "gpu")]
 pub mod kernels_book;
 

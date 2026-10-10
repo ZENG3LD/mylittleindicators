@@ -749,6 +749,12 @@ pub enum CubeFormula {
     WarnFreqEv = 995,
     /// Event: gamma squeeze detector. UNTESTED on GPU.
     GammaSqEv = 996,
+    /// Hybrid tick + book: hidden liquidity `[side, hidden, cumulative]`. UNTESTED on GPU.
+    HiddenLiqHy = 997,
+    /// Hybrid: trade-book absorption `[side, absorbed, cumulative]`. UNTESTED on GPU.
+    TbAbsorbHy = 998,
+    /// Hybrid: sweep impact `[side, levels swept, slippage]`. UNTESTED on GPU.
+    SweepImpactHy = 999,
     /// Composite: FFT dominant period. UNTESTED on GPU.
     FftBar = 1323,
     /// Composite: wavelet entropy. UNTESTED on GPU.
@@ -1237,6 +1243,7 @@ impl CubeFormula {
             CubeFormula::VwapDevEv => 3,
             CubeFormula::BookDepthChangeBk => 2,
             CubeFormula::WallDetectorBk => 3,
+            CubeFormula::HiddenLiqHy | CubeFormula::TbAbsorbHy | CubeFormula::SweepImpactHy => 3,
             CubeFormula::BestLevelVolBk => 3,
             CubeFormula::PriceLevelDensityBk => 3,
             CubeFormula::LiquiditySweepBk => 2,
@@ -1754,6 +1761,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::BidAskBounceRate), Some(CubeFormula::BidAskBounceBk));
         assert_eq!(formula_of(IndicatorId::MidPriceVelocity), Some(CubeFormula::MidPriceVelBk));
         assert_eq!(formula_of(IndicatorId::BookDepthChange), Some(CubeFormula::BookDepthChangeBk));
+        assert_eq!(formula_of(IndicatorId::HiddenLiquidityDetector), Some(CubeFormula::HiddenLiqHy));
+        assert_eq!(formula_of(IndicatorId::TradeBookAbsorption), Some(CubeFormula::TbAbsorbHy));
+        assert_eq!(formula_of(IndicatorId::SweepImpactAnalyzer), Some(CubeFormula::SweepImpactHy));
         assert_eq!(formula_of(IndicatorId::WallDetector), Some(CubeFormula::WallDetectorBk));
         assert_eq!(formula_of(IndicatorId::BestLevelVolatility), Some(CubeFormula::BestLevelVolBk));
         assert_eq!(formula_of(IndicatorId::PriceLevelDensity), Some(CubeFormula::PriceLevelDensityBk));
