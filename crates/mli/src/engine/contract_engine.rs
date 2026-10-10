@@ -383,7 +383,7 @@ mli_contract_macros::contract_universe! {
         OrderFlowImb:  OrderBook : OrderBook +cube(comp_ofi_bk) => crate::indicators::clusters::order_flow_imbalance::OrderFlowImbalance { #profile_grid },
         ClQueueImb:    OrderBook : OrderBook +cube(book_imbalance) => crate::indicators::clusters::queue_imbalance::QueueImbalance,
         TickVolume:    Tick      : _ +cube(comp_tick_volume_ev)         => crate::indicators::clusters::tick_volume_analyzer::TickVolumeAnalyzer,
-        VwapLevels:    Fields   : _         => crate::indicators::clusters::volume_weighted_price_levels::VolumeWeightedPriceLevels { #levels_grid },
+        VwapLevels:    Fields   : _ +cube(comp_vwapl_bar) => crate::indicators::clusters::volume_weighted_price_levels::VolumeWeightedPriceLevels { #levels_grid },
         CompositeWeightDrift: CompositeIndex : _ +cube(comp_weight_drift_ky) => crate::indicators::composite_index::composite_weight_drift::CompositeWeightDrift,
         IndexComponentDrift: CompositeIndex : _ +cube(comp_weight_drift_ky) => crate::indicators::composite_index::index_component_drift::IndexComponentDrift,
         IndexCorrelationBreakdown: CompositeIndex : _ +cube(comp_index_corr_ky) => crate::indicators::composite_index::index_correlation_breakdown::IndexCorrelationBreakdown { #correlation_grid },

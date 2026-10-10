@@ -835,6 +835,8 @@ pub enum CubeFormula {
     PocBar = 1354,
     /// Composite: volume profile channels vah/poc/val. UNTESTED on GPU.
     VolprofchanBar = 1355,
+    /// Composite: volume weighted price levels cumulative vwap. UNTESTED on GPU.
+    VwapLevelsBar = 1356,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1721,6 +1723,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vprofile), Some(CubeFormula::VprofileBar));
         assert_eq!(formula_of(IndicatorId::Poc), Some(CubeFormula::PocBar));
         assert_eq!(formula_of(IndicatorId::Volprofchan), Some(CubeFormula::VolprofchanBar));
+        assert_eq!(formula_of(IndicatorId::VwapLevels), Some(CubeFormula::VwapLevelsBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

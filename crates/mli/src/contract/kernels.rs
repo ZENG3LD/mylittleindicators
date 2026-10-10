@@ -10495,6 +10495,28 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Volume weighted price levels, cumulative VWAP (1356).
+    #[test]
+    fn lane_matches_cpu_bar_batch64() {
+        use crate::indicators::clusters::volume_weighted_price_levels::VolumeWeightedPriceLevels;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = VolumeWeightedPriceLevels::new(14, 0.01);
+        chk(&run_cols(CubeFormula::VwapLevelsBar, &bars, CubeParams::period(1)), bars.iter().map(|b| { m.feed(&[b.open, b.high, b.low, b.close, b.volume]); vec![m.value()] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

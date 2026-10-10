@@ -6558,6 +6558,20 @@ fn bar_scan(
             v0 = scr[6];
             v1 = scr[5];
             v2 = scr[7];
+        } else if formula == 1356u32 {
+            // volume-weighted price levels, scalar output = the all-history cumulative VWAP (typical price weighted by
+            // volume; held while the cumulative volume is not positive). scr: 0 cum volume, 1 cum price*volume, 2 vwap.
+            if t == 0usize {
+                scr[0] = 0.0f32;
+                scr[1] = 0.0f32;
+                scr[2] = 0.0f32;
+            }
+            scr[0] = scr[0] + v[t];
+            scr[1] = scr[1] + (h[t] + l[t] + c[t]) / 3.0f32 * v[t];
+            if scr[0] > 0.0f32 {
+                scr[2] = scr[1] / scr[0];
+            }
+            v0 = scr[2];
         }
         out[t] = v0;
         out[n + t] = v1;
