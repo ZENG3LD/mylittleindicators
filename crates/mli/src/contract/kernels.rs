@@ -6369,16 +6369,43 @@ mod tests {
 
     /// Absolute `1e-3` covers f32 running sums. A large scaled series is also
     /// accepted within a relative `1e-5` of the f64 core.
+    ///
+    /// Every sample is compared. An all-zero series is not a check: the fixture
+    /// never produced the event, and a matched pair of zeros is not evidence.
+    /// A constant non-zero series is evidence. The value was produced and checked.
     #[track_caller]
     fn assert_close(gpu: &[f32], cpu: &[f64]) {
-        assert_eq!(gpu.len(), cpu.len());
-        for (g, c) in gpu.iter().zip(cpu) {
+        assert_eq!(gpu.len(), cpu.len(), "gpu {} cpu {}", gpu.len(), cpu.len());
+        assert!(!cpu.is_empty(), "no samples to compare");
+        let first = cpu[0];
+        let mut changed = false;
+        let mut nonzero = 0usize;
+        for (i, (g, c)) in gpu.iter().zip(cpu).enumerate() {
             let delta = (*g as f64 - *c).abs();
+            let rel = if c.abs() > 0.0 { delta / c.abs() } else { delta };
             assert!(
                 delta < 1.0e-3 || delta < c.abs() * 1.0e-5,
-                "{g} vs {c} (delta {delta})"
+                "bar {i}: {g} vs {c} (abs {delta}, rel {rel})"
             );
+            if (c - first).abs() > 1.0e-9 {
+                changed = true;
+            }
+            if c.abs() > 1.0e-12 {
+                nonzero += 1;
+            }
         }
+        assert!(
+            nonzero > 0,
+            "no event in {} samples: first={first}, nonzero={nonzero}, changed={changed}",
+            cpu.len()
+        );
+    }
+
+    /// The gate rejects a matched pair of zeros. That pair is not evidence.
+    #[test]
+    fn flat_series_is_not_a_check() {
+        let caught = std::panic::catch_unwind(|| assert_close(&[0.0, 0.0, 0.0], &[0.0, 0.0, 0.0]));
+        assert!(caught.is_err(), "a flat zero series must not pass");
     }
 
     fn bars(n: usize) -> Vec<ResearchBar> {

@@ -525,7 +525,7 @@ fn ts_kth(scr: &mut [f32], off: usize, n: usize, k: usize) -> f32 {
 }
 
 #[cube]
-fn bar_scan(
+fn bar_scan_w0(
     o: &[f32],
     h: &[f32],
     l: &[f32],
@@ -693,7 +693,89 @@ fn bar_scan(
             v0 = hi;
             v1 = (hi + lo) / 2.0f32;
             v2 = lo;
-        } else if formula == 1204u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w0(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w0(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w1(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1204u32 {
             // Darvas box: cumulative extremes since the first bar
             if t == 0usize {
                 dh = h[0];
@@ -793,7 +875,89 @@ fn bar_scan(
                 v0 = c[t] + p80;
                 v2 = c[t] - p20;
             }
-        } else if formula >= 1209u32 && formula <= 1211u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w1(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w1(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w2(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula >= 1209u32 && formula <= 1211u32 {
             // Ichimoku cloud: period/p2/p3 = tenkan/kijun/senkou-B windows, p4 = displacement
             let mut tp = period as usize;
             let mut kp = p2 as usize;
@@ -902,7 +1066,89 @@ fn bar_scan(
                 v0 = kk * sd;
                 v2 = -kk * sd;
             }
-        } else if formula == 1215u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w2(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w2(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w3(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1215u32 {
             // volatility stop (long stop): v = smoothed typical price, o = ATR (flag 1)
             // flag 0 = std of closes, 1 = ATR, 2 = mean range
             let mut w = period as usize;
@@ -1030,7 +1276,89 @@ fn bar_scan(
                 }
             }
             v0 = held0;
-        } else if formula == 1219u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w3(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w3(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w4(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1219u32 {
             // information gain between consecutive binned returns, window >= 20, bins >= 4
             let mut w = period as usize;
             if w < 20 {
@@ -1129,7 +1457,89 @@ fn bar_scan(
                 }
             }
             v0 = held0;
-        } else if formula == 1222u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w4(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w4(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w5(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1222u32 {
             // permutation entropy (normalised): period window, p2 order, p3 delay; ordinal
             // patterns are stored as index permutations in scr[pat * order ..]
             let pr = period as usize;
@@ -1251,7 +1661,89 @@ fn bar_scan(
                 held0 = hh.max(0.0f32);
             }
             v0 = held0;
-        } else if formula == 1224u32 || formula == 1225u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w5(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w5(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w6(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1224u32 || formula == 1225u32 {
             // Jensen-Shannon (1224) / Kullback-Leibler (1225) divergence between the older and
             // newer half of the last `w` returns; scr[0..bn) = p, scr[bn..2bn) = q
             let mut w = period as usize;
@@ -1371,7 +1863,89 @@ fn bar_scan(
                 held0 = (cc as f32) / norm;
             }
             v0 = held0;
-        } else if formula == 1227u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w6(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w6(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w7(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1227u32 {
             // Ljung-Box Q over the ring-ordered returns (period window >= 20, fast lags)
             let mut w = period as usize;
             if w < 20 {
@@ -1477,7 +2051,89 @@ fn bar_scan(
                 }
             }
             v0 = held0;
-        } else if formula == 1229u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w7(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w7(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w8(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1229u32 {
             // half life of mean reversion from an AR(1) fit of consecutive returns
             let mut w = period as usize;
             if w < 20 {
@@ -1598,7 +2254,89 @@ fn bar_scan(
                 hset = 1u32;
             }
             v0 = held0;
-        } else if formula == 1232u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w8(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w8(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w9(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1232u32 {
             // Higuchi fractal dimension (period window, p2 max k)
             let mut pr = period as usize;
             if pr > 512 {
@@ -1666,7 +2404,89 @@ fn bar_scan(
                 }
             }
             v0 = held0;
-        } else if formula == 1233u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w9(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w9(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w10(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1233u32 {
             // detrended fluctuation analysis alpha over four scales (period, p2, p3, p4)
             let n0 = period as usize;
             let n1 = p2 as usize;
@@ -1759,7 +2579,89 @@ fn bar_scan(
                 held0 = cnt / (w as f32);
             }
             v0 = held0;
-        } else if formula == 1236u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w10(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w10(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w11(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1236u32 {
             // KPSS level-stationarity proxy with a Newey-West long-run variance
             let mut n = period as usize;
             if n < 50 {
@@ -1872,7 +2774,89 @@ fn bar_scan(
                 }
             }
             v0 = held0;
-        } else if formula == 1238u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w11(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w11(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w12(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1238u32 {
             // ADF proxy t-statistic (constant, Schwert lag rule) over the last `period` closes
             let mut n = period as usize;
             if n < 20 {
@@ -1971,7 +2955,89 @@ fn bar_scan(
                 }
             }
             v0 = held0;
-        } else if formula == 1240u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w12(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w12(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w13(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1240u32 {
             // Zivot-Andrews proxy: minimum break-dummy ADF t-statistic (one lag)
             let mut n = period as usize;
             if n < 30 {
@@ -2085,7 +3151,89 @@ fn bar_scan(
                 }
             }
             v0 = held0;
-        } else if formula >= 1242u32 && formula <= 1244u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w13(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w13(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w14(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula >= 1242u32 && formula <= 1244u32 {
             // AR(1) fit of (close - SMA) over the last `w` residuals; `v` carries the SMA series
             let mut w = period as usize;
             if formula == 1242u32 {
@@ -2166,7 +3314,89 @@ fn bar_scan(
                 held0 = (v[t] - mean) / sdv;
             }
             v0 = held0;
-        } else if formula == 1247u32 || formula == 1248u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w14(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w14(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w15(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1247u32 || formula == 1248u32 {
             // ARCH-LM R^2 (1247) / chi-square p-value (1248) of squared returns on their lags
             let mut n = period as usize;
             if n < 50 {
@@ -2288,7 +3518,89 @@ fn bar_scan(
             if t > 0usize {
                 v0 = (c[t] - c[t - 1]).abs();
             }
-        } else if formula == 1391u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w15(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w15(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w16(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1391u32 {
             // stage: raw stochastic of the RSI series (`v`), RSI ready from bar `period`,
             // stochastic window `p2`
             let pr = period as usize;
@@ -2419,7 +3731,89 @@ fn bar_scan(
                     v0 = th;
                 }
             }
-        } else if formula == 1261u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w16(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w16(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w17(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1261u32 {
             // TDI basis: mean of the RSI series (`v`) over min(t + 1, period p2) bars
             let mut bp = p2 as usize;
             if bp < 1 {
@@ -2488,7 +3882,89 @@ fn bar_scan(
             if t >= 2usize {
                 v0 = (v[t] + a * o[t] * 10.0f32).max(0.0f32).min(100.0f32);
             }
-        } else if formula == 1265u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w17(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w17(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w18(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1265u32 {
             // Kaufman adaptive MA with its ten read-outs; period = ER window (2..=200), fast
             // 1..=50, slow fast+1..=200
             let mut erp = period as usize;
@@ -2618,7 +4094,89 @@ fn bar_scan(
             } else {
                 v0 = v[t];
             }
-        } else if formula == 1267u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w18(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w18(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w19(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1267u32 {
             // relative volume `[rvol, percentile]` over min(t + 1, period) bars of the volume lane
             let mut w = period as usize;
             if w < 1 {
@@ -2658,7 +4216,89 @@ fn bar_scan(
             } else {
                 v0 = c[t];
             }
-        } else if formula == 1269u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w19(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w19(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w20(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1269u32 {
             // FRAMA: flag 0 standard, 1 improved, 2 dynamic, 3 robust fractal dimension
             let pr = period as usize;
             if t + 1 < pr {
@@ -2784,7 +4424,89 @@ fn bar_scan(
                 }
                 v0 = held0;
             }
-        } else if formula == 1270u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w20(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w20(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w21(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1270u32 {
             // ROC percentile `[roc, percentile]`: period = ROC lag, p2 = window
             let pr = period as usize;
             let mut w = p2 as usize;
@@ -2909,7 +4631,89 @@ fn bar_scan(
             held1 = held0;
             held0 = ss;
             v0 = ss;
-        } else if formula == 1274u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w21(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w21(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w22(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1274u32 {
             // Ehlers fractal adaptive MA (fama): period capped by the 512-sample history
             let pr = period as usize;
             let mut minp = pr / 4;
@@ -3020,7 +4824,89 @@ fn bar_scan(
                 v1 = ph;
                 v2 = fq;
             }
-        } else if formula == 1276u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w22(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w22(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w23(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1276u32 {
             // Hilbert dominant cycle period (smoothed); a = min period, b = max period
             let pi = 3.1415927f32;
             if t >= 7usize {
@@ -3145,7 +5031,89 @@ fn bar_scan(
                 lagged = scr[(t - lag) % 16usize];
             }
             v0 = held0 + (held0 - lagged);
-        } else if formula == 1279u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w23(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w23(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w24(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1279u32 {
             // Ultimate oscillator over rescanned buying-pressure / true-range windows (period, p2, p3)
             let p3u = p3 as usize;
             if t >= p3u && t >= 1usize {
@@ -3242,7 +5210,89 @@ fn bar_scan(
                     v0 = 0.5f32;
                 }
             }
-        } else if formula == 1284u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w24(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w24(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w25(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1284u32 {
             // price/volume coherence proxy: |corr| of log price / log volume changes over the window;
             // lanes: c = close, v = volume
             let mut w = period as usize;
@@ -3375,7 +5425,89 @@ fn bar_scan(
                     v0 = 0.0f32 - 1.0f32;
                 }
             }
-        } else if formula == 1288u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w25(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w25(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w26(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1288u32 {
             // Elder impulse: trend smoother series in lane v; MACD 12/26/9 EMAs inline
             let mut prev = 0.0f32;
             if t > 0usize {
@@ -3443,7 +5575,89 @@ fn bar_scan(
                 ratio = v[t] / o[t];
             }
             v0 = (raw * ratio.sqrt()).max(0.0f32).min(100.0f32);
-        } else if formula == 1291u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w26(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w26(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w27(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1291u32 {
             // volume-weighted RSI (lanes c = close, v = volume); period = rsi period, p2 = volume period
             let rp = period as usize;
             let vp = p2 as usize;
@@ -3571,7 +5785,89 @@ fn bar_scan(
             }
             v0 = val;
             v1 = sr;
-        } else if formula == 1294u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w27(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w27(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w28(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1294u32 {
             // squeeze momentum `[momentum, squeeze]`: lane o = BB middle, h = KC middle, l = ATR
             // (ATR fed from bar 1); period = bb period, p2 = kc period, p3 = momentum period
             let bbp = period as usize;
@@ -3620,7 +5916,89 @@ fn bar_scan(
             }
             v0 = held0;
             v1 = sq;
-        } else if formula >= 1295u32 && formula <= 1299u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w28(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w28(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w29(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula >= 1295u32 && formula <= 1299u32 {
             // pivot levels family: every `period` bars (aligned to bar 0) the H/L/C (open for Woodie / Demark)
             // of the finished period give new levels; between completions the last levels are held.
             // The CPU `levels_grid` matrix (one price rung per row) is emitted as one column per rung.
@@ -3738,7 +6116,89 @@ fn bar_scan(
             if t + 1 >= 3usize {
                 v2 = l[t - 2];
             }
-        } else if formula == 1301u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w29(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w29(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w30(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1301u32 {
             // classic daily pivot channels with adaptive width: levels from the first bar, then
             // recomputed every `period` bars (default 1440); lanes o,h,l,c; outputs [upper, pivot, lower]
             let mut pp = period as usize;
@@ -3828,7 +6288,89 @@ fn bar_scan(
             v0 = res;
             v1 = scr[3];
             v2 = sup;
-        } else if formula == 1302u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w30(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w30(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w31(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1302u32 {
             // Theil-Sen channels `[upper, middle, lower]`: window = period (5..=10000), k = a (<= 0 means 2).
             // Median slope by bisection over pairwise slopes, intercept / deviation medians by rank selection
             // (scr[0..w] intercepts, scr[w..2w] deviations); ring positions like the CPU buffer.
@@ -3962,7 +6504,89 @@ fn bar_scan(
                 }
                 v0 = held2;
             }
-        } else if formula == 1307u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w31(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w31(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w32(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1307u32 {
             // Fisher transform `[fisher, trigger]`: period = window, p2 = smoothing period; held0 = smoothed
             // normalised price, held1 = fisher, held2 = ema seeded flag
             let pr = period as usize;
@@ -4086,7 +6710,89 @@ fn bar_scan(
                 held2 = 0.0f32;
                 cnt_a = 0usize;
             }
-        } else if formula == 1311u32 || formula == 1312u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w32(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w32(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w33(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1311u32 || formula == 1312u32 {
             // variance-ratio aggregate: mean of the three VR series in lanes o / h / l;
             // 1312 additionally z-scores that mean over max(ext[4], 20) bars (0 until the window is full)
             let mean = (o[t] + h[t] + l[t]) / 3.0f32;
@@ -4197,7 +6903,89 @@ fn bar_scan(
                 }
             }
             v0 = held2;
-        } else if formula == 1316u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w33(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w33(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w34(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1316u32 {
             // statistical wick detector `[upper_spike, lower_spike]`: percentile rank (>= 0.95) of the current
             // wick fractions within the last max(period, 1) bars
             let mut w = period as usize;
@@ -4296,7 +7084,89 @@ fn bar_scan(
             }
             v0 = held2;
             v1 = f1;
-        } else if formula == 1318u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w34(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w34(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w35(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1318u32 {
             // Connors RSI: (RSI + streak RSI + ROC percentile rank) / 3. Lane o = RSI fed from bar 1 (host
             // pass), p2 = streak RSI period, p3 = ROC window. scr ring (p2 + 1) of streak lengths;
             // held0 = streak length, held1 = last direction, held2 = avg gain, f0 = avg loss, f1 = streak RSI
@@ -4434,7 +7304,89 @@ fn bar_scan(
                     v0 = ((c[t] - ll) / (hh - ll)) * 100.0f32;
                 }
             }
-        } else if formula == 1320u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w35(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w35(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w36(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1320u32 {
             // pivot anchored VWAP: cumulative close * volume restarts whenever the high is at least the previous
             // lookback - 1 highs (or the low at most their lows); lookback = max(period, 3), only once the ring is full
             let mut lb = period as usize;
@@ -4534,7 +7486,89 @@ fn bar_scan(
                 }
             }
             v0 = s / (len as f32);
-        } else if formula == 1323u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w36(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w36(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w37(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1323u32 {
             // FFT dominant period: window N = next power of two of `period` (max 256), Hamming window over the
             // last N closes, DFT of the first N / 2 bins; dominant bin = first strict maximum of the magnitude
             // over bins 1..N/2 (the CPU spectral smoothing never fires: it indexes the vector being built);
@@ -4574,7 +7608,89 @@ fn bar_scan(
                 }
             }
             v0 = held0;
-        } else if formula == 1324u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w37(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w37(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w38(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1324u32 {
             // wavelet entropy over the last min(t + 1, 512) closes (0 until 32 samples). `period` = max scales
             // (<= 32, >= 2), `flag` = wavelet (0 Haar, 1 Db4, 2 Db6, 3 Morlet, 4 Mexican, 5 Biorthogonal).
             // Morlet / Mexican: CWT energies over scales 64^(i / (ms - 1)); others: DWT detail energies for
@@ -4713,7 +7829,89 @@ fn bar_scan(
                 held0 = ent;
             }
             v0 = held0;
-        } else if formula == 1325u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w38(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w38(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w39(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1325u32 {
             // mutual information of the close return and its lag-return over the last (window - lag) pairs.
             // period = window (>= 2), p2 = lag (1..window-1), p3 = bins (2..32), a = clip. Equivalent to the CPU
             // incremental joint table: pairs of bars max(first full ring bar, t - (window - lag) + 1) ..= t.
@@ -4794,7 +7992,89 @@ fn bar_scan(
                 held0 = mi.max(0.0f32);
             }
             v0 = held0;
-        } else if formula == 1326u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w39(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w39(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w40(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1326u32 {
             // transfer entropy (volume return -> price return), lanes close / volume. period = window (>= 3),
             // p2 = lag (1..window-2), p3 = bins (2..16), a = clip. Joint triples (y, y1, x1) of bars
             // max(first full ring bar, t - (window - lag - 1) + 1) ..= t. scratch: joint [0, 4096),
@@ -4891,7 +8171,89 @@ fn bar_scan(
                 held0 = te.max(0.0f32);
             }
             v0 = held0;
-        } else if formula == 1327u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w40(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w40(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w41(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1327u32 {
             // fuzzy candlesticks `[direction, size, body_size, upper_wick, lower_wick]` as the CPU i8 codes.
             // period = window, thresholds t1 = a, t2 = b, t3 = c, t4 = p4 / 1000. Population std over the last
             // `period` values of range, (open - low) / range (the CPU "body percent"), upper and lower wick shares;
@@ -5007,7 +8369,89 @@ fn bar_scan(
                     }
                 }
             }
-        } else if formula == 1328u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w41(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w41(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w42(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1328u32 {
             // oscillator with volume weight `[line, signal, strength]`: lane o = inner oscillator (host-resolved
             // RSI / CMO / PSL / Bias), period = baseline window (>= 2), a = spike threshold (>= 1.01).
             // Signal is 0 until the volume window is full and one more bar has been seen
@@ -5140,7 +8584,89 @@ fn bar_scan(
                 }
                 v1 = le / (len as f32);
             }
-        } else if formula == 1332u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w42(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w42(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w43(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1332u32 {
             // Kalman regime composite: lanes o = Kscr, h = ATR percentile, l = close-vol percentile (host-resolved);
             // weights a / b / c = w_regime / w_atr / w_vov
             let den = (a + b + _cc).max(1.0e-9f32);
@@ -5196,7 +8722,89 @@ fn bar_scan(
             } else {
                 held0 = 0.5f32;
             }
-        } else if formula == 1335u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w43(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w43(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w44(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1335u32 {
             // candlestick pattern signal (+1 / -1 / 0). `flag` = pattern index in the CPU enum order (0 Doji ..
             // 33 DownsideGapThreeMethods); signal 0 until the pattern's bar count has been seen. Bars are loaded
             // oldest first into (o, h, l, c)0..4 (unused slots repeat the current bar).
@@ -5396,7 +9004,89 @@ fn bar_scan(
                 }
                 v0 = r;
             }
-        } else if formula == 1336u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w44(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w44(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w45(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1336u32 {
             // divergence (lanes: o = host-resolved inner oscillator, h = host-resolved ATR, c = close):
             // period = swing lookback (>= 2), p2 = compare_swings (2..4), flag bits 1 regular / 2 hidden /
             // 4 strength / 8 use ATR. Swings (abs idx, price, osc) x4 per side live in scr[0..26].
@@ -5562,7 +9252,89 @@ fn bar_scan(
             v0 = o[t];
             v1 = sig;
             v2 = stg;
-        } else if formula == 1341u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w45(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w45(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w46(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1341u32 {
             // extended Kalman filter (factory: Linear observation, no adaptive noise). a = dt, b = process noise std,
             // _cc = measurement noise std, friction in scr[0] (extra). State s0, s1, P00, P01, P10, P11, init flag in
             // scr[1..8]. Output = filtered value (kept while the innovation variance is <= 1e-12)
@@ -5629,7 +9401,89 @@ fn bar_scan(
                 }
             }
             v0 = scr[8];
-        } else if formula == 1342u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w46(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w46(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w47(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1342u32 {
             // unscented Kalman filter (factory UT params alpha 0.001, beta 2, kappa 0 -> n + lambda = 2e-6). The
             // sigma-point weights are +-1e6, which f32 cannot carry, so the (linear) state / observation functions are
             // evaluated in the algebraically identical centred form: predicted mean = F x, spread terms
@@ -5738,7 +9592,89 @@ fn bar_scan(
                     v0 = (1.0f32 - cv.min(1.0f32)).max(0.0f32);
                 }
             }
-        } else if formula == 1345u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w47(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w47(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w48(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1345u32 {
             // market regime classifier. lanes: o = close, h = fast MA, l = slow MA, c = ATR, v = smoothed ATR, stability
             // (already smoothed) in scr[0..n]; a / b / _cc = trend / volatility / quiet thresholds. out: -2 down,
             // -1 quiet, 0 sideways, 1 choppy, 2 up, 3 high vol, 99 transition
@@ -5847,7 +9783,89 @@ fn bar_scan(
                     v0 = real * 0.4f32 + scr[0].sqrt() * 0.4f32 + h[t] * 0.2f32;
                 }
             }
-        } else if formula == 1350u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w48(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w48(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w49(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1350u32 {
             // dynamic volatility regime, stage 2: adaptive thresholds + regime class 1..6. lanes o = ATR, h = smoothed
             // composite volatility; a = threshold adaptation speed. State: scr[0] / scr[1] = low / high threshold.
             if t == 0usize {
@@ -5910,7 +9928,89 @@ fn bar_scan(
                     v0 = 6.0f32;
                 }
             }
-        } else if formula == 1351u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w49(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w49(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w50(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1351u32 {
             // swing detection (value = last non-zero swing signal). lanes o = ATR (host, mode 1 only), h, l, c.
             // flag: 0 percent (a = %), 1 ATR multiple (a = mult), 2 n-bar extreme, 3 lookahead, 4 time; period = n.
             // scr: 0 last forced bar, 1 last extreme, 2 pivot high, 3 pivot low, 4 trend (0 none / 1 up / 2 down), 5 last swing
@@ -6025,7 +10125,89 @@ fn bar_scan(
                 scr[5] = sig;
             }
             v0 = scr[5];
-        } else if formula == 1352u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w50(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w50(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w51(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1352u32 {
             // rolling volume profile (poc, vah, val): period = window (>= 2), a = bucket size, b = value-area fraction.
             // Distinct bucket keys of the window live sorted ascending in scr[0..w), their volumes in scr[w..2w),
             // last published (poc, vah, val) in scr[2w..2w+3]. POC tie rule: lowest price bucket.
@@ -6112,7 +10294,89 @@ fn bar_scan(
             v0 = scr[2usize * w];
             v1 = scr[2usize * w + 1usize];
             v2 = scr[2usize * w + 2usize];
-        } else if formula == 1353u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w51(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w51(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w52(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1353u32 {
             // session volume profile (VolumeProfile): scr[0..n) = seconds since the first bar (extra), then at base = n:
             // base+0 session start, base+1 level count, base+2 published POC price, base+3 published POC volume,
             // base+4 started flag, levels: keys at base+8.., volumes at base+8+cap (cap = period, new levels beyond
@@ -6165,7 +10429,89 @@ fn bar_scan(
             }
             v0 = scr[base + 2usize];
             v1 = scr[base + 3usize];
-        } else if formula == 1354u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w52(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w52(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w53(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1354u32 {
             // POC detector (poc, volume imbalance). Host columns in scr[0..7n): seconds since first bar, day id,
             // session id, open / high / low / close tick (exact f64 rounding). period = rolling bars P, a = min volume
             // threshold, b = 10^precision, _cc = level tolerance in ticks, flag = capacity of the daily / session maps
@@ -6426,7 +10772,89 @@ fn bar_scan(
             }
             v0 = scr[bs + 8usize];
             v1 = scr[bs + 7usize];
-        } else if formula == 1355u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w53(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w53(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w54(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1355u32 {
             // volume profile channels (VAH, POC, VAL) in the factory configuration: adaptive bins, daily recompute
             // (first bar, then every 1440 bars) over the last 1000 bars. period = bin count, a = value area percent.
             // scr: 0 min price, 1 max price, 2 bars since recalc, 3 adaptive multiplier, 4 EMA range, 5 POC, 6 VAH,
@@ -6558,7 +10986,89 @@ fn bar_scan(
             v0 = scr[6];
             v1 = scr[5];
             v2 = scr[7];
-        } else if formula == 1356u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w54(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w54(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w55(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1356u32 {
             // volume-weighted price levels, scalar output = the all-history cumulative VWAP (typical price weighted by
             // volume; held while the cumulative volume is not positive). scr: 0 cum volume, 1 cum price*volume, 2 vwap.
             if t == 0usize {
@@ -6572,7 +11082,89 @@ fn bar_scan(
                 scr[2] = scr[1] / scr[0];
             }
             v0 = scr[2];
-        } else if formula == 1357u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w55(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w55(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w56(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1357u32 {
             // adaptive channels (upper, centre, lower, width, adaptation level). Lanes: o = host centre (adaptive
             // LinReg only), h / l / c = high / low / close, v = host ATR. period = channel period, b = ATR period (host sets it from `fast`),
             // flag = adaptation mode (bits 0..3: 0 volatility, 1 trend, 2 cycle, 3 combined, 4 ML) | centre type << 4
@@ -6749,7 +11341,89 @@ fn bar_scan(
             v2 = scr[3];
             v3 = scr[4];
             v4 = scr[5];
-        } else if formula == 1358u32 {
+        }
+        out[t] = v0;
+        out[n + t] = v1;
+        out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_w56(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    cc: f32,
+    flag: u32,
+) {
+    bar_scan_w56(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+}
+
+#[cube]
+fn bar_scan_w57(
+    o: &[f32],
+    h: &[f32],
+    l: &[f32],
+    c: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    scr: &mut [f32],
+    formula: u32,
+    period: u32,
+    p2: u32,
+    p3: u32,
+    p4: u32,
+    a: f32,
+    b: f32,
+    _cc: f32,
+    flag: u32,
+) {
+    let n = c.len();
+    let mut k = 0.0f32;
+    let mut d = 0.0f32;
+    let mut dh = 0.0f32;
+    let mut dl = 0.0f32;
+    let mut cnt_a = 0usize;
+    let mut hset = 0u32;
+    let mut f0 = 0.0f32;
+    let mut f1 = 0.0f32;
+    let mut f2 = 0.0f32;
+    let mut f3 = 0.0f32;
+    let mut rstate = a;
+    let mut vw = 0.0f32;
+    let mut held0 = 0.0f32;
+    let mut held1 = 0.0f32;
+    let mut held2 = 0.0f32;
+    for t in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
+        if formula == 1358u32 {
             // adaptive Bollinger bands (upper, middle, lower, bandwidth, %B, squeeze ratio). Lanes: o = source price,
             // h = close, v = host ATR(14). period = base period, a / b / _cc = base / min / max multiplier,
             // flag = min period | max period << 12 | MA kind << 24 (CubeSmoother code: 0 SMA, 1 EMA, 2 WMA, 3 RMA).
@@ -6897,7 +11571,7 @@ fn bar_scan(
 }
 
 #[cube(launch_unchecked)]
-fn bar_map(
+fn bar_map_w57(
     o: &[f32],
     h: &[f32],
     l: &[f32],
@@ -6915,11 +11589,9 @@ fn bar_map(
     cc: f32,
     flag: u32,
 ) {
-    bar_scan(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
+    bar_scan_w57(o, h, l, c, v, out, scr, formula, period, p2, p3, p4, a, b, cc, flag);
 }
 
-/// Launch the bar scan for a raw code (also used by the internal stage codes 1390..=1399) over the
-/// five lanes; returns the flat `10 * n` output (column `k` at `k * n`).
 pub(crate) fn bar_run(code: u32, ins: [&Vec<f32>; 5], params: CubeParams, flag: u32) -> Vec<f32> {
     bar_run_x(code, ins, &[], params, flag)
 }
@@ -6975,7 +11647,8 @@ pub(crate) fn bar_run_x(code: u32, ins: [&Vec<f32>; 5], extra: &[f32], params: C
     scr_init[..extra.len()].copy_from_slice(extra);
     let scr_buf = client.create_from_slice(f32::as_bytes(&scr_init));
     unsafe {
-        bar_map::launch_unchecked(
+match code {
+        1200 | 1201 | 1202 | 1203 => bar_map_w0::launch_unchecked(
             &client,
             CubeCount::new_1d(1),
             CubeDim::new_1d(1),
@@ -6995,7 +11668,1206 @@ pub(crate) fn bar_run_x(code: u32, ins: [&Vec<f32>; 5], extra: &[f32], params: C
             params.b,
             params.c,
             flag,
-        );
+        ),
+        1204 | 1205 | 1206 | 1207 | 1208 => bar_map_w1::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1209 | 1210 | 1211 | 1212 | 1213 | 1214 => bar_map_w2::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1215 | 1216 | 1217 | 1218 => bar_map_w3::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1219 | 1220 | 1221 => bar_map_w4::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1222 | 1223 => bar_map_w5::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1224 | 1225 | 1226 => bar_map_w6::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1227 | 1228 => bar_map_w7::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1229 | 1230 | 1231 => bar_map_w8::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1232 => bar_map_w9::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1233 | 1234 | 1235 => bar_map_w10::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1236 | 1237 => bar_map_w11::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1238 | 1239 => bar_map_w12::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1240 | 1241 => bar_map_w13::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1242 | 1243 | 1244 | 1245 | 1246 => bar_map_w14::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1247 | 1248 | 1249 | 1250 | 1251 | 1390 => bar_map_w15::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1258 | 1259 | 1260 | 1391 | 1392 | 1393 | 1394 | 1395 => bar_map_w16::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1261 | 1263 | 1396 | 1397 | 1398 | 1399 => bar_map_w17::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1265 | 1389 => bar_map_w18::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1267 | 1268 => bar_map_w19::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1269 => bar_map_w20::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1270 | 1272 | 1273 | 1386 | 1387 => bar_map_w21::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1274 | 1275 => bar_map_w22::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1276 | 1277 | 1278 => bar_map_w23::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1279 | 1280 | 1281 | 1282 | 1283 => bar_map_w24::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1284 | 1285 | 1286 | 1287 => bar_map_w25::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1288 | 1290 => bar_map_w26::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1291 | 1292 | 1293 => bar_map_w27::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1294 => bar_map_w28::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1295 | 1296 | 1297 | 1298 | 1299 | 1300 => bar_map_w29::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1301 => bar_map_w30::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1302 | 1303 | 1304 | 1305 | 1306 => bar_map_w31::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1307 | 1308 | 1309 | 1310 => bar_map_w32::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1311 | 1312 | 1313 | 1314 | 1315 => bar_map_w33::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1316 | 1317 => bar_map_w34::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1318 | 1319 => bar_map_w35::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1320 | 1321 | 1322 => bar_map_w36::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1323 => bar_map_w37::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1324 => bar_map_w38::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1325 => bar_map_w39::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1326 => bar_map_w40::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1327 => bar_map_w41::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1328 | 1329 | 1330 | 1331 => bar_map_w42::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1332 | 1333 | 1334 => bar_map_w43::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1335 => bar_map_w44::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1336 => bar_map_w45::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1341 => bar_map_w46::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1342 | 1344 | 1346 => bar_map_w47::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1345 | 1347 | 1348 | 1349 => bar_map_w48::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1350 => bar_map_w49::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1351 => bar_map_w50::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1352 => bar_map_w51::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1353 => bar_map_w52::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1354 => bar_map_w53::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1355 => bar_map_w54::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1356 => bar_map_w55::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1357 => bar_map_w56::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        1358 => bar_map_w57::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(ins[0]), n),
+            BufferArg::from_raw_parts(up(ins[1]), n),
+            BufferArg::from_raw_parts(up(ins[2]), n),
+            BufferArg::from_raw_parts(up(ins[3]), n),
+            BufferArg::from_raw_parts(up(ins[4]), n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
+            BufferArg::from_raw_parts(scr_buf, scr_len),
+            code,
+            params.period,
+            params.fast,
+            params.slow,
+            params.signal,
+            params.a,
+            params.b,
+            params.c,
+            flag,
+        ),
+        other => panic!("bar formula {other} has no scan entry"),
+    };
     }
     let bytes = client.read_one_unchecked(out);
     f32::from_bytes(&bytes).to_vec()
