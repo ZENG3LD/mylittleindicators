@@ -359,6 +359,26 @@ pub enum CubeFormula {
     PctChannels = 601,
     /// RSI percentile bands `[upper, middle, lower]`: RSI(`period`), window `slow` (10..=1024), 80th / 20th order statistics once full. UNTESTED on GPU.
     RsiPctBands = 602,
+    /// Hour of day 0..=23. Calendar adapter (`launch_cube_timed`). UNTESTED on GPU.
+    HourOfDay = 700,
+    /// Week in month `((dom - 1) / 7) + 1`. UNTESTED on GPU.
+    WeekInMonth = 701,
+    /// Weekday occurrence within the month (host-computed). UNTESTED on GPU.
+    WeekdayOccurrence = 702,
+    /// Month turn: `1 - near / w` with `w = clamp(period, 1, 10)`. UNTESTED on GPU.
+    MonthTurn = 703,
+    /// Quarter turn: `1 - near / w` with `w = clamp(period, 1, 15)`. UNTESTED on GPU.
+    QuarterTurn = 704,
+    /// Weekend proximity with `w = clamp(period, 1, 5)`. UNTESTED on GPU.
+    WeekendProx = 705,
+    /// Start / end of month flags, `w = clamp(period, 1, 5)`. UNTESTED on GPU.
+    StartEndMonth = 706,
+    /// Start / end of quarter flags, `w = clamp(period, 1, 7)`. UNTESTED on GPU.
+    StartEndQuarter = 707,
+    /// Start / end of week flags, `w = clamp(period, 1, 3)`. UNTESTED on GPU.
+    StartEndWeek = 708,
+    /// Hour sin / cos encoding. UNTESTED on GPU.
+    TimeEnc = 709,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -500,7 +520,7 @@ impl CubeFormula {
     /// `true` for the calendar formulas (code 140..=149). They need the time
     /// adapter and run through `launch_cube_timed`.
     pub const fn needs_time(self) -> bool {
-        self.code() >= 140 && self.code() < 150
+        (self.code() >= 140 && self.code() < 150) || (self.code() >= 700 && self.code() < 710)
     }
 
     pub const fn output_count(self) -> u32 {
@@ -512,6 +532,10 @@ impl CubeFormula {
             CubeFormula::HeikinAshiCols => 4,
             CubeFormula::CandleAnatomyCols => 5,
             CubeFormula::Vortex => 2,
+            CubeFormula::StartEndMonth
+            | CubeFormula::StartEndQuarter
+            | CubeFormula::StartEndWeek
+            | CubeFormula::TimeEnc => 2,
             CubeFormula::RollQuart | CubeFormula::PctChannels | CubeFormula::RsiPctBands => 3,
             CubeFormula::Dm => 3,
             CubeFormula::DiPlusMinus => 2,
@@ -763,6 +787,16 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::HourDay), Some(CubeFormula::HourOfDay));
+        assert_eq!(formula_of(IndicatorId::WeekMonth), Some(CubeFormula::WeekInMonth));
+        assert_eq!(formula_of(IndicatorId::DayWeekMonth), Some(CubeFormula::WeekdayOccurrence));
+        assert_eq!(formula_of(IndicatorId::MonthTurn), Some(CubeFormula::MonthTurn));
+        assert_eq!(formula_of(IndicatorId::QtrTurn), Some(CubeFormula::QuarterTurn));
+        assert_eq!(formula_of(IndicatorId::HolidayProx), Some(CubeFormula::WeekendProx));
+        assert_eq!(formula_of(IndicatorId::SomEom), Some(CubeFormula::StartEndMonth));
+        assert_eq!(formula_of(IndicatorId::SoqEoq), Some(CubeFormula::StartEndQuarter));
+        assert_eq!(formula_of(IndicatorId::SowEow), Some(CubeFormula::StartEndWeek));
+        assert_eq!(formula_of(IndicatorId::Tenc), Some(CubeFormula::TimeEnc));
         assert_eq!(formula_of(IndicatorId::RsiPctRank), Some(CubeFormula::RsiPctRank));
         assert_eq!(formula_of(IndicatorId::Rquart), Some(CubeFormula::RollQuart));
         assert_eq!(formula_of(IndicatorId::Percentilech), Some(CubeFormula::PctChannels));

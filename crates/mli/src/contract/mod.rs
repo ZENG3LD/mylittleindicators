@@ -699,6 +699,10 @@ pub mod kernels;
 #[cfg(feature = "gpu")]
 pub mod kernels_post;
 
+/// Calendar formulas, codes 700..=709. UNTESTED on GPU.
+#[cfg(feature = "gpu")]
+pub mod kernels_cal;
+
 pub mod axis;
 pub use axis::{sweep_f64, CubeIter, Param, ParamScalar};
 

@@ -593,6 +593,13 @@ pub struct GpuTimes {
     pub month: Vec<f32>,
     /// Day of month, `1..=31`.
     pub dom: Vec<f32>,
+    /// Days in the bar's month, `28..=31`.
+    pub dim: Vec<f32>,
+    /// Occurrence of the weekday within the month (`1..=5`), as `DayOfWeekInMonthEffect` gives it.
+    pub occ: Vec<f32>,
+    /// Days to the nearest quarter boundary when that is `<= 15`, else `99`
+    /// (read from `QuarterTurnEffect` with a 15 day window, so it agrees with the CPU feed).
+    pub qnear: Vec<f32>,
 }
 
 impl GpuTimes {
@@ -607,6 +614,14 @@ impl GpuTimes {
             out.hour.push((secs.rem_euclid(86_400) / 3600) as f32);
             out.month.push(m.clamp(1, 12) as f32);
             out.dom.push(d.clamp(1, 31) as f32);
+            out.dim.push(CalendarService::days_in_month(_y, m) as f32);
+            out.occ.push(
+                crate::indicators::calendar::day_of_week_in_month::DayOfWeekInMonthEffect::new()
+                    .feed(ms) as f32,
+            );
+            let qv = crate::indicators::calendar::quarter_turn_effect::QuarterTurnEffect::new(15)
+                .feed(ms);
+            out.qnear.push(if qv > 0.0 { ((1.0 - qv) * 15.0).round() as f32 } else { 99.0 });
         }
         out
     }

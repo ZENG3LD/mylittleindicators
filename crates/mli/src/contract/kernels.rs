@@ -4558,6 +4558,10 @@ pub fn launch_cube_columns(
     if formula.code() >= 600 && formula.code() < 700 {
         return super::kernels_post::launch_cube_post_columns(formula, samples, params);
     }
+    assert!(
+        !formula.needs_time(),
+        "calendar formulas need the time adapter: use kernels_cal::launch_cube_calendar"
+    );
     let n = samples.len();
     let cols = formula.output_count() as usize;
     let c = GpuSample::columns(samples);
@@ -4693,6 +4697,9 @@ pub fn launch_cube_timed(
     }
     assert!(formula.needs_time(), "launch_cube_timed needs a calendar formula (code 140..=149)");
     assert_eq!(times.len(), samples.len(), "one GpuTimes row per sample");
+    if formula.code() >= 700 {
+        return super::kernels_cal::launch_cube_calendar(formula, times, _params).swap_remove(0);
+    }
     let n = samples.len();
     let c = GpuSample::columns(samples);
     let client =
@@ -6705,6 +6712,75 @@ mod tests {
             lo.push(l);
         }
         assert_cols(&run_cols(CubeFormula::RsiPctBands, &bars, p), &[&up, &mid, &lo]);
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
+    #[test]
+    fn lane_matches_cpu_calendar_batch() {
+        use super::super::kernels_cal::launch_cube_calendar;
+        use crate::indicators::calendar::day_of_week_in_month::DayOfWeekInMonthEffect;
+        use crate::indicators::calendar::holiday_weekend_proximity::HolidayWeekendProximityEffect;
+        use crate::indicators::calendar::hour_of_day_effect::HourOfDayEffect;
+        use crate::indicators::calendar::month_turn_effect::MonthTurnEffect;
+        use crate::indicators::calendar::quarter_turn_effect::QuarterTurnEffect;
+        use crate::indicators::calendar::start_end_of_month_flags::StartEndOfMonthFlags;
+        use crate::indicators::calendar::start_end_of_quarter_flags::StartEndOfQuarterFlags;
+        use crate::indicators::calendar::start_end_of_week_flags::StartEndOfWeekFlags;
+        use crate::indicators::calendar::week_in_month_effect::WeekInMonthEffect;
+
+        // 400 bars, 29 hours apart: spans several months, quarters and month ends.
+        let ms: Vec<i64> = (0..400).map(|i| 1_704_067_200_000 + i as i64 * 29 * 3_600_000).collect();
+        let t = GpuTimes::from_ms(&ms);
+        let col = |f: CubeFormula, w: u32| launch_cube_calendar(f, &t, CubeParams::period(w));
+        let one = |f: &mut dyn FnMut(i64) -> f64| -> Vec<f64> { ms.iter().map(|m| f(*m)).collect() };
+
+        let mut e = HourOfDayEffect::new();
+        assert_close(&col(CubeFormula::HourOfDay, 1)[0], &one(&mut |m| e.feed(m)));
+        let mut e = WeekInMonthEffect::new();
+        assert_close(&col(CubeFormula::WeekInMonth, 1)[0], &one(&mut |m| e.feed(m)));
+        let mut e = DayOfWeekInMonthEffect::new();
+        assert_close(&col(CubeFormula::WeekdayOccurrence, 1)[0], &one(&mut |m| e.feed(m)));
+        for w in [2u32, 5] {
+            let mut e = MonthTurnEffect::new(w);
+            assert_close(&col(CubeFormula::MonthTurn, w)[0], &one(&mut |m| e.feed(m)));
+        }
+        for w in [3u32, 10] {
+            let mut e = QuarterTurnEffect::new(w);
+            assert_close(&col(CubeFormula::QuarterTurn, w)[0], &one(&mut |m| e.feed(m)));
+        }
+        let mut e = HolidayWeekendProximityEffect::new(3);
+        assert_close(&col(CubeFormula::WeekendProx, 3)[0], &one(&mut |m| e.feed(m)));
+
+        let (mut s, mut en) = (Vec::new(), Vec::new());
+        let mut e = StartEndOfMonthFlags::new(3);
+        for m in &ms {
+            let (a, b) = e.feed(*m);
+            s.push(a);
+            en.push(b);
+        }
+        let g = col(CubeFormula::StartEndMonth, 3);
+        assert_close(&g[0], &s);
+        assert_close(&g[1], &en);
+        let (mut s, mut en) = (Vec::new(), Vec::new());
+        let mut e = StartEndOfQuarterFlags::new(4);
+        for m in &ms {
+            let (a, b) = e.feed(*m);
+            s.push(a);
+            en.push(b);
+        }
+        let g = col(CubeFormula::StartEndQuarter, 4);
+        assert_close(&g[0], &s);
+        assert_close(&g[1], &en);
+        let (mut s, mut en) = (Vec::new(), Vec::new());
+        let mut e = StartEndOfWeekFlags::new(2);
+        for m in &ms {
+            let (a, b) = e.feed(*m);
+            s.push(a);
+            en.push(b);
+        }
+        let g = col(CubeFormula::StartEndWeek, 2);
+        assert_close(&g[0], &s);
+        assert_close(&g[1], &en);
     }
 
     #[test]
