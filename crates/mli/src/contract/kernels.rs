@@ -9656,6 +9656,34 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formula 1319 (AdaptiveStoch).
+    #[test]
+    fn lane_matches_cpu_bar_batch37() {
+        use crate::indicators::momentum::adaptive_stochastic::AdaptiveStochastic;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(14);
+        p.fast = 28;
+        p.slow = 14;
+        p.signal = 3;
+        p.a = 1.5;
+        p.smoother = CubeSmoother::Sma;
+        let mut m = AdaptiveStochastic::from_periods(14, 28, 14, 1.5, crate::engine::contract_engine::SmootherId::Sma, 3);
+        chk(&run_cols(CubeFormula::AdaptiveStochBar, &bars, p), lanes.iter().map(|l| { let r = m.feed(&[l[0], l[1], l[2]]); vec![r.k_percent, r.d_percent] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

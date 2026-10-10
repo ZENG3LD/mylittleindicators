@@ -4390,6 +4390,50 @@ fn bar_scan(
                 }
                 v0 = (o[t] + udv + rocp) / 3.0f32;
             }
+        } else if formula == 1319u32 {
+            // adaptive stochastic %K (the D smoother runs afterwards on the host path): lane o = Wilder ATR,
+            // period = base / min period, p2 = max period, a = volatility sensitivity.
+            // held0 = current period, held1 = volatility EMA(10) (live from the 16th bar)
+            if t == 0usize {
+                held0 = period as f32;
+            }
+            if t >= 15usize {
+                if t == 15usize {
+                    held1 = o[t];
+                } else {
+                    held1 = (2.0f32 / 11.0f32) * o[t] + (1.0f32 - 2.0f32 / 11.0f32) * held1;
+                }
+                let mut nrm = 0.01f32;
+                if c[t] > 0.0f32 {
+                    nrm = held1 / c[t];
+                }
+                let vf = (nrm * 100.0f32 * a).max(0.1f32);
+                let adj = 1.0f32 / (1.0f32 + vf);
+                held0 = ((period as f32) * adj).max(period as f32).min(p2 as f32);
+            }
+            let mut pu = held0 as usize;
+            if pu < 2usize {
+                pu = 2usize;
+            }
+            let mut avail = t + 1;
+            if avail > 64usize {
+                avail = 64usize;
+            }
+            if avail > pu {
+                avail = pu;
+            }
+            v0 = 50.0f32;
+            if avail >= 2usize {
+                let mut hh = h[t];
+                let mut ll = l[t];
+                for k2 in 0..avail {
+                    hh = hh.max(h[t - k2]);
+                    ll = ll.min(l[t - k2]);
+                }
+                if (hh - ll).abs() > 1.0e-12f32 {
+                    v0 = ((c[t] - ll) / (hh - ll)) * 100.0f32;
+                }
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -4721,6 +4765,13 @@ fn launch_cube_bar_x(
         }
         let flat = bar_run(formula.code(), [&rsi, &h, &l, &c, &v], params, 0);
         return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::AdaptiveStochBar {
+        let atr = super::kernels_comp::atr_series(samples, params, super::CubeSmoother::Rma, params.slow.max(1), 0);
+        let flat = bar_run(formula.code(), [&atr, &h, &l, &c, &v], params, 0);
+        let k = flat[0..n].to_vec();
+        let d = smooth_series(&k, params.smoother, params.signal.max(1), 0, params.a, params.b);
+        return vec![k, d];
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

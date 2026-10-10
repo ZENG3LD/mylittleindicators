@@ -489,7 +489,7 @@ mli_contract_macros::contract_universe! {
         Qqe:            Field : Oscillator +cube(comp_qqe_bar) => crate::indicators::momentum::qqe::Qqe { line smoothed },
         EhlersRocket:   Field : Oscillator +cube(comp_ehlers_rocket_bar)   => crate::indicators::momentum::ehlers_rocket_rsi::EhlersRocketRsi { value },
         AtrRsi:         Fields       : Oscillator +cube(comp_atr_rsi_bar) => crate::indicators::momentum::atr_rsi::AtrRsi { value },
-        AdaptiveStoch:  Fields       : Oscillator   => crate::indicators::momentum::adaptive_stochastic::AdaptiveStochastic { k d },
+        AdaptiveStoch:  Fields       : Oscillator +cube(comp_adaptive_stoch_bar) => crate::indicators::momentum::adaptive_stochastic::AdaptiveStochastic { k d },
         StochRsi:       Field  : Oscillator +cube(comp_stoch_rsi_bar)   => crate::indicators::momentum::stochastic_rsi::StochasticRsi { k d },
         RangeAtr: Fields : _ +cube(range_atr) => crate::indicators::ratio::range_to_atr::RangeToAtr,
         VhfMa: Field : _ +cube(comp_vhf_ma_bar) => crate::indicators::regime::vhf_ma::VhfMa,

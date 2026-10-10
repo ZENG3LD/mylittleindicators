@@ -725,6 +725,8 @@ pub enum CubeFormula {
     TsSwingsBar = 1317,
     /// Composite: connors rsi. UNTESTED on GPU.
     ConnorsRsiBar = 1318,
+    /// Composite: adaptive stochastic. UNTESTED on GPU.
+    AdaptiveStochBar = 1319,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1235,6 +1237,7 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::AdaptiveStochBar => 2,
             CubeFormula::WickspikeBar => 2,
             CubeFormula::TsSwingsBar => 2,
             CubeFormula::MoFisherBar => 2,
@@ -1559,6 +1562,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Wickspike), Some(CubeFormula::WickspikeBar));
         assert_eq!(formula_of(IndicatorId::TsSwings), Some(CubeFormula::TsSwingsBar));
         assert_eq!(formula_of(IndicatorId::ConnorsRsi), Some(CubeFormula::ConnorsRsiBar));
+        assert_eq!(formula_of(IndicatorId::AdaptiveStoch), Some(CubeFormula::AdaptiveStochBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
