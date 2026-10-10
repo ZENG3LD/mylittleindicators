@@ -10340,6 +10340,33 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Adaptive volatility regime score (1347).
+    #[test]
+    fn lane_matches_cpu_bar_batch59() {
+        use crate::indicators::regime::adaptive_volatility_regime::AdaptiveVolatilityRegime;
+        use crate::engine::contract_engine::SmootherId as S;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(14);
+        p.smoother = CubeSmoother::Ema;
+        p.fast = 10;
+        p.smoother2 = CubeSmoother::Ema;
+        let mut m = AdaptiveVolatilityRegime::from_smoothers(0.1, 50, S::Ema);
+        chk(&run_cols(CubeFormula::AvrBar, &bars, p), bars.iter().map(|b| { m.feed(&[b.open, b.high, b.low, b.close, b.volume]); vec![m.value()] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

@@ -5782,6 +5782,34 @@ fn bar_scan(
             } else {
                 v0 = 99.0f32;
             }
+        } else if formula == 1348u32 {
+            // normalised intraday range (high - low) / close, 0 for a non-positive close
+            if c[t] > 0.0f32 {
+                v0 = (h[t] - l[t]) / c[t];
+            }
+        } else if formula == 1347u32 {
+            // adaptive volatility regime score: lanes o = close, h = ATR, l = smoothed intraday range. The CPU volume
+            // feature is exactly 0 (it compares the volume with itself), so only three features contribute.
+            let mut f0 = 0.0f32;
+            if o[t] > 0.0f32 {
+                f0 = (100.0f32 * h[t] / o[t]).tanh();
+            }
+            let f1 = (100.0f32 * l[t]).tanh();
+            let mut f2 = 0.0f32;
+            if t >= 5usize {
+                let mut sm = 0.0f32;
+                for k in (t - 4usize)..(t + 1usize) {
+                    sm = sm + (o[k] - o[k - 1usize]) / o[k - 1usize];
+                }
+                let mean = sm / 5.0f32;
+                let mut va = 0.0f32;
+                for k in (t - 4usize)..(t + 1usize) {
+                    let dv = (o[k] - o[k - 1usize]) / o[k - 1usize] - mean;
+                    va = va + dv * dv;
+                }
+                f2 = (10.0f32 * (va / 5.0f32).sqrt()).tanh();
+            }
+            v0 = (0.3f32 * f0 + 0.3f32 * f1 + 0.25f32 * f2).max(0.0f32).min(1.0f32);
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -6310,6 +6338,14 @@ fn launch_cube_bar_x(
         let raw = bar_run(1346, [&o, &h, &l, &c, &v], params, 0);
         let stab = smooth_series(&raw[0..n].to_vec(), cs(params.ext[3]), params.ext[7].max(1), 9, params.a, params.b);
         let flat = bar_run_x(formula.code(), [&c, &fast, &slow, &atr, &vma], &stab, params, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::AvrBar {
+        // period = ATR period, smoother = ATR smoother, fast = short volatility MA period, smoother2 = its smoother
+        let atr = super::kernels_comp::atr_series(samples, params, params.smoother, params.period.max(1), 0);
+        let ir = bar_run(1348, [&o, &h, &l, &c, &v], params, 0);
+        let ism = smooth_series(&ir[0..n].to_vec(), params.smoother2, params.fast.max(1), 0, params.a, params.b);
+        let flat = bar_run(formula.code(), [&c, &atr, &ism, &c, &v], params, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {
