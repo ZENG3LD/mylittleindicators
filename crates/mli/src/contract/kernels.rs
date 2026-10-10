@@ -9159,8 +9159,6 @@ mod tests {
         p.fast = 14;
         p.slow = 28;
         let _ = p;
-        let mut m = UltimateOscillator::with_periods(7, 14, 28);
-        chk(&run_cols(CubeFormula::UoBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]])]).collect());
         let mut m = NrRange::new(7);
         chk(&run_cols(CubeFormula::NrBar, &bars, CubeParams::period(7)), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1]]).0]).collect());
         let mut p = CubeParams::period(1);
@@ -9268,8 +9266,6 @@ mod tests {
         p.slow = 28;
         p.signal = 5;
         p.smoother = CubeSmoother::Ema;
-        let mut m = UltimateOscillatorSmooth::new(7, 14, 28, 5);
-        chk(&run_cols(CubeFormula::UoSmoothBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]])]).collect());
         // UoSmooth uses p.fast / p.slow as period2 / period3; AtrRsi uses period (rsi), fast (atr), slow (atr ma)
         let mut p = CubeParams::period(14);
         p.fast = 14;
@@ -11711,9 +11707,9 @@ mod tests {
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
     }
 
-    /// UNTESTED on GPU (no GPU on the authoring box): tick CVD / volume delta / VPIN event formulas 990-992.
+    /// UNTESTED on GPU (no GPU on the authoring box): VPIN event formula 992.
     #[test]
-    fn tick_cvd_vdelta_vpin_match_cpu() {
+    fn tick_vpin_matches_cpu() {
         use crate::core::types::Tick;
         use crate::engine::streams::tick_consumer::TickConsumer;
         use crate::indicators::volume::cumulative_volume_delta::CumulativeVolumeDelta;
@@ -11728,12 +11724,6 @@ mod tests {
             })
             .collect();
         let fr = GpuEventFrame::from_ticks(&ticks);
-        let mut m = CumulativeVolumeDelta::new(20);
-        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
-        assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::CvdEv, &fr, CubeParams::period(20))[0], &c);
-        let mut m = VolumeDelta::new(10);
-        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
-        assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::VdeltaEv, &fr, CubeParams::period(10))[0], &c);
         let mut m = Vpin::new(25.0, 5);
         let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
         let mut p = CubeParams::period(5);

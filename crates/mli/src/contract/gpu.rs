@@ -647,8 +647,6 @@ pub enum CubeFormula {
     FundingSettleImpactMg = 1091,
     /// Composite: ehlers zero-lag ema. UNTESTED on GPU.
     EhlerszBar = 1278,
-    /// Composite: ultimate oscillator. UNTESTED on GPU.
-    UoBar = 1279,
     /// Composite: nr range. UNTESTED on GPU.
     NrBar = 1280,
     /// Composite: ehlers instantaneous trendline. UNTESTED on GPU.
@@ -667,8 +665,6 @@ pub enum CubeFormula {
     AmatBar = 1287,
     /// Composite: elder impulse. UNTESTED on GPU.
     ElderImpulseBar = 1288,
-    /// Composite: smoothed ultimate oscillator. UNTESTED on GPU.
-    UoSmoothBar = 1289,
     /// Composite: atr rsi. UNTESTED on GPU.
     AtrRsiBar = 1290,
     /// Composite: volume weighted rsi. UNTESTED on GPU.
@@ -735,10 +731,6 @@ pub enum CubeFormula {
     LiqgapBar = 1322,
     /// Composite: Chebyshev filter. UNTESTED on GPU.
     ChebyComp = 1092,
-    /// Event: tick cumulative volume delta over a window. UNTESTED on GPU.
-    CvdEv = 990,
-    /// Event: tick volume delta. UNTESTED on GPU.
-    VdeltaEv = 991,
     /// Event: VPIN. UNTESTED on GPU.
     VpinEv = 992,
     /// Event: absorption detector `[score, signal]`. UNTESTED on GPU.
@@ -1542,7 +1534,6 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
         assert_eq!(formula_of(IndicatorId::Ehlersz), Some(CubeFormula::EhlerszBar));
-        assert_eq!(formula_of(IndicatorId::Uo), Some(CubeFormula::UoBar));
         assert_eq!(formula_of(IndicatorId::Nr), Some(CubeFormula::NrBar));
         assert_eq!(formula_of(IndicatorId::Eit), Some(CubeFormula::EitBar));
         assert_eq!(formula_of(IndicatorId::Pgry), Some(CubeFormula::PgryBar));
@@ -1552,7 +1543,6 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Kregime), Some(CubeFormula::KregimeBar));
         assert_eq!(formula_of(IndicatorId::Amat), Some(CubeFormula::AmatBar));
         assert_eq!(formula_of(IndicatorId::ElderImpulse), Some(CubeFormula::ElderImpulseBar));
-        assert_eq!(formula_of(IndicatorId::UoSmooth), Some(CubeFormula::UoSmoothBar));
         assert_eq!(formula_of(IndicatorId::AtrRsi), Some(CubeFormula::AtrRsiBar));
         assert_eq!(formula_of(IndicatorId::Vwrsi), Some(CubeFormula::VwrsiBar));
         assert_eq!(formula_of(IndicatorId::Qqe), Some(CubeFormula::QqeBar));
@@ -1586,8 +1576,6 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Swingstr), Some(CubeFormula::SwingstrBar));
         assert_eq!(formula_of(IndicatorId::Liqgap), Some(CubeFormula::LiqgapBar));
         assert_eq!(formula_of(IndicatorId::Cheby), Some(CubeFormula::ChebyComp));
-        assert_eq!(formula_of(IndicatorId::Cvd), Some(CubeFormula::CvdEv));
-        assert_eq!(formula_of(IndicatorId::Vdelta), Some(CubeFormula::VdeltaEv));
         assert_eq!(formula_of(IndicatorId::Vpin), Some(CubeFormula::VpinEv));
         assert_eq!(formula_of(IndicatorId::AbsorptionDetector), Some(CubeFormula::AbsorptionEv));
         assert_eq!(formula_of(IndicatorId::AdaptiveWindowSelector), Some(CubeFormula::AdaptWinEv));
