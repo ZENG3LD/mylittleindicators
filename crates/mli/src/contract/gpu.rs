@@ -333,6 +333,24 @@ pub enum CubeFormula {
     KeltDist = 417,
     /// Keltner position: `(close - lower) / (upper - lower)`, 0.5 while not ready or the width is 0. UNTESTED on GPU.
     KeltPos = 418,
+    /// ATR through the first smoother (`smooth_period`) of the Wilder true range. Used as an inner series. UNTESTED on GPU.
+    AtrSm = 419,
+    /// `max(high - low, 0)`. UNTESTED on GPU.
+    HlRange = 420,
+    /// `|ln(close / previous close)|`, 0 on the first bar. UNTESTED on GPU.
+    AbsLogRet = 421,
+    /// `(high + low) / 2`. UNTESTED on GPU.
+    Hl2 = 422,
+    /// Composite (post stage): share of the last `slow` |ATR| values `<=` the current one. Inner: [`CubeFormula::AtrSm`]. UNTESTED on GPU.
+    AtrPct = 500,
+    /// Composite: `p - ema(p)` of [`CubeFormula::AtrPct`]; `a` is alpha (clamped to 0.01..1). UNTESTED on GPU.
+    AtrPctTrend = 501,
+    /// Composite: population z-score of ATR over `slow` (at least 2) bars. UNTESTED on GPU.
+    AtrZ = 502,
+    /// Composite: share of the last `slow` |vol-of-vol| values `<=` the current one. Inner: [`CubeFormula::VolOfVol`]. UNTESTED on GPU.
+    VovPct = 503,
+    /// Composite: `p - ema(p)` of [`CubeFormula::VovPct`]. UNTESTED on GPU.
+    VovPctTrend = 504,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -730,6 +748,14 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::VoVr), Some(CubeFormula::VolRatio));
         assert_eq!(formula_of(IndicatorId::RangeAtr), Some(CubeFormula::RangeAtr));
         assert_eq!(formula_of(IndicatorId::Atrbw), Some(CubeFormula::RangeAtr));
+        assert_eq!(formula_of(IndicatorId::Atrp), Some(CubeFormula::AtrPct));
+        assert_eq!(formula_of(IndicatorId::Atrpt), Some(CubeFormula::AtrPctTrend));
+        assert_eq!(formula_of(IndicatorId::Atrz), Some(CubeFormula::AtrZ));
+        assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
+        assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
+        assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::C2cvp), Some(CubeFormula::AbsLogRet));
+        assert_eq!(formula_of(IndicatorId::Hlva), Some(CubeFormula::Hl2));
         assert_eq!(formula_of(IndicatorId::Keltbw), Some(CubeFormula::KeltBw));
         assert_eq!(formula_of(IndicatorId::Keltdist), Some(CubeFormula::KeltDist));
         assert_eq!(formula_of(IndicatorId::Keltpos), Some(CubeFormula::KeltPos));

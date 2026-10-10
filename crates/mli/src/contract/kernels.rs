@@ -4248,6 +4248,9 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     if formula.code() >= 400 && formula.code() < 500 && formula.output_count() == 1 {
         return launch_cube_smoothed_gx(formula, samples, params);
     }
+    if formula.code() >= 500 && formula.code() < 700 && formula.output_count() == 1 {
+        return super::kernels_post::launch_cube_post(formula, samples, params);
+    }
     if formula.output_count() > 1 {
         // Multi-column formulas return their first column here; use `launch_cube_columns` for all.
         return launch_cube_columns(formula, samples, params).swap_remove(0);
@@ -5837,13 +5840,40 @@ fn gx_prep_scan(
             let mf = ((close[i] - low[i]) - (high[i] - close[i])) / hl;
             raw0[i] = mf * volume[i];
             raw1[i] = volume[i];
-        } else if formula == 414u32 || formula == 415u32 {
+        } else if formula == 414u32 || formula == 415u32 || formula == 419u32 {
             raw0[i] = wilder_tr(high, low, close, i);
             let mut r = high[i] - low[i];
             if r < 0.0f32 {
                 r = 0.0f32;
             }
             raw1[i] = r;
+        } else if formula == 420u32 {
+            // High-low range, never negative.
+            let mut r = high[i] - low[i];
+            if r < 0.0f32 {
+                r = 0.0f32;
+            }
+            raw0[i] = r;
+            raw1[i] = r;
+        } else if formula == 421u32 {
+            // |ln(close / previous close)|, 0 on the first bar (previous close floored at 1e-12).
+            let mut r = 0.0f32;
+            if i > 0 {
+                let mut pv = close[i - 1];
+                if pv < 1.0e-12f32 {
+                    pv = 1.0e-12f32;
+                }
+                r = (close[i] / pv).ln();
+                if r < 0.0f32 {
+                    r = -r;
+                }
+            }
+            raw0[i] = r;
+            raw1[i] = r;
+        } else if formula == 422u32 {
+            let m = (high[i] + low[i]) / 2.0f32;
+            raw0[i] = m;
+            raw1[i] = m;
         } else if formula >= 416u32 && formula <= 418u32 {
             raw0[i] = fld(open, high, low, close, volume, i, lane);
             raw1[i] = wilder_tr(high, low, close, i);
@@ -5917,6 +5947,10 @@ fn gx_comb_scan(
             if f > 1.0e-12f32 {
                 v = raw1[i] / f;
             }
+        } else if formula == 419u32 {
+            v = f;
+        } else if formula >= 420u32 && formula <= 422u32 {
+            v = raw1[i];
         } else if formula >= 416u32 && formula <= 418u32 {
             // Keltner family: `f` is the centre line, `s` the ATR, ready once `period` bars are in.
             let mut p = period as usize;
@@ -6042,8 +6076,12 @@ fn launch_cube_smoothed_gx(
             code,
         );
         let first = params.smoother.code();
-        smooth!(raw0, sm0, first, params.smooth_period);
-        if code == 413 {
+        if code < 420 {
+            smooth!(raw0, sm0, first, params.smooth_period);
+        }
+        if code == 419 || code >= 420 {
+            // Single smoother (419) or no smoother at all (420..): nothing more to run.
+        } else if code == 413 {
             // Twiggs money flow: the same smoother over volume.
             smooth!(raw1, sm1, first, params.smooth_period);
         } else if code == 414 {
@@ -6552,6 +6590,68 @@ mod tests {
         ap.smoother = CubeSmoother::Rma;
         ap.smooth_period = 7;
         assert_close(&run(CubeFormula::RangeAtr, &bars, ap), &cpu_ab);
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): gx batch 5, composites 500..=504 and 419..=422.
+    #[test]
+    fn lane_matches_cpu_gx_batch5() {
+        use crate::indicators::levels::hl_value_area::HlValueArea;
+        use crate::indicators::volatility::atr_percentile::AtrPercentile;
+        use crate::indicators::volatility::atr_percentile_trend::AtrPercentileTrend;
+        use crate::indicators::volatility::atr_zscore::AtrZscore;
+        use crate::indicators::volatility::close_to_close_vol_percentile::CloseVolPercentile;
+        use crate::indicators::volatility::range_percentile::RangePercentile;
+        use crate::indicators::volatility::vol_of_vol_percentile::VolOfVolPercentile;
+        use crate::indicators::volatility::vol_of_vol_percentile_trend::VolOfVolPercentileTrend;
+
+        let bars = bars(90);
+        let hlc = |b: &ResearchBar| [b.high, b.low, b.close];
+        let mut ap = CubeParams::period(7);
+        ap.smoother = CubeSmoother::Rma;
+        ap.smooth_period = 7;
+        ap.slow = 12;
+        ap.a = 0.3;
+
+        let mut m = AtrPercentile::from_smoothers(7, SmootherId::Rma, 12);
+        let c: Vec<f64> = bars.iter().map(|b| m.feed(&hlc(b))).collect();
+        assert_close(&run(CubeFormula::AtrPct, &bars, ap), &c);
+
+        let mut m = AtrPercentileTrend::new(7, 12, 0.3);
+        let c: Vec<f64> = bars.iter().map(|b| m.feed(&hlc(b))).collect();
+        assert_close(&run(CubeFormula::AtrPctTrend, &bars, ap), &c);
+
+        let mut m = AtrZscore::from_smoother(7, SmootherId::Rma, 12);
+        let c: Vec<f64> = bars.iter().map(|b| m.feed(&hlc(b))).collect();
+        assert_close(&run(CubeFormula::AtrZ, &bars, ap), &c);
+
+        let mut vp = CubeParams::period(8);
+        vp.slow = 12;
+        vp.a = 0.3;
+        let mut m = VolOfVolPercentile::with_period(8, 12);
+        let c: Vec<f64> = bars.iter().map(|b| m.feed(&hlc(b))).collect();
+        assert_close(&run(CubeFormula::VovPct, &bars, vp), &c);
+
+        let mut m = VolOfVolPercentileTrend::new(8, 12, 0.3);
+        let c: Vec<f64> = bars.iter().map(|b| m.feed(&hlc(b))).collect();
+        assert_close(&run(CubeFormula::VovPctTrend, &bars, vp), &c);
+
+        let mut m = RangePercentile::new(20);
+        let c: Vec<f64> = bars.iter().map(|b| m.feed(&[b.high, b.low]).0).collect();
+        assert_close(&run(CubeFormula::HlRange, &bars, CubeParams::period(1)), &c);
+
+        let mut m = CloseVolPercentile::new(10, 20);
+        let c: Vec<f64> = bars.iter().map(|b| m.feed(b.close).0).collect();
+        assert_close(&run(CubeFormula::AbsLogRet, &bars, CubeParams::period(1)), &c);
+
+        let mut m = HlValueArea::new(10);
+        let c: Vec<f64> = bars
+            .iter()
+            .map(|b| {
+                m.feed(&[b.high, b.low]);
+                m.value()
+            })
+            .collect();
+        assert_close(&run(CubeFormula::Hl2, &bars, CubeParams::period(1)), &c);
     }
 
     #[test]

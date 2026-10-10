@@ -694,6 +694,11 @@ pub use gpu_sample::{GpuColumns, GpuLevel, GpuSample, GpuTimes};
 #[cfg(feature = "gpu")]
 pub mod kernels;
 
+/// Composite formulas (codes 500..=699): an inner series from an existing formula, then a
+/// post stage (rolling rank / z-score / EMA-detrend / …). UNTESTED on GPU.
+#[cfg(feature = "gpu")]
+pub mod kernels_post;
+
 pub mod axis;
 pub use axis::{sweep_f64, CubeIter, Param, ParamScalar};
 

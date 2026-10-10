@@ -291,6 +291,15 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "kelt_bw" => "KeltBw",
         "kelt_dist" => "KeltDist",
         "kelt_pos" => "KeltPos",
+        "atr_sm" => "AtrSm",
+        "hl_range" => "HlRange",
+        "abs_log_ret" => "AbsLogRet",
+        "hl2" => "Hl2",
+        "atr_pct" => "AtrPct",
+        "atr_pct_trend" => "AtrPctTrend",
+        "atr_z" => "AtrZ",
+        "vov_pct" => "VovPct",
+        "vov_pct_trend" => "VovPctTrend",
         _ => {
             return Err(syn::Error::new(
                 name.span(),
