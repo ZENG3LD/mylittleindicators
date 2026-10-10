@@ -623,6 +623,9 @@ fn bar_scan_w0(
                 } else {
                     v0 = lo - a;
                 }
+            } else if flag != 1u32 {
+                // CPU lower_line starts at 0, so the absolute stop is -offset until the window fills
+                v0 = 0.0f32 - a;
             }
         } else if formula == 1202u32 {
             let mut w = period as usize;
@@ -3836,7 +3839,8 @@ fn bar_scan_w17(
             if held1 > 0.5f32 {
                 held0 = (alpha * pct) * c[t] + (1.0f32 - alpha * pct) * held0;
             }
-            if held1 < 0.5f32 && t >= pr {
+            // CMO skips the seed bar, then fills when index >= period (index == t + 1)
+            if held1 < 0.5f32 && t >= 1usize && t + 1 >= pr {
                 held1 = 1.0f32;
                 held0 = c[t];
             }
@@ -4907,8 +4911,13 @@ fn bar_scan_w23(
         let mut v8 = 0.0f32;
         let mut v9 = 0.0f32;
         if formula == 1276u32 {
-            // Hilbert dominant cycle period (smoothed); a = min period, b = max period
+            // Hilbert dominant cycle period (smoothed); a = min period, b = max period.
+            // CPU returns the empty result (20) until two quadrature samples exist,
+            // and the smoother is seeded at (min + max) / 2.
             let pi = 3.1415927f32;
+            if t == 0usize {
+                held0 = (a + b) * 0.5f32;
+            }
             if t >= 7usize {
                 let ic = (c[t - 3] + c[t - 2] + c[t - 1] + c[t]) / 4.0f32;
                 let qc = (c[t - 6] + 2.0f32 * c[t - 4] + 3.0f32 * c[t - 2] + 3.0f32 * c[t]) / 9.0f32;
@@ -4937,8 +4946,10 @@ fn bar_scan_w23(
                 held0 = 0.2f32 * ip + 0.8f32 * held0;
                 held1 = phase;
                 cnt_a = cnt_a + 1usize;
+                v0 = held0;
+            } else {
+                v0 = 20.0f32;
             }
-            v0 = held0;
         } else if formula == 1277u32 {
             // MESA adaptive MA (EMA 6 / 12 quadrature stage, EMA 10 period smoother):
             // a = min period, b = max period.
@@ -5009,8 +5020,10 @@ fn bar_scan_w23(
             // Ehlers zero-lag EMA: ema + (ema - ema[lag]); lag = p2 or (period-1)/2 (min 1); the ring keeps 16 emas
             let pr = period as f32;
             let al = 2.0f32 / (pr + 1.0f32);
+            // p2 is a custom lag only when it is in 1..period. CubeParams::period copies
+            // period into fast, and a custom lag is required to be shorter than period.
             let mut lag = p2 as usize;
-            if lag == 0usize {
+            if lag == 0usize || lag >= period as usize {
                 lag = ((period as usize) - 1) / 2;
                 if lag < 1usize {
                     lag = 1usize;
@@ -5114,45 +5127,69 @@ fn bar_scan_w24(
         let mut v8 = 0.0f32;
         let mut v9 = 0.0f32;
         if formula == 1279u32 {
-            // Ultimate oscillator over rescanned buying-pressure / true-range windows (period, p2, p3)
+            // Ultimate oscillator. CPU holds 50 until the long window is full (bar 0 stores
+            // no pressure). Sums follow UltimateOscillator::feed: on a roll the evicted
+            // sample is subtracted from the short and medium sums as well as the long one.
+            // scr[0..p3) buying pressure, scr[p3..2*p3) true range, oldest at index 0.
+            // held0/held1 short BP/TR, held2/f0 medium, f1/f2 long, cnt_a = deque length.
+            let p1 = period as usize;
+            let p2u = p2 as usize;
             let p3u = p3 as usize;
-            if t >= p3u && t >= 1usize {
-                let mut sb1 = 0.0f32;
-                let mut st1 = 0.0f32;
-                let mut sb2 = 0.0f32;
-                let mut st2 = 0.0f32;
-                let mut sb3 = 0.0f32;
-                let mut st3 = 0.0f32;
-                for k in 0..p3u {
-                    let q = t - k;
-                    let pc = c[q - 1];
-                    let lo = l[q].min(pc);
-                    let bp = c[q] - lo;
-                    let tr = (h[q] - l[q]).max((h[q] - pc).abs()).max((l[q] - pc).abs());
-                    sb3 = sb3 + bp;
-                    st3 = st3 + tr;
-                    if k < p2 as usize {
-                        sb2 = sb2 + bp;
-                        st2 = st2 + tr;
+            v0 = 50.0f32;
+            if t >= 1usize && p3u >= 1usize {
+                let pc = c[t - 1];
+                let lo = l[t].min(pc);
+                let bp = c[t] - lo;
+                let trv = (h[t] - l[t]).max((h[t] - pc).abs()).max((l[t] - pc).abs());
+                if cnt_a >= p3u {
+                    let old_bp = scr[0];
+                    let old_tr = scr[p3u];
+                    held0 = held0 - old_bp;
+                    held1 = held1 - old_tr;
+                    held2 = held2 - old_bp;
+                    f0 = f0 - old_tr;
+                    f1 = f1 - old_bp;
+                    f2 = f2 - old_tr;
+                    for j in 1..p3u {
+                        scr[j - 1usize] = scr[j];
+                        scr[p3u + j - 1usize] = scr[p3u + j];
                     }
-                    if k < period as usize {
-                        sb1 = sb1 + bp;
-                        st1 = st1 + tr;
+                    cnt_a = cnt_a - 1usize;
+                }
+                scr[cnt_a] = bp;
+                scr[p3u + cnt_a] = trv;
+                cnt_a = cnt_a + 1usize;
+                held0 = held0 + bp;
+                held1 = held1 + trv;
+                held2 = held2 + bp;
+                f0 = f0 + trv;
+                f1 = f1 + bp;
+                f2 = f2 + trv;
+                if cnt_a > p1 {
+                    let idx = cnt_a - p1 - 1usize;
+                    held0 = held0 - scr[idx];
+                    held1 = held1 - scr[p3u + idx];
+                }
+                if cnt_a > p2u {
+                    let idx = cnt_a - p2u - 1usize;
+                    held2 = held2 - scr[idx];
+                    f0 = f0 - scr[p3u + idx];
+                }
+                if cnt_a >= p3u {
+                    let mut a1 = 0.0f32;
+                    let mut a2 = 0.0f32;
+                    let mut a3 = 0.0f32;
+                    if held1.abs() >= 1.0e-12f32 {
+                        a1 = held0 / held1;
                     }
+                    if f0.abs() >= 1.0e-12f32 {
+                        a2 = held2 / f0;
+                    }
+                    if f2.abs() >= 1.0e-12f32 {
+                        a3 = f1 / f2;
+                    }
+                    v0 = (100.0f32 * (4.0f32 * a1 + 2.0f32 * a2 + a3) / 7.0f32).max(0.0f32).min(100.0f32);
                 }
-                let mut a1 = 0.0f32;
-                let mut a2 = 0.0f32;
-                let mut a3 = 0.0f32;
-                if st1.abs() >= 1.0e-12f32 {
-                    a1 = sb1 / st1;
-                }
-                if st2.abs() >= 1.0e-12f32 {
-                    a2 = sb2 / st2;
-                }
-                if st3.abs() >= 1.0e-12f32 {
-                    a3 = sb3 / st3;
-                }
-                v0 = (100.0f32 * (4.0f32 * a1 + 2.0f32 * a2 + a3) / 7.0f32).max(0.0f32).min(100.0f32);
             }
         } else if formula == 1280u32 {
             // NR range: the exposed output is the clamped bar range
@@ -13033,8 +13070,15 @@ fn launch_cube_bar_x(
         let kp = params.slow.max(1);
         let dp = params.signal.max(1);
         let k0 = rp + sp + kp - 2;
-        let k = smooth_series(&raw, params.smoother, kp, k0, params.a, params.b);
-        let d = smooth_series(&k, params.smoother2, dp, k0 + kp - 1, params.a, params.b);
+        let mut k = smooth_series(&raw, params.smoother, kp, k0, params.a, params.b);
+        let mut d = smooth_series(&k, params.smoother2, dp, k0 + kp - 1, params.a, params.b);
+        // CPU current_k / current_d start at 50 and stay there until each SMA is fed.
+        for x in k.iter_mut().take(k0 as usize) {
+            *x = 50.0;
+        }
+        for x in d.iter_mut().take((k0 + kp - 1) as usize) {
+            *x = 50.0;
+        }
         return vec![k, d];
     }
     if formula == CubeFormula::DssBar {
@@ -13438,9 +13482,30 @@ fn launch_cube_bar_x(
         return vec![bar_stage(1396, [&fast, &h, &l, &c, &slow], sp, 0)];
     }
     if formula == CubeFormula::VidyaBar {
-        let mut cp = params;
-        cp.smoother = params.smoother;
-        v = super::kernels::launch_cube(CubeFormula::Cmo, samples, cp);
+        // Inner CMO uses the configured smoother (SMA from Vidya::new). The catalog
+        // Cmo kernel is Wilder RMA, so it is not this series. Gains start at bar 1.
+        let pr = params.period.max(1);
+        let mut up = vec![0.0f32; n];
+        let mut dn = vec![0.0f32; n];
+        for i in 1..n {
+            let d = c[i] - c[i - 1];
+            if d > 0.0 {
+                up[i] = d;
+            } else {
+                dn[i] = -d;
+            }
+        }
+        let g = smooth_series(&up, params.smoother, pr, 1, params.a, params.b);
+        let ls = smooth_series(&dn, params.smoother, pr, 1, params.a, params.b);
+        v = vec![0.0; n];
+        for i in 0..n {
+            if (i as u32) + 1 >= pr {
+                let den = g[i] + ls[i];
+                if den.abs() >= 1.0e-12 {
+                    v[i] = 100.0 * (g[i] - ls[i]) / den;
+                }
+            }
+        }
     }
     if formula == CubeFormula::EhlersRocketBar {
         let sp = smooth_series(&c, super::CubeSmoother::Ema, 3, 0, params.a, params.b);
