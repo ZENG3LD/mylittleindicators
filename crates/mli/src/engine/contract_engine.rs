@@ -534,7 +534,7 @@ mli_contract_macros::contract_universe! {
         Vwrsi:        Fields : Oscillator +cube(comp_vwrsi_bar) => crate::indicators::momentum::volume_weighted_rsi::VolumeWeightedRsi,
         Mrf: Fields : _ +cube(comp_mrf_bar) => crate::indicators::regime::market_regime_filter::MarketRegimeFilter,
         Avr: Fields : _ +cube(comp_avr_bar) => crate::indicators::regime::adaptive_volatility_regime::AdaptiveVolatilityRegime,
-        Dvr: Fields : _ => crate::indicators::regime::dynamic_volatility_regime::DynamicVolatilityRegime,
+        Dvr: Fields : _ +cube(comp_dvr_bar) => crate::indicators::regime::dynamic_volatility_regime::DynamicVolatilityRegime,
         Rc:  Fields : _ +cube(comp_rc_bar) => crate::indicators::regime::regime_composite::RegimeComposite,
         EgCoint: Field : _ +cube(comp_eg_coint_bar) => crate::indicators::statistics::engle_granger_proxy::EngleGrangerProxy,
         AdfKpss: Field : _ +cube(comp_adf_kpss_bar) => crate::indicators::statistics::adf_kpss_composite::AdfKpssComposite,

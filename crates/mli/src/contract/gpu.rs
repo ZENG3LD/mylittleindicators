@@ -823,6 +823,8 @@ pub enum CubeFormula {
     MrfBar = 1345,
     /// Composite: adaptive volatility regime score. UNTESTED on GPU.
     AvrBar = 1347,
+    /// Composite: dynamic volatility regime score. UNTESTED on GPU.
+    DvrBar = 1349,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1699,6 +1701,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vbd), Some(CubeFormula::VbdBar));
         assert_eq!(formula_of(IndicatorId::Mrf), Some(CubeFormula::MrfBar));
         assert_eq!(formula_of(IndicatorId::Avr), Some(CubeFormula::AvrBar));
+        assert_eq!(formula_of(IndicatorId::Dvr), Some(CubeFormula::DvrBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

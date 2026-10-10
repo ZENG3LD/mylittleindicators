@@ -5810,6 +5810,106 @@ fn bar_scan(
                 f2 = (10.0f32 * (va / 5.0f32).sqrt()).tanh();
             }
             v0 = (0.3f32 * f0 + 0.3f32 * f1 + 0.25f32 * f2).max(0.0f32).min(1.0f32);
+        } else if formula == 1349u32 {
+            // dynamic volatility regime, stage 1: composite volatility. lanes o = close, h = ATR; a / b / c = GARCH
+            // alpha / beta / omega. State: scr[0] = conditional variance. Bar 0 -> 0, bar 1 -> ATR (unsmoothed on the
+            // CPU too), bar >= 2 -> 0.4 realised(20, sample) + 0.4 sqrt(garch variance) + 0.2 ATR
+            if t == 0usize {
+                scr[0] = 0.0f32;
+            } else {
+                let rt = (o[t] / o[t - 1usize]).ln();
+                if t == 1usize {
+                    scr[0] = rt * rt;
+                } else {
+                    scr[0] = _cc + a * rt * rt + b * scr[0];
+                }
+                if t == 1usize {
+                    v0 = h[t];
+                } else {
+                    let mut real = 0.0f32;
+                    if t >= 10usize {
+                        let mut w = 20usize;
+                        if t < w {
+                            w = t;
+                        }
+                        let mut sm = 0.0f32;
+                        for k in (t + 1usize - w)..(t + 1usize) {
+                            sm = sm + (o[k] / o[k - 1usize]).ln();
+                        }
+                        let mean = sm / (w as f32);
+                        let mut va = 0.0f32;
+                        for k in (t + 1usize - w)..(t + 1usize) {
+                            let dv = (o[k] / o[k - 1usize]).ln() - mean;
+                            va = va + dv * dv;
+                        }
+                        real = (va / ((w - 1usize) as f32)).sqrt();
+                    }
+                    v0 = real * 0.4f32 + scr[0].sqrt() * 0.4f32 + h[t] * 0.2f32;
+                }
+            }
+        } else if formula == 1350u32 {
+            // dynamic volatility regime, stage 2: adaptive thresholds + regime class 1..6. lanes o = ATR, h = smoothed
+            // composite volatility; a = threshold adaptation speed. State: scr[0] / scr[1] = low / high threshold.
+            if t == 0usize {
+                scr[0] = 0.0f32;
+                scr[1] = 0.0f32;
+            } else {
+                let mut vol = h[t];
+                if t == 1usize {
+                    vol = o[t];
+                }
+                let nv = t - 1usize;
+                if nv < 10usize {
+                    scr[0] = vol * 0.7f32;
+                    scr[1] = vol * 1.3f32;
+                } else {
+                    let mut w = 32usize;
+                    if nv < w {
+                        w = nv;
+                    }
+                    let base = t + 1usize - w;
+                    let n25 = w / 4usize;
+                    let n75 = 3usize * w / 4usize;
+                    let mut p25 = 0.0f32;
+                    let mut p75 = 0.0f32;
+                    for i in 0..w {
+                        let x = h[base + i];
+                        let mut less = 0usize;
+                        let mut eq = 0usize;
+                        for j in 0..w {
+                            let y = h[base + j];
+                            if y < x {
+                                less = less + 1usize;
+                            } else if y == x {
+                                eq = eq + 1usize;
+                            }
+                        }
+                        if less <= n25 && n25 < less + eq {
+                            p25 = x;
+                        }
+                        if less <= n75 && n75 < less + eq {
+                            p75 = x;
+                        }
+                    }
+                    scr[0] = a * p25 + (1.0f32 - a) * scr[0];
+                    scr[1] = a * p75 + (1.0f32 - a) * scr[1];
+                }
+                let lo = scr[0];
+                let hi = scr[1];
+                if vol <= lo * 0.7f32 {
+                    v0 = 1.0f32;
+                } else if vol <= lo {
+                    v0 = 2.0f32;
+                } else if vol <= hi {
+                    v0 = 3.0f32;
+                } else if vol <= hi * 1.3f32 {
+                    v0 = 4.0f32;
+                } else if vol <= hi * 1.8f32 {
+                    v0 = 5.0f32;
+                } else {
+                    v0 = 6.0f32;
+                }
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -6347,6 +6447,21 @@ fn launch_cube_bar_x(
         let ism = smooth_series(&ir[0..n].to_vec(), params.smoother2, params.fast.max(1), 0, params.a, params.b);
         let flat = bar_run(formula.code(), [&c, &atr, &ism, &c, &v], params, 0);
         return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::DvrBar {
+        // period / smoother = ATR; a / b / c = GARCH alpha / beta (= persistence * (1 - alpha)) / omega;
+        // fast + smoother2 = volatility MA; slow + smoother3 = regime smoother; ext[0] = threshold speed * 1e6
+        let atr = super::kernels_comp::atr_series(samples, params, params.smoother, params.period.max(1), 0);
+        let comp = bar_run(1349, [&c, &atr, &l, &c, &v], params, 0);
+        let sm = smooth_series(&comp[0..n].to_vec(), params.smoother2, params.fast.max(1), 2, params.a, params.b);
+        let mut p2 = params;
+        p2.a = params.ext[0] as f32 / 1.0e6;
+        let reg = bar_run(1350, [&atr, &sm, &l, &c, &v], p2, 0);
+        let mut score = smooth_series(&reg[0..n].to_vec(), params.smoother3, params.slow.max(1), 1, params.a, params.b);
+        if !score.is_empty() {
+            score[0] = 3.0;
+        }
+        return vec![score];
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

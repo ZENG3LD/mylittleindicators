@@ -10367,6 +10367,40 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Dynamic volatility regime score (1349, 1350).
+    #[test]
+    fn lane_matches_cpu_bar_batch60() {
+        use crate::indicators::regime::dynamic_volatility_regime::DynamicVolatilityRegime;
+        use crate::engine::contract_engine::SmootherId as S;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let (alpha, pers, omega, speed) = (0.1f64, 0.85f64, 1e-6f64, 0.1f64);
+        let mut p = CubeParams::period(14);
+        p.smoother = CubeSmoother::Sma;
+        p.a = alpha as f32;
+        p.b = (pers * (1.0 - alpha)) as f32;
+        p.c = omega as f32;
+        p.fast = 10;
+        p.smoother2 = CubeSmoother::Ema;
+        p.slow = 5;
+        p.smoother3 = CubeSmoother::Ema;
+        p.ext[0] = 100_000;
+        let mut m = DynamicVolatilityRegime::from_smoothers(alpha, pers, omega, speed, S::Sma);
+        chk(&run_cols(CubeFormula::DvrBar, &bars, p), bars.iter().map(|b| { m.feed(&[b.open, b.high, b.low, b.close, b.volume]); vec![m.value()] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
