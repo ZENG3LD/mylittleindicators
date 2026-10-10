@@ -6572,6 +6572,183 @@ fn bar_scan(
                 scr[2] = scr[1] / scr[0];
             }
             v0 = scr[2];
+        } else if formula == 1357u32 {
+            // adaptive channels (upper, centre, lower, width, adaptation level). Lanes: o = host centre (adaptive
+            // LinReg only), h / l / c = high / low / close, v = host ATR. period = channel period, b = ATR period (host sets it from `fast`),
+            // flag = adaptation mode (bits 0..3: 0 volatility, 1 trend, 2 cycle, 3 combined, 4 ML) | centre type << 4
+            // (0 KAMA 10/2/30, 1 fast KAMA 5/1/15, 2 slow KAMA 20/5/50, 3 adaptive LinReg: its KAMA is never fed, so
+            // every KAMA statistic stays 0). scr: 0 centre, 11 kama state, 1 ml factor, 2 upper, 3 lower, 4 width, 5 level, 6 ER,
+            // 7 smoothing constant, 8 adaptive period, 9 ER variance, 10 trend consistency; 16.. ER ring (100),
+            // 128.. direction ring (16).
+            let mode = flag & 15u32;
+            let ctype = flag >> 4u32;
+            let mut erp = 10usize;
+            let mut fsp = 2.0f32;
+            let mut slp = 30.0f32;
+            if ctype == 1u32 {
+                erp = 5usize;
+                fsp = 1.0f32;
+                slp = 15.0f32;
+            } else if ctype == 2u32 {
+                erp = 20usize;
+                fsp = 5.0f32;
+                slp = 50.0f32;
+            }
+            let fast_sc = 2.0f32 / (fsp + 1.0f32);
+            let slow_sc = 2.0f32 / (slp + 1.0f32);
+            let ppu = period as usize;
+            if t == 0usize {
+                scr[1] = 1.0f32;
+                scr[2] = 0.0f32;
+                scr[3] = 0.0f32;
+                scr[4] = 0.0f32;
+                scr[5] = 0.5f32;
+            }
+            let linreg = ctype == 3u32;
+            let mut kready = false;
+            if !linreg {
+                if t < erp {
+                    scr[11] = c[t];
+                }
+                if t >= erp {
+                    kready = true;
+                    let dr = (c[t] - c[t - erp]).abs();
+                    let mut vo = 0.0f32;
+                    for i in (t - erp + 1usize)..(t + 1usize) {
+                        vo = vo + (c[i] - c[i - 1usize]).abs();
+                    }
+                    let mut er = 0.0f32;
+                    if vo > 0.0f32 {
+                        er = (dr / vo).max(0.0f32).min(1.0f32);
+                    }
+                    scr[6] = er;
+                    let sc = (er * (fast_sc - slow_sc) + slow_sc) * (er * (fast_sc - slow_sc) + slow_sc);
+                    scr[7] = sc;
+                    if sc > 0.0f32 {
+                        scr[8] = 2.0f32 / sc - 1.0f32;
+                    } else {
+                        scr[8] = slp;
+                    }
+                    let k = t - erp;
+                    scr[16usize + k % 100usize] = er;
+                    scr[128usize + k % 16usize] = dr;
+                    // kama recursion (the warm-up value is the previous close)
+                    let kprev = scr[11];
+                    scr[11] = kprev + sc * (c[t] - kprev);
+                    let mut cnt = k + 1usize;
+                    if cnt > 100usize {
+                        cnt = 100usize;
+                    }
+                    let mut sm = 0.0f32;
+                    for i in 0..cnt {
+                        sm = sm + scr[16usize + (k - i) % 100usize];
+                    }
+                    let avg = sm / (cnt as f32);
+                    let mut vs = 0.0f32;
+                    for i in 0..cnt {
+                        let dv = scr[16usize + (k - i) % 100usize] - avg;
+                        vs = vs + dv * dv;
+                    }
+                    scr[9] = vs / (cnt as f32);
+                    scr[10] = 0.0f32;
+                    if k >= 9usize {
+                        let mut up = 0.0f32;
+                        let mut dn = 0.0f32;
+                        for i in 1..10usize {
+                            let newer = scr[128usize + (k - (i - 1usize)) % 16usize];
+                            let older = scr[128usize + (k - i) % 16usize];
+                            if newer < older {
+                                up = up + 1.0f32;
+                            } else if newer > older {
+                                dn = dn + 1.0f32;
+                            }
+                        }
+                        if up + dn > 0.0f32 {
+                            scr[10] = up.max(dn) / (up + dn);
+                        }
+                    }
+                }
+                scr[0] = scr[11];
+            } else {
+                scr[0] = o[t];
+                scr[6] = 0.0f32;
+                scr[8] = 0.0f32;
+                scr[9] = 0.0f32;
+                scr[10] = 0.0f32;
+            }
+            let atr = v[t];
+            let atr_ready = (t + 1usize) >= (b as usize);
+            let mut ready = atr_ready && kready;
+            if linreg {
+                ready = atr_ready && (t + 1usize) >= ppu;
+            }
+            let rng = h[t] - l[t];
+            let mut vr = 1.0f32;
+            if atr > 0.0f32 {
+                vr = rng / atr;
+            }
+            let er = scr[6];
+            let tc = scr[10];
+            // regime multiplier: trending 1.2, volatile 1.5, ranging 0.8, quiet 0.6, transition 1.0
+            let mut rm = 1.0f32;
+            if er > 0.7f32 && tc > 0.6f32 {
+                rm = 1.2f32;
+            } else if vr > 1.5f32 {
+                if er > 0.4f32 {
+                    rm = 1.5f32;
+                } else {
+                    rm = 0.8f32;
+                }
+            } else if vr < 0.7f32 && er < 0.3f32 {
+                rm = 0.6f32;
+            } else if er < 0.4f32 && tc < 0.3f32 {
+                rm = 0.8f32;
+            }
+            let mut vf = 1.0f32;
+            if atr > 0.0f32 {
+                vf = (rng / atr).max(0.3f32).min(3.0f32);
+            }
+            let pf = (scr[8] / (ppu as f32)).max(0.1f32).min(2.0f32);
+            let mut lvl = 0.5f32;
+            if mode == 0u32 {
+                lvl = vf / 3.0f32;
+            } else if mode == 1u32 {
+                lvl = er;
+            } else if mode == 3u32 {
+                lvl = (vf / 3.0f32 + er + pf / 2.0f32) / 3.0f32;
+            } else if mode == 4u32 {
+                lvl = scr[1];
+            }
+            scr[5] = lvl.max(0.0f32).min(1.0f32);
+            if t + 1usize >= 100usize {
+                let mut sm = 0.0f32;
+                for i in (t - 99usize)..(t + 1usize) {
+                    sm = sm + (h[i] - l[i]);
+                }
+                let mean = sm / 100.0f32;
+                let mut vs = 0.0f32;
+                for i in (t - 99usize)..(t + 1usize) {
+                    let dv = (h[i] - l[i]) - mean;
+                    vs = vs + dv * dv;
+                }
+                let sd = (vs / 100.0f32).sqrt();
+                if sd > 0.0f32 {
+                    let z = (rng - mean) / sd;
+                    scr[1] = (1.0f32 + z.abs() / 3.0f32).max(0.5f32).min(2.0f32);
+                }
+            }
+            if ready {
+                let evf = (1.0f32 + scr[9]).max(0.5f32).min(2.0f32);
+                let wd = atr * 2.0f32 * scr[5] * evf * rm;
+                scr[4] = wd;
+                scr[2] = scr[0] + wd;
+                scr[3] = scr[0] - wd;
+            }
+            v0 = scr[2];
+            v1 = scr[0];
+            v2 = scr[3];
+            v3 = scr[4];
+            v4 = scr[5];
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -7192,6 +7369,23 @@ fn launch_cube_bar_x(
         // period = bin count (6..=200), a = value area percent. The matrix output stays a CPU / host grid.
         let flat = bar_run(formula.code(), [&o, &h, &l, &c, &v], params, 0);
         return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec(), flat[2 * n..3 * n].to_vec()];
+    }
+    if formula == CubeFormula::AdaptivechanBar {
+        // period = channel period, fast = ATR period, smoother = ATR smoother, ext[0] = adaptation mode
+        // (0 volatility, 1 trend, 2 cycle, 3 combined, 4 ML), ext[1] = centre type (0 KAMA, 1 fast, 2 slow, 3 LinReg)
+        let atr = super::kernels_comp::atr_series(samples, params, params.smoother, params.fast.max(1), 0);
+        let centre = if params.ext[1] == 3 {
+            let mut lp = params;
+            lp.period = params.period.max(1);
+            super::kernels_comp::launch_cube_comp(CubeFormula::LrCols, samples, lp)[0].clone()
+        } else {
+            c.clone()
+        };
+        let flag = params.ext[0] | (params.ext[1] << 4);
+        let mut pb = params;
+        pb.b = params.fast as f32;
+        let flat = bar_run(formula.code(), [&centre, &h, &l, &c, &atr], pb, flag);
+        return (0..5).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect();
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

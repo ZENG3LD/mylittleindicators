@@ -79,7 +79,7 @@ mli_contract_macros::contract_universe! {
         Cv:              Fields       : Volatility +cube(comp_cv_comp)    => crate::indicators::volatility::chaikin_volatility::ChaikinVolatility,
         Rvi:             Field     : Oscillator +cube(comp_rvi_comp)    => crate::indicators::volatility::rvi::Rvi,
         Mi:              Fields      : Volatility +cube(comp_mi_comp)    => crate::indicators::volatility::mass_index::MassIndex,
-        Adaptivechan:    Fields       : Channel       => crate::indicators::channels::adaptive_channels::AdaptiveChannels { upper middle lower channel_width adaptation_level },
+        Adaptivechan:    Fields       : Channel +cube(comp_adaptchan_bar) => crate::indicators::channels::adaptive_channels::AdaptiveChannels { upper middle lower channel_width adaptation_level },
         BookImb:         OrderBook    : OrderBook +cube(book_imbalance)     => crate::indicators::book::imbalance::BookImbalanceRatio,
         LiquidationRate: Liquidation  : Liquidations +cube(ev_liq_rate)  => crate::indicators::liquidations::liquidation_rate::LiquidationRate,
         OiZScore:        OpenInterest : OpenInterest +cube(pop_zscore)  => crate::indicators::open_interest::oi_z_score::OiZScore,

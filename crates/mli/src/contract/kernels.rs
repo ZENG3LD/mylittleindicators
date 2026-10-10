@@ -10517,6 +10517,42 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Adaptive channels, KAMA / LinReg centres and modes (1357).
+    #[test]
+    fn lane_matches_cpu_bar_batch65() {
+        use crate::indicators::channels::adaptive_channels::{AdaptationMode as AM, AdaptiveChannels, CenterLineType as CT};
+        use crate::indicators::volatility::atr::Atr;
+        use crate::engine::contract_engine::SmootherId as S;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let go = |per: u32, mode: u32, ct: u32, am: AM, cty: CT| {
+            let mut p = CubeParams::period(per);
+            p.fast = 20;
+            p.smoother = CubeSmoother::Rma;
+            p.ext[0] = mode;
+            p.ext[1] = ct;
+            let mut m = AdaptiveChannels::new_custom_with_atr(per as usize, am, cty, 50, Atr::from_smoother(20, S::Rma));
+            chk(&run_cols(CubeFormula::AdaptivechanBar, &bars, p), bars.iter().map(|b| { m.feed(&[b.high, b.low, b.close]); vec![m.upper(), m.middle(), m.lower(), m.channel_width(), m.adaptation_level()] }).collect());
+        };
+        go(20, 3, 0, AM::Combined, CT::KAMA);
+        go(15, 0, 1, AM::Volatility, CT::FastKAMA);
+        go(25, 1, 2, AM::Trend, CT::SlowKAMA);
+        go(20, 4, 0, AM::MachineLearning, CT::KAMA);
+        go(14, 3, 3, AM::Combined, CT::AdaptiveLinReg);
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
