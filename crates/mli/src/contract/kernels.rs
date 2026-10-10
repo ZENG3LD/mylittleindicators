@@ -4248,6 +4248,9 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     if formula.code() >= 400 && formula.code() < 500 && formula.output_count() == 1 {
         return launch_cube_smoothed_gx(formula, samples, params);
     }
+    if formula.code() >= 830 && formula.code() < 850 {
+        return super::kernels_post::launch_cube_barsig(formula, samples, params).swap_remove(0);
+    }
     if formula.code() >= 810 && formula.code() < 830 {
         return super::kernels_post::launch_cube_signal2(formula, samples, params);
     }
@@ -4563,6 +4566,9 @@ pub fn launch_cube_columns(
     }
     if formula.code() >= 600 && formula.code() < 700 {
         return super::kernels_post::launch_cube_post_columns(formula, samples, params);
+    }
+    if formula.code() >= 830 && formula.code() < 850 {
+        return super::kernels_post::launch_cube_barsig(formula, samples, params);
     }
     assert!(
         !formula.needs_time(),
@@ -6897,6 +6903,40 @@ mod tests {
         let mut cp = CubeParams::period(1);
         cp.a = 0.01;
         assert_close(&run(CubeFormula::CusumFilter, &bars, cp), &cpu(&close, |v| { cf.feed(v); cf.event as f64 }));
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): bar-pattern signals 830..=833.
+    #[test]
+    fn lane_matches_cpu_barsig_batch() {
+        use crate::indicators::structure::bos_event_detector::BosEventDetector;
+        use crate::indicators::structure::fvg_event_detector::FvgEventDetector;
+        use crate::indicators::structure::pivot::Pivot;
+        use crate::indicators::swing::williams_fractals::WilliamsFractals;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let (mut up, mut dn) = (Vec::new(), Vec::new());
+        let mut f = WilliamsFractals::new();
+        for b in &bars {
+            let (u, d) = f.feed(&[b.high, b.low]);
+            up.push(if u { 1.0 } else { 0.0 });
+            dn.push(if d { 1.0 } else { 0.0 });
+        }
+        assert_cols(&run_cols(CubeFormula::Fractals, &bars, CubeParams::period(1)), &[&up, &dn]);
+
+        let mut f = FvgEventDetector::new();
+        let c: Vec<f64> = bars.iter().map(|b| { f.feed(&[b.high, b.low]); f.value() }).collect();
+        assert_close(&run(CubeFormula::FvgSig, &bars, CubeParams::period(1)), &c);
+
+        let mut pv = Pivot::new(3, 2);
+        let mut pp = CubeParams::period(1);
+        pp.fast = 3;
+        pp.slow = 2;
+        assert_close(&run(CubeFormula::NbarPivotSig, &bars, pp), &cpu(&close, |v| { pv.feed(v); pv.value() }));
+
+        let mut bo = BosEventDetector::new(8);
+        let c: Vec<f64> = bars.iter().map(|b| { bo.feed(&[b.high, b.low]); bo.value() }).collect();
+        assert_close(&run(CubeFormula::BosSig, &bars, CubeParams::period(8)), &c);
     }
 
     #[test]

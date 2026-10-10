@@ -409,6 +409,14 @@ pub enum CubeFormula {
     RelPositionSig = 815,
     /// CUSUM event filter on the lane (`a` threshold): 1 / -1 / 0. UNTESTED on GPU.
     CusumFilter = 816,
+    /// Williams fractals `[up, down]` as 1 / 0, from bar 4. UNTESTED on GPU.
+    Fractals = 830,
+    /// Fair value gap: 1 bull / -1 bear / 0, from bar 2. UNTESTED on GPU.
+    FvgSig = 831,
+    /// N-bar pivot of the lane: `fast` bars left, `slow` bars right; 1 high / -1 low. UNTESTED on GPU.
+    NbarPivotSig = 832,
+    /// Break of structure over `period` (at least 2) bars: 1 / -1 / 0. UNTESTED on GPU.
+    BosSig = 833,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -562,6 +570,7 @@ impl CubeFormula {
             CubeFormula::HeikinAshiCols => 4,
             CubeFormula::CandleAnatomyCols => 5,
             CubeFormula::Vortex => 2,
+            CubeFormula::Fractals => 2,
             CubeFormula::StartEndMonth
             | CubeFormula::StartEndQuarter
             | CubeFormula::StartEndWeek
@@ -817,6 +826,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Fractals), Some(CubeFormula::Fractals));
+        assert_eq!(formula_of(IndicatorId::Fvg), Some(CubeFormula::FvgSig));
+        assert_eq!(formula_of(IndicatorId::NbarPivot), Some(CubeFormula::NbarPivotSig));
+        assert_eq!(formula_of(IndicatorId::Bos), Some(CubeFormula::BosSig));
         assert_eq!(formula_of(IndicatorId::Logicand), Some(CubeFormula::LogicAnd));
         assert_eq!(formula_of(IndicatorId::Logicor), Some(CubeFormula::LogicOr));
         assert_eq!(formula_of(IndicatorId::Logicxor), Some(CubeFormula::LogicXor));

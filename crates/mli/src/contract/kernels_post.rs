@@ -773,3 +773,133 @@ pub fn launch_cube_signal2(
         _ => Vec::new(),
     }
 }
+
+/// Bar-pattern signals over two series. Ops: 40 Williams fractals (`[up, down]`, from bar 4),
+/// 41 fair value gap (+1 bull / -1 bear, from bar 2), 42 N-bar pivot on `hi` (`left`, `right`
+/// >= 1; +1 local high / -1 local low, from bar `left + right`), 43 break of structure
+/// (`left` = lookback >= 2; +1 new high over the previous `lookback - 1` bars, else -1 new low).
+#[cube]
+fn bar_sig_scan(hi: &[f32], lo: &[f32], out: &mut [f32], op: u32, left: u32, right: u32) {
+    let n = hi.len();
+    for i in 0..n {
+        let mut r0 = 0.0f32;
+        let mut r1 = 0.0f32;
+        if op == 40u32 {
+            if i >= 4 {
+                let hc = hi[i - 2];
+                let lc = lo[i - 2];
+                if hc > hi[i - 4] && hc > hi[i - 3] && hc > hi[i - 1] && hc > hi[i] {
+                    r0 = 1.0f32;
+                }
+                if lc < lo[i - 4] && lc < lo[i - 3] && lc < lo[i - 1] && lc < lo[i] {
+                    r1 = 1.0f32;
+                }
+            }
+        } else if op == 41u32 {
+            if i >= 2 {
+                let bull = lo[i - 1] > hi[i - 2] && lo[i - 1] > hi[i];
+                let bear = hi[i - 1] < lo[i - 2] && hi[i - 1] < lo[i];
+                if bull {
+                    r0 = 1.0f32;
+                } else if bear {
+                    r0 = -1.0f32;
+                }
+            }
+        } else if op == 42u32 {
+            let l = left as usize;
+            let r = right as usize;
+            let needed = l + r + 1;
+            if i + 1 >= needed {
+                let start = i + 1 - needed;
+                let pv = hi[start + l];
+                let mut is_high = true;
+                let mut is_low = true;
+                for k in 0..needed {
+                    if k != l {
+                        if hi[start + k] > pv {
+                            is_high = false;
+                        }
+                        if hi[start + k] < pv {
+                            is_low = false;
+                        }
+                    }
+                }
+                if is_high && !is_low {
+                    r0 = 1.0f32;
+                } else if is_low && !is_high {
+                    r0 = -1.0f32;
+                }
+            }
+        } else if op == 43u32 {
+            let lb = left as usize;
+            if i + 1 >= lb {
+                let mut pmax = hi[i - 1];
+                let mut pmin = lo[i - 1];
+                for k in 1..lb {
+                    if hi[i - k] > pmax {
+                        pmax = hi[i - k];
+                    }
+                    if lo[i - k] < pmin {
+                        pmin = lo[i - k];
+                    }
+                }
+                if hi[i] > pmax {
+                    r0 = 1.0f32;
+                } else if lo[i] < pmin {
+                    r0 = -1.0f32;
+                }
+            }
+        }
+        out[i] = r0;
+        out[n + i] = r1;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_sig_map(hi: &[f32], lo: &[f32], out: &mut [f32], op: u32, left: u32, right: u32) {
+    bar_sig_scan(hi, lo, out, op, left, right);
+}
+
+/// Launch a bar-pattern signal (codes 830..=849). Returns one column, or two for fractals.
+pub fn launch_cube_barsig(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    params: CubeParams,
+) -> Vec<Vec<f32>> {
+    let n = samples.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let cols = super::GpuSample::columns(samples);
+    let (op, hi, lo, left, right) = match formula {
+        CubeFormula::Fractals => (40u32, cols.high.clone(), cols.low.clone(), 0u32, 0u32),
+        CubeFormula::FvgSig => (41, cols.high.clone(), cols.low.clone(), 0, 0),
+        CubeFormula::NbarPivotSig => {
+            let lane = launch_cube(CubeFormula::Identity, samples, params);
+            (42, lane.clone(), lane, params.fast.max(1), params.slow.max(1))
+        }
+        _ => (43, cols.high.clone(), cols.low.clone(), params.period.max(2), 0),
+    };
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let hb = client.create_from_slice(f32::as_bytes(&hi));
+    let lb = client.create_from_slice(f32::as_bytes(&lo));
+    let out = client.empty(2 * n * core::mem::size_of::<f32>());
+    unsafe {
+        bar_sig_map::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(hb, n),
+            BufferArg::from_raw_parts(lb, n),
+            BufferArg::from_raw_parts(out.clone(), 2 * n),
+            op,
+            left,
+            right,
+        );
+    }
+    let bytes = client.read_one_unchecked(out);
+    let flat = f32::from_bytes(&bytes).to_vec();
+    let c = formula.output_count() as usize;
+    (0..c).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect()
+}
