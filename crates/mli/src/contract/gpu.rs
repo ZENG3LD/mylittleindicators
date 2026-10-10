@@ -155,6 +155,22 @@ pub enum CubeFormula {
     /// Bipower variance of the lane. First sample is 0. Scaled by `(pi/2) * 252 * 10000`.
     /// Products follow the feed's ring slots, not time order.
     Bipower = 53,
+    /// Vertical horizontal filter of the lane. Zero until `period` samples.
+    Vhf = 54,
+    /// Polarized fractal efficiency of the lane, in `[-100, 100]`. Zero until the window
+    /// is full. `period` is clamped to 5..=1024.
+    Pfe = 55,
+    /// Population z-score of volume. Zero until two samples.
+    VolumeZ = 56,
+    /// Z-score of `close - close[period]`. The z window is [`CubeParams::fast`] (at least 2).
+    /// Zero until two such diffs exist.
+    MomZ = 57,
+    /// Bollinger %B with an SMA center. `0.5` until `period` samples.
+    /// [`CubeParams::a`] is the standard-deviation multiple (at least 0.1).
+    PercentB = 58,
+    /// Chande forecast oscillator. `100 * (price - regression endpoint) / price`.
+    /// Zero until `period` samples. `period` below 2 is 2.
+    Cfo = 59,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -304,6 +320,12 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Pzo), Some(CubeFormula::Pzo));
         assert_eq!(formula_of(IndicatorId::Cog), Some(CubeFormula::Cog));
         assert_eq!(formula_of(IndicatorId::Bpv), Some(CubeFormula::Bipower));
+        assert_eq!(formula_of(IndicatorId::Vhf), Some(CubeFormula::Vhf));
+        assert_eq!(formula_of(IndicatorId::Pfe), Some(CubeFormula::Pfe));
+        assert_eq!(formula_of(IndicatorId::Vz), Some(CubeFormula::VolumeZ));
+        assert_eq!(formula_of(IndicatorId::MomZscore), Some(CubeFormula::MomZ));
+        assert_eq!(formula_of(IndicatorId::Percentb), Some(CubeFormula::PercentB));
+        assert_eq!(formula_of(IndicatorId::Cfo), Some(CubeFormula::Cfo));
     }
 
     #[cfg(feature = "gpu-shader")]

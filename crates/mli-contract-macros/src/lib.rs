@@ -208,6 +208,12 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "pzo" => "Pzo",
         "cog" => "Cog",
         "bipower" => "Bipower",
+        "vhf" => "Vhf",
+        "pfe" => "Pfe",
+        "volume_z" => "VolumeZ",
+        "mom_z" => "MomZ",
+        "percent_b" => "PercentB",
+        "cfo" => "Cfo",
         _ => {
             return Err(syn::Error::new(
                 name.span(),
