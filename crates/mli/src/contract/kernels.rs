@@ -4242,6 +4242,9 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     if formula.is_smoothed() {
         return launch_cube_smoothed(formula, samples, params);
     }
+    if formula.code() >= 200 && formula.code() < 300 {
+        return launch_cube_gx(formula, samples, params);
+    }
     if formula.output_count() > 1 {
         // Multi-column formulas return their first column here; use `launch_cube_columns` for all.
         return launch_cube_columns(formula, samples, params).swap_remove(0);
@@ -4708,6 +4711,655 @@ pub fn launch_cube_timed(
     f32::from_bytes(&bytes).to_vec()
 }
 
+// ---------------------------------------------------------------------------
+// gx entries: formulas 200..=299. UNTESTED on GPU (no GPU on the authoring box).
+// A new batch is a new entry (`gx_scan_c`, ...), never a new arm in an old one.
+// ---------------------------------------------------------------------------
+
+/// `(high + low) / 2` smoothed `(p0 + 2 p1 + 2 p2 + p3) / 6` at bar `j >= 3`.
+#[cube]
+fn hl2_fir(high: &[f32], low: &[f32], j: usize) -> f32 {
+    let p3 = (high[j] + low[j]) / 2.0f32;
+    let p2 = (high[j - 1] + low[j - 1]) / 2.0f32;
+    let p1 = (high[j - 2] + low[j - 2]) / 2.0f32;
+    let p0 = (high[j - 3] + low[j - 3]) / 2.0f32;
+    (p3 + 2.0f32 * p2 + 2.0f32 * p1 + p0) / 6.0f32
+}
+
+/// `RealizedVol` of the lane at bar `i` over `win` returns. Zero at bar 0.
+/// `a > 0` multiplies the result.
+#[cube]
+fn rv_at(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    i: usize,
+    win: usize,
+    lane: u32,
+    a: f32,
+) -> f32 {
+    let mut out = 0.0f32;
+    if i > 0 {
+        let mut use_n = i;
+        if use_n > win {
+            use_n = win;
+        }
+        let mut sum = 0.0f32;
+        for t in 0..use_n {
+            let j = i - use_n + 1 + t;
+            let mut pv = fld(open, high, low, close, volume, j - 1, lane);
+            if pv < 1.0e-12f32 {
+                pv = 1.0e-12f32;
+            }
+            let cx = fld(open, high, low, close, volume, j, lane);
+            let r = (cx / pv).ln();
+            sum = sum + r * r;
+        }
+        let vol = sqrt_f(sum / (use_n as f32));
+        if a > 0.0f32 {
+            out = vol * a;
+        } else {
+            out = vol;
+        }
+    }
+    out
+}
+
+/// `BipowerVariance` of the lane at bar `k` (ring-slot products as the feed). Zero at bar 0.
+#[cube]
+fn bpv_at(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    k: usize,
+    win: usize,
+    lane: u32,
+) -> f32 {
+    let pi = 3.14159274f32;
+    let mut res = 0.0f32;
+    if k > 0 {
+        let mut len = k;
+        if len > win {
+            len = win;
+        }
+        let mut newest = k - 1;
+        for _step in 0..k {
+            if newest >= win {
+                newest = newest - win;
+            }
+        }
+        let mut s = 0.0f32;
+        for t in 1..len {
+            let mut age_hi = newest + win - t;
+            if t <= newest {
+                age_hi = newest - t;
+            }
+            let mut age_lo = newest + win - (t - 1);
+            if t - 1 <= newest {
+                age_lo = newest - (t - 1);
+            }
+            let r_hi = k - age_hi;
+            let r_lo = k - age_lo;
+            let mut pv_hi = fld(open, high, low, close, volume, r_hi - 1, lane);
+            if pv_hi < 1.0e-12f32 {
+                pv_hi = 1.0e-12f32;
+            }
+            let mut ar_hi = (fld(open, high, low, close, volume, r_hi, lane) / pv_hi).ln();
+            if ar_hi < 0.0f32 {
+                ar_hi = -ar_hi;
+            }
+            let mut pv_lo = fld(open, high, low, close, volume, r_lo - 1, lane);
+            if pv_lo < 1.0e-12f32 {
+                pv_lo = 1.0e-12f32;
+            }
+            let mut ar_lo = (fld(open, high, low, close, volume, r_lo, lane) / pv_lo).ln();
+            if ar_lo < 0.0f32 {
+                ar_lo = -ar_lo;
+            }
+            s = s + ar_hi * ar_lo;
+        }
+        let mut denom = (len as f32) - 1.0f32;
+        if denom < 1.0f32 {
+            denom = 1.0f32;
+        }
+        res = pi * 0.5f32 * (s / denom) * 252.0f32 * 10000.0f32;
+    }
+    res
+}
+
+/// gx formulas 200 through 204: scalar-state recursions over bars.
+#[cube]
+fn gx_scan_a(
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    output: &mut [f32],
+    period: u32,
+    a: f32,
+    b: f32,
+    c: f32,
+    formula: u32,
+) {
+    let n = high.len();
+    if formula == 200u32 {
+        // Parabolic SAR. a = af start, b = af step, c = af cap.
+        let mut sar = 0.0f32;
+        let mut up = 1u32;
+        let mut af = a;
+        let mut ep = 0.0f32;
+        let mut last_high = 0.0f32;
+        let mut last_low = 0.0f32;
+        for i in 0..n {
+            let h = high[i];
+            let l = low[i];
+            let prev_high = last_high;
+            let prev_low = last_low;
+            last_high = h;
+            last_low = l;
+            if i == 0 {
+                sar = l;
+                ep = h;
+                up = 1u32;
+            } else if i == 1 {
+                if h > prev_high {
+                    up = 1u32;
+                    sar = prev_low;
+                    if l < prev_low {
+                        sar = l;
+                    }
+                    ep = h;
+                } else {
+                    up = 0u32;
+                    sar = prev_high;
+                    if h > prev_high {
+                        sar = h;
+                    }
+                    ep = l;
+                }
+                af = a;
+            } else {
+                let prev_sar = sar;
+                let new_sar = prev_sar + af * (ep - prev_sar);
+                sar = new_sar;
+                if up == 1u32 {
+                    let mut min_low = prev_low;
+                    if last_low < min_low {
+                        min_low = last_low;
+                    }
+                    if sar > min_low {
+                        sar = min_low;
+                    }
+                    if h > ep {
+                        ep = h;
+                        af = af + b;
+                        if af > c {
+                            af = c;
+                        }
+                    }
+                    if l <= sar {
+                        up = 0u32;
+                        sar = ep;
+                        ep = l;
+                        af = a;
+                    }
+                } else {
+                    let mut max_high = prev_high;
+                    if last_high > max_high {
+                        max_high = last_high;
+                    }
+                    if sar < max_high {
+                        sar = max_high;
+                    }
+                    if l < ep {
+                        ep = l;
+                        af = af + b;
+                        if af > c {
+                            af = c;
+                        }
+                    }
+                    if h >= sar {
+                        up = 1u32;
+                        sar = ep;
+                        ep = h;
+                        af = a;
+                    }
+                }
+            }
+            output[i] = sar;
+        }
+    } else if formula == 201u32 {
+        // Supertrend with Wilder ATR. period = ATR period, a = multiplier.
+        let mut p = period as usize;
+        if p < 1 {
+            p = 1;
+        }
+        let pf = p as f32;
+        let mut atr = 0.0f32;
+        let mut prev_super = 0.0f32;
+        let mut prev_up = 1u32;
+        for i in 0..n {
+            if i == 0 {
+                atr = high[0] - low[0];
+            } else {
+                atr = (atr * (pf - 1.0f32) + wilder_tr(high, low, close, i)) / pf;
+            }
+            let hl2 = (high[i] + low[i]) / 2.0f32;
+            let ub = hl2 + a * atr;
+            let lb = hl2 - a * atr;
+            let cl = close[i];
+            let mut fub = ub;
+            let mut flb = lb;
+            if i > 0 {
+                let mut pfu = ub;
+                if prev_up == 1u32 {
+                    pfu = prev_super;
+                }
+                if ub < pfu || cl > pfu {
+                    fub = ub;
+                } else {
+                    fub = pfu;
+                }
+                let mut pfl = lb;
+                if prev_up == 0u32 {
+                    pfl = prev_super;
+                }
+                if lb > pfl || cl < pfl {
+                    flb = lb;
+                } else {
+                    flb = pfl;
+                }
+            }
+            let mut cur_up = prev_up;
+            if i == 0 {
+                if cl <= fub {
+                    cur_up = 0u32;
+                } else {
+                    cur_up = 1u32;
+                }
+            } else if prev_up == 1u32 && cl <= flb {
+                cur_up = 0u32;
+            } else if prev_up == 0u32 && cl >= fub {
+                cur_up = 1u32;
+            }
+            let mut sv = fub;
+            if cur_up == 1u32 {
+                sv = flb;
+            }
+            prev_super = sv;
+            prev_up = cur_up;
+            output[i] = sv;
+        }
+    } else if formula == 202u32 || formula == 203u32 {
+        // ADX (202) and its slope (203). Wilder ATR value feeds the DM sums, as Adx::feed.
+        let mut p = period as usize;
+        if p < 1 {
+            p = 1;
+        }
+        if formula == 203u32 {
+            if p < 2 {
+                p = 2;
+            }
+        }
+        let pf = p as f32;
+        let sf = 1.0f32 / pf;
+        let mut atr = 0.0f32;
+        let mut tr_sum = 0.0f32;
+        let mut pdm_sum = 0.0f32;
+        let mut mdm_sum = 0.0f32;
+        let mut adx = 0.0f32;
+        let mut prev_adx = 0.0f32;
+        let mut slope = 0.0f32;
+        for i in 0..n {
+            if i > 0 {
+                if i == 1 {
+                    atr = high[1] - low[1];
+                } else {
+                    atr = (atr * (pf - 1.0f32) + wilder_tr(high, low, close, i)) / pf;
+                }
+                let up_move = high[i] - high[i - 1];
+                let down_move = low[i - 1] - low[i];
+                let mut pdm = 0.0f32;
+                let mut mdm = 0.0f32;
+                if up_move > down_move {
+                    if up_move > 0.0f32 {
+                        pdm = up_move;
+                    }
+                }
+                if down_move > up_move {
+                    if down_move > 0.0f32 {
+                        mdm = down_move;
+                    }
+                }
+                let mut do_calc = false;
+                if i <= p {
+                    tr_sum = tr_sum + atr;
+                    pdm_sum = pdm_sum + pdm;
+                    mdm_sum = mdm_sum + mdm;
+                    if i == p {
+                        do_calc = true;
+                    }
+                } else {
+                    tr_sum = tr_sum - tr_sum * sf + atr;
+                    pdm_sum = pdm_sum - pdm_sum * sf + pdm;
+                    mdm_sum = mdm_sum - mdm_sum * sf + mdm;
+                    do_calc = true;
+                }
+                if do_calc {
+                    let mut abs_tr = tr_sum;
+                    if abs_tr < 0.0f32 {
+                        abs_tr = -abs_tr;
+                    }
+                    if abs_tr >= 1.0e-12f32 {
+                        let pdi = (pdm_sum / tr_sum) * 100.0f32;
+                        let mdi = (mdm_sum / tr_sum) * 100.0f32;
+                        let di_sum = pdi + mdi;
+                        let mut abs_sum = di_sum;
+                        if abs_sum < 0.0f32 {
+                            abs_sum = -abs_sum;
+                        }
+                        let mut dx = 0.0f32;
+                        if abs_sum >= 1.0e-12f32 {
+                            let mut dd = pdi - mdi;
+                            if dd < 0.0f32 {
+                                dd = -dd;
+                            }
+                            dx = (dd / di_sum) * 100.0f32;
+                        }
+                        if i <= p {
+                            if p == 1 {
+                                adx = dx;
+                            }
+                        } else {
+                            adx = adx - adx * sf + dx * sf;
+                        }
+                    }
+                }
+            }
+            if i + 1 > p + p {
+                if i >= p {
+                    slope = adx - prev_adx;
+                    prev_adx = adx;
+                }
+            }
+            if formula == 203u32 {
+                output[i] = slope;
+            } else {
+                output[i] = adx;
+            }
+        }
+    } else if formula == 204u32 {
+        // CusumBreakDetector. a = threshold, b = kappa.
+        let mut pos = 0.0f32;
+        let mut neg = 0.0f32;
+        let mut value = 0.0f32;
+        for i in 0..n {
+            if i > 0 {
+                let r = (close[i] / close[i - 1]).ln();
+                pos = b * (pos + r);
+                if pos < 0.0f32 {
+                    pos = 0.0f32;
+                }
+                neg = b * (neg - r);
+                if neg < 0.0f32 {
+                    neg = 0.0f32;
+                }
+                let mut hit_pos = pos - a;
+                if hit_pos < 0.0f32 {
+                    hit_pos = 0.0f32;
+                }
+                let mut hit_neg = neg - a;
+                if hit_neg < 0.0f32 {
+                    hit_neg = 0.0f32;
+                }
+                value = hit_pos;
+                if hit_neg > value {
+                    value = hit_neg;
+                }
+                if hit_pos > 0.0f32 {
+                    pos = 0.0f32;
+                }
+                if hit_neg > 0.0f32 {
+                    neg = 0.0f32;
+                }
+            }
+            output[i] = value;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn gx_map_a(
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    output: &mut [f32],
+    period: u32,
+    a: f32,
+    b: f32,
+    c: f32,
+    formula: u32,
+) {
+    gx_scan_a(high, low, close, output, period, a, b, c, formula);
+}
+
+/// gx formulas 205 through 208: windowed volatility and the hl2 cycle.
+#[cube]
+fn gx_scan_b(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    fast: u32,
+    slow: u32,
+    a: f32,
+    formula: u32,
+) {
+    let n = open.len();
+    if formula == 205u32 {
+        // HAR-RV: windows period / fast / slow.
+        let mut wd = period as usize;
+        if wd < 1 {
+            wd = 1;
+        }
+        let mut ww = fast as usize;
+        if ww < 1 {
+            ww = 1;
+        }
+        let mut wm = slow as usize;
+        if wm < 1 {
+            wm = 1;
+        }
+        for i in 0..n {
+            let rd = rv_at(open, high, low, close, volume, i, wd, lane, a);
+            let rw = rv_at(open, high, low, close, volume, i, ww, lane, a);
+            let rm = rv_at(open, high, low, close, volume, i, wm, lane, a);
+            output[i] = 0.6f32 * rd + 0.3f32 * rw + 0.1f32 * rm;
+        }
+    } else if formula == 206u32 {
+        // RbvJumpTest.
+        let mut win = period as usize;
+        if win < 2 {
+            win = 2;
+        }
+        for i in 0..n {
+            let bv = bpv_at(open, high, low, close, volume, i, win, lane);
+            let rv = rv_at(open, high, low, close, volume, i, win, lane, a);
+            let mut v = 0.0f32;
+            if bv > 0.0f32 {
+                let mut dm = rv * rv - bv;
+                if dm < 0.0f32 {
+                    dm = 0.0f32;
+                }
+                v = dm / (bv + 1.0e-9f32);
+            }
+            output[i] = v;
+        }
+    } else if formula == 207u32 {
+        // VolOfVol, AbsReturn source: std of the last `win` |ln(c / c_prev)|.
+        let mut win = period as usize;
+        if win < 2 {
+            win = 2;
+        }
+        let mut value = 0.0f32;
+        for i in 0..n {
+            if i >= 1 {
+                let mut cnt = i;
+                if cnt > win {
+                    cnt = win;
+                }
+                if cnt >= 2 {
+                    let first = i - cnt + 1;
+                    let mut sum = 0.0f32;
+                    for t in 0..cnt {
+                        let j = first + t;
+                        let mut pv = close[j - 1];
+                        if pv < 1.0e-12f32 {
+                            pv = 1.0e-12f32;
+                        }
+                        let mut x = (close[j] / pv).ln();
+                        if x < 0.0f32 {
+                            x = -x;
+                        }
+                        sum = sum + x;
+                    }
+                    let mean = sum / (cnt as f32);
+                    let mut ss = 0.0f32;
+                    for t in 0..cnt {
+                        let j = first + t;
+                        let mut pv = close[j - 1];
+                        if pv < 1.0e-12f32 {
+                            pv = 1.0e-12f32;
+                        }
+                        let mut x = (close[j] / pv).ln();
+                        if x < 0.0f32 {
+                            x = -x;
+                        }
+                        let d = x - mean;
+                        ss = ss + d * d;
+                    }
+                    value = sqrt_f(ss / (cnt as f32));
+                }
+            }
+            output[i] = value;
+        }
+    } else if formula == 208u32 {
+        // EhlersCyberCycle of (high + low) / 2. a = alpha.
+        let mut alpha = a;
+        if alpha < 0.01f32 {
+            alpha = 0.01f32;
+        }
+        if alpha > 0.99f32 {
+            alpha = 0.99f32;
+        }
+        let omh = 1.0f32 - 0.5f32 * alpha;
+        let c1 = omh * omh;
+        let c2 = 2.0f32 * (1.0f32 - alpha);
+        let c3 = (1.0f32 - alpha) * (1.0f32 - alpha);
+        let mut cyc1 = 0.0f32;
+        let mut cyc2 = 0.0f32;
+        let mut ncyc = 0u32;
+        let mut value = 0.0f32;
+        for i in 0..n {
+            if i >= 5 {
+                let s2 = hl2_fir(high, low, i);
+                let s1 = hl2_fir(high, low, i - 1);
+                let s0 = hl2_fir(high, low, i - 2);
+                let sd = s2 - 2.0f32 * s1 + s0;
+                let mut cycle = c1 * sd;
+                if ncyc >= 1u32 {
+                    cycle = cycle + c2 * cyc1;
+                }
+                if ncyc >= 2u32 {
+                    cycle = cycle - c3 * cyc2;
+                }
+                cyc2 = cyc1;
+                cyc1 = cycle;
+                ncyc = ncyc + 1u32;
+                value = cycle;
+            }
+            output[i] = value;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn gx_map_b(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    fast: u32,
+    slow: u32,
+    a: f32,
+    formula: u32,
+) {
+    gx_scan_b(open, high, low, close, volume, output, lane, period, fast, slow, a, formula);
+}
+
+/// Launch for the gx single-output formulas (code 200..=299).
+fn launch_cube_gx(formula: CubeFormula, samples: &[GpuSample], params: CubeParams) -> Vec<f32> {
+    let n = samples.len();
+    let c = GpuSample::columns(samples);
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let open_b = client.create_from_slice(f32::as_bytes(&c.open));
+    let high_b = client.create_from_slice(f32::as_bytes(&c.high));
+    let low_b = client.create_from_slice(f32::as_bytes(&c.low));
+    let close_b = client.create_from_slice(f32::as_bytes(&c.close));
+    let volume_b = client.create_from_slice(f32::as_bytes(&c.volume));
+    let output = client.empty(n * core::mem::size_of::<f32>());
+    unsafe {
+        if formula.code() < 205 {
+            gx_map_a::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(output.clone(), n),
+                params.period,
+                params.a,
+                params.b,
+                params.c,
+                formula.code(),
+            );
+        } else {
+            gx_map_b::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(open_b, n),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(volume_b, n),
+                BufferArg::from_raw_parts(output.clone(), n),
+                params.lane.code(),
+                params.period,
+                params.fast,
+                params.slow,
+                params.a,
+                formula.code(),
+            );
+        }
+    }
+    let bytes = client.read_one_unchecked(output);
+    f32::from_bytes(&bytes).to_vec()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4903,6 +5555,102 @@ mod tests {
 
     fn cpu(values: &[f64], mut step: impl FnMut(f64) -> f64) -> Vec<f64> {
         values.iter().copied().map(|v| step(v)).collect()
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): gx batch 1, codes 200..=208.
+    #[test]
+    fn lane_matches_cpu_gx_batch1() {
+        use crate::indicators::statistics::cusum_break_detector::CusumBreakDetector;
+        use crate::indicators::trend::adx::Adx;
+        use crate::indicators::trend::adx_slope::AdxSlope;
+        use crate::indicators::trend::supertrend::Supertrend;
+        use crate::indicators::trend_stop::parabolic_sar::ParabolicSAR;
+        use crate::indicators::trend_stop::psar_stop::PSARStop;
+        use crate::indicators::momentum::ehlers_cyber_cycle::EhlersCyberCycle;
+        use crate::indicators::volatility::har_rv::HarRv;
+        use crate::indicators::volatility::rbv_jump_test::RbvJumpTest;
+        use crate::indicators::volatility::vol_of_vol::{VoVSource, VolOfVol};
+
+        let bars = bars(70);
+
+        let mut sar = ParabolicSAR::with_params(0.02, 0.02, 0.2);
+        let cpu_sar: Vec<f64> = bars.iter().map(|b| sar.feed(&[b.high, b.low])).collect();
+        let mut sar_params = CubeParams::period(1);
+        sar_params.a = 0.02;
+        sar_params.b = 0.02;
+        sar_params.c = 0.2;
+        assert_close(&run(CubeFormula::Psar, &bars, sar_params), &cpu_sar);
+
+        let mut psars = PSARStop::with_params(0.03, 0.01, 0.25);
+        let cpu_psars: Vec<f64> = bars
+            .iter()
+            .map(|b| psars.feed(&[b.high, b.low, b.close]))
+            .collect();
+        let mut psars_params = CubeParams::period(1);
+        psars_params.a = 0.03;
+        psars_params.b = 0.01;
+        psars_params.c = 0.25;
+        assert_close(&run(CubeFormula::Psar, &bars, psars_params), &cpu_psars);
+
+        let mut st = Supertrend::with_params(7, 3.0);
+        let cpu_st: Vec<f64> = bars
+            .iter()
+            .map(|b| st.feed(&[b.high, b.low, b.close]))
+            .collect();
+        let mut st_params = CubeParams::period(7);
+        st_params.a = 3.0;
+        assert_close(&run(CubeFormula::Supertrend, &bars, st_params), &cpu_st);
+
+        let mut adx = Adx::new(5);
+        let cpu_adx: Vec<f64> = bars
+            .iter()
+            .map(|b| adx.feed(&[b.high, b.low, b.close]))
+            .collect();
+        assert_close(&run(CubeFormula::Adx, &bars, CubeParams::period(5)), &cpu_adx);
+
+        let mut adx_slope = AdxSlope::new(5);
+        let cpu_adx_slope: Vec<f64> = bars
+            .iter()
+            .map(|b| adx_slope.feed(&[b.high, b.low, b.close]))
+            .collect();
+        assert_close(
+            &run(CubeFormula::AdxSlope, &bars, CubeParams::period(5)),
+            &cpu_adx_slope,
+        );
+
+        let mut cusum = CusumBreakDetector::new(0.02, 0.9);
+        let cpu_cusum: Vec<f64> = bars.iter().map(|b| cusum.feed(b.close)).collect();
+        let mut cusum_params = CubeParams::period(1);
+        cusum_params.a = 0.02;
+        cusum_params.b = 0.9;
+        assert_close(&run(CubeFormula::Cusum, &bars, cusum_params), &cpu_cusum);
+
+        let mut har = HarRv::new(3, 7, 15, 252.0_f64.sqrt());
+        let cpu_har: Vec<f64> = bars.iter().map(|b| har.feed(b.close)).collect();
+        let mut har_params = CubeParams::period(3);
+        har_params.fast = 7;
+        har_params.slow = 15;
+        har_params.a = 252.0_f64.sqrt() as f32;
+        assert_close(&run(CubeFormula::Har, &bars, har_params), &cpu_har);
+
+        let mut rbvj = RbvJumpTest::new(8, 252.0);
+        let cpu_rbvj: Vec<f64> = bars.iter().map(|b| rbvj.feed(&[b.close])).collect();
+        let mut rbvj_params = CubeParams::period(8);
+        rbvj_params.a = 252.0;
+        assert_close(&run(CubeFormula::Rbvj, &bars, rbvj_params), &cpu_rbvj);
+
+        let mut vov = VolOfVol::new(VoVSource::AbsReturn, 8);
+        let cpu_vov: Vec<f64> = bars
+            .iter()
+            .map(|b| vov.feed(&[b.high, b.low, b.close]))
+            .collect();
+        assert_close(&run(CubeFormula::VolOfVol, &bars, CubeParams::period(8)), &cpu_vov);
+
+        let mut ecc = EhlersCyberCycle::new(0.07);
+        let cpu_ecc: Vec<f64> = bars.iter().map(|b| ecc.feed(&[b.high, b.low])).collect();
+        let mut ecc_params = CubeParams::period(1);
+        ecc_params.a = 0.07;
+        assert_close(&run(CubeFormula::EhlersCc, &bars, ecc_params), &cpu_ecc);
     }
 
     #[test]

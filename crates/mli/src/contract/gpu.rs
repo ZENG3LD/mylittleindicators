@@ -285,6 +285,24 @@ pub enum CubeFormula {
     MonthEffect = 142,
     /// Day-of-month / week-of-quarter effect readout: mean of the non-zero day-of-month mean returns (the feed's `woq()` value). Use `launch_cube_timed`.
     DayOfMonthEffect = 143,
+    /// Parabolic SAR of high and low. [`CubeParams::a`] is the start AF, [`CubeParams::b`] the AF step, [`CubeParams::c`] the AF cap. Output is the SAR level. Shared by `Psar` and `Psars` (`PSARStop` returns the SAR of its inner `ParabolicSAR`). UNTESTED on GPU.
+    Psar = 200,
+    /// Supertrend level with the default Wilder (RMA) ATR. `period` is the ATR period, [`CubeParams::a`] the multiplier. UNTESTED on GPU.
+    Supertrend = 201,
+    /// ADX with Wilder (RMA) ATR as in `Adx::feed`: bar 0 is 0, the ATR value (not the true range) feeds the DM sums, ADX stays 0 until `period` bars. UNTESTED on GPU.
+    Adx = 202,
+    /// ADX slope: `AdxSlope::feed`. `period` below 2 is 2. Holds the last slope until the ADX is ready (`count > 2 * period`). UNTESTED on GPU.
+    AdxSlope = 203,
+    /// `CusumBreakDetector`: [`CubeParams::a`] is the threshold, [`CubeParams::b`] the decay `kappa`. First bar is 0. UNTESTED on GPU.
+    Cusum = 204,
+    /// HAR-RV: `0.6 rv(period) + 0.3 rv(fast) + 0.1 rv(slow)` with the `RealizedVol` kernel arm. [`CubeParams::a`] is the annualize factor (multiplies when > 0). UNTESTED on GPU.
+    Har = 205,
+    /// Realized bipower jump test: `max(rv^2 - bv, 0) / (bv + 1e-9)` when `bv > 0`. `period` is the window (at least 2), [`CubeParams::a`] the annualize factor of `rv`. Uses the `Bipower` ring-slot products. UNTESTED on GPU.
+    Rbvj = 206,
+    /// Volatility of volatility, `AbsReturn` source only: population std of the last `period` (at least 2) `|ln(c/c_prev)|` values. Zero until two such values exist. The `Atr` source stays on the CPU. UNTESTED on GPU.
+    VolOfVol = 207,
+    /// Ehlers cyber cycle of `(high + low) / 2`: `EhlersCyberCycle`. [`CubeParams::a`] is alpha clamped to `[0.01, 0.99]`. Holds 0 until six bars. UNTESTED on GPU.
+    EhlersCc = 208,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -347,6 +365,8 @@ pub struct CubeParams {
     pub signal: u32,
     pub a: f32,
     pub b: f32,
+    /// Third scalar coefficient (Parabolic SAR AF cap and the like). Default `0.0`.
+    pub c: f32,
     pub flag: u32,
     /// Book levels to sum. `1` is top of book.
     pub levels: u32,
@@ -375,6 +395,7 @@ impl CubeParams {
             signal: 9,
             a: 0.85,
             b: 6.0,
+            c: 0.0,
             flag: 0,
             levels: 1,
             slot: 0,
@@ -642,6 +663,16 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::MonthQtr), Some(CubeFormula::MonthEffect));
         assert_eq!(formula_of(IndicatorId::DomWoq), Some(CubeFormula::DayOfMonthEffect));
         assert_eq!(formula_of(IndicatorId::Hampel), Some(CubeFormula::Hampel));
+        assert_eq!(formula_of(IndicatorId::Psar), Some(CubeFormula::Psar));
+        assert_eq!(formula_of(IndicatorId::Psars), Some(CubeFormula::Psar));
+        assert_eq!(formula_of(IndicatorId::Supertrend), Some(CubeFormula::Supertrend));
+        assert_eq!(formula_of(IndicatorId::Adx), Some(CubeFormula::Adx));
+        assert_eq!(formula_of(IndicatorId::AdxSlope), Some(CubeFormula::AdxSlope));
+        assert_eq!(formula_of(IndicatorId::Cusum), Some(CubeFormula::Cusum));
+        assert_eq!(formula_of(IndicatorId::Har), Some(CubeFormula::Har));
+        assert_eq!(formula_of(IndicatorId::Rbvj), Some(CubeFormula::Rbvj));
+        assert_eq!(formula_of(IndicatorId::Vov), Some(CubeFormula::VolOfVol));
+        assert_eq!(formula_of(IndicatorId::EhlersCc), Some(CubeFormula::EhlersCc));
         assert_eq!(gpu_of(IndicatorId::Decyc), GpuMode::Shader);
         assert_eq!(formula_of(IndicatorId::Decyc), None);
         let spec = shader_of(IndicatorId::Decyc).expect("decycler shader");

@@ -267,6 +267,15 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "month_effect" => "MonthEffect",
         "day_of_month_effect" => "DayOfMonthEffect",
         "hampel" => "Hampel",
+        "psar" => "Psar",
+        "supertrend" => "Supertrend",
+        "adx" => "Adx",
+        "adx_slope" => "AdxSlope",
+        "cusum" => "Cusum",
+        "har" => "Har",
+        "rbvj" => "Rbvj",
+        "vol_of_vol" => "VolOfVol",
+        "ehlers_cc" => "EhlersCc",
         _ => {
             return Err(syn::Error::new(
                 name.span(),
