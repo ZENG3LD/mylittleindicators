@@ -9484,6 +9484,47 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1307..=1309 (MoFisher, RelTrendPos, SweepRev).
+    #[test]
+    fn lane_matches_cpu_bar_batch32() {
+        use crate::indicators::levels::relative_trend_position::RelativeTrendPosition;
+        use crate::indicators::momentum::fisher_transform::FisherTransform;
+        use crate::indicators::momentum::sweep_reversion::{SweepReversionIndex, SweepReversionParams};
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(10);
+        p.fast = 3;
+        let mut m = FisherTransform::new(10, 3);
+        chk(&run_cols(CubeFormula::MoFisherBar, &bars, p), lanes.iter().map(|l| { let (f, t) = m.feed(&[l[0], l[1], l[2]]); vec![f, t] }).collect());
+        let mut p = CubeParams::period(20);
+        p.smoother = CubeSmoother::Sma;
+        let mut m = RelativeTrendPosition::new(20);
+        chk(&run_cols(CubeFormula::RelTrendPosBar, &bars, p), lanes.iter().map(|l| { let (a, b) = m.feed(&[l[0], l[1], l[2], l[3]]); vec![a, b] }).collect());
+        for confirm in [false, true] {
+            let sp = SweepReversionParams { lookback_period: 20, close_quartile: 0.35, atr_period: 14, weight_k: 1.0, confirm_next_bar: confirm, atr_smoother: crate::engine::contract_engine::SmootherId::Rma };
+            let mut p = CubeParams::period(20);
+            p.fast = 14;
+            p.a = 0.35;
+            p.b = 1.0;
+            p.flag = confirm as u32;
+            p.smoother = CubeSmoother::Rma;
+            let mut m = SweepReversionIndex::new(sp);
+            chk(&run_cols(CubeFormula::SweepRevBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]])]).collect());
+        }
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

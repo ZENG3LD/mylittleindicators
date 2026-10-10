@@ -3962,6 +3962,101 @@ fn bar_scan(
                 }
                 v0 = held2;
             }
+        } else if formula == 1307u32 {
+            // Fisher transform `[fisher, trigger]`: period = window, p2 = smoothing period; held0 = smoothed
+            // normalised price, held1 = fisher, held2 = ema seeded flag
+            let pr = period as usize;
+            if pr >= 1usize && t + 1 >= pr {
+                let mut hh = h[t];
+                let mut ll = l[t];
+                for k2 in 0..pr {
+                    hh = hh.max(h[t - k2]);
+                    ll = ll.min(l[t - k2]);
+                }
+                let mut nrm = 0.0f32;
+                if (hh - ll).abs() >= 1.0e-12f32 {
+                    nrm = 2.0f32 * ((c[t] - ll) / (hh - ll)) - 1.0f32;
+                }
+                let al = 2.0f32 / ((p2 as f32) + 1.0f32);
+                if held2 < 0.5f32 {
+                    held0 = nrm;
+                    held2 = 1.0f32;
+                } else {
+                    held0 = al * nrm + (1.0f32 - al) * held0;
+                }
+                let cl = held0.max(0.0f32 - 0.999f32).min(0.999f32);
+                v1 = held1;
+                held1 = 0.5f32 * ((1.0f32 + cl) / (1.0f32 - cl)).ln();
+                f0 = v1;
+            }
+            v0 = held1;
+            v1 = f0;
+        } else if formula == 1308u32 {
+            // relative trend position `[sma_rel, avwap_rel]`: smoother of close in lane v, cumulative VWAP inline
+            let tp = (h[t] + l[t] + c[t]) / 3.0f32;
+            let vv = v[t].max(0.0f32);
+            held0 = held0 + tp * vv;
+            held1 = held1 + vv;
+            if held1 > 0.0f32 {
+                vw = held0 / held1;
+            }
+            let sm = o[t];
+            if sm != 0.0f32 {
+                v0 = (c[t] - sm) / sm.abs().max(1.0e-9f32);
+            }
+            if vw != 0.0f32 {
+                v1 = (c[t] - vw) / vw.abs().max(1.0e-9f32);
+            }
+        } else if formula == 1309u32 {
+            // sweep reversion: lookback = period, ATR (lane v) period = p2, quartile = a, weight k = b,
+            // flag = confirm next bar. held0 = pending signal, held1 = its reference close.
+            let lb = period as usize;
+            let mut sig = 0.0f32;
+            if lb >= 1usize && t + 1 >= lb && t + 1 >= (p2 as usize) {
+                let mut sw_top = false;
+                let mut sw_bot = false;
+                if t >= lb {
+                    let mut ph = h[t - 1];
+                    let mut pl = l[t - 1];
+                    for k2 in 0..lb {
+                        ph = ph.max(h[t - 1 - k2]);
+                        pl = pl.min(l[t - 1 - k2]);
+                    }
+                    sw_top = h[t] > ph;
+                    sw_bot = l[t] < pl;
+                }
+                let rg = (h[t] - l[t]).max(1.0e-12f32);
+                let pos = (c[t] - l[t]) / rg;
+                let mut raw = 0.0f32;
+                if sw_top && pos <= a {
+                    raw = 1.0f32;
+                } else if sw_bot && pos >= 1.0f32 - a {
+                    raw = 0.0f32 - 1.0f32;
+                }
+                if flag == 1u32 {
+                    if held0 != 0.0f32 {
+                        let mut ok = false;
+                        if held0 > 0.0f32 {
+                            ok = c[t] < held1;
+                        } else {
+                            ok = c[t] > held1;
+                        }
+                        if ok {
+                            sig = held0;
+                        }
+                        held0 = 0.0f32;
+                    } else if raw != 0.0f32 {
+                        held0 = raw;
+                        held1 = c[t];
+                    }
+                } else {
+                    sig = raw;
+                }
+                let at = v[t].abs().max(1.0e-12f32);
+                let dv = (c[t] - 0.5f32 * (h[t] + l[t])).abs();
+                let wgt = (dv / (b.max(1.0e-12f32) * at)).min(1.0f32);
+                v0 = sig * wgt;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -4257,6 +4352,16 @@ fn launch_cube_bar_x(
         let lips = smooth_series(&mid, super::CubeSmoother::Sma, 5, 0, params.a, params.b);
         let flat = bar_run(formula.code(), [&jaw, &teeth, &lips, &c, &c], params, 0);
         return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec(), flat[2 * n..3 * n].to_vec()];
+    }
+    if formula == CubeFormula::RelTrendPosBar {
+        let sm = smooth_series(&c, params.smoother, params.period.max(1), 0, params.a, params.b);
+        let flat = bar_run(formula.code(), [&sm, &h, &l, &c, &v], params, 0);
+        return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec()];
+    }
+    if formula == CubeFormula::SweepRevBar {
+        let atr = super::kernels_comp::atr_series(samples, params, params.smoother, params.fast.max(1), 0);
+        let flat = bar_run(formula.code(), [&o, &h, &l, &c, &atr], params, params.flag);
+        return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

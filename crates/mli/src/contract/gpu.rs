@@ -701,6 +701,12 @@ pub enum CubeFormula {
     AvwapMrevBar = 1305,
     /// Composite: avwap touch probability. UNTESTED on GPU.
     AvwapTprobBar = 1306,
+    /// Composite: fisher transform. UNTESTED on GPU.
+    MoFisherBar = 1307,
+    /// Composite: relative trend position. UNTESTED on GPU.
+    RelTrendPosBar = 1308,
+    /// Composite: sweep reversion. UNTESTED on GPU.
+    SweepRevBar = 1309,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1211,6 +1217,8 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::MoFisherBar => 2,
+            CubeFormula::RelTrendPosBar => 2,
             CubeFormula::TheilsenchanBar => 3,
             CubeFormula::AlligatorBar => 3,
             CubeFormula::PivotchanBar => 3,
@@ -1519,6 +1527,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::AvwapDist), Some(CubeFormula::AvwapDistBar));
         assert_eq!(formula_of(IndicatorId::AvwapMrev), Some(CubeFormula::AvwapMrevBar));
         assert_eq!(formula_of(IndicatorId::AvwapTprob), Some(CubeFormula::AvwapTprobBar));
+        assert_eq!(formula_of(IndicatorId::MoFisher), Some(CubeFormula::MoFisherBar));
+        assert_eq!(formula_of(IndicatorId::RelTrendPos), Some(CubeFormula::RelTrendPosBar));
+        assert_eq!(formula_of(IndicatorId::SweepRev), Some(CubeFormula::SweepRevBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
