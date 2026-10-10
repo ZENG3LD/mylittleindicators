@@ -557,6 +557,16 @@ pub enum CubeFormula {
     PriceZComp = 1033,
     /// Composite: Volume price trend. UNTESTED on GPU.
     VptComp = 1034,
+    /// Composite: Rolling linear regression line/gradient/intercept/r2. UNTESTED on GPU.
+    LrCols = 1035,
+    /// Composite: Regression channels upper/middle/lower. UNTESTED on GPU.
+    RegChanCols = 1036,
+    /// Composite: Regression channel width. UNTESTED on GPU.
+    RegChanWidthComp = 1037,
+    /// Composite: Standard deviation channels upper/middle/lower. UNTESTED on GPU.
+    StdDevChanCols = 1038,
+    /// Composite: Standard deviation channel width. UNTESTED on GPU.
+    StdDevWidthComp = 1039,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -737,6 +747,9 @@ impl CubeFormula {
             CubeFormula::DidiCols => 2,
             CubeFormula::SslCols => 2,
             CubeFormula::RvgiCols => 2,
+            CubeFormula::LrCols => 4,
+            CubeFormula::RegChanCols => 3,
+            CubeFormula::StdDevChanCols => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1002,6 +1015,11 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Lr), Some(CubeFormula::LrCols));
+        assert_eq!(formula_of(IndicatorId::Regchan), Some(CubeFormula::RegChanCols));
+        assert_eq!(formula_of(IndicatorId::Regchanwidth), Some(CubeFormula::RegChanWidthComp));
+        assert_eq!(formula_of(IndicatorId::Stddevchan), Some(CubeFormula::StdDevChanCols));
+        assert_eq!(formula_of(IndicatorId::Stddevwidth), Some(CubeFormula::StdDevWidthComp));
         assert_eq!(formula_of(IndicatorId::Didi), Some(CubeFormula::DidiCols));
         assert_eq!(formula_of(IndicatorId::Ssl), Some(CubeFormula::SslCols));
         assert_eq!(formula_of(IndicatorId::Rvgi), Some(CubeFormula::RvgiCols));

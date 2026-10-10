@@ -7046,6 +7046,51 @@ mod tests {
         assert_close(&run(CubeFormula::VptComp, &bars, p), &cv.iter().map(|l| m.feed(l)).collect::<Vec<f64>>());
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): composites 1035..=1039.
+    #[test]
+    fn lane_matches_cpu_comp_batch6() {
+        use crate::indicators::average::lr::LinearRegressionMA;
+        use crate::indicators::channels::regression_channel_width::RegressionChannelWidth;
+        use crate::indicators::channels::regression_channels::{RegressionChannelMode, RegressionChannels};
+        use crate::indicators::channels::standard_deviation_channels::{RegressionSource, StandardDeviationChannels, StandardDeviationMode};
+        use crate::indicators::channels::stddev_channel_width::StdDevChannelWidth;
+
+        let bars = bars(120);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(10);
+        p.a = 2.0;
+        for zl in [false, true] {
+            let mut lp = p;
+            lp.flag = zl as u32;
+            let mut m = LinearRegressionMA::with_zero_lag(10, zl);
+            chk(&run_cols(CubeFormula::LrCols, &bars, lp), close.iter().map(|c| { m.feed(*c); vec![m.line(), m.gradient(), m.intercept(), m.r2()] }).collect());
+        }
+        for (flag, mode) in [(0u32, RegressionChannelMode::Standard), (1, RegressionChannelMode::Percentage), (2, RegressionChannelMode::R2Weighted)] {
+            let mut rp = p;
+            rp.flag = flag;
+            let mut m = RegressionChannels::new(10, 2.0, mode);
+            chk(&run_cols(CubeFormula::RegChanCols, &bars, rp), close.iter().map(|c| { let (u, mi, l) = m.feed(*c); vec![u, mi, l] }).collect());
+        }
+        let mut m = RegressionChannelWidth::new(10, 2.0);
+        assert_close(&run(CubeFormula::RegChanWidthComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        for (flag, mode) in [(0u32, StandardDeviationMode::Simple), (1, StandardDeviationMode::Population)] {
+            let mut sp = p;
+            sp.flag = flag;
+            let mut m = StandardDeviationChannels::new_custom(10, 2.0, mode, RegressionSource::Close);
+            chk(&run_cols(CubeFormula::StdDevChanCols, &bars, sp), close.iter().map(|c| { let (u, mi, l) = m.feed(*c); vec![u, mi, l] }).collect());
+        }
+        let mut m = StdDevChannelWidth::new(10, 2.0);
+        assert_close(&run(CubeFormula::StdDevWidthComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

@@ -429,6 +429,34 @@ fn ew_scan(
                 }
             }
             v = held;
+        } else if op == 51u32 {
+            // std-dev channel deviation: x = price, y = regression line, window a, b = 1 for the
+            // population (n - 1) denominator; 0 until the window is full
+            let p = a as usize;
+            if t + 1 >= p {
+                let mut ss = 0.0f32;
+                for j in (t + 1 - p)..(t + 1) {
+                    let d = x[j] - y[t];
+                    ss = ss + d * d;
+                }
+                let mut den = a;
+                if b > 0.5f32 {
+                    den = a - 1.0f32;
+                }
+                v = (ss / den).sqrt();
+            }
+        } else if op == 52u32 {
+            // R2-weighted deviation: x = residual std, y = r2; times (0.5 + (r2 > 0 ? 1 - r2 : 1))
+            let mut wgt = 1.0f32;
+            if y[t] > 0.0f32 {
+                wgt = 1.0f32 - y[t];
+            }
+            v = x[t] * (0.5f32 + wgt);
+        } else if op == 53u32 {
+            v = x[t];
+            if v < 0.0f32 {
+                v = -v;
+            }
         } else if op == 29u32 {
             if z[t] != 0.0f32 {
                 v = (x[t] - y[t]) / z[t];
@@ -496,6 +524,120 @@ pub(crate) fn ewb(
     }
     let bytes = client.read_one_unchecked(out);
     f32::from_bytes(&bytes).to_vec()
+}
+
+/// Rolling OLS over the last `period` values with x = 1..=period (`LinearRegressionMA`):
+/// `line` (fitted value at the last x, plus the slope when `zero_lag != 0`), `slope`,
+/// `icpt`, `r2` and `rstd` (population std of the residuals, used by the regression
+/// channels). All 0 until the window is full.
+#[cube]
+fn lr_scan(
+    x: &[f32],
+    line: &mut [f32],
+    slope: &mut [f32],
+    icpt: &mut [f32],
+    r2: &mut [f32],
+    rstd: &mut [f32],
+    period: u32,
+    zero_lag: u32,
+) {
+    let n = x.len();
+    let p = period as usize;
+    let pf = p as f32;
+    let xs = 0.5f32 * pf * (pf + 1.0f32);
+    let xms = xs * (2.0f32 * pf + 1.0f32) / 3.0f32;
+    let divisor = pf * xms - xs * xs;
+    for t in 0..n {
+        let mut ln = 0.0f32;
+        let mut sl = 0.0f32;
+        let mut ic = 0.0f32;
+        let mut rr = 0.0f32;
+        let mut rs = 0.0f32;
+        if p >= 1 && t + 1 >= p {
+            let st = t + 1 - p;
+            let mut ysum = 0.0f32;
+            let mut sxy = 0.0f32;
+            for j in 0..p {
+                ysum = ysum + x[st + j];
+                sxy = sxy + ((j + 1) as f32) * x[st + j];
+            }
+            sl = (pf * sxy - xs * ysum) / divisor;
+            ic = (ysum * xms - xs * sxy) / divisor;
+            ln = sl * pf + ic;
+            if zero_lag != 0u32 {
+                ln = ln + sl;
+            }
+            let mean = ysum / pf;
+            let mut sres = 0.0f32;
+            let mut sres2 = 0.0f32;
+            let mut stot = 0.0f32;
+            for j in 0..p {
+                let res = sl * ((j + 1) as f32) + ic - x[st + j];
+                sres = sres + res;
+                sres2 = sres2 + res * res;
+                let dm = x[st + j] - mean;
+                stot = stot + dm * dm;
+            }
+            rr = 1.0f32 - sres2 / stot;
+            let rm = sres / pf;
+            let mut vv = 0.0f32;
+            for j in 0..p {
+                let res = sl * ((j + 1) as f32) + ic - x[st + j];
+                let d = (-res) - (-rm);
+                vv = vv + d * d;
+            }
+            rs = (vv / pf).sqrt();
+        }
+        line[t] = ln;
+        slope[t] = sl;
+        icpt[t] = ic;
+        r2[t] = rr;
+        rstd[t] = rs;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn lr_map(
+    x: &[f32],
+    line: &mut [f32],
+    slope: &mut [f32],
+    icpt: &mut [f32],
+    r2: &mut [f32],
+    rstd: &mut [f32],
+    period: u32,
+    zero_lag: u32,
+) {
+    lr_scan(x, line, slope, icpt, r2, rstd, period, zero_lag);
+}
+
+/// `[line, slope, intercept, r2, residual std]` of the rolling regression.
+pub(crate) fn lr_all(x: &[f32], period: u32, zero_lag: bool) -> Vec<Vec<f32>> {
+    let n = x.len();
+    if n == 0 {
+        return vec![Vec::new(); 5];
+    }
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let xb = client.create_from_slice(f32::as_bytes(x));
+    let bufs: Vec<_> = (0..5).map(|_| client.empty(n * core::mem::size_of::<f32>())).collect();
+    unsafe {
+        lr_map::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(xb, n),
+            BufferArg::from_raw_parts(bufs[0].clone(), n),
+            BufferArg::from_raw_parts(bufs[1].clone(), n),
+            BufferArg::from_raw_parts(bufs[2].clone(), n),
+            BufferArg::from_raw_parts(bufs[3].clone(), n),
+            BufferArg::from_raw_parts(bufs[4].clone(), n),
+            period,
+            zero_lag as u32,
+        );
+    }
+    bufs.into_iter()
+        .map(|b| f32::from_bytes(&client.read_one_unchecked(b)).to_vec())
+        .collect()
 }
 
 fn ew2(op: u32, x: &[f32], y: &[f32], a: f32) -> Vec<f32> {
@@ -886,6 +1028,53 @@ pub fn launch_cube_comp(
             let c = lane_series(samples, p, OhlcvField::Close);
             let v = lane_series(samples, p, OhlcvField::Volume);
             vec![ew2(50, &c, &v, 0.0)]
+        }
+        // Rolling linear regression `[line, gradient, intercept, r2]` over `period`;
+        // `flag != 0` is the zero-lag variant.
+        CubeFormula::LrCols => {
+            let src = lane_series(samples, p, p.lane);
+            let mut r = super::kernels_comp::lr_all(&src, p.period, p.flag != 0);
+            r.truncate(4);
+            r
+        }
+        // Regression channels `[upper, middle, lower]`, `a` = multiplier, `flag`: 0 standard
+        // (residual std), 1 percentage, 2 R2-weighted. Bands are 0 until a full window.
+        CubeFormula::RegChanCols | CubeFormula::RegChanWidthComp => {
+            let src = lane_series(samples, p, p.lane);
+            let wide = formula == CubeFormula::RegChanWidthComp;
+            let (per, mult) = if wide { (p.period.max(2), p.a.max(0.1)) } else { (p.period, p.a) };
+            let r = lr_all(&src, per, false);
+            let mid = r[0].clone();
+            let g = per.max(1) as f32;
+            let band: Vec<f32> = match p.flag {
+                1 => mid.iter().map(|m| *m * (mult / 100.0)).collect(),
+                2 => ewc(52, &r[4], &r[3], &r[4], 0.0, 0.0).iter().map(|w| *w * mult).collect(),
+                _ => r[4].iter().map(|w| *w * mult).collect(),
+            };
+            let up = ewc(15, &ewc(13, &mid, &band, &mid, 1.0, 0.0), &mid, &mid, g, 0.0);
+            let lo = ewc(15, &ewc(14, &mid, &band, &mid, 1.0, 0.0), &mid, &mid, g, 0.0);
+            if formula == CubeFormula::RegChanWidthComp {
+                return vec![ewc(53, &ew2(2, &up, &lo, 0.0), &up, &up, 0.0, 0.0)];
+            }
+            vec![up, mid, lo]
+        }
+        // Standard-deviation channels `[upper, middle, lower]` (the 2-sigma bands about the
+        // regression line): `a` = multiplier, `flag` 1 = population (n - 1) denominator
+        // (simple and adaptive both divide by n: the adaptive factor stays 1).
+        CubeFormula::StdDevChanCols | CubeFormula::StdDevWidthComp => {
+            let src = lane_series(samples, p, p.lane);
+            let wide = formula == CubeFormula::StdDevWidthComp;
+            let (per, mult) = if wide { (p.period.max(2), p.a.max(0.1)) } else { (p.period, p.a) };
+            let r = lr_all(&src, per, false);
+            let mid = r[0].clone();
+            let sd = ewc(51, &src, &mid, &src, per as f32, if p.flag == 1 { 1.0 } else { 0.0 });
+            let band: Vec<f32> = sd.iter().map(|w| *w * mult).collect();
+            let up = ewc(13, &mid, &band, &mid, 1.0, 0.0);
+            let lo = ewc(14, &mid, &band, &mid, 1.0, 0.0);
+            if formula == CubeFormula::StdDevWidthComp {
+                return vec![ewc(53, &ew2(2, &up, &lo, 0.0), &up, &up, 0.0, 0.0)];
+            }
+            vec![up, mid, lo]
         }
         _ => Vec::new(),
     }
