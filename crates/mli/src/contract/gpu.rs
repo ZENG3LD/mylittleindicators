@@ -579,6 +579,28 @@ pub enum CubeFormula {
     KslopezComp = 1044,
     /// Composite: Alpha-beta-gamma filter pos/vel/acc. UNTESTED on GPU.
     AbgCols = 1045,
+    /// Composite: Spectral flatness percentile. UNTESTED on GPU.
+    SflatpComp = 1120,
+    /// Composite: Spectral rolloff percentile. UNTESTED on GPU.
+    SrollpComp = 1121,
+    /// Composite: Spectral rolloff robust percentile. UNTESTED on GPU.
+    SrollrpComp = 1122,
+    /// Composite: Spectral slope percentile. UNTESTED on GPU.
+    SslopepComp = 1123,
+    /// Composite: Spectral slope robust percentile. UNTESTED on GPU.
+    SsloperpComp = 1124,
+    /// Composite: Spectral slope z-score. UNTESTED on GPU.
+    SslopezComp = 1125,
+    /// Composite: Spectral crest percentile. UNTESTED on GPU.
+    ScrestpComp = 1126,
+    /// Composite: Spectral entropy of entropy. UNTESTED on GPU.
+    SententComp = 1127,
+    /// Composite: Spectral entropy rate. UNTESTED on GPU.
+    SentrComp = 1128,
+    /// Composite: Spectral flux proxy. UNTESTED on GPU.
+    SfluxComp = 1129,
+    /// Composite: STFT band energy ratio. UNTESTED on GPU.
+    StftComp = 1136,
     /// Composite: Spectral flatness. UNTESTED on GPU.
     SflatComp = 1100,
     /// Composite: Spectral slope. UNTESTED on GPU.
@@ -1056,6 +1078,17 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Sflatp), Some(CubeFormula::SflatpComp));
+        assert_eq!(formula_of(IndicatorId::Srollp), Some(CubeFormula::SrollpComp));
+        assert_eq!(formula_of(IndicatorId::Srollrp), Some(CubeFormula::SrollrpComp));
+        assert_eq!(formula_of(IndicatorId::Sslopep), Some(CubeFormula::SslopepComp));
+        assert_eq!(formula_of(IndicatorId::Ssloperp), Some(CubeFormula::SsloperpComp));
+        assert_eq!(formula_of(IndicatorId::Sslopez), Some(CubeFormula::SslopezComp));
+        assert_eq!(formula_of(IndicatorId::Screstp), Some(CubeFormula::ScrestpComp));
+        assert_eq!(formula_of(IndicatorId::Sentent), Some(CubeFormula::SententComp));
+        assert_eq!(formula_of(IndicatorId::Sentr), Some(CubeFormula::SentrComp));
+        assert_eq!(formula_of(IndicatorId::Sflux), Some(CubeFormula::SfluxComp));
+        assert_eq!(formula_of(IndicatorId::Stft), Some(CubeFormula::StftComp));
         assert_eq!(formula_of(IndicatorId::Sflat), Some(CubeFormula::SflatComp));
         assert_eq!(formula_of(IndicatorId::Sslope), Some(CubeFormula::SslopeComp));
         assert_eq!(formula_of(IndicatorId::Sbp), Some(CubeFormula::SbpCols));

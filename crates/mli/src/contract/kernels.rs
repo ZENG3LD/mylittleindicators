@@ -4251,6 +4251,13 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     if formula.code() >= 1000 && formula.code() < 1100 {
         return super::kernels_comp::launch_cube_comp(formula, samples, params).swap_remove(0);
     }
+    if formula.code() >= 1120 && formula.code() < 1140 {
+        return if formula == CubeFormula::StftComp {
+            super::kernels_spec::launch_cube_stft(samples, params).swap_remove(0)
+        } else {
+            super::kernels_spec::launch_cube_spectral_post(formula, samples, params).swap_remove(0)
+        };
+    }
     if formula.code() >= 1100 && formula.code() < 1200 {
         return super::kernels_spec::launch_cube_spectral(formula, samples, params).swap_remove(0);
     }
@@ -4575,6 +4582,13 @@ pub fn launch_cube_columns(
     }
     if formula.code() >= 1000 && formula.code() < 1100 {
         return super::kernels_comp::launch_cube_comp(formula, samples, params);
+    }
+    if formula.code() >= 1120 && formula.code() < 1140 {
+        return if formula == CubeFormula::StftComp {
+            super::kernels_spec::launch_cube_stft(samples, params)
+        } else {
+            super::kernels_spec::launch_cube_spectral_post(formula, samples, params)
+        };
     }
     if formula.code() >= 1100 && formula.code() < 1200 {
         return super::kernels_spec::launch_cube_spectral(formula, samples, params);
@@ -7224,6 +7238,55 @@ mod tests {
             let mut m = SpectralRolloff95::new(w);
             assert_close(&run(CubeFormula::Sroll95Comp, &bars, p), &cpu(&close, |v| m.feed(v)));
         }
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): spectral post statistics 1120..=1136.
+    #[test]
+    fn lane_matches_cpu_spectral_post_batch() {
+        use crate::indicators::signal_processing::spectral_crest_percentile::SpectralCrestPercentile;
+        use crate::indicators::signal_processing::spectral_entropy_of_entropy::SpectralEntropyOfEntropy;
+        use crate::indicators::signal_processing::spectral_entropy_rate::SpectralEntropyRate;
+        use crate::indicators::signal_processing::spectral_flatness_percentile::SpectralFlatnessPercentile;
+        use crate::indicators::signal_processing::spectral_flux_proxy::SpectralFluxProxy;
+        use crate::indicators::signal_processing::spectral_rolloff_percentile::SpectralRolloffPercentile;
+        use crate::indicators::signal_processing::spectral_rolloff_robust_percentile::SpectralRolloffRobustPercentile;
+        use crate::indicators::signal_processing::spectral_slope_percentile::SpectralSlopePercentile;
+        use crate::indicators::signal_processing::spectral_slope_robust_percentile::SpectralSlopeRobustPercentile;
+        use crate::indicators::signal_processing::spectral_slope_zscore::SpectralSlopeZscore;
+        use crate::indicators::signal_processing::stft_features::StftBandEnergyRatio;
+
+        let bars = bars(400);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let mut p = CubeParams::period(32);
+        p.slow = 50;
+        p.a = 0.8;
+        p.b = 0.3;
+        let mut m = SpectralFlatnessPercentile::new(32, 50);
+        assert_close(&run(CubeFormula::SflatpComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut m = SpectralRolloffPercentile::new(32, 50, 0.8);
+        assert_close(&run(CubeFormula::SrollpComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut m = SpectralRolloffRobustPercentile::new(32, 50, 0.8);
+        assert_close(&run(CubeFormula::SrollrpComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut m = SpectralSlopePercentile::new(32, 50);
+        assert_close(&run(CubeFormula::SslopepComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut m = SpectralSlopeRobustPercentile::new(32, 50);
+        assert_close(&run(CubeFormula::SsloperpComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut m = SpectralSlopeZscore::new(32, 50);
+        assert_close(&run(CubeFormula::SslopezComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut m = SpectralCrestPercentile::new(32, 50);
+        assert_close(&run(CubeFormula::ScrestpComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut m = SpectralEntropyOfEntropy::new(32, 50);
+        assert_close(&run(CubeFormula::SententComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut ap = p;
+        ap.a = 0.3;
+        let mut m = SpectralEntropyRate::new(32, 0.3);
+        assert_close(&run(CubeFormula::SentrComp, &bars, ap), &cpu(&close, |v| m.feed(v)));
+        let mut m = SpectralFluxProxy::new(32, 0.8, 0.3);
+        assert_close(&run(CubeFormula::SfluxComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        let mut sp = CubeParams::period(16);
+        sp.slow = 4;
+        let mut m = StftBandEnergyRatio::new(16, 4);
+        assert_close(&run(CubeFormula::StftComp, &bars, sp), &cpu(&close, |v| m.feed(v)));
     }
 
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.

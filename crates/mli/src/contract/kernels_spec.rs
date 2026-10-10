@@ -631,3 +631,206 @@ pub fn launch_cube_spectral(
     let take = formula.output_count() as usize;
     cols.into_iter().take(take).collect()
 }
+
+/// Post-statistics over a derived series `x` (window `w`): see [`spost_launch`].
+/// 0 fraction `<= x` over the partial window (0..1, held until a value exists);
+/// 1 percent `<= x` once the window is full, `init` before; 2 robust percent: values clamped to
+///   the 5 % / 95 % order statistics; 3 z-score (population std floor 1e-9) once full;
+/// 4 population std once full; 5 EMA of the step `x[t] - x[t-1]` (`a` = alpha, `b` = 1 for the
+///   absolute step), 0 on the first bar; 6 STFT band energy ratio over the raw ring of `w` bars
+///   split into `a` parts (`(high + eps) / (low + eps)` about the newest value, ring order).
+#[cube]
+fn spost_scan(x: &[f32], out: &mut [f32], w: u32, mode: u32, init: f32, a: f32, b: f32) {
+    let n = x.len();
+    let ww = w as usize;
+    let mut held = init;
+    for t in 0..n {
+        let filled = t + 1 >= ww;
+        let mut lo = 0usize;
+        if t + 1 > ww {
+            lo = t + 1 - ww;
+        }
+        let len = t + 1 - lo;
+        if mode == 0u32 {
+            let mut le = 0.0f32;
+            for j in lo..(t + 1) {
+                if x[j] <= x[t] {
+                    le = le + 1.0f32;
+                }
+            }
+            held = le / (len as f32);
+        } else if mode == 1u32 {
+            if filled {
+                let mut le = 0.0f32;
+                for j in lo..(t + 1) {
+                    if x[j] <= x[t] {
+                        le = le + 1.0f32;
+                    }
+                }
+                held = 100.0f32 * le / (ww as f32);
+            }
+        } else if mode == 2u32 {
+            if filled {
+                let kk = (0.05f32 * (ww as f32)) as usize;
+                // k-th and (w-1-k)-th smallest by rank counting
+                let mut low = x[t];
+                let mut high = x[t];
+                for j in lo..(t + 1) {
+                    let mut less = 0usize;
+                    let mut leq = 0usize;
+                    for m in lo..(t + 1) {
+                        if x[m] < x[j] {
+                            less = less + 1;
+                        }
+                        if x[m] <= x[j] {
+                            leq = leq + 1;
+                        }
+                    }
+                    if less <= kk && kk < leq {
+                        low = x[j];
+                    }
+                    let hk = ww - 1 - kk;
+                    if less <= hk && hk < leq {
+                        high = x[j];
+                    }
+                }
+                let mut le = 0.0f32;
+                for j in lo..(t + 1) {
+                    let mut tt = x[j];
+                    if tt < low {
+                        tt = low;
+                    }
+                    if tt > high {
+                        tt = high;
+                    }
+                    if tt <= x[t] {
+                        le = le + 1.0f32;
+                    }
+                }
+                held = 100.0f32 * le / (ww as f32);
+            }
+        } else if mode == 3u32 || mode == 4u32 {
+            if filled {
+                let mut sum = 0.0f32;
+                for j in lo..(t + 1) {
+                    sum = sum + x[j];
+                }
+                let mean = sum / (ww as f32);
+                let mut ss = 0.0f32;
+                for j in lo..(t + 1) {
+                    let d = x[j] - mean;
+                    ss = ss + d * d;
+                }
+                let mut sd = (ss / (ww as f32)).sqrt();
+                if mode == 3u32 {
+                    if sd < 1.0e-9f32 {
+                        sd = 1.0e-9f32;
+                    }
+                    held = (x[t] - mean) / sd;
+                } else {
+                    held = sd;
+                }
+            }
+        } else if mode == 5u32 {
+            if t > 0 {
+                let mut d = x[t] - x[t - 1];
+                if b > 0.5f32 && d < 0.0f32 {
+                    d = -d;
+                }
+                held = a * d + (1.0f32 - a) * held;
+            }
+        } else if mode == 6u32 {
+            if filled {
+                let part = ww / (a as usize);
+                let mut lv = 0.0f32;
+                let mut hv = 0.0f32;
+                for i in 0..part {
+                    // ring slot i holds the newest bar with index = i (mod w)
+                    let back = ((t % ww) + ww - i) % ww;
+                    let d = x[t - back] - x[t];
+                    lv = lv + d * d;
+                }
+                for i in (ww - part)..ww {
+                    let back = ((t % ww) + ww - i) % ww;
+                    let d = x[t - back] - x[t];
+                    hv = hv + d * d;
+                }
+                held = (hv + 1.0e-10f32) / (lv + 1.0e-10f32);
+            }
+        }
+        out[t] = held;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn spost_map(x: &[f32], out: &mut [f32], w: u32, mode: u32, init: f32, a: f32, b: f32) {
+    spost_scan(x, out, w, mode, init, a, b);
+}
+
+pub(crate) fn spost_launch(x: &[f32], w: u32, mode: u32, init: f32, a: f32, b: f32) -> Vec<f32> {
+    let n = x.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let xb = client.create_from_slice(f32::as_bytes(x));
+    let ob = client.empty(n * 4);
+    unsafe {
+        spost_map::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(xb, n),
+            BufferArg::from_raw_parts(ob.clone(), n),
+            w,
+            mode,
+            init,
+            a,
+            b,
+        );
+    }
+    f32::from_bytes(&client.read_one_unchecked(ob)).to_vec()
+}
+
+/// Spectral post formulas (codes 1120..=1135): an inner spectral statistic, then a window
+/// statistic over its history. `period` = FFT window, `slow` = second window, `a` / `b` as
+/// the inner or outer constructor takes them.
+pub fn launch_cube_spectral_post(
+    formula: super::CubeFormula,
+    samples: &[GpuSample],
+    p: CubeParams,
+) -> Vec<Vec<f32>> {
+    use super::CubeFormula as F;
+    if samples.is_empty() {
+        return Vec::new();
+    }
+    let mut ip = p;
+    let (inner, w, mode, init, a, b) = match formula {
+        F::SflatpComp => (F::SflatComp, p.slow.max(10), 0, 0.0, 0.0, 0.0),
+        F::SrollpComp => {
+            ip.a = p.a;
+            (F::SrollComp, p.slow.clamp(30, 4096), 1, 50.0, 0.0, 0.0)
+        }
+        F::SrollrpComp => (F::SrollComp, p.slow.max(50), 2, 50.0, 0.0, 0.0),
+        F::SslopepComp => (F::SslopeComp, p.slow.clamp(30, 4096), 1, 50.0, 0.0, 0.0),
+        F::SsloperpComp => (F::SslopeComp, p.slow.max(50), 2, 50.0, 0.0, 0.0),
+        F::SslopezComp => (F::SslopeComp, p.slow.clamp(20, 2048), 3, 0.0, 0.0, 0.0),
+        F::ScrestpComp => (F::ScrestComp, p.slow.max(30), 1, 50.0, 0.0, 0.0),
+        F::SententComp => (F::SentComp, p.slow.max(20), 4, 0.0, 0.0, 0.0),
+        F::SentrComp => (F::SentComp, 1, 5, 0.0, p.a.clamp(0.01, 1.0), 0.0),
+        F::SfluxComp => {
+            ip.a = p.a;
+            (F::SrollComp, 1, 5, 0.0, p.b.clamp(0.0, 1.0), 1.0)
+        }
+        _ => return Vec::new(),
+    };
+    let series = launch_cube_spectral(inner, samples, ip).swap_remove(0);
+    vec![spost_launch(&series, w, mode, init, a, b)]
+}
+
+/// STFT band energy ratio (code 1136): raw close, window `period` (4..=1024), `slow` parts (1..=8).
+pub fn launch_cube_stft(samples: &[GpuSample], p: CubeParams) -> Vec<Vec<f32>> {
+    let x = close_series(samples, p);
+    vec![spost_launch(&x, p.period.clamp(4, 1024), 6, 0.0, p.slow.clamp(1, 8) as f32, 0.0)]
+}
