@@ -302,6 +302,8 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "vov_pct_trend" => "VovPctTrend",
         "rsi_pct_rank" => "RsiPctRank",
         "roll_quart" => "RollQuart",
+        "comp_kpss_bar" => "KpssBar",
+        "comp_kpss_trend_bar" => "KpssTrendBar",
         "comp_hurst_bar" => "HurstBar",
         "comp_fractal_dim_bar" => "FractalDimBar",
         "comp_dfa_bar" => "DfaBar",

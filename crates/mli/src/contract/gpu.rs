@@ -645,6 +645,10 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: kpss proxy. UNTESTED on GPU.
+    KpssBar = 1236,
+    /// Composite: kpss trend proxy. UNTESTED on GPU.
+    KpssTrendBar = 1237,
     /// Composite: hurst exponent. UNTESTED on GPU.
     HurstBar = 1231,
     /// Composite: higuchi fractal dimension. UNTESTED on GPU.
@@ -1329,6 +1333,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Kpss), Some(CubeFormula::KpssBar));
+        assert_eq!(formula_of(IndicatorId::KpssTrend), Some(CubeFormula::KpssTrendBar));
         assert_eq!(formula_of(IndicatorId::Hurst), Some(CubeFormula::HurstBar));
         assert_eq!(formula_of(IndicatorId::FractalDim), Some(CubeFormula::FractalDimBar));
         assert_eq!(formula_of(IndicatorId::Dfa), Some(CubeFormula::DfaBar));

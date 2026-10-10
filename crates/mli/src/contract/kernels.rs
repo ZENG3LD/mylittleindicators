@@ -8707,6 +8707,31 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1236..=1237.
+    #[test]
+    fn lane_matches_cpu_bar_batch12() {
+        use crate::indicators::statistics::kpss_proxy::KpssProxy;
+        use crate::indicators::statistics::kpss_trend_proxy::KpssTrendProxy;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = KpssProxy::new(60);
+        chk(&run_cols(CubeFormula::KpssBar, &bars, CubeParams::period(60)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut m = KpssTrendProxy::new(60);
+        chk(&run_cols(CubeFormula::KpssTrendBar, &bars, CubeParams::period(60)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

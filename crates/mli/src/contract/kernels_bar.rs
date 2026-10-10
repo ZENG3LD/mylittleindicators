@@ -1464,6 +1464,119 @@ fn bar_scan(
                 held0 = cnt / (w as f32);
             }
             v0 = held0;
+        } else if formula == 1236u32 {
+            // KPSS level-stationarity proxy with a Newey-West long-run variance
+            let mut n = period as usize;
+            if n < 50 {
+                n = 50;
+            }
+            if n > 1024 {
+                n = 1024;
+            }
+            if t + 1 >= n {
+                let base = t + 1 - n;
+                let nf = n as f32;
+                let mut sm = 0.0f32;
+                for i in 0..n {
+                    sm = sm + c[base + i];
+                }
+                let mean = sm / nf;
+                let mut run = 0.0f32;
+                let mut s2 = 0.0f32;
+                let mut em = 0.0f32;
+                for i in 0..n {
+                    let e = c[base + i] - mean;
+                    scr[i] = e;
+                    run = run + e;
+                    s2 = s2 + run * run;
+                    em = em + e;
+                }
+                em = em / nf;
+                // Newey-West: bandwidth floor(4 (n/100)^(2/9)), at least 1, at most n - 1
+                let bwf = 4.0f32 * ((nf / 100.0f32).ln() * 0.22222222f32).exp();
+                let mut l = bwf.floor() as usize;
+                if l < 1usize {
+                    l = 1usize;
+                }
+                if l > n - 1 {
+                    l = n - 1;
+                }
+                let mut g0 = 0.0f32;
+                for i in 0..n {
+                    let d = scr[i] - em;
+                    g0 = g0 + d * d;
+                }
+                let mut lrv = g0 / nf;
+                for lag in 1..(l + 1) {
+                    let mut g = 0.0f32;
+                    for k in lag..n {
+                        g = g + (scr[k] - em) * (scr[k - lag] - em);
+                    }
+                    g = g / nf;
+                    let wgt = 1.0f32 - (lag as f32) / ((l as f32) + 1.0f32);
+                    lrv = lrv + 2.0f32 * wgt * g;
+                }
+                lrv = lrv.max(0.0f32).max(1.0e-12f32);
+                held0 = (s2 / (nf * nf * lrv)).max(0.0f32);
+            }
+            v0 = held0;
+        } else if formula == 1237u32 {
+            // KPSS trend-stationarity proxy: residuals of y ~ t, cheap long-run variance
+            let mut n = period as usize;
+            if n < 50 {
+                n = 50;
+            }
+            if n > 2048 {
+                n = 2048;
+            }
+            if t + 1 >= n {
+                let base = t + 1 - n;
+                let nf = n as f32;
+                let mut sx = 0.0f32;
+                let mut sy = 0.0f32;
+                let mut sxx = 0.0f32;
+                let mut sxy = 0.0f32;
+                for i in 0..n {
+                    let tt = (i + 1) as f32;
+                    let y = c[base + i];
+                    sx = sx + tt;
+                    sy = sy + y;
+                    sxx = sxx + tt * tt;
+                    sxy = sxy + tt * y;
+                }
+                let den = nf * sxx - sx * sx;
+                if den.abs() >= 1.0e-12f32 {
+                    let ai = (sxx * sy - sx * sxy) / den;
+                    let bi = (nf * sxy - sx * sy) / den;
+                    let mut run = 0.0f32;
+                    let mut s2 = 0.0f32;
+                    let mut em = 0.0f32;
+                    for i in 0..n {
+                        let e = c[base + i] - (ai + bi * ((i + 1) as f32));
+                        scr[i] = e;
+                        run = run + e;
+                        s2 = s2 + run * run;
+                        em = em + e;
+                    }
+                    em = em / nf;
+                    let mut var = 0.0f32;
+                    let mut cov1 = 0.0f32;
+                    for i in 0..n {
+                        let d = scr[i] - em;
+                        var = var + d * d;
+                    }
+                    for i in 1..n {
+                        cov1 = cov1 + (scr[i] - em) * (scr[i - 1] - em);
+                    }
+                    var = var / nf;
+                    cov1 = cov1 / ((n - 1) as f32);
+                    let lrv = (var + 2.0f32 * cov1.max(0.0f32)).max(1.0e-12f32);
+                    held0 = (s2 / (nf * lrv)).max(0.0f32);
+                } else {
+                    held0 = 0.0f32;
+                }
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;
