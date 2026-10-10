@@ -293,7 +293,7 @@ mli_contract_macros::contract_universe! {
         SpreadDistribution:  OrderBook     : OrderBook +cube(comp_spread_distribution_bk)  => crate::indicators::book::spread_distribution::SpreadDistribution { spread percentile },
         WallDetector:        OrderBook     : OrderBook +cube(comp_wall_detector_bk)  => crate::indicators::book::wall_detector::WallDetector { bid_price ask_price total_size },
         BookChurnRate:       OrderbookDelta : OrderBook +cube(comp_book_churn_ev)  => crate::indicators::book::book_churn_rate::BookChurnRate,
-        IcebergDetector:     OrderbookDelta : OrderBook  => crate::indicators::book::iceberg_detector::IcebergDetector { side price count },
+        IcebergDetector:     OrderbookDelta : OrderBook +cube(comp_iceberg_lv) => crate::indicators::book::iceberg_detector::IcebergDetector { side price count },
         LevelReplenishRate:  OrderbookDelta : OrderBook +cube(comp_level_replenish_ev)  => crate::indicators::book::level_replenishment_rate::LevelReplenishmentRate,
         BestLevelVolatility: OrderBook : OrderBook +cube(comp_best_level_vol_bk) => crate::indicators::book_advanced::best_level_volatility::BestLevelVolatility { std_bid std_ask max },
         BidAskAsymmetry: OrderBook : OrderBook +cube(book_imbalance) => crate::indicators::book_advanced::bid_ask_asymmetry::BidAskAsymmetry,

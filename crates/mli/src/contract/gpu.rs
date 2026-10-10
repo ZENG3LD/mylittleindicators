@@ -783,6 +783,8 @@ pub enum CubeFormula {
     IndexCorrBreakKy = 1401,
     /// QuoteLifecycleTracker (keyed / profile / fit family). UNTESTED on GPU.
     QuoteLifecycleEv = 1402,
+    /// IcebergDetector (keyed / profile / fit family). UNTESTED on GPU.
+    IcebergLv = 1403,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1249,6 +1251,7 @@ impl CubeFormula {
             CubeFormula::VwapDevEv => 3,
             CubeFormula::BookDepthChangeBk => 2,
             CubeFormula::WallDetectorBk => 3,
+            CubeFormula::IcebergLv => 3,
             CubeFormula::HiddenLiqHy | CubeFormula::TbAbsorbHy | CubeFormula::SweepImpactHy => 3,
             CubeFormula::BestLevelVolBk => 3,
             CubeFormula::PriceLevelDensityBk => 3,
@@ -1774,6 +1777,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::IndexComponentDrift), Some(CubeFormula::WeightDriftKy));
         assert_eq!(formula_of(IndicatorId::IndexCorrelationBreakdown), Some(CubeFormula::IndexCorrBreakKy));
         assert_eq!(formula_of(IndicatorId::QuoteLifecycleTracker), Some(CubeFormula::QuoteLifecycleEv));
+        assert_eq!(formula_of(IndicatorId::IcebergDetector), Some(CubeFormula::IcebergLv));
         assert_eq!(formula_of(IndicatorId::WallDetector), Some(CubeFormula::WallDetectorBk));
         assert_eq!(formula_of(IndicatorId::BestLevelVolatility), Some(CubeFormula::BestLevelVolBk));
         assert_eq!(formula_of(IndicatorId::PriceLevelDensity), Some(CubeFormula::PriceLevelDensityBk));

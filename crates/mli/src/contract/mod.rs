@@ -738,6 +738,9 @@ pub mod keyed_frame;
 /// Keyed-state kernels (1400..).
 #[cfg(feature = "gpu")]
 pub mod kernels_keyed;
+/// Level-update (per-price-level keyed state) kernels (1403..).
+#[cfg(feature = "gpu")]
+pub mod kernels_level;
 /// Hybrid tick + book kernels (997..=999).
 #[cfg(feature = "gpu")]
 pub mod kernels_hybrid;

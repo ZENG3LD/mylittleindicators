@@ -12173,4 +12173,28 @@ mod tests {
         let c: Vec<f64> = l3.iter().map(|e| { m.update_orderbook_l3(e); m.value() }).collect();
         assert_close(&super::super::kernels_ev::launch_cube_events(CubeFormula::QuoteLifecycleEv, &fr, CubeParams::period(9))[0], &c);
     }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): IcebergDetector (1403) with interned (side, bucket) keys.
+    #[test]
+    fn iceberg_matches_cpu() {
+        use crate::core::types::{OrderBookLevel, OrderbookDelta};
+        use crate::engine::streams::orderbook_delta_consumer::OrderbookDeltaConsumer;
+        use crate::indicators::book::iceberg_detector::IcebergDetector;
+        use super::super::kernels_level::{launch_cube_levels, GpuLevelFrame};
+        let deltas: Vec<OrderbookDelta> = (0..200usize)
+            .map(|i| OrderbookDelta {
+                bids: (0..(i % 4)).map(|l| OrderBookLevel::new(100.0 - l as f64 + 0.3, if (i + l) % 3 == 0 { 0.0 } else { 1.0 + (i % 2) as f64 })).collect(),
+                asks: (0..((i + 1) % 3)).map(|l| OrderBookLevel::new(101.0 + l as f64, if (i + l) % 4 == 0 { 0.0 } else { 2.0 })).collect(),
+                timestamp: 1_000 + i as i64 * 100,
+                ..Default::default()
+            })
+            .collect();
+        let fr = GpuLevelFrame::from_deltas(&deltas, 1.0);
+        let mut m = IcebergDetector::new(1.0, 3);
+        let rows: Vec<[f64; 3]> = deltas.iter().map(|d| { m.update_delta(d); [m.side(), m.price(), m.count()] }).collect();
+        let mut p = CubeParams::period(3);
+        p.a = 1.0;
+        let g = launch_cube_levels(CubeFormula::IcebergLv, &fr, p);
+        for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
+    }
 }
