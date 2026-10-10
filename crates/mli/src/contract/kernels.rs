@@ -12697,4 +12697,49 @@ mod tests {
         let g = launch_cube_profile_window(CubeFormula::ValueAreaTrackerTk, &fr, p);
         for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
     }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): session volume profile (1353) and POC detector (1354).
+    #[test]
+    fn session_profile_and_poc_match_cpu() {
+        use crate::contract::gpu_sample::GpuTimes;
+        use crate::contract::kernels_bar::launch_cube_bar_timed;
+        use crate::indicators::volume::poc_detector::PocDetector;
+        use crate::indicators::volume::volume_profile::VolumeProfile;
+        use crate::types::Bar;
+        let base = bars(240);
+        // 20 minute bars over several days, volumes made tie-free
+        let rb: Vec<ResearchBar> = base.iter().enumerate().map(|(i, b)| {
+            ResearchBar::new(1_704_067_200_000 + i as i64 * 20 * 60_000, b.open, b.high, b.low, b.close, b.volume + 0.37 * i as f64)
+        }).collect();
+        let samples: Vec<GpuSample> = rb.iter().map(GpuSample::from).collect();
+        let times = GpuTimes::from_bars(&rb).with_poc_columns(&rb, 2, 9, 17);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> { (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect() };
+        // VolumeProfile: tick 0.5, 6 hour sessions
+        let mut p = CubeParams::period(2048);
+        p.a = 0.5;
+        p.b = 6.0 * 3600.0;
+        let mut m = VolumeProfile::new(0.5, 6 * 3600 * 1000);
+        let mut last = [0.0f64, 0.0];
+        let rows: Vec<Vec<f64>> = rb.iter().map(|b| {
+            if m.update(&Bar { time: b.time, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume }) {
+                let poc = m.get_poc().unwrap();
+                last = [poc.price, poc.volume];
+            }
+            last.to_vec()
+        }).collect();
+        let c = cols(rows);
+        let r: Vec<&Vec<f64>> = c.iter().collect();
+        assert_cols(&launch_cube_bar_timed(CubeFormula::VprofileBar, &samples, &times, p), &r);
+        // PocDetector: precision 2, min volume 100, rolling 12
+        let mut p = CubeParams::period(12);
+        p.a = 100.0;
+        p.b = 100.0;
+        p.c = 1.0;
+        p.flag = 4096;
+        let mut m = PocDetector::new(2, 100.0, 12);
+        let rows: Vec<Vec<f64>> = rb.iter().map(|b| { m.feed(b.time, &[b.open, b.high, b.low, b.close, b.volume]); vec![m.poc(), m.volume_imbalance()] }).collect();
+        let c = cols(rows);
+        let r: Vec<&Vec<f64>> = c.iter().collect();
+        assert_cols(&launch_cube_bar_timed(CubeFormula::PocBar, &samples, &times, p), &r);
+    }
 }

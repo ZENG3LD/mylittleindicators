@@ -602,6 +602,12 @@ pub struct GpuTimes {
     pub qnear: Vec<f32>,
     /// Monthly anchor key of `AnchoredVwap::calc_month_key` (`(unix_days / 30.436875) as i64`), exact in f32.
     pub mkey: Vec<f32>,
+    /// Seconds since the first bar (`(time_ms - first_time_ms) / 1000`), the session clock of `VolumeProfile`.
+    pub trel: Vec<f32>,
+    /// `PocDetector` host columns, `7n` floats: day id, session id (both relative, equality is all that matters),
+    /// then the open / high / low / close tick (exact `(price * 10^precision).round()`), each `n` long. Empty unless
+    /// built with [`GpuTimes::with_poc_columns`].
+    pub poc_cols: Vec<f32>,
 }
 
 impl GpuTimes {
@@ -609,7 +615,9 @@ impl GpuTimes {
     pub fn from_ms(times_ms: &[i64]) -> Self {
         use crate::core::types::CalendarService;
         let mut out = GpuTimes::default();
+        let t0 = times_ms.first().copied().unwrap_or(0);
         for &ms in times_ms {
+            out.trel.push(((ms - t0) as f64 / 1000.0) as f32);
             let secs = ms.div_euclid(1000);
             let (_y, m, d) = CalendarService::ymd_from_timestamp(secs);
             out.weekday.push((CalendarService::weekday_from_timestamp(secs) as usize).min(6) as f32);
@@ -627,6 +635,26 @@ impl GpuTimes {
             out.qnear.push(if qv > 0.0 { ((1.0 - qv) * 15.0).round() as f32 } else { 99.0 });
         }
         out
+    }
+
+    /// Add the `PocDetector` columns (`precision` decimals, session hours `[start_hour, end_hour)` UTC).
+    pub fn with_poc_columns(mut self, bars: &[ResearchBar], precision: u32, start_hour: i64, end_hour: i64) -> Self {
+        let n = bars.len();
+        let mult = 10_f64.powi(precision as i32);
+        let secs: Vec<i64> = bars.iter().map(|b| b.time.div_euclid(1000)).collect();
+        let d0 = secs.first().map(|s| s / 86400).unwrap_or(0);
+        let mut day = Vec::with_capacity(n);
+        let mut sess = Vec::with_capacity(n);
+        for &s in &secs {
+            let d = s / 86400;
+            let hour = (s % 86400) / 3600;
+            day.push((d - d0) as f32);
+            let off = if hour >= start_hour && hour < end_hour { 0 } else if hour < start_hour { -1 } else { 1 };
+            sess.push((d - d0 + off) as f32);
+        }
+        let tick = |f: &dyn Fn(&ResearchBar) -> f64| -> Vec<f32> { bars.iter().map(|b| (f(b) * mult).round() as f32).collect() };
+        self.poc_cols = [day, sess, tick(&|b| b.open), tick(&|b| b.high), tick(&|b| b.low), tick(&|b| b.close)].concat();
+        self
     }
 
     /// Build the columns from research bars.

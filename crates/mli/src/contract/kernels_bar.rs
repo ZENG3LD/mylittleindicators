@@ -6112,6 +6112,320 @@ fn bar_scan(
             v0 = scr[2usize * w];
             v1 = scr[2usize * w + 1usize];
             v2 = scr[2usize * w + 2usize];
+        } else if formula == 1353u32 {
+            // session volume profile (VolumeProfile): scr[0..n) = seconds since the first bar (extra), then at base = n:
+            // base+0 session start, base+1 level count, base+2 published POC price, base+3 published POC volume,
+            // base+4 started flag, levels: keys at base+8.., volumes at base+8+cap (cap = period, new levels beyond
+            // the cap are dropped). a = tick size, b = session duration in seconds (<= 0: never reset).
+            // POC: CPU `max_by` returns the LAST maximal level in insertion order, replicated by `>=`.
+            let base = n;
+            let cap = period as usize;
+            if b > 0.0f32 && (scr[base + 4usize] < 0.5f32 || scr[t] >= scr[base] + b) {
+                scr[base + 1usize] = 0.0f32;
+                scr[base] = scr[t];
+            }
+            scr[base + 4usize] = 1.0f32;
+            if v[t] > 0.0f32 {
+                let q = v[t] * 0.25f32;
+                for pi in 0..4usize {
+                    let mut px = o[t];
+                    if pi == 1usize {
+                        px = h[t];
+                    } else if pi == 2usize {
+                        px = l[t];
+                    } else if pi == 3usize {
+                        px = c[t];
+                    }
+                    let key = (px / a + 0.5f32).floor();
+                    let nl = scr[base + 1usize] as usize;
+                    let mut found = false;
+                    for k in 0..nl {
+                        if scr[base + 8usize + k] == key {
+                            scr[base + 8usize + cap + k] = scr[base + 8usize + cap + k] + q;
+                            found = true;
+                        }
+                    }
+                    if !found && nl < cap {
+                        scr[base + 8usize + nl] = key;
+                        scr[base + 8usize + cap + nl] = q;
+                        scr[base + 1usize] = (nl + 1usize) as f32;
+                    }
+                }
+                let nl2 = scr[base + 1usize] as usize;
+                let mut bv = scr[base + 8usize + cap];
+                let mut bk = scr[base + 8usize];
+                for k in 1..nl2 {
+                    if scr[base + 8usize + cap + k] >= bv {
+                        bv = scr[base + 8usize + cap + k];
+                        bk = scr[base + 8usize + k];
+                    }
+                }
+                scr[base + 2usize] = bk * a;
+                scr[base + 3usize] = bv;
+            }
+            v0 = scr[base + 2usize];
+            v1 = scr[base + 3usize];
+        } else if formula == 1354u32 {
+            // POC detector (poc, volume imbalance). Host columns in scr[0..7n): seconds since first bar, day id,
+            // session id, open / high / low / close tick (exact f64 rounding). period = rolling bars P, a = min volume
+            // threshold, b = 10^precision, _cc = level tolerance in ticks, flag = capacity of the daily / session maps
+            // (rolling map capacity 4P+8; entries past a capacity are dropped). Maps are unordered arrays: POC = highest
+            // volume (>= threshold), lowest tick on ties = the CPU BTreeMap scan. Active levels live in 32-slot arrays.
+            // Level tick is stored as is (the CPU re-derives it with a truncating `as i64`).
+            let pp = period as usize;
+            let cap_r = 4usize * pp + 8usize;
+            let cap_d = flag as usize;
+            let bs = 7usize * n;
+            let rk = bs + 16usize;
+            let rv = rk + cap_r;
+            let dk = rv + cap_r;
+            let dv = dk + cap_d;
+            let sk = dv + cap_d;
+            let sv = sk + cap_d;
+            let lv = sv + cap_d;
+            // lv + 32 * f: 0 tick, 1 price, 2 volume, 3 touches, 4 first, 5 last, 6 strength
+            let vpl = v[t] / 4.0f32;
+            let same_day = scr[bs] > 0.5f32 && scr[n + t] == scr[bs + 1usize];
+            let same_sess = scr[bs] > 0.5f32 && scr[2usize * n + t] == scr[bs + 2usize];
+            for j in 0..4usize {
+                let tk = scr[(3usize + j) * n + t];
+                let mut nr = scr[bs + 3usize] as usize;
+                let mut fr = false;
+                for q in 0..nr {
+                    if scr[rk + q] == tk {
+                        scr[rv + q] = scr[rv + q] + vpl;
+                        fr = true;
+                    }
+                }
+                if !fr && nr < cap_r {
+                    scr[rk + nr] = tk;
+                    scr[rv + nr] = vpl;
+                    nr = nr + 1usize;
+                    scr[bs + 3usize] = nr as f32;
+                }
+                if same_day {
+                    let mut nd = scr[bs + 4usize] as usize;
+                    let mut fd = false;
+                    for q in 0..nd {
+                        if scr[dk + q] == tk {
+                            scr[dv + q] = scr[dv + q] + vpl;
+                            fd = true;
+                        }
+                    }
+                    if !fd && nd < cap_d {
+                        scr[dk + nd] = tk;
+                        scr[dv + nd] = vpl;
+                        nd = nd + 1usize;
+                        scr[bs + 4usize] = nd as f32;
+                    }
+                }
+                if same_sess {
+                    let mut ns = scr[bs + 5usize] as usize;
+                    let mut fs = false;
+                    for q in 0..ns {
+                        if scr[sk + q] == tk {
+                            scr[sv + q] = scr[sv + q] + vpl;
+                            fs = true;
+                        }
+                    }
+                    if !fs && ns < cap_d {
+                        scr[sk + ns] = tk;
+                        scr[sv + ns] = vpl;
+                        ns = ns + 1usize;
+                        scr[bs + 5usize] = ns as f32;
+                    }
+                }
+            }
+            // rolling removal of the oldest bar of the last P (history length >= P, CPU history is capped at 500)
+            if t + 1usize >= pp && pp <= 500usize {
+                let old = t + 1usize - pp;
+                let ovl = v[old] / 4.0f32;
+                for j in 0..4usize {
+                    let tk = scr[(3usize + j) * n + old];
+                    let nr = scr[bs + 3usize] as usize;
+                    let mut at = nr;
+                    for q in 0..nr {
+                        if scr[rk + q] == tk && at == nr {
+                            at = q;
+                        }
+                    }
+                    if at < nr {
+                        scr[rv + at] = scr[rv + at] - ovl;
+                        if scr[rv + at] <= 0.0f32 {
+                            scr[rk + at] = scr[rk + nr - 1usize];
+                            scr[rv + at] = scr[rv + nr - 1usize];
+                            scr[bs + 3usize] = (nr - 1usize) as f32;
+                        }
+                    }
+                }
+            }
+            // trim to the 500 largest levels once more than 1000 are tracked
+            let nr2 = scr[bs + 3usize] as usize;
+            if nr2 > 1000usize {
+                let mut thr = 0.0f32;
+                for i in 0..nr2 {
+                    let x = scr[rv + i];
+                    let mut gt = 0usize;
+                    let mut eq = 0usize;
+                    for j in 0..nr2 {
+                        if scr[rv + j] > x {
+                            gt = gt + 1usize;
+                        } else if scr[rv + j] == x {
+                            eq = eq + 1usize;
+                        }
+                    }
+                    if gt <= 500usize && 500usize < gt + eq {
+                        thr = x;
+                    }
+                }
+                let mut w = 0usize;
+                for i in 0..nr2 {
+                    if scr[rv + i] >= thr {
+                        scr[rk + w] = scr[rk + i];
+                        scr[rv + w] = scr[rv + i];
+                        w = w + 1usize;
+                    }
+                }
+                scr[bs + 3usize] = w as f32;
+            }
+            // day / session windows
+            if scr[bs] < 0.5f32 || scr[n + t] != scr[bs + 1usize] {
+                scr[bs + 4usize] = 0.0f32;
+                scr[bs + 1usize] = scr[n + t];
+            }
+            if scr[bs] < 0.5f32 || scr[2usize * n + t] != scr[bs + 2usize] {
+                scr[bs + 5usize] = 0.0f32;
+                scr[bs + 2usize] = scr[2usize * n + t];
+            }
+            scr[bs] = 1.0f32;
+            // POCs and active levels: daily (0), session (1), rolling (2)
+            for src in 0..3usize {
+                let mut kb = dk;
+                let mut vb = dv;
+                let mut cn = scr[bs + 4usize] as usize;
+                if src == 1usize {
+                    kb = sk;
+                    vb = sv;
+                    cn = scr[bs + 5usize] as usize;
+                } else if src == 2usize {
+                    kb = rk;
+                    vb = rv;
+                    cn = scr[bs + 3usize] as usize;
+                }
+                let mut mx = 0.0f32;
+                let mut mt = 0.0f32;
+                let mut has = false;
+                for q in 0..cn {
+                    let vq = scr[vb + q];
+                    if vq >= a {
+                        if vq > mx || (vq == mx && has && scr[kb + q] < mt) {
+                            if vq > 0.0f32 {
+                                mx = vq;
+                                mt = scr[kb + q];
+                                has = true;
+                            }
+                        }
+                    }
+                }
+                scr[bs + 9usize + src] = 0.0f32;
+                if has {
+                    scr[bs + 9usize + src] = mt / b;
+                    scr[bs + 12usize + src] = 1.0f32;
+                    let mut nl = scr[bs + 6usize] as usize;
+                    let mut at = nl;
+                    for i in 0..nl {
+                        let dtk = scr[lv + i] - mt;
+                        if dtk.abs() <= _cc && at == nl {
+                            at = i;
+                        }
+                    }
+                    if at < nl {
+                        scr[lv + 64usize + at] = scr[lv + 64usize + at] + mx;
+                        scr[lv + 96usize + at] = scr[lv + 96usize + at] + 1.0f32;
+                        scr[lv + 160usize + at] = scr[t];
+                        let vf = (scr[lv + 64usize + at] / 1000000.0f32).min(1.0f32);
+                        let tf = (scr[lv + 96usize + at] / 10.0f32).min(1.0f32);
+                        let dt = ((scr[lv + 160usize + at] - scr[lv + 128usize + at]) / 86400.0f32 / 7.0f32).min(1.0f32);
+                        scr[lv + 192usize + at] = (vf * 0.5f32 + tf * 0.3f32 + dt * 0.2f32).min(1.0f32);
+                    } else if nl < 32usize {
+                        scr[lv + nl] = mt;
+                        scr[lv + 32usize + nl] = mt / b;
+                        scr[lv + 64usize + nl] = mx;
+                        scr[lv + 96usize + nl] = 1.0f32;
+                        scr[lv + 128usize + nl] = scr[t];
+                        scr[lv + 160usize + nl] = scr[t];
+                        scr[lv + 192usize + nl] = 0.0f32;
+                        nl = nl + 1usize;
+                        scr[bs + 6usize] = nl as f32;
+                    }
+                } else {
+                    scr[bs + 12usize + src] = 0.0f32;
+                }
+            }
+            if scr[bs + 14usize] > 0.5f32 {
+                scr[bs + 8usize] = scr[bs + 11usize];
+            } else if scr[bs + 13usize] > 0.5f32 {
+                scr[bs + 8usize] = scr[bs + 10usize];
+            } else if scr[bs + 12usize] > 0.5f32 {
+                scr[bs + 8usize] = scr[bs + 9usize];
+            } else {
+                scr[bs + 8usize] = 0.0f32;
+            }
+            // cleanup: age > 7 days or broken (|close - price| beyond the tolerance)
+            let nl3 = scr[bs + 6usize] as usize;
+            let tolp = 1.0f32 / b;
+            let mut wi = 0usize;
+            for i in 0..nl3 {
+                let lp = scr[lv + 32usize + i];
+                let old_l = scr[t] - scr[lv + 160usize + i] > 604800.0f32;
+                let broken = c[t] > lp + tolp || c[t] < lp - tolp;
+                if !(old_l || broken) {
+                    for f in 0..7usize {
+                        scr[lv + 32usize * f + wi] = scr[lv + 32usize * f + i];
+                    }
+                    wi = wi + 1usize;
+                }
+            }
+            // stable insertion sort by strength, descending
+            for i in 1..wi {
+                let mut j = i;
+                let mut go = true;
+                for _s in 0..i {
+                    if go && j > 0usize {
+                        if scr[lv + 192usize + j - 1usize] < scr[lv + 192usize + j] {
+                            for f in 0..7usize {
+                                let tmp = scr[lv + 32usize * f + j];
+                                scr[lv + 32usize * f + j] = scr[lv + 32usize * f + j - 1usize];
+                                scr[lv + 32usize * f + j - 1usize] = tmp;
+                            }
+                            j = j - 1usize;
+                        } else {
+                            go = false;
+                        }
+                    }
+                }
+            }
+            if wi > 20usize {
+                wi = 20usize;
+            }
+            scr[bs + 6usize] = wi as f32;
+            if wi > 0usize {
+                let mut ab = 0.0f32;
+                let mut be = 0.0f32;
+                for i in 0..wi {
+                    let lp = scr[lv + 32usize + i];
+                    if c[t] > lp {
+                        ab = ab + scr[lv + 64usize + i];
+                    } else if c[t] < lp {
+                        be = be + scr[lv + 64usize + i];
+                    }
+                }
+                if ab + be > 0.0f32 {
+                    scr[bs + 7usize] = (ab - be) / (ab + be);
+                }
+            }
+            v0 = scr[bs + 8usize];
+            v1 = scr[bs + 7usize];
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -6200,7 +6514,7 @@ pub(crate) fn bar_run_x(code: u32, ins: [&Vec<f32>; 5], extra: &[f32], params: C
     let out = client.empty(10 * n * core::mem::size_of::<f32>());
     // scratch (histograms / rings / design matrices) sized from the largest window parameter
     let scr_len = ((params.period.max(params.fast).max(params.slow).max(params.signal)) as usize * 28 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
-    let scr_len = scr_len.max(extra.len() + 64);
+    let scr_len = scr_len.max(extra.len() + 64 + 4 * params.period as usize);
     let mut scr_init = vec![0.0f32; scr_len];
     scr_init[..extra.len()].copy_from_slice(extra);
     let scr_buf = client.create_from_slice(f32::as_bytes(&scr_init));
@@ -6237,6 +6551,43 @@ pub(crate) fn bar_stage(code: u32, ins: [&Vec<f32>; 5], params: CubeParams, flag
     bar_run(code, ins, params, flag)[0..n].to_vec()
 }
 
+/// Session-clock bar formulas (`VprofileBar`, `PocBar`): `GpuTimes::trel` rides in the scratch front (`extra`).
+/// `params.period` = bounded level capacity, `params.a` = tick size, `params.b` = session length in seconds.
+/// UNTESTED on GPU.
+pub fn launch_cube_session(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    times: &super::gpu_sample::GpuTimes,
+    params: CubeParams,
+) -> Vec<Vec<f32>> {
+    let n = samples.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let o = lane_series(samples, params, OhlcvField::Open);
+    let h = lane_series(samples, params, OhlcvField::High);
+    let l = lane_series(samples, params, OhlcvField::Low);
+    let c = lane_series(samples, params, params.lane);
+    let v = lane_series(samples, params, OhlcvField::Volume);
+    let (extra, nout, params) = if formula == CubeFormula::PocBar {
+        // layout: trel | day | session | 4 ticks (7n) | state + maps + levels (zero padded)
+        assert_eq!(times.poc_cols.len(), 6 * n, "build GpuTimes with `with_poc_columns`");
+        let cap_r = 4 * params.period as usize + 8;
+        let cap_d = params.flag as usize;
+        let mut e = times.trel.clone();
+        e.extend_from_slice(&times.poc_cols);
+        let tick_rel = e.len();
+        e.extend(std::iter::repeat(0.0f32).take(16 + 2 * cap_r + 4 * cap_d + 256));
+        let _ = tick_rel;
+        (e, 2usize, params)
+    } else {
+        (times.trel.clone(), 2usize, params)
+    };
+    let flag = if formula == CubeFormula::PocBar { params.flag } else { 0 };
+    let flat = bar_run_x(formula.code(), [&o, &h, &l, &c, &v], &extra, params, flag);
+    (0..nout).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect()
+}
+
 /// Run a bar formula of codes 1200..=1399. One `Vec` per output column.
 pub fn launch_cube_bar(
     formula: CubeFormula,
@@ -6255,6 +6606,9 @@ pub fn launch_cube_bar_timed(
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
     assert_eq!(times.mkey.len(), samples.len(), "one GpuTimes row per sample");
+    if formula == CubeFormula::VprofileBar || formula == CubeFormula::PocBar {
+        return launch_cube_session(formula, samples, times, params);
+    }
     launch_cube_bar_x(formula, samples, params, Some(&times.mkey))
 }
 
@@ -6684,6 +7038,9 @@ fn launch_cube_bar_x(
         p.b = params.b.clamp(0.01, 0.99);
         let flat = bar_run(formula.code(), [&o, &h, &l, &c, &v], p, 0);
         return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec(), flat[2 * n..3 * n].to_vec()];
+    }
+    if formula == CubeFormula::VprofileBar || formula == CubeFormula::PocBar {
+        panic!("{:?} reads the session clock: call launch_cube_bar_timed with a GpuTimes", formula);
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

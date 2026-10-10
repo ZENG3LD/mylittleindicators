@@ -829,6 +829,10 @@ pub enum CubeFormula {
     SwingBar = 1351,
     /// Composite: rolling volume profile poc/vah/val. UNTESTED on GPU.
     RvpBar = 1352,
+    /// Composite: session volume profile poc price / poc volume. UNTESTED on GPU.
+    VprofileBar = 1353,
+    /// Composite: poc detector poc price / volume imbalance. UNTESTED on GPU.
+    PocBar = 1354,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1345,6 +1349,8 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::PocBar => 2,
+            CubeFormula::VprofileBar => 2,
             CubeFormula::RvpBar => 3,
             CubeFormula::DivergenceBar => 3,
             CubeFormula::XmilBar => 5,
@@ -1709,6 +1715,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Dvr), Some(CubeFormula::DvrBar));
         assert_eq!(formula_of(IndicatorId::SwingDetect), Some(CubeFormula::SwingBar));
         assert_eq!(formula_of(IndicatorId::Rvp), Some(CubeFormula::RvpBar));
+        assert_eq!(formula_of(IndicatorId::Vprofile), Some(CubeFormula::VprofileBar));
+        assert_eq!(formula_of(IndicatorId::Poc), Some(CubeFormula::PocBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

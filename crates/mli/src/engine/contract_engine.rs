@@ -597,9 +597,9 @@ mli_contract_macros::contract_universe! {
         AvwapDist: Fields : _ +time +cube(comp_avwap_dist_bar) => crate::indicators::levels::avwap_distance::AvwapDistance,
         AvwapMrev: Fields : _ +time +cube(comp_avwap_mrev_bar) => crate::indicators::levels::avwap_multi_anchor_reversion::AvwapMultiAnchorReversion,
         AvwapTprob: Fields : _ +time +cube(comp_avwap_tprob_bar) => crate::indicators::levels::avwap_touch_probability::AvwapTouchProbability,
-        Poc: Fields : _ +time => crate::indicators::volume::poc_detector::PocDetector { poc volume_imbalance },
+        Poc: Fields : _ +time +cube(comp_poc_bar) => crate::indicators::volume::poc_detector::PocDetector { poc volume_imbalance },
         Var: Field : _ +cube(var) => crate::indicators::regression::var::Var,
-        Vprofile: Fields : _ +time => crate::indicators::volume::volume_profile::VolumeProfile { #profile_grid },
+        Vprofile: Fields : _ +time +cube(comp_vprofile_bar) => crate::indicators::volume::volume_profile::VolumeProfile { #profile_grid },
         Adaptivebb: Fields : Channel => crate::indicators::channels::adaptive_bollinger_bands::AdaptiveBollingerBands { upper middle lower bandwidth percent_b squeeze_ratio },
     }
 }
