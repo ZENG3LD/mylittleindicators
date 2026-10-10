@@ -12317,4 +12317,31 @@ mod tests {
         let g = launch_cube_profile(CubeFormula::FootprintChartTk, &fr, CubeParams::period(1));
         for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
     }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): TpoSessionBalance (1408) and ValueAreaTracker (1409).
+    #[test]
+    fn tpo_and_value_area_match_cpu() {
+        use crate::core::types::Tick;
+        use crate::engine::streams::tick_consumer::TickConsumer;
+        use crate::indicators::tick_advanced::tpo_session_balance::TpoSessionBalance;
+        use crate::indicators::tick_advanced::value_area_tracker::ValueAreaTracker;
+        use super::super::kernels_profile::{launch_cube_profile_window, GpuProfileFrame};
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let ticks: Vec<Tick> = (0..260usize)
+            .map(|i| Tick::new(1_000 + i as i64 * 40, 100.0 + 6.0 * w(i, 0.173), 0.1 + 3.0 * w(i, 0.911) + i as f64 * 1e-4, w(i, 0.37) > 0.45))
+            .collect();
+        let fr = GpuProfileFrame::from_ticks(&ticks, 0.5);
+        let mut p = CubeParams::period(1);
+        p.a = 2_000.0;
+        p.b = 0.5;
+        p.c = 0.7;
+        let mut m = TpoSessionBalance::new(2_000, 0.5);
+        let rows: Vec<[f64; 3]> = ticks.iter().map(|t| { m.update_tick(t); [m.price(), m.max_count(), m.buckets()] }).collect();
+        let g = launch_cube_profile_window(CubeFormula::TpoSessionBalanceTk, &fr, p);
+        for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
+        let mut m = ValueAreaTracker::new(2_000, 0.5, 0.7);
+        let rows: Vec<[f64; 3]> = ticks.iter().map(|t| { m.update_tick(t); [m.poc(), m.vah(), m.val()] }).collect();
+        let g = launch_cube_profile_window(CubeFormula::ValueAreaTrackerTk, &fr, p);
+        for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
+    }
 }
