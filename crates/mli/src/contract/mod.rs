@@ -692,6 +692,7 @@ pub mod gpu_sample;
 pub use gpu_sample::{GpuColumns, GpuLevel, GpuSample, GpuTimes};
 
 pub mod event_frame;
+pub mod book_frame;
 pub use event_frame::{GpuEventFrame, EVENT_COLS};
 
 #[cfg(feature = "gpu")]
@@ -721,7 +722,10 @@ pub mod kernels_spec;
 /// Event-frame formulas, codes 900..=999. UNTESTED on GPU.
 #[cfg(feature = "gpu")]
 pub mod kernels_ev;
+#[cfg(feature = "gpu")]
 pub mod kernels_evx;
+#[cfg(feature = "gpu")]
+pub mod kernels_book;
 
 pub mod axis;
 pub use axis::{sweep_f64, CubeIter, Param, ParamScalar};

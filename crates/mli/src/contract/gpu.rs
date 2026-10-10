@@ -601,6 +601,20 @@ pub enum CubeFormula {
     PressureComp = 1059,
     /// Composite: MACD histogram z-score. UNTESTED on GPU.
     MacdHistZComp = 1060,
+    /// Composite: bid/ask bounce rate. UNTESTED on GPU.
+    BidAskBounceBk = 960,
+    /// Composite: mid price velocity. UNTESTED on GPU.
+    MidPriceVelBk = 961,
+    /// Composite: book depth change bid/ask. UNTESTED on GPU.
+    BookDepthChangeBk = 962,
+    /// Composite: wall detector bid_price/ask_price/total_size. UNTESTED on GPU.
+    WallDetectorBk = 963,
+    /// Composite: best level volatility. UNTESTED on GPU.
+    BestLevelVolBk = 964,
+    /// Composite: price level density. UNTESTED on GPU.
+    PriceLevelDensityBk = 965,
+    /// Composite: liquidity sweep direction/magnitude. UNTESTED on GPU.
+    LiquiditySweepBk = 966,
     /// Composite: L3 cancel ratio. UNTESTED on GPU.
     L3CancelRatioEv = 940,
     /// Composite: auction price deviation (always 0). UNTESTED on GPU.
@@ -859,6 +873,11 @@ impl CubeFormula {
             CubeFormula::TradeClusterEv => 3,
             CubeFormula::VolImbZoneEv => 3,
             CubeFormula::VwapDevEv => 3,
+            CubeFormula::BookDepthChangeBk => 2,
+            CubeFormula::WallDetectorBk => 3,
+            CubeFormula::BestLevelVolBk => 3,
+            CubeFormula::PriceLevelDensityBk => 3,
+            CubeFormula::LiquiditySweepBk => 2,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1125,6 +1144,13 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::BidAskBounceRate), Some(CubeFormula::BidAskBounceBk));
+        assert_eq!(formula_of(IndicatorId::MidPriceVelocity), Some(CubeFormula::MidPriceVelBk));
+        assert_eq!(formula_of(IndicatorId::BookDepthChange), Some(CubeFormula::BookDepthChangeBk));
+        assert_eq!(formula_of(IndicatorId::WallDetector), Some(CubeFormula::WallDetectorBk));
+        assert_eq!(formula_of(IndicatorId::BestLevelVolatility), Some(CubeFormula::BestLevelVolBk));
+        assert_eq!(formula_of(IndicatorId::PriceLevelDensity), Some(CubeFormula::PriceLevelDensityBk));
+        assert_eq!(formula_of(IndicatorId::LiquiditySweep), Some(CubeFormula::LiquiditySweepBk));
         assert_eq!(formula_of(IndicatorId::MacdHistZ), Some(CubeFormula::MacdHistZComp));
         assert_eq!(formula_of(IndicatorId::L3CancelRatio), Some(CubeFormula::L3CancelRatioEv));
         assert_eq!(formula_of(IndicatorId::AuctionPriceDeviation), Some(CubeFormula::AuctionPriceDeviationEv));

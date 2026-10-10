@@ -7494,6 +7494,93 @@ mod tests {
         assert_close(&run(CubeFormula::MacdHistZComp, &bars, mp), &c);
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): order-book snapshot rows 960..=966.
+    #[test]
+    fn lane_matches_cpu_book_batch() {
+        use super::super::book_frame::GpuBookFrame;
+        use super::super::kernels_book::launch_cube_book;
+        use crate::core::types::OrderBook;
+        use crate::engine::streams::order_book_consumer::OrderBookConsumer;
+        use crate::indicators::book::book_depth_change::BookDepthChange;
+        use crate::indicators::book::liquidity_sweep::LiquiditySweep;
+        use crate::indicators::book::wall_detector::WallDetector;
+        use crate::indicators::book_advanced::best_level_volatility::BestLevelVolatility;
+        use crate::indicators::book_advanced::bid_ask_bounce_rate::BidAskBounceRate;
+        use crate::indicators::book_advanced::mid_price_velocity::MidPriceVelocity;
+        use crate::indicators::book_advanced::price_level_density::PriceLevelDensity;
+
+        let n = 70usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let t0 = 1_700_000_000_000i64;
+        let books: Vec<OrderBook> = (0..n)
+            .map(|i| {
+                let mid = 100.0 + 2.0 * w(i, 0.21);
+                let kb = 4 + (w(i, 0.8) * 4.0) as usize;
+                let ka = 4 + (w(i, 0.6) * 4.0) as usize;
+                let bids = (0..kb).map(|l| (((mid - 0.1 * (l as f64 + 1.0)) * 10.0).round() / 10.0, 1.0 + 5.0 * w(i + l, 0.9))).collect();
+                let asks = (0..ka).map(|l| (((mid + 0.1 * (l as f64 + 1.0)) * 10.0).round() / 10.0, 1.0 + 5.0 * w(i + l, 1.1))).collect();
+                OrderBook::simple(bids, asks, t0 + i as i64 * 200)
+            })
+            .collect();
+        let fr = GpuBookFrame::from_books(&books, 16);
+        let mut p = CubeParams::period(8);
+        p.levels = 3;
+        p.a = 90.0;
+        let mut m = BidAskBounceRate::new(8);
+        let c: Vec<f64> = books.iter().map(|b| { m.update_orderbook(b); m.value() }).collect();
+        assert_close(&launch_cube_book(CubeFormula::BidAskBounceBk, &fr, p)[0], &c);
+        let mut m = MidPriceVelocity::new(8);
+        let c: Vec<f64> = books.iter().map(|b| { m.update_orderbook(b); m.value() }).collect();
+        assert_close(&launch_cube_book(CubeFormula::MidPriceVelBk, &fr, p)[0], &c);
+        let mut m = BookDepthChange::new(8);
+        let (mut a, mut b2) = (Vec::new(), Vec::new());
+        for b in &books {
+            m.update_orderbook(b);
+            a.push(m.bid());
+            b2.push(m.ask());
+        }
+        assert_cols(&launch_cube_book(CubeFormula::BookDepthChangeBk, &fr, p), &[&a, &b2]);
+        let mut m = WallDetector::new(30, 90.0, 3);
+        let (mut a, mut b2, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        for b in &books {
+            m.update_orderbook(b);
+            a.push(m.bid_price());
+            b2.push(m.ask_price());
+            c3.push(m.total_size());
+        }
+        let mut wp = p;
+        wp.period = 30;
+        assert_cols(&launch_cube_book(CubeFormula::WallDetectorBk, &fr, wp), &[&a, &b2, &c3]);
+        let mut m = BestLevelVolatility::new(8);
+        let (mut a, mut b2, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        for b in &books {
+            m.update_orderbook(b);
+            a.push(m.std_bid());
+            b2.push(m.std_ask());
+            c3.push(m.max());
+        }
+        assert_cols(&launch_cube_book(CubeFormula::BestLevelVolBk, &fr, p), &[&a, &b2, &c3]);
+        let mut m = PriceLevelDensity::new(5);
+        let (mut a, mut b2, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        for b in &books {
+            m.update_orderbook(b);
+            a.push(m.density_bid());
+            b2.push(m.density_ask());
+            c3.push(m.avg());
+        }
+        let mut dp = p;
+        dp.period = 5;
+        assert_cols(&launch_cube_book(CubeFormula::PriceLevelDensityBk, &fr, dp), &[&a, &b2, &c3]);
+        let mut m = LiquiditySweep::new();
+        let (mut a, mut b2) = (Vec::new(), Vec::new());
+        for b in &books {
+            m.update_orderbook(b);
+            a.push(m.direction());
+            b2.push(m.magnitude());
+        }
+        assert_cols(&launch_cube_book(CubeFormula::LiquiditySweepBk, &fr, p), &[&a, &b2]);
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
