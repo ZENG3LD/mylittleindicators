@@ -509,7 +509,7 @@ mli_contract_macros::contract_universe! {
         VoKc:  Fields     : Channel +cube(comp_vo_kc_cols)   => crate::indicators::volatility::kc::Kc { upper middle lower },
         VoVr:  Fields     : Volatility +cube(vol_ratio) => crate::indicators::volatility::vr::Vr,
         Vovp:  Fields  : Volatility +cube(vov_pct) => crate::indicators::volatility::vol_of_vol_percentile::VolOfVolPercentile,
-        Vbd:   Fields     : _          => crate::indicators::volatility::volatility_breakout_detector::VolatilityBreakoutDetector,
+        Vbd:   Fields     : _ +cube(comp_vbd_bar) => crate::indicators::volatility::volatility_breakout_detector::VolatilityBreakoutDetector,
         Atrc:  Fields     : Channel +cube(comp_atrc_cols)   => crate::indicators::volatility::atr_channels::AtrChannels { upper middle lower },
         NviPvi: Fields : _ +cube(comp_nvi_pvi_bar) => crate::indicators::volume::nvi_pvi::NegativePositiveVolumeIndex { nvi pvi },
         Vpt:    Fields : _ +cube(comp_vpt_comp) => crate::indicators::volume::vpt::VolumePriceTrend,

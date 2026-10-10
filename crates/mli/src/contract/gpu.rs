@@ -817,6 +817,8 @@ pub enum CubeFormula {
     UkfBar = 1342,
     /// Particle (keyed / profile / fit family). UNTESTED on GPU.
     ParticleBar = 1343,
+    /// Composite: volatility breakout detector class. UNTESTED on GPU.
+    VbdBar = 1344,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1690,6 +1692,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Divergence), Some(CubeFormula::DivergenceBar));
         assert_eq!(formula_of(IndicatorId::Ekf), Some(CubeFormula::EkfBar));
         assert_eq!(formula_of(IndicatorId::Ukf), Some(CubeFormula::UkfBar));
+        assert_eq!(formula_of(IndicatorId::Vbd), Some(CubeFormula::VbdBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

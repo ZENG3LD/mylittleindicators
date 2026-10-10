@@ -5701,6 +5701,24 @@ fn bar_scan(
                 }
             }
             v0 = scr[8];
+        } else if formula == 1344u32 {
+            // volatility breakout class: o = short ATR, h = smoothed long ATR (host-resolved); a / b / _cc = mild / strong /
+            // extreme thresholds, flag = squeeze threshold * 1e6. out = -1 squeeze, 0 none, 1 mild, 2 strong, 3 extreme
+            let sm = h[t];
+            let mut ratio = 1.0f32;
+            if sm > 0.0f32 {
+                ratio = o[t] / sm;
+            }
+            let sq = (flag as f32) / 1.0e6f32;
+            if ratio >= _cc {
+                v0 = 3.0f32;
+            } else if ratio >= b {
+                v0 = 2.0f32;
+            } else if ratio >= a {
+                v0 = 1.0f32;
+            } else if ratio <= sq {
+                v0 = -1.0f32;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -6196,6 +6214,16 @@ fn launch_cube_bar_x(
         let p = CubeParams { a: params.a, b: params.b, ..params };
         let fr = params.ext[0] as f32 / 1.0e6;
         let flat = bar_run_x(formula.code(), [&o, &h, &l, &c, &v], &[fr], p, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::VbdBar {
+        // fast = long ATR period, smoother = ATR smoother (short ATR period is the constant 5), a / b / c = mild /
+        // strong / extreme thresholds, ext[0] = squeeze threshold * 1e6
+        let long = super::kernels_comp::atr_series(samples, params, params.smoother, params.fast.max(1), 0);
+        let short = super::kernels_comp::atr_series(samples, params, params.smoother, 5, 0);
+        let ema = smooth_series(&long, super::CubeSmoother::Ema, 20, 0, 0.0, 0.0);
+        let p = CubeParams { a: params.a, b: params.b, ..params };
+        let flat = bar_run(formula.code(), [&short, &ema, &l, &c, &v], p, params.ext[0]);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {
