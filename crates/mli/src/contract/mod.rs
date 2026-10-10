@@ -706,6 +706,10 @@ pub mod kernels_post;
 #[cfg(feature = "gpu")]
 pub mod kernels_cal;
 
+/// wgpu dispatcher for hand-written WGSL rows. UNTESTED on GPU.
+#[cfg(feature = "gpu-shader")]
+pub mod shader_run;
+
 /// Smoother-chain composites, codes 1000..=1099. UNTESTED on GPU.
 #[cfg(feature = "gpu")]
 pub mod kernels_comp;

@@ -7142,6 +7142,22 @@ mod tests {
         assert_cols(&run_cols(CubeFormula::AbgCols, &bars, CubeParams::period(10)), &[&a, &b, &c]);
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): WGSL dispatcher, Decycler end to end.
+    #[cfg(feature = "gpu-shader")]
+    #[test]
+    fn shader_decycler_matches_cpu() {
+        use crate::indicators::signal_processing::decycler::Decycler;
+        let bars = bars(120);
+        let samples: Vec<GpuSample> = bars.iter().map(GpuSample::from).collect();
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        for period in [10.0f32, 30.0] {
+            let gpu = super::super::shader_run::launch_shader(crate::engine::indicator_id::IndicatorId::Decyc, &samples, period)
+                .expect("wgpu adapter");
+            let mut m = Decycler::new(period as f64);
+            assert_close(&gpu[0], &cpu(&close, |v| m.feed(v)));
+        }
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
