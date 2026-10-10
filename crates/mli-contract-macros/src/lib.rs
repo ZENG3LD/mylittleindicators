@@ -276,6 +276,12 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "rbvj" => "Rbvj",
         "vol_of_vol" => "VolOfVol",
         "ehlers_cc" => "EhlersCc",
+        "vortex" => "Vortex",
+        "dm" => "Dm",
+        "di_plus_minus" => "DiPlusMinus",
+        "rwi" => "Rwi",
+        "higher_moments" => "HigherMoments",
+        "swing_age" => "SwingAge",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

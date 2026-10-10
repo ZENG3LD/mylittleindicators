@@ -303,6 +303,18 @@ pub enum CubeFormula {
     VolOfVol = 207,
     /// Ehlers cyber cycle of `(high + low) / 2`: `EhlersCyberCycle`. [`CubeParams::a`] is alpha clamped to `[0.01, 0.99]`. Holds 0 until six bars. UNTESTED on GPU.
     EhlersCc = 208,
+    /// Vortex indicator. Columns: VI+, VI-. Wilder ATR as in the feed (bar 0 returns `1, 1`); sums of `|high - low_prev|`, `|low - high_prev|` and ATR over the last `period` bars; holds the previous pair when the ATR sum is ~0. Multi-column. UNTESTED on GPU.
+    Vortex = 300,
+    /// `Dm::feed`. Columns: +DI, -DI, ADX. Window sums over the last `period` bars of `1..=i` (true range with the previous close); DI from the first `period - 1` entries, ADX is the mean of the last `period` DX values. UNTESTED on GPU.
+    Dm = 301,
+    /// `DiPlusMinus`: +DI, -DI of the Wilder-smoothed `Adx` state (0 until `period` bars). UNTESTED on GPU.
+    DiPlusMinus = 302,
+    /// `Rwi`. Columns: up (`high`), down (`low`). Wilder ATR over `period` (at least 2), `(high - low_prev)+ / (atr * sqrt(period))` and the mirror. UNTESTED on GPU.
+    Rwi = 303,
+    /// `HigherMoments`. Columns: skew, kurtosis of the last `period` (at least 3) log returns; 0 until `period + 1` closes. UNTESTED on GPU.
+    HigherMoments = 304,
+    /// `SwingAge`. Columns: bars since a new window high, bars since a new window low (as f32). Window is `period` (at least 2); holds 0 until it is full. UNTESTED on GPU.
+    SwingAge = 305,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -455,6 +467,12 @@ impl CubeFormula {
             CubeFormula::CentralPivotRange => 3,
             CubeFormula::HeikinAshiCols => 4,
             CubeFormula::CandleAnatomyCols => 5,
+            CubeFormula::Vortex => 2,
+            CubeFormula::Dm => 3,
+            CubeFormula::DiPlusMinus => 2,
+            CubeFormula::Rwi => 2,
+            CubeFormula::HigherMoments => 2,
+            CubeFormula::SwingAge => 2,
             _ => 1,
         }
     }
@@ -640,6 +658,13 @@ mod tests {
             (IndicatorId::Cpr, CubeFormula::CentralPivotRange),
             (IndicatorId::Heikinashi, CubeFormula::HeikinAshiCols),
             (IndicatorId::Candleanatomy, CubeFormula::CandleAnatomyCols),
+            (IndicatorId::Vortex, CubeFormula::Vortex),
+            (IndicatorId::Dm, CubeFormula::Dm),
+            (IndicatorId::DiPlusMinus, CubeFormula::DiPlusMinus),
+            (IndicatorId::Rwi, CubeFormula::Rwi),
+            (IndicatorId::Hmom, CubeFormula::HigherMoments),
+            (IndicatorId::SwingAge, CubeFormula::SwingAge),
+            (IndicatorId::VoDc, CubeFormula::DonchianBands),
         ] {
             assert_eq!(
                 crate::engine::contract_engine::outputs_of(id).map(|o| o.len() as u32),
@@ -673,6 +698,13 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Rbvj), Some(CubeFormula::Rbvj));
         assert_eq!(formula_of(IndicatorId::Vov), Some(CubeFormula::VolOfVol));
         assert_eq!(formula_of(IndicatorId::EhlersCc), Some(CubeFormula::EhlersCc));
+        assert_eq!(formula_of(IndicatorId::Vortex), Some(CubeFormula::Vortex));
+        assert_eq!(formula_of(IndicatorId::Dm), Some(CubeFormula::Dm));
+        assert_eq!(formula_of(IndicatorId::DiPlusMinus), Some(CubeFormula::DiPlusMinus));
+        assert_eq!(formula_of(IndicatorId::Rwi), Some(CubeFormula::Rwi));
+        assert_eq!(formula_of(IndicatorId::Hmom), Some(CubeFormula::HigherMoments));
+        assert_eq!(formula_of(IndicatorId::SwingAge), Some(CubeFormula::SwingAge));
+        assert_eq!(formula_of(IndicatorId::VoDc), Some(CubeFormula::DonchianBands));
         assert_eq!(gpu_of(IndicatorId::Decyc), GpuMode::Shader);
         assert_eq!(formula_of(IndicatorId::Decyc), None);
         let spec = shader_of(IndicatorId::Decyc).expect("decycler shader");

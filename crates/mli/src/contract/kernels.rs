@@ -4546,6 +4546,9 @@ pub fn launch_cube_columns(
     if formula.output_count() <= 1 {
         return vec![launch_cube(formula, samples, params)];
     }
+    if formula.code() >= 300 && formula.code() < 400 {
+        return launch_cube_gx_columns(formula, samples, params);
+    }
     let n = samples.len();
     let cols = formula.output_count() as usize;
     let c = GpuSample::columns(samples);
@@ -5360,6 +5363,447 @@ fn launch_cube_gx(formula: CubeFormula, samples: &[GpuSample], params: CubeParam
     f32::from_bytes(&bytes).to_vec()
 }
 
+/// Sum over the Dm ring window ending at bar `i` (`which` 0 true range, 1 +DM, 2 -DM).
+/// The window is the last `min(i, p)` bars of `1..=i`, as `Dm::feed`.
+#[cube]
+fn dm_sums_at(high: &[f32], low: &[f32], close: &[f32], i: usize, p: usize, which: u32) -> f32 {
+    let mut start = 1usize;
+    if i >= p {
+        start = i + 1 - p;
+    }
+    let cnt = i + 1 - start;
+    let mut s = 0.0f32;
+    for t in 0..cnt {
+        let j = start + t;
+        if which == 0u32 {
+            s = s + wilder_tr(high, low, close, j);
+        } else {
+            let up_move = high[j] - high[j - 1];
+            let down_move = low[j - 1] - low[j];
+            if which == 1u32 {
+                if up_move > down_move {
+                    if up_move > 0.0f32 {
+                        s = s + up_move;
+                    }
+                }
+            } else {
+                if down_move > up_move {
+                    if down_move > 0.0f32 {
+                        s = s + down_move;
+                    }
+                }
+            }
+        }
+    }
+    s
+}
+
+/// DX of `Dm::feed` at bar `j` (`j + 1 >= p`).
+#[cube]
+fn dm_dx_at(high: &[f32], low: &[f32], close: &[f32], j: usize, p: usize) -> f32 {
+    let ts = dm_sums_at(high, low, close, j, p, 0u32);
+    let ps = dm_sums_at(high, low, close, j, p, 1u32);
+    let ms = dm_sums_at(high, low, close, j, p, 2u32);
+    let mut abs_ts = ts;
+    if abs_ts < 0.0f32 {
+        abs_ts = -abs_ts;
+    }
+    let mut dx = 0.0f32;
+    if abs_ts >= 1.0e-12f32 {
+        let pdi = 100.0f32 * ps / ts;
+        let mdi = 100.0f32 * ms / ts;
+        let mut diff = pdi - mdi;
+        if diff < 0.0f32 {
+            diff = -diff;
+        }
+        let sum = pdi + mdi;
+        let mut abs_sum = sum;
+        if abs_sum < 0.0f32 {
+            abs_sum = -abs_sum;
+        }
+        if abs_sum >= 1.0e-12f32 {
+            dx = 100.0f32 * diff / sum;
+        }
+    }
+    dx
+}
+
+/// gx columns, formulas 300 through 305. Output holds `cols` columns of `n` values,
+/// then one scratch column of `n` values (vortex ATR).
+#[cube]
+fn gx_cols_a(
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    output: &mut [f32],
+    period: u32,
+    formula: u32,
+) {
+    let n = high.len();
+    let mut p = period as usize;
+    if p < 1 {
+        p = 1;
+    }
+    if formula == 300u32 {
+        // Vortex: columns plus, minus. Scratch column 2 holds the Wilder ATR value per bar.
+        let pf = p as f32;
+        let mut atr = 0.0f32;
+        let mut vip = 1.0f32;
+        let mut vim = 1.0f32;
+        for i in 0..n {
+            if i > 0 {
+                if i == 1 {
+                    atr = high[1] - low[1];
+                } else {
+                    atr = (atr * (pf - 1.0f32) + wilder_tr(high, low, close, i)) / pf;
+                }
+                output[2 * n + i] = atr;
+                let mut start = 1usize;
+                if i >= p {
+                    start = i + 1 - p;
+                }
+                let cnt = i + 1 - start;
+                let mut ps = 0.0f32;
+                let mut ns = 0.0f32;
+                let mut ts = 0.0f32;
+                for t in 0..cnt {
+                    let j = start + t;
+                    let mut pv = high[j] - low[j - 1];
+                    if pv < 0.0f32 {
+                        pv = -pv;
+                    }
+                    let mut nv = low[j] - high[j - 1];
+                    if nv < 0.0f32 {
+                        nv = -nv;
+                    }
+                    ps = ps + pv;
+                    ns = ns + nv;
+                    ts = ts + output[2 * n + j];
+                }
+                let mut abs_ts = ts;
+                if abs_ts < 0.0f32 {
+                    abs_ts = -abs_ts;
+                }
+                if abs_ts > 1.0e-12f32 {
+                    vip = ps / ts;
+                    vim = ns / ts;
+                }
+            }
+            output[i] = vip;
+            output[n + i] = vim;
+        }
+    } else if formula == 302u32 {
+        // DiPlusMinus: +DI / -DI of the Wilder-smoothed Adx state.
+        let pf = p as f32;
+        let sf = 1.0f32 / pf;
+        let mut atr = 0.0f32;
+        let mut tr_sum = 0.0f32;
+        let mut pdm_sum = 0.0f32;
+        let mut mdm_sum = 0.0f32;
+        let mut pdi_v = 0.0f32;
+        let mut mdi_v = 0.0f32;
+        for i in 0..n {
+            if i > 0 {
+                if i == 1 {
+                    atr = high[1] - low[1];
+                } else {
+                    atr = (atr * (pf - 1.0f32) + wilder_tr(high, low, close, i)) / pf;
+                }
+                let up_move = high[i] - high[i - 1];
+                let down_move = low[i - 1] - low[i];
+                let mut pdm = 0.0f32;
+                let mut mdm = 0.0f32;
+                if up_move > down_move {
+                    if up_move > 0.0f32 {
+                        pdm = up_move;
+                    }
+                }
+                if down_move > up_move {
+                    if down_move > 0.0f32 {
+                        mdm = down_move;
+                    }
+                }
+                let mut do_calc = false;
+                if i <= p {
+                    tr_sum = tr_sum + atr;
+                    pdm_sum = pdm_sum + pdm;
+                    mdm_sum = mdm_sum + mdm;
+                    if i == p {
+                        do_calc = true;
+                    }
+                } else {
+                    tr_sum = tr_sum - tr_sum * sf + atr;
+                    pdm_sum = pdm_sum - pdm_sum * sf + pdm;
+                    mdm_sum = mdm_sum - mdm_sum * sf + mdm;
+                    do_calc = true;
+                }
+                if do_calc {
+                    let mut abs_tr = tr_sum;
+                    if abs_tr < 0.0f32 {
+                        abs_tr = -abs_tr;
+                    }
+                    if abs_tr < 1.0e-12f32 {
+                        pdi_v = 0.0f32;
+                        mdi_v = 0.0f32;
+                    } else {
+                        pdi_v = (pdm_sum / tr_sum) * 100.0f32;
+                        mdi_v = (mdm_sum / tr_sum) * 100.0f32;
+                    }
+                }
+            }
+            output[i] = pdi_v;
+            output[n + i] = mdi_v;
+        }
+    } else if formula == 303u32 {
+        // Rwi: columns up (high), down (low). period at least 2.
+        if p < 2 {
+            p = 2;
+        }
+        let pf = p as f32;
+        let sq = sqrt_f(pf);
+        let mut atr = 0.0f32;
+        let mut up = 0.0f32;
+        let mut down = 0.0f32;
+        for i in 0..n {
+            if i == 0 {
+                atr = high[0] - low[0];
+            } else {
+                atr = (atr * (pf - 1.0f32) + wilder_tr(high, low, close, i)) / pf;
+            }
+            let mut denom = atr * sq;
+            if denom < 1.0e-12f32 {
+                denom = 1.0e-12f32;
+            }
+            if i > 0 {
+                let mut u = high[i] - low[i - 1];
+                if u < 0.0f32 {
+                    u = 0.0f32;
+                }
+                let mut d = high[i - 1] - low[i];
+                if d < 0.0f32 {
+                    d = 0.0f32;
+                }
+                up = u / denom;
+                down = d / denom;
+            }
+            output[i] = up;
+            output[n + i] = down;
+        }
+    } else if formula == 304u32 {
+        // HigherMoments: skew and kurtosis of the last `win` log returns. Holds 0 until win + 1 closes.
+        let mut win = p;
+        if win < 3 {
+            win = 3;
+        }
+        let mut skew = 0.0f32;
+        let mut kurt = 0.0f32;
+        for i in 0..n {
+            if i >= win {
+                let mut sum = 0.0f32;
+                for k in 0..win {
+                    let mut c1 = close[i - k - 1];
+                    if c1 < 1.0e-12f32 {
+                        c1 = 1.0e-12f32;
+                    }
+                    let mut c2 = close[i - k];
+                    if c2 < 1.0e-12f32 {
+                        c2 = 1.0e-12f32;
+                    }
+                    sum = sum + (c2 / c1).ln();
+                }
+                let wf = win as f32;
+                let mean = sum / wf;
+                let mut m2 = 0.0f32;
+                let mut m3 = 0.0f32;
+                let mut m4 = 0.0f32;
+                for k in 0..win {
+                    let mut c1 = close[i - k - 1];
+                    if c1 < 1.0e-12f32 {
+                        c1 = 1.0e-12f32;
+                    }
+                    let mut c2 = close[i - k];
+                    if c2 < 1.0e-12f32 {
+                        c2 = 1.0e-12f32;
+                    }
+                    let d = (c2 / c1).ln() - mean;
+                    let d2 = d * d;
+                    m2 = m2 + d2;
+                    m3 = m3 + d2 * d;
+                    m4 = m4 + d2 * d2;
+                }
+                m2 = m2 / wf;
+                m3 = m3 / wf;
+                m4 = m4 / wf;
+                let mut s2 = m2;
+                if s2 < 1.0e-12f32 {
+                    s2 = 1.0e-12f32;
+                }
+                skew = m3 / (s2 * sqrt_f(s2));
+                kurt = m4 / (s2 * s2);
+            }
+            output[i] = skew;
+            output[n + i] = kurt;
+        }
+    } else if formula == 305u32 {
+        // SwingAge: bars since the bar set a new window high / low. lookback at least 2.
+        let mut len = p;
+        if len < 2 {
+            len = 2;
+        }
+        let mut ah = 0.0f32;
+        let mut al = 0.0f32;
+        for i in 0..n {
+            if i + 1 >= len {
+                let mut prev_max = high[i - 1];
+                let mut prev_min = low[i - 1];
+                for k in 1..len {
+                    if high[i - k] > prev_max {
+                        prev_max = high[i - k];
+                    }
+                    if low[i - k] < prev_min {
+                        prev_min = low[i - k];
+                    }
+                }
+                if high[i] >= prev_max {
+                    ah = 0.0f32;
+                } else {
+                    ah = ah + 1.0f32;
+                }
+                if low[i] <= prev_min {
+                    al = 0.0f32;
+                } else {
+                    al = al + 1.0f32;
+                }
+            }
+            output[i] = ah;
+            output[n + i] = al;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn gx_cols_map_a(
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    output: &mut [f32],
+    period: u32,
+    formula: u32,
+) {
+    gx_cols_a(high, low, close, output, period, formula);
+}
+
+/// gx columns, formula 301 (Dm). Own entry: the ADX ring recomputes DX over the window.
+#[cube]
+fn gx_cols_b(
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    output: &mut [f32],
+    period: u32,
+    formula: u32,
+) {
+    let n = high.len();
+    let mut p = period as usize;
+    if p < 1 {
+        p = 1;
+    }
+    if formula == 301u32 {
+        for i in 0..n {
+            let mut pdi = 0.0f32;
+            let mut mdi = 0.0f32;
+            let mut adx = 0.0f32;
+            if i > 0 {
+                if i + 1 >= p {
+                    let ts = dm_sums_at(high, low, close, i, p, 0u32);
+                    let ps = dm_sums_at(high, low, close, i, p, 1u32);
+                    let ms = dm_sums_at(high, low, close, i, p, 2u32);
+                    let mut abs_ts = ts;
+                    if abs_ts < 0.0f32 {
+                        abs_ts = -abs_ts;
+                    }
+                    if abs_ts >= 1.0e-12f32 {
+                        pdi = 100.0f32 * ps / ts;
+                        mdi = 100.0f32 * ms / ts;
+                    }
+                    if i + 2 >= p + p {
+                        let start = i + 1 - p;
+                        let mut dsum = 0.0f32;
+                        for t in 0..p {
+                            dsum = dsum + dm_dx_at(high, low, close, start + t, p);
+                        }
+                        adx = dsum / (p as f32);
+                    }
+                }
+            }
+            output[i] = pdi;
+            output[n + i] = mdi;
+            output[2 * n + i] = adx;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn gx_cols_map_b(
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    output: &mut [f32],
+    period: u32,
+    formula: u32,
+) {
+    gx_cols_b(high, low, close, output, period, formula);
+}
+
+/// Launch for the gx multi-column formulas (code 300..=399): `output_count` columns.
+fn launch_cube_gx_columns(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    params: CubeParams,
+) -> Vec<Vec<f32>> {
+    let n = samples.len();
+    let cols = formula.output_count() as usize;
+    let c = GpuSample::columns(samples);
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let high_b = client.create_from_slice(f32::as_bytes(&c.high));
+    let low_b = client.create_from_slice(f32::as_bytes(&c.low));
+    let close_b = client.create_from_slice(f32::as_bytes(&c.close));
+    // One scratch column after the output columns.
+    let total = n * (cols + 1);
+    let output = client.empty(total * core::mem::size_of::<f32>());
+    unsafe {
+        if formula.code() == 301 {
+            gx_cols_map_b::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(output.clone(), total),
+                params.period,
+                formula.code(),
+            );
+        } else {
+            gx_cols_map_a::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(output.clone(), total),
+                params.period,
+                formula.code(),
+            );
+        }
+    }
+    let bytes = client.read_one_unchecked(output);
+    let flat = f32::from_bytes(&bytes).to_vec();
+    flat.chunks(n).take(cols).map(|ch| ch.to_vec()).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5651,6 +6095,89 @@ mod tests {
         let mut ecc_params = CubeParams::period(1);
         ecc_params.a = 0.07;
         assert_close(&run(CubeFormula::EhlersCc, &bars, ecc_params), &cpu_ecc);
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): gx batch 2, multi-column codes 300..=305
+    /// and the Dc alias (VoDc on `DonchianBands`).
+    #[test]
+    fn lane_matches_cpu_gx_batch2() {
+        use crate::indicators::regime::rwi::Rwi;
+        use crate::indicators::statistics::higher_moments::HigherMoments;
+        use crate::indicators::swing::swing_age::SwingAge;
+        use crate::indicators::trend::di_plus_minus::DiPlusMinus;
+        use crate::indicators::trend::dm::Dm;
+        use crate::indicators::trend::vortex_indicator::VortexIndicator;
+        use crate::indicators::volatility::dc::Dc;
+
+        let bars = bars(70);
+
+        let mut vx = VortexIndicator::with_period(5);
+        let (mut vp, mut vm) = (Vec::new(), Vec::new());
+        for b in &bars {
+            let (p, m) = vx.feed(&[b.high, b.low, b.close]);
+            vp.push(p);
+            vm.push(m);
+        }
+        assert_cols(&run_cols(CubeFormula::Vortex, &bars, CubeParams::period(5)), &[&vp, &vm]);
+
+        let mut dm = Dm::new(5);
+        let (mut dp, mut dn, mut da) = (Vec::new(), Vec::new(), Vec::new());
+        for b in &bars {
+            let (p, m, a) = dm.feed(&[b.high, b.low, b.close]);
+            dp.push(p);
+            dn.push(m);
+            da.push(a);
+        }
+        assert_cols(&run_cols(CubeFormula::Dm, &bars, CubeParams::period(5)), &[&dp, &dn, &da]);
+
+        let mut dpm = DiPlusMinus::with_period(5);
+        let (mut pp, mut pm) = (Vec::new(), Vec::new());
+        for b in &bars {
+            dpm.feed(&[b.high, b.low, b.close]);
+            pp.push(dpm.plus_di());
+            pm.push(dpm.minus_di());
+        }
+        assert_cols(&run_cols(CubeFormula::DiPlusMinus, &bars, CubeParams::period(5)), &[&pp, &pm]);
+
+        let mut rwi = Rwi::new(5);
+        let (mut ru, mut rd) = (Vec::new(), Vec::new());
+        for b in &bars {
+            let (u, d) = rwi.feed(&[b.high, b.low, b.close]);
+            ru.push(u);
+            rd.push(d);
+        }
+        assert_cols(&run_cols(CubeFormula::Rwi, &bars, CubeParams::period(5)), &[&ru, &rd]);
+
+        let mut hm = HigherMoments::new(8);
+        let (mut sk, mut ku) = (Vec::new(), Vec::new());
+        for b in &bars {
+            let (s, k) = hm.feed(b.close);
+            sk.push(s);
+            ku.push(k);
+        }
+        assert_cols(&run_cols(CubeFormula::HigherMoments, &bars, CubeParams::period(8)), &[&sk, &ku]);
+
+        let mut sa = SwingAge::new(6);
+        let (mut ah, mut al) = (Vec::new(), Vec::new());
+        for b in &bars {
+            let (h, l) = sa.feed(&[b.high, b.low]);
+            ah.push(h as f64);
+            al.push(l as f64);
+        }
+        assert_cols(&run_cols(CubeFormula::SwingAge, &bars, CubeParams::period(6)), &[&ah, &al]);
+
+        let mut dc = Dc::new(5);
+        let (mut du, mut dmid, mut dl) = (Vec::new(), Vec::new(), Vec::new());
+        for b in &bars {
+            let (u, m, l) = dc.feed(&[b.high, b.low]);
+            du.push(u);
+            dmid.push(m);
+            dl.push(l);
+        }
+        assert_cols(
+            &run_cols(CubeFormula::DonchianBands, &bars, CubeParams::period(5)),
+            &[&du, &dmid, &dl],
+        );
     }
 
     #[test]
