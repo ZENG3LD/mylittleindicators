@@ -356,6 +356,7 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "comp_fuzzy_bar" => "FuzzyBar",
         "comp_oscvolw_bar" => "OscVolWeightBar",
         "comp_confluence_bar" => "ConfluenceBar",
+        "comp_xmil_bar" => "XmilBar",
         "comp_esine_bar" => "EsineBar",
         "comp_ess_bar" => "EssBar",
         "comp_ehlersfa_bar" => "EhlersfaBar",

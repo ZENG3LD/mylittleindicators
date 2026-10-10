@@ -763,6 +763,8 @@ pub enum CubeFormula {
     OscVolWeightBar = 1328,
     /// Composite: oscillator confluence. UNTESTED on GPU.
     ConfluenceBar = 1329,
+    /// Composite: cross mutual information lags. UNTESTED on GPU.
+    XmilBar = 1330,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1273,6 +1275,7 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::XmilBar => 5,
             CubeFormula::OscVolWeightBar => 3,
             CubeFormula::FuzzyBar => 5,
             CubeFormula::AbsorptionEv => 2,
@@ -1620,6 +1623,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Fuzzy), Some(CubeFormula::FuzzyBar));
         assert_eq!(formula_of(IndicatorId::OscVolWeight), Some(CubeFormula::OscVolWeightBar));
         assert_eq!(formula_of(IndicatorId::Confluence), Some(CubeFormula::ConfluenceBar));
+        assert_eq!(formula_of(IndicatorId::Xmil), Some(CubeFormula::XmilBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

@@ -5104,6 +5104,9 @@ fn bar_scan(
                     }
                 }
             }
+        } else if formula == 1330u32 {
+            // cross mutual information over lags: host pre-stage runs 1325 once per lag [1, 2, 3, 5, 10]
+            v0 = 0.0f32;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -5434,6 +5437,17 @@ fn launch_cube_bar_x(
         let p = CubeParams { fast: cnt as u32, slow: ready, ..params };
         let flat = bar_run(formula.code(), [&series[0], &series[1], &series[2], &series[3], &series[4]], p, 0);
         return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::XmilBar {
+        // window = period, bins = slow, clip = a; lags are the CPU factory's fixed [1, 2, 3, 5, 10]
+        let mut cols = Vec::new();
+        for lag in [1u32, 2, 3, 5, 10] {
+            let w = params.period.max(2);
+            let p = CubeParams { fast: lag.min(w - 1), signal: params.signal.max(200), ..params };
+            let flat = bar_run(1325, [&o, &h, &l, &c, &v], p, 0);
+            cols.push(flat[0..n].to_vec());
+        }
+        return cols;
     }
     if formula == CubeFormula::MinfoBar || formula == CubeFormula::TeBar {
         let flat = bar_run(formula.code(), [&o, &h, &l, &c, &v], CubeParams { signal: params.signal.max(200), ..params }, 0);

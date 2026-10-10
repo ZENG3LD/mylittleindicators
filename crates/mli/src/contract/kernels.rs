@@ -9939,6 +9939,32 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Cross mutual information lags (1330).
+    #[test]
+    fn lane_matches_cpu_bar_batch45() {
+        use crate::indicators::entropy::cross_mutual_information_lags::CrossMutualInformationLags;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(30);
+        p.slow = 8;
+        p.a = 0.05;
+        let mut m = CrossMutualInformationLags::new(30, &[1, 2, 3, 5, 10], 8, 0.05);
+        let rows: Vec<Vec<f64>> = close.iter().map(|c| m.feed(*c).to_vec()).collect();
+        chk(&run_cols(CubeFormula::XmilBar, &bars, p), rows);
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

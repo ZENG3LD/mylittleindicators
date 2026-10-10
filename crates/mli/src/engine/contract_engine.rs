@@ -387,7 +387,7 @@ mli_contract_macros::contract_universe! {
         CompositeWeightDrift: CompositeIndex : _ => crate::indicators::composite_index::composite_weight_drift::CompositeWeightDrift,
         IndexComponentDrift: CompositeIndex : _ => crate::indicators::composite_index::index_component_drift::IndexComponentDrift,
         IndexCorrelationBreakdown: CompositeIndex : _ => crate::indicators::composite_index::index_correlation_breakdown::IndexCorrelationBreakdown { #correlation_grid },
-        Xmil: Field : _ => crate::indicators::entropy::cross_mutual_information_lags::CrossMutualInformationLags,
+        Xmil: Field : _ +cube(comp_xmil_bar) => crate::indicators::entropy::cross_mutual_information_lags::CrossMutualInformationLags,
         Minfo: Field : _ +cube(comp_minfo_bar) => crate::indicators::entropy::mutual_information::MutualInformation,
         GammaSqueezeDetector: OptionGreeks : _ +cube(comp_gammasq_ev) => crate::indicators::greeks::gamma_squeeze_detector::GammaSqueezeDetector,
         Kslopez: Field : _ +cube(comp_kslopez_comp) => crate::indicators::kalman::kalman_slope_zscore::KalmanSlopeZscore,
