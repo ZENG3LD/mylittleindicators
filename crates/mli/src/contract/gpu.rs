@@ -78,6 +78,17 @@ pub enum CubeFormula {
     Macd = 22,
     /// APO: EMA(`fast`) of `lane` minus EMA(`slow`) of the same lane.
     Apo = 23,
+    /// Top-of-book microprice. Holds the previous value when a side is missing
+    /// or the top sizes sum to zero.
+    Microprice = 24,
+    /// `(bid_depth - ask_depth) / (bid_depth + ask_depth)` over [`CubeParams::levels`].
+    /// Zero when the depth sum is zero. Shared by book imbalance and bid/ask asymmetry.
+    BookImbalance = 25,
+    /// Bid depth slope minus ask depth slope. `period` is the snapshot window,
+    /// [`CubeParams::levels`] is the depth.
+    BookPressure = 26,
+    /// `output[i] = s0[i]`. Primary number of a non-bar sample.
+    Scalar = 27,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -97,6 +108,8 @@ pub struct CubeParams {
     pub a: f32,
     pub b: f32,
     pub flag: u32,
+    /// Book levels to sum. `1` is top of book.
+    pub levels: u32,
 }
 
 impl CubeParams {
@@ -113,6 +126,7 @@ impl CubeParams {
             a: 0.85,
             b: 6.0,
             flag: 0,
+            levels: 1,
         }
     }
 }
@@ -176,6 +190,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Tr), Some(CubeFormula::TrueRange));
         assert_eq!(formula_of(IndicatorId::Bop), Some(CubeFormula::Bop));
         assert_eq!(formula_of(IndicatorId::Vwma), Some(CubeFormula::Vwma));
+        assert_eq!(formula_of(IndicatorId::BookMicroprice), Some(CubeFormula::Microprice));
+        assert_eq!(formula_of(IndicatorId::BookImb), Some(CubeFormula::BookImbalance));
+        assert_eq!(formula_of(IndicatorId::BidAskAsymmetry), Some(CubeFormula::BookImbalance));
+        assert_eq!(formula_of(IndicatorId::BookPressure), Some(CubeFormula::BookPressure));
     }
 
     #[cfg(feature = "gpu-shader")]

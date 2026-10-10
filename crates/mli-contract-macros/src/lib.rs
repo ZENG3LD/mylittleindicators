@@ -179,6 +179,9 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "vwma" => "Vwma",
         "macd" => "Macd",
         "apo" => "Apo",
+        "microprice" => "Microprice",
+        "book_imbalance" => "BookImbalance",
+        "book_pressure" => "BookPressure",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

@@ -11,7 +11,9 @@ use cubecl::prelude::*;
 use cubecl::__private::Runtime;
 
 use super::gpu::CubeParams;
+use super::gpu_sample::GpuSample;
 use super::CubeFormula;
+#[cfg(test)]
 use super::ResearchBar;
 
 #[cube]
@@ -94,6 +96,23 @@ fn prefix_mean(
     acc / (window as f32)
 }
 
+#[cube]
+fn depth_sum(sz: &[f32], nside: &[f32], i: usize, depth: usize, levels: usize) -> f32 {
+    let mut n = nside[i] as usize;
+    if n > depth {
+        n = depth;
+    }
+    if n > levels {
+        n = levels;
+    }
+    let base = i * depth;
+    let mut acc = 0.0f32;
+    for k in 0..n {
+        acc = acc + sz[base + k];
+    }
+    acc
+}
+
 /// Sequential formulas. One unit writes the whole lane.
 #[cube]
 fn scan_lane(
@@ -102,6 +121,12 @@ fn scan_lane(
     low: &[f32],
     close: &[f32],
     volume: &[f32],
+    bid_px: &[f32],
+    bid_sz: &[f32],
+    ask_px: &[f32],
+    ask_sz: &[f32],
+    bid_n: &[f32],
+    ask_n: &[f32],
     output: &mut [f32],
     lane: u32,
     lane2: u32,
@@ -112,6 +137,8 @@ fn scan_lane(
     a: f32,
     b: f32,
     flag: u32,
+    depth: u32,
+    levels: u32,
     formula: u32,
 ) {
     let n = open.len();
@@ -506,6 +533,50 @@ fn scan_lane(
             e2 = aslow * x2 + (1.0f32 - aslow) * e2;
             output[k] = e1 - e2;
         }
+    } else if formula == 24u32 {
+        let d = depth as usize;
+        let mut y = 0.0f32;
+        for i in 0..n {
+            let bn = bid_n[i] as usize;
+            let an = ask_n[i] as usize;
+            if bn >= 1 && an >= 1 {
+                let base = i * d;
+                let bsz = bid_sz[base];
+                let asz = ask_sz[base];
+                let tot = bsz + asz;
+                if tot > 0.0f32 {
+                    y = (bsz * ask_px[base] + asz * bid_px[base]) / tot;
+                }
+            }
+            output[i] = y;
+        }
+    } else if formula == 26u32 {
+        let d = depth as usize;
+        let mut lv = levels as usize;
+        if lv < 1 {
+            lv = 1;
+        }
+        let mut win = p;
+        if win < 2 {
+            win = 2;
+        }
+        for i in 0..n {
+            let mut cnt = i + 1;
+            if cnt > win {
+                cnt = win;
+            }
+            if cnt < 2 {
+                output[i] = 0.0f32;
+            } else {
+                let first = i + 1 - cnt;
+                let bid_last = depth_sum(bid_sz, bid_n, i, d, lv);
+                let bid_first = depth_sum(bid_sz, bid_n, first, d, lv);
+                let ask_last = depth_sum(ask_sz, ask_n, i, d, lv);
+                let ask_first = depth_sum(ask_sz, ask_n, first, d, lv);
+                let denom = cnt as f32;
+                output[i] = (bid_last - bid_first) / denom - (ask_last - ask_first) / denom;
+            }
+        }
     }
 }
 
@@ -516,6 +587,17 @@ fn lane_map(
     low: &[f32],
     close: &[f32],
     volume: &[f32],
+    bid_px: &[f32],
+    bid_sz: &[f32],
+    ask_px: &[f32],
+    ask_sz: &[f32],
+    bid_n: &[f32],
+    ask_n: &[f32],
+    s0: &[f32],
+    s1: &[f32],
+    s2: &[f32],
+    s3: &[f32],
+    side: &[f32],
     output: &mut [f32],
     lane: u32,
     lane2: u32,
@@ -526,10 +608,16 @@ fn lane_map(
     a: f32,
     b: f32,
     flag: u32,
+    depth: u32,
+    levels: u32,
     formula: u32,
 ) {
     let i = ABSOLUTE_POS;
     if i < open.len() {
+        let mut touch = s1[0] + s2[0] + s3[0] + side[0];
+        if touch > 1.0e30 {
+            touch = 0.0f32;
+        }
         if formula == 20u32 {
             let mut denom = high[i] - low[i];
             if denom < 0.0f32 {
@@ -539,11 +627,28 @@ fn lane_map(
                 denom = 1.0e-12;
             }
             output[i] = (close[i] - open[i]) / denom;
+        } else if formula == 25u32 {
+            let d = depth as usize;
+            let mut lv = levels as usize;
+            if lv < 1 {
+                lv = 1;
+            }
+            let bid = depth_sum(bid_sz, bid_n, i, d, lv);
+            let ask = depth_sum(ask_sz, ask_n, i, d, lv);
+            let tot = bid + ask;
+            if tot > 0.0f32 {
+                output[i] = (bid - ask) / tot;
+            } else {
+                output[i] = 0.0f32;
+            }
+        } else if formula == 27u32 {
+            output[i] = s0[i] + touch * 0.0f32;
         } else if formula >= 5u32 {
             if i == 0 {
                 scan_lane(
-                    open, high, low, close, volume, output, lane, lane2, period, fast, slow,
-                    signal, a, b, flag, formula,
+                    open, high, low, close, volume, bid_px, bid_sz, ask_px, ask_sz, bid_n, ask_n,
+                    output, lane, lane2, period, fast, slow, signal, a, b, flag, depth, levels,
+                    formula,
                 );
             }
         } else if formula == 0u32 {
@@ -601,31 +706,40 @@ fn lane_map(
     }
 }
 
-/// Run one cube formula over OHLCV bars.
+/// Run one cube formula over GPU samples.
 ///
-/// `params` carries the source lanes and the config axes (`period`, `fast`,
-/// `slow`, `signal`, `a`, `b`, `flag`). An empty bar slice returns an empty
-/// buffer and does not create a device.
-pub fn launch_cube(formula: CubeFormula, bars: &[ResearchBar], params: CubeParams) -> Vec<f32> {
-    if bars.is_empty() {
+/// `samples` are the f32 image of the market stream (`GpuSample::Bar` for a
+/// bar series, `GpuSample::Book` for a book, and the other stream arms).
+/// `params` carries lanes, periods, and book `levels`. An empty slice returns
+/// an empty buffer and does not create a device.
+pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubeParams) -> Vec<f32> {
+    if samples.is_empty() {
         return Vec::new();
     }
-    let n = bars.len();
-    let open: Vec<f32> = bars.iter().map(|b| b.open as f32).collect();
-    let high: Vec<f32> = bars.iter().map(|b| b.high as f32).collect();
-    let low: Vec<f32> = bars.iter().map(|b| b.low as f32).collect();
-    let close: Vec<f32> = bars.iter().map(|b| b.close as f32).collect();
-    let volume: Vec<f32> = bars.iter().map(|b| b.volume as f32).collect();
+    let n = samples.len();
+    let c = GpuSample::columns(samples);
     let client =
         cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
-    let open_b = client.create_from_slice(f32::as_bytes(&open));
-    let high_b = client.create_from_slice(f32::as_bytes(&high));
-    let low_b = client.create_from_slice(f32::as_bytes(&low));
-    let close_b = client.create_from_slice(f32::as_bytes(&close));
-    let volume_b = client.create_from_slice(f32::as_bytes(&volume));
+    let open_b = client.create_from_slice(f32::as_bytes(&c.open));
+    let high_b = client.create_from_slice(f32::as_bytes(&c.high));
+    let low_b = client.create_from_slice(f32::as_bytes(&c.low));
+    let close_b = client.create_from_slice(f32::as_bytes(&c.close));
+    let volume_b = client.create_from_slice(f32::as_bytes(&c.volume));
+    let bid_px_b = client.create_from_slice(f32::as_bytes(&c.bid_px));
+    let bid_sz_b = client.create_from_slice(f32::as_bytes(&c.bid_sz));
+    let ask_px_b = client.create_from_slice(f32::as_bytes(&c.ask_px));
+    let ask_sz_b = client.create_from_slice(f32::as_bytes(&c.ask_sz));
+    let bid_n_b = client.create_from_slice(f32::as_bytes(&c.bid_n));
+    let ask_n_b = client.create_from_slice(f32::as_bytes(&c.ask_n));
+    let s0_b = client.create_from_slice(f32::as_bytes(&c.s0));
+    let s1_b = client.create_from_slice(f32::as_bytes(&c.s1));
+    let s2_b = client.create_from_slice(f32::as_bytes(&c.s2));
+    let s3_b = client.create_from_slice(f32::as_bytes(&c.s3));
+    let side_b = client.create_from_slice(f32::as_bytes(&c.side));
     let output = client.empty(n * core::mem::size_of::<f32>());
     let dim = 64u32;
     let cubes = (n as u32).div_ceil(dim);
+    let book_len = c.bid_px.len();
     unsafe {
         lane_map::launch_unchecked(
             &client,
@@ -636,6 +750,17 @@ pub fn launch_cube(formula: CubeFormula, bars: &[ResearchBar], params: CubeParam
             BufferArg::from_raw_parts(low_b, n),
             BufferArg::from_raw_parts(close_b, n),
             BufferArg::from_raw_parts(volume_b, n),
+            BufferArg::from_raw_parts(bid_px_b, book_len),
+            BufferArg::from_raw_parts(bid_sz_b, book_len),
+            BufferArg::from_raw_parts(ask_px_b, book_len),
+            BufferArg::from_raw_parts(ask_sz_b, book_len),
+            BufferArg::from_raw_parts(bid_n_b, n),
+            BufferArg::from_raw_parts(ask_n_b, n),
+            BufferArg::from_raw_parts(s0_b, n),
+            BufferArg::from_raw_parts(s1_b, n),
+            BufferArg::from_raw_parts(s2_b, n),
+            BufferArg::from_raw_parts(s3_b, n),
+            BufferArg::from_raw_parts(side_b, n),
             BufferArg::from_raw_parts(output.clone(), n),
             params.lane.code(),
             params.lane2.code(),
@@ -646,6 +771,8 @@ pub fn launch_cube(formula: CubeFormula, bars: &[ResearchBar], params: CubeParam
             params.a,
             params.b,
             params.flag,
+            c.depth,
+            params.levels,
             formula.code(),
         );
     }
@@ -677,10 +804,16 @@ mod tests {
     use crate::indicators::momentum::macd::Macd;
     use crate::indicators::momentum::roc::Roc;
     use crate::indicators::momentum::rsi::Rsi;
+    use crate::indicators::book::book_pressure::BookPressure;
+    use crate::indicators::book::imbalance::BookImbalanceRatio;
+    use crate::indicators::book::microprice::Microprice;
+    use crate::indicators::book_advanced::bid_ask_asymmetry::BidAskAsymmetry;
     use crate::indicators::swing::highest::Highest;
     use crate::indicators::swing::lowest::Lowest;
     use crate::indicators::volatility::atr::Atr;
     use crate::indicators::volatility::true_range::TrueRange;
+    use crate::core::types::{FundingRate, OrderBook};
+    use crate::engine::streams::order_book_consumer::OrderBookConsumer;
 
     fn assert_close(gpu: &[f32], cpu: &[f64]) {
         assert_eq!(gpu.len(), cpu.len());
@@ -703,6 +836,11 @@ mod tests {
             .collect()
     }
 
+    fn run(formula: CubeFormula, bars: &[ResearchBar], params: CubeParams) -> Vec<f32> {
+        let samples: Vec<GpuSample> = bars.iter().map(GpuSample::from).collect();
+        launch_cube(formula, &samples, params)
+    }
+
     fn cpu(values: &[f64], mut step: impl FnMut(f64) -> f64) -> Vec<f64> {
         values.iter().copied().map(|v| step(v)).collect()
     }
@@ -714,20 +852,20 @@ mod tests {
         let high: Vec<f64> = bars.iter().map(|b| b.high).collect();
         let p5 = CubeParams::period(5);
 
-        let identity = launch_cube(CubeFormula::Identity, &bars, CubeParams::period(1));
+        let identity = run(CubeFormula::Identity, &bars, CubeParams::period(1));
         assert_close(&identity, &close);
 
         let mut vol_lane = CubeParams::period(1);
         vol_lane.lane = OhlcvField::Volume;
         let volumes: Vec<f64> = bars.iter().map(|b| b.volume).collect();
         assert_close(
-            &launch_cube(CubeFormula::Identity, &bars, vol_lane),
+            &run(CubeFormula::Identity, &bars, vol_lane),
             &volumes,
         );
 
         let mut sma = Sma::new(5);
         assert_close(
-            &launch_cube(CubeFormula::WindowMean, &bars, p5),
+            &run(CubeFormula::WindowMean, &bars, p5),
             &cpu(&close, |v| sma.feed(v)),
         );
 
@@ -736,7 +874,7 @@ mod tests {
         let mut hl2_params = CubeParams::period(5);
         hl2_params.lane = OhlcvField::HL2;
         assert_close(
-            &launch_cube(CubeFormula::WindowMean, &bars, hl2_params),
+            &run(CubeFormula::WindowMean, &bars, hl2_params),
             &cpu(&hl2, |v| sma_hl2.feed(v)),
         );
 
@@ -744,61 +882,61 @@ mod tests {
         let mut hi_params = CubeParams::period(5);
         hi_params.lane = OhlcvField::High;
         assert_close(
-            &launch_cube(CubeFormula::WindowMax, &bars, hi_params),
+            &run(CubeFormula::WindowMax, &bars, hi_params),
             &cpu(&high, |v| highest.feed(v)),
         );
 
         let mut lowest = Lowest::new(5);
         assert_close(
-            &launch_cube(CubeFormula::WindowMin, &bars, p5),
+            &run(CubeFormula::WindowMin, &bars, p5),
             &cpu(&close, |v| lowest.feed(v)),
         );
 
         let mut wma = Wma::new(4);
         assert_close(
-            &launch_cube(CubeFormula::WindowWeighted, &bars, CubeParams::period(4)),
+            &run(CubeFormula::WindowWeighted, &bars, CubeParams::period(4)),
             &cpu(&close, |v| wma.feed(v)),
         );
 
         let mut ema = Ema::new(5);
         assert_close(
-            &launch_cube(CubeFormula::Ema, &bars, p5),
+            &run(CubeFormula::Ema, &bars, p5),
             &cpu(&close, |v| ema.feed(v)),
         );
         let mut rma = Rma::new(5);
         assert_close(
-            &launch_cube(CubeFormula::Rma, &bars, p5),
+            &run(CubeFormula::Rma, &bars, p5),
             &cpu(&close, |v| rma.feed(v)),
         );
         let mut dema = Dema::new(5);
         assert_close(
-            &launch_cube(CubeFormula::Dema, &bars, p5),
+            &run(CubeFormula::Dema, &bars, p5),
             &cpu(&close, |v| dema.feed(v)),
         );
         let mut tema = Tema::new(5);
         assert_close(
-            &launch_cube(CubeFormula::Tema, &bars, p5),
+            &run(CubeFormula::Tema, &bars, p5),
             &cpu(&close, |v| tema.feed(v)),
         );
         let mut tma = Tma::new(5);
         assert_close(
-            &launch_cube(CubeFormula::Tma, &bars, p5),
+            &run(CubeFormula::Tma, &bars, p5),
             &cpu(&close, |v| tma.feed(v)),
         );
         let mut trima = Trima::new(5);
         assert_close(
-            &launch_cube(CubeFormula::Tma, &bars, p5),
+            &run(CubeFormula::Tma, &bars, p5),
             &cpu(&close, |v| trima.feed(v)),
         );
         let mut hma = Hma::new(8);
         assert_close(
-            &launch_cube(CubeFormula::Hma, &bars, CubeParams::period(8)),
+            &run(CubeFormula::Hma, &bars, CubeParams::period(8)),
             &cpu(&close, |v| hma.feed(v)),
         );
 
         let mut alma = Alma::new(5);
         assert_close(
-            &launch_cube(CubeFormula::Alma, &bars, p5),
+            &run(CubeFormula::Alma, &bars, p5),
             &cpu(&close, |v| alma.feed(v)),
         );
         let mut alma_custom = Alma::with_params(5, 0.5, 3.0);
@@ -806,7 +944,7 @@ mod tests {
         alma_params.a = 0.5;
         alma_params.b = 3.0;
         assert_close(
-            &launch_cube(CubeFormula::Alma, &bars, alma_params),
+            &run(CubeFormula::Alma, &bars, alma_params),
             &cpu(&close, |v| alma_custom.feed(v)),
         );
 
@@ -814,49 +952,49 @@ mod tests {
         let mut t3_params = CubeParams::period(5);
         t3_params.a = 0.7;
         assert_close(
-            &launch_cube(CubeFormula::T3, &bars, t3_params),
+            &run(CubeFormula::T3, &bars, t3_params),
             &cpu(&close, |v| t3.feed(v)),
         );
         let mut t3_custom = T3::with_alpha(5, 0.4);
         let mut t3_custom_params = CubeParams::period(5);
         t3_custom_params.a = 0.4;
         assert_close(
-            &launch_cube(CubeFormula::T3, &bars, t3_custom_params),
+            &run(CubeFormula::T3, &bars, t3_custom_params),
             &cpu(&close, |v| t3_custom.feed(v)),
         );
 
         let mut md = McGinleyDynamic::new(5);
         assert_close(
-            &launch_cube(CubeFormula::Mcginley, &bars, p5),
+            &run(CubeFormula::Mcginley, &bars, p5),
             &cpu(&close, |v| md.feed(v)),
         );
 
         let mut roc = Roc::new(5, false);
         assert_close(
-            &launch_cube(CubeFormula::Roc, &bars, p5),
+            &run(CubeFormula::Roc, &bars, p5),
             &cpu(&close, |v| roc.feed(v)),
         );
         let mut roc_log = Roc::new(5, true);
         let mut roc_params = CubeParams::period(5);
         roc_params.flag = 1;
         assert_close(
-            &launch_cube(CubeFormula::Roc, &bars, roc_params),
+            &run(CubeFormula::Roc, &bars, roc_params),
             &cpu(&close, |v| roc_log.feed(v)),
         );
 
         let mut rsi = Rsi::new(5);
         assert_close(
-            &launch_cube(CubeFormula::Rsi, &bars, p5),
+            &run(CubeFormula::Rsi, &bars, p5),
             &cpu(&close, |v| rsi.feed(v)),
         );
         let mut cmo = Cmo::new(5);
         assert_close(
-            &launch_cube(CubeFormula::Cmo, &bars, p5),
+            &run(CubeFormula::Cmo, &bars, p5),
             &cpu(&close, |v| cmo.feed(v)),
         );
         let mut bias = Bias::new(5);
         assert_close(
-            &launch_cube(CubeFormula::Bias, &bars, p5),
+            &run(CubeFormula::Bias, &bars, p5),
             &cpu(&close, |v| bias.feed(v)),
         );
 
@@ -866,7 +1004,7 @@ mod tests {
             .map(|b| tr.feed(&[b.high, b.low, b.close]))
             .collect();
         assert_close(
-            &launch_cube(CubeFormula::TrueRange, &bars, CubeParams::period(1)),
+            &run(CubeFormula::TrueRange, &bars, CubeParams::period(1)),
             &cpu_tr,
         );
 
@@ -875,7 +1013,7 @@ mod tests {
             .iter()
             .map(|b| atr.feed(&[b.high, b.low, b.close]))
             .collect();
-        assert_close(&launch_cube(CubeFormula::Atr, &bars, p5), &cpu_atr);
+        assert_close(&run(CubeFormula::Atr, &bars, p5), &cpu_atr);
 
         let mut bop = Bop::new();
         let cpu_bop: Vec<f64> = bars
@@ -883,7 +1021,7 @@ mod tests {
             .map(|b| bop.feed(&[b.open, b.high, b.low, b.close]))
             .collect();
         assert_close(
-            &launch_cube(CubeFormula::Bop, &bars, CubeParams::period(1)),
+            &run(CubeFormula::Bop, &bars, CubeParams::period(1)),
             &cpu_bop,
         );
 
@@ -895,7 +1033,7 @@ mod tests {
         let mut vwma_params = CubeParams::period(5);
         vwma_params.lane2 = OhlcvField::Volume;
         assert_close(
-            &launch_cube(CubeFormula::Vwma, &bars, vwma_params),
+            &run(CubeFormula::Vwma, &bars, vwma_params),
             &cpu_vwma,
         );
 
@@ -912,7 +1050,7 @@ mod tests {
         let mut hold_params = CubeParams::period(1);
         hold_params.lane2 = OhlcvField::Volume;
         assert_close(
-            &launch_cube(CubeFormula::Vwma, &hold, hold_params),
+            &run(CubeFormula::Vwma, &hold, hold_params),
             &cpu_hold,
         );
 
@@ -927,13 +1065,13 @@ mod tests {
         macd_params.lane2 = OhlcvField::Open;
         macd_params.signal = 3;
         assert_close(
-            &launch_cube(CubeFormula::Macd, &bars, macd_params),
+            &run(CubeFormula::Macd, &bars, macd_params),
             &cpu_macd,
         );
 
         let mut apo = Apo::new(4, 9);
         assert_close(
-            &launch_cube(
+            &run(
                 CubeFormula::Apo,
                 &bars,
                 CubeParams {
@@ -946,6 +1084,85 @@ mod tests {
             &cpu(&high, |v| apo.feed(v)),
         );
 
-        assert!(launch_cube(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
+        let books = [
+            OrderBook::from_tuples(&[(100.0, 2.0), (99.0, 1.0)], &[(101.0, 3.0), (102.0, 4.0)], 0),
+            OrderBook::from_tuples(&[(100.5, 1.0)], &[(101.5, 1.0)], 1),
+            OrderBook::from_tuples(&[], &[(101.0, 1.0)], 2),
+            OrderBook::from_tuples(
+                &[(100.0, 5.0), (99.5, 5.0), (99.0, 5.0)],
+                &[(101.0, 1.0), (102.0, 1.0), (103.0, 1.0)],
+                3,
+            ),
+        ];
+        let book_samples: Vec<GpuSample> = books.iter().map(GpuSample::from).collect();
+        let mut micro = Microprice::new();
+        let cpu_micro: Vec<f64> = books
+            .iter()
+            .map(|b| {
+                micro.update_orderbook(b);
+                micro.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::Microprice, &book_samples, CubeParams::period(1)),
+            &cpu_micro,
+        );
+        let mut imb = BookImbalanceRatio::with_levels(2);
+        let mut asym = BidAskAsymmetry::new(2);
+        let cpu_imb: Vec<f64> = books
+            .iter()
+            .map(|b| {
+                imb.update_orderbook(b);
+                imb.value()
+            })
+            .collect();
+        let cpu_asym: Vec<f64> = books
+            .iter()
+            .map(|b| {
+                asym.update_orderbook(b);
+                asym.value()
+            })
+            .collect();
+        let mut imb_params = CubeParams::period(1);
+        imb_params.levels = 2;
+        assert_close(
+            &launch_cube(CubeFormula::BookImbalance, &book_samples, imb_params),
+            &cpu_imb,
+        );
+        assert_close(
+            &launch_cube(CubeFormula::BookImbalance, &book_samples, imb_params),
+            &cpu_asym,
+        );
+        let mut pressure = BookPressure::new(3, 1);
+        let cpu_pressure: Vec<f64> = books
+            .iter()
+            .map(|b| {
+                pressure.update_orderbook(b);
+                pressure.value()
+            })
+            .collect();
+        let mut pressure_params = CubeParams::period(3);
+        pressure_params.levels = 1;
+        assert_close(
+            &launch_cube(CubeFormula::BookPressure, &book_samples, pressure_params),
+            &cpu_pressure,
+        );
+
+        let mut rates = Vec::new();
+        let funding: Vec<GpuSample> = (0..8)
+            .map(|i| {
+                let mut fr = FundingRate::default();
+                fr.rate = 0.0001 * (i as f64 + 1.0);
+                fr.mark_price = Some(100.0 + i as f64);
+                rates.push(fr.rate);
+                GpuSample::from(&fr)
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::Scalar, &funding, CubeParams::period(1)),
+            &rates,
+        );
+
+        assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
     }
 }
