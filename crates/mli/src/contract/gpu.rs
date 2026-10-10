@@ -733,6 +733,8 @@ pub enum CubeFormula {
     SwingstrBar = 1321,
     /// Composite: liquidity gap density. UNTESTED on GPU.
     LiqgapBar = 1322,
+    /// Composite: Chebyshev filter. UNTESTED on GPU.
+    ChebyComp = 1092,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1572,6 +1574,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Pivavwap), Some(CubeFormula::PivavwapBar));
         assert_eq!(formula_of(IndicatorId::Swingstr), Some(CubeFormula::SwingstrBar));
         assert_eq!(formula_of(IndicatorId::Liqgap), Some(CubeFormula::LiqgapBar));
+        assert_eq!(formula_of(IndicatorId::Cheby), Some(CubeFormula::ChebyComp));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

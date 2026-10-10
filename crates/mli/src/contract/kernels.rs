@@ -9735,6 +9735,34 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Chebyshev comp formula 1092 (direct form and biquad cascade).
+    #[test]
+    fn lane_matches_cpu_comp_cheby() {
+        use crate::indicators::signal_processing::chebyshev::{ChebyshevFilter, ChebyshevType, FilterType};
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        for (order, ty) in [(3usize, ChebyshevType::Type1), (4, ChebyshevType::Type2), (6, ChebyshevType::Type1), (8, ChebyshevType::Type2)] {
+            let mut p = CubeParams::period(order as u32);
+            p.a = 0.1;
+            p.b = 1.0;
+            p.flag = (ty == ChebyshevType::Type2) as u32;
+            let mut m = ChebyshevFilter::new(ty, FilterType::LowPass, order, 0.1, 1.0);
+            chk(&run_cols(CubeFormula::ChebyComp, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        }
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

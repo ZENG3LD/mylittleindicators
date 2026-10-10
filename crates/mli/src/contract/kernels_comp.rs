@@ -1062,6 +1062,84 @@ fn fir_scan(x: &[f32], c: &[f32], out: &mut [f32], w: u32) {
     }
 }
 
+/// `ChebyshevFilter` direct form: `b[i]` multiplies the i-th oldest of the last `order + 1` inputs and
+/// `a[i + 1]` the i-th oldest of the last `order` outputs (the CPU buffer order); both buffers start
+/// filled with the first sample, the first output is the first sample. Normalised by `a[0]`.
+#[cube]
+fn cheby_direct_scan(x: &[f32], a: &[f32], b: &[f32], out: &mut [f32], order: u32, na: u32, nb: u32) {
+    let n = x.len();
+    let o = order as usize;
+    let nac = na as usize;
+    let nbc = nb as usize;
+    for t in 0..n {
+        if t == 0 {
+            out[0] = x[0];
+        } else {
+            let mut acc = 0.0f32;
+            for i in 0..(o + 1) {
+                if i < nbc {
+                    let mut xv = x[0];
+                    if t + i >= o {
+                        xv = x[t + i - o];
+                    }
+                    acc = acc + b[i] * xv;
+                }
+            }
+            for i in 0..o {
+                if i + 1 < nac {
+                    let mut yv = x[0];
+                    if t + i >= o {
+                        yv = out[t + i - o];
+                    }
+                    acc = acc - a[i + 1] * yv;
+                }
+            }
+            if nac > 0usize {
+                if a[0].abs() > 1.0e-12f32 {
+                    acc = acc / a[0];
+                }
+            }
+            out[t] = acc;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn cheby_direct_map(x: &[f32], a: &[f32], b: &[f32], out: &mut [f32], order: u32, na: u32, nb: u32) {
+    cheby_direct_scan(x, a, b, out, order, na, nb);
+}
+
+/// `ChebyshevFilter` biquad cascade (`coef` holds `[b0, b1, b2, a1, a2]` per section):
+/// `w = in - a1 y1 - a2 y2`, `out = b0 w + b1 y1 + b2 y2`; first output is the first sample.
+#[cube]
+fn cheby_biquad_scan(x: &[f32], coef: &[f32], out: &mut [f32], nsec: u32, scr: &mut [f32]) {
+    let n = x.len();
+    let ns = nsec as usize;
+    for t in 0..n {
+        if t == 0 {
+            out[0] = x[0];
+            for s in 0..(2 * ns) {
+                scr[s] = 0.0f32;
+            }
+        } else {
+            let mut v = x[t];
+            for s in 0..ns {
+                let w = v - coef[5 * s + 3] * scr[2 * s] - coef[5 * s + 4] * scr[2 * s + 1];
+                let o = coef[5 * s] * w + coef[5 * s + 1] * scr[2 * s] + coef[5 * s + 2] * scr[2 * s + 1];
+                scr[2 * s + 1] = scr[2 * s];
+                scr[2 * s] = o;
+                v = o;
+            }
+            out[t] = v;
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn cheby_biquad_map(x: &[f32], coef: &[f32], out: &mut [f32], nsec: u32, scr: &mut [f32]) {
+    cheby_biquad_scan(x, coef, out, nsec, scr);
+}
+
 #[cube(launch_unchecked)]
 fn fir_map(x: &[f32], c: &[f32], out: &mut [f32], w: u32) {
     fir_scan(x, c, out, w);
@@ -1135,6 +1213,31 @@ fn run_buf(x: &[f32], extra: &[&[f32]], which: u32, u: &[u32], f: &[f32]) -> Vec
                 BufferArg::from_raw_parts(ob.clone(), n),
                 u[0],
             ),
+            3 => cheby_direct_map::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(xb, n),
+                BufferArg::from_raw_parts(eb[0].clone(), extra[0].len()),
+                BufferArg::from_raw_parts(eb[1].clone(), extra[1].len()),
+                BufferArg::from_raw_parts(ob.clone(), n),
+                u[0],
+                u[1],
+                u[2],
+            ),
+            4 => {
+                let sb = client.create_from_slice(f32::as_bytes(&[0.0f32; 16]));
+                cheby_biquad_map::launch_unchecked(
+                    &client,
+                    CubeCount::new_1d(1),
+                    CubeDim::new_1d(1),
+                    BufferArg::from_raw_parts(xb, n),
+                    BufferArg::from_raw_parts(eb[0].clone(), extra[0].len()),
+                    BufferArg::from_raw_parts(ob.clone(), n),
+                    u[0],
+                    BufferArg::from_raw_parts(sb, 16),
+                )
+            }
             _ => roof_map::launch_unchecked(
                 &client,
                 CubeCount::new_1d(1),
@@ -1650,6 +1753,36 @@ pub fn launch_cube_comp(
             a.resize(order + 1, 0.0);
             b.resize(order + 1, 0.0);
             vec![run_buf(&src, &[&a, &b], 0, &[order as u32], &[])]
+        }
+        // Chebyshev filter: `period` = order (1..=8), `a` = cutoff (0.001..0.499), `b` = ripple dB,
+        // `flag` 1 = type II, `ext[0]` filter type (0 low, 1 high, 2 band-pass, 3 band-stop). Coefficients come
+        // from the CPU design (`direct_coefficients` for order <= 4, `biquad_coefficients` above).
+        CubeFormula::ChebyComp => {
+            use crate::indicators::signal_processing::chebyshev::{ChebyshevFilter, ChebyshevType, FilterType};
+            let src = lane_series(samples, p, p.lane);
+            let ct = if p.flag == 1 { ChebyshevType::Type2 } else { ChebyshevType::Type1 };
+            let ft = match p.ext[0] {
+                1 => FilterType::HighPass,
+                2 => FilterType::BandPass,
+                3 => FilterType::BandStop,
+                _ => FilterType::LowPass,
+            };
+            let order = (p.period as usize).clamp(1, 8);
+            let f = ChebyshevFilter::new(ct, ft, order, p.a as f64, p.b as f64);
+            let sec = f.biquad_coefficients();
+            if !sec.is_empty() {
+                let mut coef: Vec<f32> = sec.iter().flat_map(|s| s.iter().map(|v| *v as f32)).collect();
+                coef.resize(5 * 4, 0.0);
+                vec![run_buf(&src, &[&coef], 4, &[sec.len() as u32], &[])]
+            } else {
+                let (ac, bc) = f.direct_coefficients();
+                let mut a: Vec<f32> = ac.iter().map(|v| *v as f32).collect();
+                let mut b: Vec<f32> = bc.iter().map(|v| *v as f32).collect();
+                let (na, nb) = (a.len() as u32, b.len() as u32);
+                a.resize(a.len().max(1), 0.0);
+                b.resize(b.len().max(1), 0.0);
+                vec![run_buf(&src, &[&a, &b], 3, &[order as u32, na, nb], &[])]
+            }
         }
         // Savitzky-Golay: `period` window (made odd, 5..=63), `slow` polynomial order, `flag`
         // derivative order (0 smoothing .. 3). Window coefficients are read off the CPU filter by

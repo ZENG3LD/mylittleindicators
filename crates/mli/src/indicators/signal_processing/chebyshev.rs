@@ -93,6 +93,20 @@ impl BiquadSection {
 }
 
 impl ChebyshevFilter {
+    /// Direct-form coefficients `(a, b)` used when `order <= 4` (read by the GPU port).
+    pub fn direct_coefficients(&self) -> (&[f64], &[f64]) {
+        (&self.a_coefficients, &self.b_coefficients)
+    }
+
+    /// Biquad cascade `[b0, b1, b2, a1, a2]` per section; non-empty only when `order > 4`
+    /// (read by the GPU port).
+    pub fn biquad_coefficients(&self) -> Vec<[f64; 5]> {
+        self.biquad_sections
+            .iter()
+            .map(|s| [s.b0, s.b1, s.b2, s.a1, s.a2])
+            .collect()
+    }
+
     pub fn new(
         chebyshev_type: ChebyshevType, 
         filter_type: FilterType, 

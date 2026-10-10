@@ -170,7 +170,7 @@ mli_contract_macros::contract_universe! {
         Theilsenchan:    Field       : Channel +cube(comp_theilsenchan_bar) => crate::indicators::channels::theil_sen_channels::TheilSenChannels { upper middle lower },
         Autocorr:        Field       : _ +cube(autocorr)             => crate::indicators::signal_processing::autocorr::Autocorr,
         Butter:          Field       : _ +cube(comp_butter_comp)             => crate::indicators::signal_processing::butterworth::ButterworthFilter,
-        Cheby:           Field       : _             => crate::indicators::signal_processing::chebyshev::ChebyshevFilter,
+        Cheby:           Field       : _ +cube(comp_cheby_comp) => crate::indicators::signal_processing::chebyshev::ChebyshevFilter,
         Cyber:           Field       : _ +cube(cyber_cycle)             => crate::indicators::signal_processing::cyber_cycle::CyberCycle,
         Decyc:           Field       : _ +shader             => crate::indicators::signal_processing::decycler::Decycler,
         Esine:           Field       : _ +cube(comp_esine_bar)             => crate::indicators::signal_processing::ehlers_sinewave::EhlersSinewave,
