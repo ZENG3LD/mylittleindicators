@@ -5719,6 +5719,69 @@ fn bar_scan(
             } else if ratio <= sq {
                 v0 = -1.0f32;
             }
+        } else if formula == 1346u32 {
+            // raw stability of the last 10 bar ranges (high - low): 1 - min(cv, 1); 0.5 while < 10 bars or zero mean
+            v0 = 0.5f32;
+            if t >= 9usize {
+                let mut sm = 0.0f32;
+                for q in (t - 9usize)..(t + 1usize) {
+                    sm = sm + (h[q] - l[q]);
+                }
+                let mean = sm / 10.0f32;
+                if mean > 0.0f32 {
+                    let mut va = 0.0f32;
+                    for q in (t - 9usize)..(t + 1usize) {
+                        let dv = (h[q] - l[q]) - mean;
+                        va = va + dv * dv;
+                    }
+                    let cv = (va / 10.0f32).sqrt() / mean;
+                    v0 = (1.0f32 - cv.min(1.0f32)).max(0.0f32);
+                }
+            }
+        } else if formula == 1345u32 {
+            // market regime classifier. lanes: o = close, h = fast MA, l = slow MA, c = ATR, v = smoothed ATR, stability
+            // (already smoothed) in scr[0..n]; a / b / _cc = trend / volatility / quiet thresholds. out: -2 down,
+            // -1 quiet, 0 sideways, 1 choppy, 2 up, 3 high vol, 99 transition
+            let mut vol = 1.0f32;
+            if v[t] > 0.0f32 {
+                vol = c[t] / v[t];
+            }
+            let mut dist = 0.0f32;
+            if l[t] != 0.0f32 {
+                dist = (h[t] - l[t]).abs() / l[t];
+            }
+            let ts = (dist / a).min(1.0f32);
+            let mut dir = 0.0f32;
+            if h[t] > l[t] && o[t] > h[t] {
+                dir = 1.0f32;
+            } else if h[t] < l[t] && o[t] < h[t] {
+                dir = -1.0f32;
+            }
+            let mut st = 0.5f32;
+            if t >= 9usize {
+                st = scr[t];
+            }
+            if vol > b {
+                v0 = 3.0f32;
+            } else if vol < _cc {
+                v0 = -1.0f32;
+            } else if ts > 0.6f32 && st > 0.5f32 {
+                if dir > 0.5f32 {
+                    v0 = 2.0f32;
+                } else if dir < -0.5f32 {
+                    v0 = -2.0f32;
+                } else {
+                    v0 = 99.0f32;
+                }
+            } else if ts < 0.3f32 {
+                if st > 0.6f32 {
+                    v0 = 0.0f32;
+                } else {
+                    v0 = 1.0f32;
+                }
+            } else {
+                v0 = 99.0f32;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -6224,6 +6287,29 @@ fn launch_cube_bar_x(
         let ema = smooth_series(&long, super::CubeSmoother::Ema, 20, 0, 0.0, 0.0);
         let p = CubeParams { a: params.a, b: params.b, ..params };
         let flat = bar_run(formula.code(), [&short, &ema, &l, &c, &v], p, params.ext[0]);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::MrfBar {
+        // period = ATR (Wilder) period, ext[0..4] = CubeSmoother codes of fast / slow / volatility / stability MAs,
+        // ext[4..8] = their periods, a / b / c = trend / volatility / quiet thresholds
+        let cs = |k: u32| match k {
+            1 => super::CubeSmoother::Ema,
+            2 => super::CubeSmoother::Wma,
+            3 => super::CubeSmoother::Rma,
+            4 => super::CubeSmoother::Dema,
+            5 => super::CubeSmoother::Tema,
+            6 => super::CubeSmoother::Tma,
+            7 => super::CubeSmoother::Hma,
+            8 => super::CubeSmoother::Alma,
+            _ => super::CubeSmoother::Sma,
+        };
+        let fast = smooth_series(&c, cs(params.ext[0]), params.ext[4].max(1), 0, params.a, params.b);
+        let slow = smooth_series(&c, cs(params.ext[1]), params.ext[5].max(1), 0, params.a, params.b);
+        let atr = super::kernels_comp::atr_series(samples, params, super::CubeSmoother::Rma, params.period.max(1), 0);
+        let vma = smooth_series(&atr, cs(params.ext[2]), params.ext[6].max(1), 0, params.a, params.b);
+        let raw = bar_run(1346, [&o, &h, &l, &c, &v], params, 0);
+        let stab = smooth_series(&raw[0..n].to_vec(), cs(params.ext[3]), params.ext[7].max(1), 9, params.a, params.b);
+        let flat = bar_run_x(formula.code(), [&c, &fast, &slow, &atr, &vma], &stab, params, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {

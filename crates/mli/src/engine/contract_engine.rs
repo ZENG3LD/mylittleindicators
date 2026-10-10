@@ -532,7 +532,7 @@ mli_contract_macros::contract_universe! {
         DpoPct:       Field : Oscillator +cube(dpo_pct) => crate::indicators::momentum::dpo_percent::DpoPercent,
         UoSmooth:     Fields : Oscillator +cube(comp_uo_smooth_bar) => crate::indicators::momentum::ultimate_oscillator_smooth::UltimateOscillatorSmooth,
         Vwrsi:        Fields : Oscillator +cube(comp_vwrsi_bar) => crate::indicators::momentum::volume_weighted_rsi::VolumeWeightedRsi,
-        Mrf: Fields : _ => crate::indicators::regime::market_regime_filter::MarketRegimeFilter,
+        Mrf: Fields : _ +cube(comp_mrf_bar) => crate::indicators::regime::market_regime_filter::MarketRegimeFilter,
         Avr: Fields : _ => crate::indicators::regime::adaptive_volatility_regime::AdaptiveVolatilityRegime,
         Dvr: Fields : _ => crate::indicators::regime::dynamic_volatility_regime::DynamicVolatilityRegime,
         Rc:  Fields : _ +cube(comp_rc_bar) => crate::indicators::regime::regime_composite::RegimeComposite,

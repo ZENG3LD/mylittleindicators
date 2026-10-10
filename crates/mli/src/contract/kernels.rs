@@ -10312,6 +10312,34 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Market regime filter regime number (1345).
+    #[test]
+    fn lane_matches_cpu_bar_batch58() {
+        use crate::indicators::regime::market_regime_filter::MarketRegimeFilter;
+        use crate::engine::contract_engine::SmootherId as S;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(14);
+        p.a = 0.02;
+        p.b = 1.5;
+        p.c = 0.3;
+        p.ext = [1, 1, 0, 0, 10, 30, 20, 15];
+        let mut m = MarketRegimeFilter::from_smoothers(S::Ema, 10, S::Ema, 30, 14, S::Sma, 20, S::Ema, 8, S::Sma, 15, 0.02, 1.5, 0.3);
+        chk(&run_cols(CubeFormula::MrfBar, &bars, p), bars.iter().map(|b| { m.feed(&[b.open, b.high, b.low, b.close, b.volume]); vec![m.value()] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

@@ -819,6 +819,8 @@ pub enum CubeFormula {
     ParticleBar = 1343,
     /// Composite: volatility breakout detector class. UNTESTED on GPU.
     VbdBar = 1344,
+    /// Composite: market regime filter regime number. UNTESTED on GPU.
+    MrfBar = 1345,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1693,6 +1695,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Ekf), Some(CubeFormula::EkfBar));
         assert_eq!(formula_of(IndicatorId::Ukf), Some(CubeFormula::UkfBar));
         assert_eq!(formula_of(IndicatorId::Vbd), Some(CubeFormula::VbdBar));
+        assert_eq!(formula_of(IndicatorId::Mrf), Some(CubeFormula::MrfBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

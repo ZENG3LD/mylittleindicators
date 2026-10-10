@@ -365,6 +365,7 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "comp_ekf_bar" => "EkfBar",
         "comp_ukf_bar" => "UkfBar",
         "comp_vbd_bar" => "VbdBar",
+        "comp_mrf_bar" => "MrfBar",
         "comp_esine_bar" => "EsineBar",
         "comp_ess_bar" => "EssBar",
         "comp_ehlersfa_bar" => "EhlersfaBar",
