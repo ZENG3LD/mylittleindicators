@@ -576,7 +576,7 @@ mli_contract_macros::contract_universe! {
         Cusum: Field : _ +cube(cusum) => crate::indicators::statistics::cusum_break_detector::CusumBreakDetector,
         DistLevels: Fields : _ +cube(comp_dist_levels_bar) => crate::indicators::levels::distance_to_levels::DistanceToLevels { dist mid_pct },
         Hyst: Field : _ +cube(hysteresis_gate_sig) => crate::indicators::signal_logic::hysteresis_gate::HysteresisGate,
-        Kcomp: Fields : _ => crate::indicators::kalman::kalman_regime_composite::KalmanRegimeComposite,
+        Kcomp: Fields : _ +cube(comp_kcomp_bar) => crate::indicators::kalman::kalman_regime_composite::KalmanRegimeComposite,
         Sbp: Field : _ +cube(comp_sbp_cols) => crate::indicators::signal_processing::spectral_bandpower::SpectralBandpower { low mid high },
         Tenc: Time : _ +cube(time_enc) => crate::indicators::calendar::time_encoders::TimeEncoders { sin cos },
         BlockTradeVolumeRatio: Multi[BlockTrade, AggTrade] : _ +cube(comp_block_trade_ratio_mg) => crate::indicators::composites::block_trade_volume_ratio::BlockTradeVolumeRatio,

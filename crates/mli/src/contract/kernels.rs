@@ -9965,6 +9965,39 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Kalman regime composite (1332).
+    #[test]
+    fn lane_matches_cpu_bar_batch46() {
+        use crate::indicators::kalman::kalman_regime_composite::KalmanRegimeComposite;
+        use crate::engine::contract_engine::SmootherId;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(12);
+        p.a = 1.0;
+        p.b = 0.05;
+        p.c = 0.5;
+        p.fast = 7;
+        p.slow = 12;
+        p.signal = 20;
+        p.ext[0] = 500_000;
+        p.ext[1] = 300_000;
+        p.ext[2] = 200_000;
+        let mut m = KalmanRegimeComposite::new(1.0, 0.05, 0.5, 12, 0.95, 7, SmootherId::Sma, 12, 20, 20, 0.5, 0.3, 0.2);
+        chk(&run_cols(CubeFormula::KcompBar, &bars, p), bars.iter().map(|b| vec![m.feed(&[b.high, b.low, b.close])]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

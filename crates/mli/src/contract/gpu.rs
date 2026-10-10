@@ -765,6 +765,8 @@ pub enum CubeFormula {
     ConfluenceBar = 1329,
     /// Composite: cross mutual information lags. UNTESTED on GPU.
     XmilBar = 1330,
+    /// Composite: kalman regime composite. UNTESTED on GPU.
+    KcompBar = 1332,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1624,6 +1626,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::OscVolWeight), Some(CubeFormula::OscVolWeightBar));
         assert_eq!(formula_of(IndicatorId::Confluence), Some(CubeFormula::ConfluenceBar));
         assert_eq!(formula_of(IndicatorId::Xmil), Some(CubeFormula::XmilBar));
+        assert_eq!(formula_of(IndicatorId::Kcomp), Some(CubeFormula::KcompBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

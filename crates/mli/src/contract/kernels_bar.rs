@@ -5107,6 +5107,44 @@ fn bar_scan(
         } else if formula == 1330u32 {
             // cross mutual information over lags: host pre-stage runs 1325 once per lag [1, 2, 3, 5, 10]
             v0 = 0.0f32;
+        } else if formula == 1331u32 {
+            // close-to-close vol percentile `[abs log return, percentile]`: window = `period` (the CPU percentile
+            // window, >= 1); bar 0 only records the close. percentile = share of the last min(t, window) abs
+            // returns that are <= the current one
+            let mut w = period as usize;
+            if w < 1usize {
+                w = 1usize;
+            }
+            if t >= 1usize {
+                let mut pv = c[t - 1];
+                if pv < 1.0e-12f32 {
+                    pv = 1.0e-12f32;
+                }
+                let cur = (c[t] / pv).ln().abs();
+                v0 = cur;
+                let mut len = t;
+                if len > w {
+                    len = w;
+                }
+                let mut le = 0.0f32;
+                for q in 0..len {
+                    let s = t - q;
+                    let mut pp = c[s - 1];
+                    if pp < 1.0e-12f32 {
+                        pp = 1.0e-12f32;
+                    }
+                    let vs = (c[s] / pp).ln().abs();
+                    if vs <= cur {
+                        le = le + 1.0f32;
+                    }
+                }
+                v1 = le / (len as f32);
+            }
+        } else if formula == 1332u32 {
+            // Kalman regime composite: lanes o = Kscr, h = ATR percentile, l = close-vol percentile (host-resolved);
+            // weights a / b / c = w_regime / w_atr / w_vov
+            let den = (a + b + _cc).max(1.0e-9f32);
+            v0 = (a * o[t] + b * (1.0f32 - h[t]) + _cc * (1.0f32 - l[t])) / den;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -5436,6 +5474,24 @@ fn launch_cube_bar_x(
         }
         let p = CubeParams { fast: cnt as u32, slow: ready, ..params };
         let flat = bar_run(formula.code(), [&series[0], &series[1], &series[2], &series[3], &series[4]], p, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::KcompBar {
+        // period = Kscr window, a / b / c = Kalman dt / q / r, fast = ATR period (SMA), slow = ATR percentile
+        // window, signal = close-vol percentile window, ext[0..3] = w_regime / w_atr / w_vov in 1e-6
+        let k = super::kernels::launch_cube(CubeFormula::KscrComp, samples, params);
+        let ap = CubeParams {
+            period: params.fast,
+            smoother: super::CubeSmoother::Sma,
+            smooth_period: params.fast,
+            ..params
+        };
+        let atrp = super::kernels::launch_cube(CubeFormula::AtrPct, samples, ap);
+        let cv = bar_run(1331, [&o, &h, &l, &c, &v], CubeParams { period: params.signal.max(1), ..params }, 0);
+        let cvp = cv[n..2 * n].to_vec();
+        let w = |i: usize| params.ext[i] as f32 / 1.0e6;
+        let wp = CubeParams { a: w(0), b: w(1), c: w(2), ..params };
+        let flat = bar_run(formula.code(), [&k, &atrp, &cvp, &c, &v], wp, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::XmilBar {
