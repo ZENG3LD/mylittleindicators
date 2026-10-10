@@ -17,10 +17,10 @@ pub mod indicators;
 // Indicator self-declaration contract (typed config + defaults + construction).
 pub mod contract;
 
-// The legacy `events/` factory (EventInstance / EventId / events_catalog /
-// event_config) was ABSORBED into the main `contract_engine` ContractFactory —
-// every detector is now an ordinary contract-backed indicator core (manifest
-// member with `impl Indicator`/`Render` + `feed`). No separate events subsystem.
+// Detectors are contract members. `events::factory` is the 0.1.8
+// `EventId` / `EventInstance::create` door over that factory. It does not
+// own a second set of cores. `events::candle_pattern` and
+// `events::divergence` stay the chart hit lists.
 
 // Elliott Wave Analysis — absorbed from the former `mli-ewa` family crate.
 pub mod ewa;

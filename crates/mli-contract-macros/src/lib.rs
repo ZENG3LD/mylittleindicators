@@ -1281,6 +1281,33 @@ pub fn contract_universe(input: TokenStream) -> TokenStream {
         .filter(|m| m.flavor == "Time" || m.flags.iter().any(|f| f == "time"))
         .map(|m| &m.variant)
         .collect();
+    let mut gpu_conflict = None;
+    for member in members.iter() {
+        let cube = member.flags.iter().any(|f| f == "cube");
+        let shader = member.flags.iter().any(|f| f == "shader");
+        if cube && shader {
+            gpu_conflict = Some(member.variant.clone());
+            break;
+        }
+    }
+    if let Some(variant) = gpu_conflict {
+        return syn::Error::new(
+            variant.span(),
+            "an indicator implements at most one of +cube and +shader",
+        )
+        .to_compile_error()
+        .into();
+    }
+    let cube_variants: Vec<&Ident> = members
+        .iter()
+        .filter(|m| m.flags.iter().any(|f| f == "cube"))
+        .map(|m| &m.variant)
+        .collect();
+    let shader_variants: Vec<&Ident> = members
+        .iter()
+        .filter(|m| m.flags.iter().any(|f| f == "shader"))
+        .map(|m| &m.variant)
+        .collect();
 
     // --- global box-free factory (all members) ---
     let factory_enum = emit_runtime_enum(&Ident::new("ContractFactory", proc_macro2::Span::call_site()), &all_refs);
@@ -1307,10 +1334,14 @@ pub fn contract_universe(input: TokenStream) -> TokenStream {
                 _ => return None,
             })
         }
-        /// GPU dispatch of an id. Every member is `GpuMode::None`; no kernel is selected.
+        /// GPU dispatch of an id. `+cube` is a CubeCL kernel, `+shader` is
+        /// hand-written WGSL. An unmarked member stays `GpuMode::None`.
         pub fn gpu_of(id: crate::engine::indicator_id::IndicatorId) -> crate::contract::GpuMode {
             match id {
-                #( crate::engine::indicator_id::IndicatorId::#variants => crate::contract::GpuMode::None, )*
+                #( crate::engine::indicator_id::IndicatorId::#cube_variants =>
+                    crate::contract::GpuMode::Cube, )*
+                #( crate::engine::indicator_id::IndicatorId::#shader_variants =>
+                    crate::contract::GpuMode::Shader, )*
                 _ => crate::contract::GpuMode::None,
             }
         }
@@ -1445,7 +1476,9 @@ pub fn contract_universe(input: TokenStream) -> TokenStream {
     // `time` is a FEED-behavior flag, not a slot-family flag: it changes the core's feed arm
     // (`+time` → `feed(ts, …)`), it does NOT define a slottable id-subset. Exclude it so no
     // `TimeId`/`TimeSlot`/`TimeSlotOrder` is generated (cf. `smoother`/`oscillator`, which do).
-    flag_names.retain(|f| f != "time");
+    // `time` changes the feed arm. `cube` and `shader` select `gpu_of`. None of
+    // the three is a slot family, so they must not grow a `*Id` / `*Slot`.
+    flag_names.retain(|f| f != "time" && f != "cube" && f != "shader");
     let flag_enums: Vec<TokenStream2> = flag_names
         .iter()
         .map(|flag| {

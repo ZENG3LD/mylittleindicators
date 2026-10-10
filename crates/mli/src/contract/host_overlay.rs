@@ -35,7 +35,8 @@ pub enum ProfileSide {
     Left,
 }
 
-/// The seven host layers that landed in the public catalog after the fork.
+/// Host layers. `Cvd` is the chart strip for the real CVD series.
+/// The measurement stays [`crate::engine::indicator_id::IndicatorId::Cvd`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HostOverlayId {
     VolumeProfile,
@@ -45,10 +46,11 @@ pub enum HostOverlayId {
     DomHeatmap,
     LiquidationHeatmap,
     LiquidationProjection,
+    Cvd,
 }
 
 impl HostOverlayId {
-    pub const ALL: [HostOverlayId; 7] = [
+    pub const ALL: [HostOverlayId; 8] = [
         HostOverlayId::VolumeProfile,
         HostOverlayId::TpoProfile,
         HostOverlayId::OiDelta,
@@ -56,6 +58,7 @@ impl HostOverlayId {
         HostOverlayId::DomHeatmap,
         HostOverlayId::LiquidationHeatmap,
         HostOverlayId::LiquidationProjection,
+        HostOverlayId::Cvd,
     ];
 
     /// Catalog id. Stable across the fork.
@@ -68,6 +71,7 @@ impl HostOverlayId {
             HostOverlayId::DomHeatmap => "overlay_dom_heatmap",
             HostOverlayId::LiquidationHeatmap => "overlay_liquidation_heatmap",
             HostOverlayId::LiquidationProjection => "overlay_liquidation_projection",
+            HostOverlayId::Cvd => "overlay_cvd",
         }
     }
 
@@ -80,12 +84,15 @@ impl HostOverlayId {
             HostOverlayId::DomHeatmap => "DOM Heatmap",
             HostOverlayId::LiquidationHeatmap => "Liquidation Heatmap",
             HostOverlayId::LiquidationProjection => "Projected Liquidations",
+            HostOverlayId::Cvd => "CVD",
         }
     }
 
     pub const fn paint(self) -> PaintSpace {
         match self {
-            HostOverlayId::OiDelta | HostOverlayId::FundingRate => PaintSpace::Subpane,
+            HostOverlayId::OiDelta | HostOverlayId::FundingRate | HostOverlayId::Cvd => {
+                PaintSpace::Subpane
+            }
             _ => PaintSpace::OnPrice,
         }
     }
@@ -101,6 +108,7 @@ impl HostOverlayId {
             HostOverlayId::FundingRate => Some(StreamKind::Funding),
             HostOverlayId::DomHeatmap => Some(StreamKind::OrderBook),
             HostOverlayId::LiquidationHeatmap => Some(StreamKind::Liquidation),
+            HostOverlayId::Cvd => Some(StreamKind::Tick),
         }
     }
 
@@ -121,6 +129,7 @@ impl HostOverlayId {
             HostOverlayId::LiquidationProjection => {
                 HostOverlayConfig::LiquidationProjection(LiquidationProjectionOverlay::default())
             }
+            HostOverlayId::Cvd => HostOverlayConfig::Cvd(SignedStripOverlay::default()),
         }
     }
 }
@@ -135,6 +144,7 @@ pub enum HostOverlayConfig {
     DomHeatmap(DomHeatmapOverlay),
     LiquidationHeatmap(LiquidationHeatmapOverlay),
     LiquidationProjection(LiquidationProjectionOverlay),
+    Cvd(SignedStripOverlay),
 }
 
 /// Venues folded into one layer. Empty = every venue that serves the stream.
@@ -377,6 +387,7 @@ mod tests {
                 "overlay_dom_heatmap",
                 "overlay_liquidation_heatmap",
                 "overlay_liquidation_projection",
+                "overlay_cvd",
             ]
         );
     }
@@ -385,7 +396,7 @@ mod tests {
     fn paint_and_stream_match_the_public_catalog() {
         for id in HostOverlayId::ALL {
             match id {
-                HostOverlayId::OiDelta | HostOverlayId::FundingRate => {
+                HostOverlayId::OiDelta | HostOverlayId::FundingRate | HostOverlayId::Cvd => {
                     assert_eq!(id.paint(), PaintSpace::Subpane);
                 }
                 _ => assert_eq!(id.paint(), PaintSpace::OnPrice),
@@ -410,6 +421,8 @@ mod tests {
             HostOverlayId::LiquidationProjection.stream(),
             Some(StreamKind::OpenInterest)
         );
+        assert_eq!(HostOverlayId::Cvd.stream(), Some(StreamKind::Tick));
+        assert_eq!(HostOverlayId::Cvd.as_str(), "overlay_cvd");
     }
 
     #[test]

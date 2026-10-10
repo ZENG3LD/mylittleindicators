@@ -52,7 +52,7 @@ use crate::engine::streams::hybrid_tick_book_consumer::HybridTickBookConsumer;
 
 mli_contract_macros::contract_universe! {
     members {
-        Sma:             Field     : MovingAverage +smoother => crate::indicators::average::sma::Sma,
+        Sma:             Field     : MovingAverage +smoother +shader => crate::indicators::average::sma::Sma,
         Ema:             Field        : MovingAverage +smoother => crate::indicators::average::ema::Ema,
         Wma:             Field          : MovingAverage +smoother => crate::indicators::average::wma::Wma,
         Rma:             Field          : MovingAverage +smoother => crate::indicators::average::rma::Rma,
@@ -212,8 +212,8 @@ mli_contract_macros::contract_universe! {
         Rvol:            Fields      : _             => crate::indicators::volume::relative_volume::RelativeVolume { rvol percentile },
         SessionVwap:     Fields      : _             => crate::indicators::volume::session_vwap::SessionVwap,
         Vzo:             Fields      : _             => crate::indicators::volume::vzo::Vzo,
-        Vdelta:          Fields      : _             => crate::indicators::volume::volume_delta::VolumeDelta,
-        Volume:          Field       : _             => crate::indicators::volume::volume::Volume,
+        Vdelta:          Tick        : _             => crate::indicators::volume::volume_delta::VolumeDelta,
+        Volume:          Field       : _ +cube       => crate::indicators::volume::volume::Volume,
         Rvp:             Fields      : _             => crate::indicators::volume::rolling_volume_profile::RollingVolumeProfile { poc vah val #profile_grid },
         Shannon:         Field       : _             => crate::indicators::entropy::shannon_entropy::ShannonEntropy,
         Apen:            Field       : _             => crate::indicators::entropy::approximate_entropy::ApproximateEntropy,

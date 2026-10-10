@@ -29,6 +29,13 @@ once_cell = "1.21"
 strum = { version = "0.27", features = ["derive"] }
 arrayvec = "0.7"
 rayon = "1.10"
+# Pinned dialect from the 2026-10-10 GPU decision. Default features stay off:
+# no CUDA, no HIP, no LLVM. The launch proof is the wgpu runtime. The CPU
+# runtime links LLVM, and that link splits the space in this profile path.
+cubecl = { version = "=0.11.0", optional = true, default-features = false, features = ["std", "wgpu"] }
+# Submitter for a foreign WGSL string. CubeCL can emit WGSL; it does not host one.
+wgpu = { version = "=30.0.1", optional = true }
+naga = { version = "=30.0.1", optional = true, features = ["wgsl-in"] }
 
 [features]
 # Opt-in: route `cost_points*` through the embedded measured calibration table
@@ -36,7 +43,7 @@ rayon = "1.10"
 # bin — NO serde, NO runtime I/O) instead of the structural `WEIGHTS` rubric. OFF by
 # default → the pure structural prior, with no dependency on the generated file.
 calibrated = []
-# CubeCL runtime is not a dependency until the first kernel.
-gpu = []
-# WGSL submitter is not a dependency until a shader impl exists.
-gpu-shader = []
+# CubeCL wgpu runtime and the volume bar-map kernel.
+gpu = ["dep:cubecl"]
+# naga parses the hand-written SMA shader. wgpu is the submitter.
+gpu-shader = ["dep:wgpu", "dep:naga"]

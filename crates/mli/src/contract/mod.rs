@@ -688,6 +688,9 @@ pub use render::{
 pub mod gpu;
 pub use gpu::{GpuMode, GpuCube, GpuShader};
 
+#[cfg(feature = "gpu")]
+pub mod kernels;
+
 pub mod axis;
 pub use axis::{sweep_f64, CubeIter, Param, ParamScalar};
 

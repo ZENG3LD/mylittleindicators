@@ -1,7 +1,7 @@
-//! Volume Delta Indicator
-//! Анализирует баланс покупок/продаж
-
-use crate::types::Bar;
+//! Volume Delta — per-step aggressor delta (`buy - sell`).
+//!
+//! A bar's OHLCV has no taker side, so a bar sample does not move the
+//! ring. Real updates are [`VolumeDelta::update_with_delta`] and ticks.
 
 /// Volume Delta индикатор с фиксированным окном
 #[derive(Debug, Clone)]
@@ -43,39 +43,6 @@ impl VolumeDelta {
     pub fn update_with_delta(&mut self, buy_volume: f64, sell_volume: f64) -> f64 {
         let delta = buy_volume - sell_volume;
         self.process_delta(delta)
-    }
-
-    /// Обновить индикатор баром (эвристика по price action)
-    pub fn update(&mut self, bar: &Bar) -> f64 {
-        let delta = self.estimate_delta_from_bar(bar);
-        self.process_delta(delta)
-    }
-
-    /// Feed resolved lanes `[open, close, volume]`.
-    pub fn feed(&mut self, lanes: &[f64]) -> f64 {
-        let open = lanes[0];
-        let close = lanes[1];
-        let volume = lanes[2];
-        let delta = if close > open {
-            volume
-        } else if close < open {
-            -volume
-        } else {
-            0.0
-        };
-        self.process_delta(delta)
-    }
-
-    /// Оценка дельты из бара (эвристика)
-    fn estimate_delta_from_bar(&self, bar: &Bar) -> f64 {
-        let price_delta = bar.close - bar.open;
-        if price_delta > 0.0 {
-            bar.volume // Покупки
-        } else if price_delta < 0.0 {
-            -bar.volume // Продажи
-        } else {
-            0.0 // Нейтрально
-        }
     }
 
     /// Обработка дельты (общая логика)
@@ -138,9 +105,8 @@ mod tests {
     #[test]
     fn test_volume_delta_warmup() {
         let mut vd = VolumeDelta::new(10);
-        for i in 0..15 {
-            let price = 100.0 + (i as f64 * 0.1).sin() * 5.0;
-            vd.feed(&[price, price + 0.5, 1000.0]);
+        for _ in 0..15 {
+            vd.update_with_delta(600.0, 400.0);
         }
         assert!(vd.is_ready());
     }
@@ -148,31 +114,27 @@ mod tests {
     #[test]
     fn test_volume_delta_values() {
         let mut vd = VolumeDelta::new(10);
-        // close (101) > open (100) → positive delta
-        let delta = vd.feed(&[100.0, 101.0, 1000.0]);
-        assert!(delta > 0.0, "Rising close should have positive delta");
+        let delta = vd.update_with_delta(1000.0, 0.0);
+        assert!((delta - 1000.0).abs() < 1e-9, "buy-only step is +1000, got {delta}");
 
-        // close (100) < open (101) → negative delta
-        let delta = vd.feed(&[101.0, 100.0, 1000.0]);
-        assert!(delta < 0.0, "Falling close should have negative delta");
+        let delta = vd.update_with_delta(0.0, 1000.0);
+        assert!((delta - -1000.0).abs() < 1e-9, "sell-only step is -1000, got {delta}");
     }
 
     #[test]
     fn test_volume_delta_cumulative() {
         let mut vd = VolumeDelta::new(10);
-        for i in 0..10 {
-            let price = 100.0 + i as f64;
-            vd.feed(&[price, price + 0.5, 1000.0]);
+        for _ in 0..10 {
+            vd.update_with_delta(1000.0, 0.0);
         }
-        let cumulative = vd.cumulative_delta();
-        assert!(cumulative.is_finite());
+        assert!((vd.cumulative_delta() - 10_000.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_volume_delta_reset() {
         let mut vd = VolumeDelta::new(10);
-        for i in 0..15 {
-            vd.feed(&[100.0 + i as f64, 101.0, 1000.0]);
+        for _ in 0..15 {
+            vd.update_with_delta(1000.0, 0.0);
         }
         vd.reset();
         assert!(!vd.is_ready());
@@ -191,11 +153,12 @@ impl Default for VolumeDelta {
 
 use crate::engine::indicator_id::IndicatorId;
 use crate::engine::contract_engine::IndicatorOutputId;
-use crate::engine::ohlcv_field::OhlcvField;
 use crate::contract::{Cost, Family, Indicator, Output, Param, SourceAxis, UpdateComplexity, Store, StoreKind};
 use crate::contract::Render;
 use crate::contract::{Color, HistogramStyle, RenderOutput, RenderSpec};
 use crate::engine::stream_kind::StreamKind;
+use crate::engine::streams::tick_consumer::TickConsumer;
+use crate::core::types::Tick;
 
 /// Own config for [`VolumeDelta`] — rolling window size for the cumulative delta.
 #[derive(Debug, Clone, mli_contract_macros::ConfigAxes)]
@@ -207,14 +170,8 @@ impl Indicator for VolumeDelta {
     const ID: IndicatorId = IndicatorId::Vdelta;
     /// Standalone per-bar volume delta — not a pluggable family member.
     const FAMILY: &'static [Family] = &[];
-    const INPUT: &'static [StreamKind] = &[StreamKind::Bar];
-    /// Fixed open (direction base) + close (direction) + volume (magnitude) lanes.
-    const SOURCE: Option<SourceAxis> = Some(SourceAxis::KlineSlice(&[
-        OhlcvField::Open,
-        OhlcvField::Close,
-        OhlcvField::Volume,
-    ]));
-    const NEEDS_VOLUME: bool = true;
+    const INPUT: &'static [StreamKind] = &[StreamKind::Tick];
+    const SOURCE: Option<SourceAxis> = None;
     /// O(1) per bar — simple ring buffer with running sum.
     const COST: Cost = Cost::new(UpdateComplexity::Constant, &[Store::window(StoreKind::Vec)]);
     const OUTPUTS: &'static [Output] = &[Output::centered(IndicatorOutputId::Vdelta)];
@@ -243,6 +200,21 @@ impl crate::contract::Config for VdeltaConfig {
 }
 
 
+impl TickConsumer for VolumeDelta {
+    fn update_tick(&mut self, tick: &Tick) {
+        let delta = if tick.is_buy { tick.size } else { -tick.size };
+        self.process_delta(delta);
+    }
+
+    fn reset(&mut self) {
+        VolumeDelta::reset(self);
+    }
+
+    fn is_ready(&self) -> bool {
+        VolumeDelta::is_ready(self)
+    }
+}
+
 impl Render for VolumeDelta {
 
     fn rendering() -> RenderSpec {
@@ -262,11 +234,36 @@ mod contract_tests {
     use crate::engine::contract_engine::IndicatorOrder;
     use crate::contract::MarketSample;
 
+    fn on_wide_stack(f: impl FnOnce() + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(f)
+            .expect("spawn")
+            .join()
+            .unwrap_or_else(|payload| std::panic::resume_unwind(payload));
+    }
+
     #[test]
-    fn factory_feeds_resolved_lanes() {
-        let mut f = IndicatorOrder::Vdelta(<<VolumeDelta as crate::contract::Indicator>::Config as crate::contract::Config>::defaults()).build_solo().unwrap();
-        // Bullish bar: close > open → +volume
-        f.feed(0, MarketSample::Bar { open: 100.0, high: 9999.0, low: 9999.0, close: 101.0, volume: 500.0 });
-        assert_eq!(f.read(IndicatorOutputId::Vdelta), 500.0, "bullish bar should give +500 delta");
+    fn bar_feed_does_not_fabricate_delta() {
+        on_wide_stack(|| {
+            let mut f = IndicatorOrder::Vdelta(<<VolumeDelta as crate::contract::Indicator>::Config as crate::contract::Config>::defaults()).build_solo().unwrap();
+            f.feed(0, MarketSample::Bar { open: 100.0, high: 110.0, low: 90.0, close: 109.0, volume: 500.0 });
+            assert!(!f.is_ready());
+            let v = f.read(IndicatorOutputId::Vdelta);
+            assert!(v.abs() < 1e-9, "bar OHLCV must not move Vdelta, got {v}");
+        });
+    }
+
+    #[test]
+    fn tick_signed_size_is_the_delta() {
+        on_wide_stack(|| {
+            let mut f = IndicatorOrder::Vdelta(<<VolumeDelta as crate::contract::Indicator>::Config as crate::contract::Config>::defaults()).build_solo().unwrap();
+            let buy = crate::core::types::Tick::new(0, 100.0, 500.0, true);
+            let sell = crate::core::types::Tick::new(1, 100.0, 200.0, false);
+            f.feed(0, MarketSample::Tick(&buy));
+            f.feed(1, MarketSample::Tick(&sell));
+            let v = f.read(IndicatorOutputId::Vdelta);
+            assert!((v - -200.0).abs() < 1e-9, "last tick is the current delta, got {v}");
+        });
     }
 }
