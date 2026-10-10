@@ -537,7 +537,8 @@ fn evt_map(
 fn uses_time_window(code: u32) -> bool {
     matches!(
         code,
-        920 | 922 | 923 | 924 | 925 | 927 | 928 | 932 | 933 | 934 | 935 | 936 | 942
+        920 | 922 | 923 | 924 | 925 | 927 | 928 | 932 | 933 | 934 | 935 | 936 | 942 | 945 | 946
+            | 947
     )
 }
 
@@ -558,6 +559,9 @@ fn evt_win_scan(
     if th < 1.0f32 {
         th = 1.0f32;
     }
+    // Trade-cluster price and size stay put when the count is under the threshold.
+    let mut hold_px = 0.0f32;
+    let mut hold_sz = 0.0f32;
     for i in 0..n {
         let mut v0 = 0.0f32;
         let mut v1 = 0.0f32;
@@ -728,6 +732,130 @@ fn evt_win_scan(
                 }
                 v0 = m;
             }
+        } else if formula == 945u32 {
+            // `a` is the price bucket, `b` is the window. Price and size hold;
+            // the signal drops to 0 as soon as the bucket count is under `period`.
+            let mut bucket = a;
+            if bucket <= 0.0f32 {
+                bucket = 0.01f32;
+            }
+            let mut win = b;
+            if win < 1.0f32 {
+                win = 1.0f32;
+            }
+            let mut cth = period as f32;
+            if cth < 2.0f32 {
+                cth = 2.0f32;
+            }
+            let bid = (x[i] / bucket).floor();
+            let mut cnt = 0.0f32;
+            let mut buys = 0.0f32;
+            let mut sz = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= win {
+                    if (x[j] / bucket).floor() == bid {
+                        cnt = cnt + 1.0f32;
+                        sz = sz + x[n + j];
+                        if side[j] > 0.0f32 {
+                            buys = buys + 1.0f32;
+                        }
+                    }
+                }
+            }
+            if cnt >= cth {
+                hold_px = bid * bucket;
+                hold_sz = sz;
+                let sells = cnt - buys;
+                if buys > sells {
+                    v0 = 1.0f32;
+                } else if sells > buys {
+                    v0 = -1.0f32;
+                }
+            }
+            v1 = hold_px;
+            v2 = hold_sz;
+        } else if formula == 946u32 {
+            let mut bv = 0.0f32;
+            let mut sv = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    if side[j] > 0.0f32 {
+                        bv = bv + x[n + j];
+                    } else {
+                        sv = sv + x[n + j];
+                    }
+                }
+            }
+            let total = bv + sv;
+            if total > 1.0e-12f32 {
+                let mut d = bv - sv;
+                if d < 0.0f32 {
+                    d = 0.0f32 - d;
+                }
+                let mut zth = b;
+                if zth < 1.0e-12f32 {
+                    zth = 1.0e-12f32;
+                }
+                if zth > 1.0f32 {
+                    zth = 1.0f32;
+                }
+                if d / total > zth {
+                    let mut lo = 0.0f32;
+                    let mut hi = 0.0f32;
+                    let mut any = 0.0f32;
+                    for j in 0..(i + 1) {
+                        if ts[i] - ts[j] <= a {
+                            let mut take = 0.0f32;
+                            if bv >= sv {
+                                if side[j] > 0.0f32 {
+                                    take = 1.0f32;
+                                }
+                            } else if side[j] <= 0.0f32 {
+                                take = 1.0f32;
+                            }
+                            if take > 0.5f32 {
+                                if any < 0.5f32 {
+                                    lo = x[j];
+                                    hi = x[j];
+                                    any = 1.0f32;
+                                } else {
+                                    if x[j] < lo {
+                                        lo = x[j];
+                                    }
+                                    if x[j] > hi {
+                                        hi = x[j];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if bv >= sv {
+                        v0 = 1.0f32;
+                    } else {
+                        v0 = -1.0f32;
+                    }
+                    v1 = lo;
+                    v2 = hi;
+                }
+            }
+        } else if formula == 947u32 {
+            let mut q = 0.0f32;
+            let mut pq = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    q = q + x[n + j];
+                    pq = pq + x[j] * x[n + j];
+                }
+            }
+            let mut vw = x[i];
+            if q > 0.0f32 {
+                vw = pq / q;
+            }
+            v0 = x[i];
+            v1 = vw;
+            if vw > 0.0f32 {
+                v2 = (x[i] - vw) / vw;
+            }
         }
         out[i] = v0;
         out[n + i] = v1;
@@ -762,6 +890,12 @@ fn launch_events_window(
     let sb = client.create_from_slice(f32::as_bytes(&frame.side));
     let tb = client.create_from_slice(f32::as_bytes(&frame.ts));
     let out = client.empty(3 * n * core::mem::size_of::<f32>());
+    // 945 uses `a` as a price bucket (0.5 in the fixture). Every other arm
+    // uses `a` as a window in milliseconds.
+    let mut window_a = params.a;
+    if formula.code() != 945 {
+        window_a = window_a.max(1.0);
+    }
     unsafe {
         evt_win_map::launch_unchecked(
             &client,
@@ -773,7 +907,7 @@ fn launch_events_window(
             BufferArg::from_raw_parts(out.clone(), 3 * n),
             formula.code(),
             params.period,
-            params.a.max(1.0),
+            window_a,
             params.b,
             params.c,
         );
