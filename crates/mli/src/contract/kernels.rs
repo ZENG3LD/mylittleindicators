@@ -6960,6 +6960,43 @@ mod tests {
         chk(&run_cols(CubeFormula::VoKcCols, &bars, vp), lanes.iter().map(|l| { let (u, mi, lo) = m.feed(l); vec![u, mi, lo] }).collect());
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): composites 1022..=1027.
+    #[test]
+    fn lane_matches_cpu_comp_batch4() {
+        use crate::indicators::momentum::cci::Cci;
+        use crate::indicators::momentum::detrended_synthetic_price::DetrendedSyntheticPrice;
+        use crate::indicators::momentum::rmi::Rmi;
+        use crate::indicators::volatility::chaikin_volatility::ChaikinVolatility;
+        use crate::indicators::volatility::mass_index::MassIndex;
+        use crate::indicators::volatility::rvi::Rvi;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        for (sid, cs) in [(SmootherId::Sma, CubeSmoother::Sma), (SmootherId::Ema, CubeSmoother::Ema), (SmootherId::Rma, CubeSmoother::Rma)] {
+            let mut p = CubeParams::period(9);
+            p.smoother = cs;
+            p.smooth_period = 6;
+            p.a = 0.015;
+            p.slow = 5;
+            let mut m = Cci::from_smoother(9, 0.015, sid);
+            assert_close(&run(CubeFormula::CciComp, &bars, p), &lanes.iter().map(|l| m.feed(l)).collect::<Vec<f64>>());
+            let mut m = ChaikinVolatility::from_smoother(9, 5, sid);
+            assert_close(&run(CubeFormula::CvComp, &bars, p), &lanes.iter().map(|l| m.feed(l)).collect::<Vec<f64>>());
+            let mut m = Rmi::from_smoother(9, 6, sid);
+            assert_close(&run(CubeFormula::RmiComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = Rvi::from_smoother(9, sid);
+            assert_close(&run(CubeFormula::RviComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+            let mut m = DetrendedSyntheticPrice::from_smoother(9, sid);
+            assert_close(&run(CubeFormula::DspComp, &bars, p), &cpu(&close, |v| m.feed(v)));
+        }
+        let mut p = CubeParams::period(5);
+        p.smoother = CubeSmoother::Ema;
+        p.slow = 12;
+        let mut m = MassIndex::with_params(5, 12);
+        assert_close(&run(CubeFormula::MiComp, &bars, p), &lanes.iter().map(|l| m.feed(l)).collect::<Vec<f64>>());
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

@@ -231,6 +231,115 @@ fn ew_scan(
                     v = d2;
                 }
             }
+        } else if op == 31u32 {
+            // window std about y[t] with the Bessel factor sqrt(n / (n - 1)) for n > 1
+            let p = a as usize;
+            let mut lo = 0usize;
+            if t + 1 > p {
+                lo = t + 1 - p;
+            }
+            let nn = (t + 1 - lo) as f32;
+            let mut ss = 0.0f32;
+            for j in lo..(t + 1) {
+                let d = x[j] - y[t];
+                ss = ss + d * d;
+            }
+            v = (ss / nn).sqrt();
+            if nn > 1.0f32 {
+                v = v * (nn / (nn - 1.0f32)).sqrt();
+            }
+        } else if op == 32u32 {
+            if t > 0 && x[t] > x[t - 1] {
+                v = y[t];
+            }
+        } else if op == 33u32 {
+            if t > 0 && x[t] < x[t - 1] {
+                v = y[t];
+            }
+        } else if op == 34u32 {
+            // CCI: x = typical price, y = mean, window a, scalar b; 0 until full window
+            let p = a as usize;
+            if t + 1 >= p {
+                let mut sum = 0.0f32;
+                for j in (t + 1 - p)..(t + 1) {
+                    let mut d = x[j] - y[t];
+                    if d < 0.0f32 {
+                        d = -d;
+                    }
+                    sum = sum + d;
+                }
+                let mad = sum / (p as f32);
+                let mut am = mad;
+                if am < 0.0f32 {
+                    am = -am;
+                }
+                if am >= 1.0e-12f32 {
+                    v = (x[t] - y[t]) / (b * mad);
+                }
+            }
+        } else if op == 35u32 {
+            v = x[t] - y[t];
+            if v < 0.0f32 {
+                v = 0.0f32;
+            }
+        } else if op == 36u32 {
+            // Chaikin volatility: x = smoothed range, lag a, first bar b
+            let lag = a as usize;
+            if (t as f32) >= b {
+                let past = x[t - lag];
+                let mut ap = past;
+                if ap < 0.0f32 {
+                    ap = -ap;
+                }
+                if ap >= 1.0e-12f32 {
+                    v = 100.0f32 * (x[t] - past) / past;
+                }
+            }
+        } else if op == 37u32 {
+            v = 1.0f32;
+            let mut ay = y[t];
+            if ay < 0.0f32 {
+                ay = -ay;
+            }
+            if ay > 1.0e-12f32 {
+                v = x[t] / y[t];
+            }
+        } else if op == 38u32 {
+            // window sum of x over a bars, 0 until full
+            let p = a as usize;
+            if t + 1 >= p {
+                let mut sum = 0.0f32;
+                for j in (t + 1 - p)..(t + 1) {
+                    sum = sum + x[j];
+                }
+                v = sum;
+            }
+        } else if op == 39u32 {
+            let m = a as usize;
+            if t >= m {
+                v = x[t] - x[t - m];
+                if v < 0.0f32 {
+                    v = 0.0f32;
+                }
+            }
+        } else if op == 40u32 {
+            let m = a as usize;
+            if t >= m {
+                v = x[t - m] - x[t];
+                if v < 0.0f32 {
+                    v = 0.0f32;
+                }
+            }
+        } else if op == 41u32 {
+            // RMI: x = up average, y = down average, 0 before bar a
+            let m = a as usize;
+            if t >= m {
+                let dn = x[t] + y[t];
+                v = 50.0f32;
+                if dn > 0.0f32 {
+                    v = 100.0f32 * x[t] / dn;
+                }
+            }
         } else if op == 29u32 {
             if z[t] != 0.0f32 {
                 v = (x[t] - y[t]) / z[t];
@@ -564,6 +673,65 @@ pub fn launch_cube_comp(
             let lo = ewc(15, &ewc(14, &mid, &atr, &mid, p.a, 0.0), &mid, &mid, g, 0.0);
             let mi = ewc(15, &mid, &mid, &mid, g, 0.0);
             vec![up, mi, lo]
+        }
+        // CCI over `period` (`smoother` mean, `a` = scalar) on the typical price.
+        CubeFormula::CciComp => {
+            let tp = lane_series(samples, p, OhlcvField::HLC3);
+            let mean = sm(&tp, p.smoother, p.period, 0, p);
+            vec![ewc(34, &tp, &mean, &tp, p.period as f32, p.a)]
+        }
+        // Chaikin volatility: range smoothed by `smoother` over `period`, ROC over `slow` bars
+        // (k, at least 1) of the smoothed range from the bar the smoother is ready.
+        CubeFormula::CvComp => {
+            let h = lane_series(samples, p, OhlcvField::High);
+            let l = lane_series(samples, p, OhlcvField::Low);
+            let rng = ew2(35, &h, &l, 0.0);
+            let n = p.period.max(1);
+            let k = p.slow.max(1);
+            let e = sm(&rng, p.smoother, n, 0, p);
+            vec![ewc(36, &e, &e, &e, k as f32, (n - 1 + k) as f32)]
+        }
+        // Mass index: two chained smoothers of high - low over `period`, sum of the ratio over
+        // `slow` bars.
+        CubeFormula::MiComp => {
+            let h = lane_series(samples, p, OhlcvField::High);
+            let l = lane_series(samples, p, OhlcvField::Low);
+            let hl = ew2(2, &h, &l, 0.0);
+            let e1 = sm(&hl, p.smoother, p.period, 0, p);
+            let e2 = sm(&e1, p.smoother, p.period, 0, p);
+            let ratio = ew2(37, &e1, &e2, 0.0);
+            vec![ewc(38, &ratio, &ratio, &ratio, p.slow as f32, 0.0)]
+        }
+        // Relative momentum index: momentum lookback `period`, up / down averages with
+        // `smoother` over `smooth_period`, fed from bar `period`.
+        CubeFormula::RmiComp => {
+            let src = lane_series(samples, p, p.lane);
+            let m = p.period.max(1);
+            let up = ewc(39, &src, &src, &src, m as f32, 0.0);
+            let dn = ewc(40, &src, &src, &src, m as f32, 0.0);
+            let ua = sm(&up, p.smoother, p.smooth_period, m, p);
+            let da = sm(&dn, p.smoother, p.smooth_period, m, p);
+            vec![ewc(41, &ua, &da, &ua, m as f32, 0.0)]
+        }
+        // Relative volatility index over `period`, one `smoother` for all three slots.
+        CubeFormula::RviComp => {
+            let src = lane_series(samples, p, p.lane);
+            let pp = p.period.max(1);
+            let mean = sm(&src, p.smoother, pp, 0, p);
+            let sd = ewc(31, &src, &mean, &src, pp as f32, 0.0);
+            let pi = ewc(32, &src, &sd, &src, 0.0, 0.0);
+            let ni = ewc(33, &src, &sd, &src, 0.0, 0.0);
+            let pos = sm(&pi, p.smoother, pp, 1, p);
+            let neg = sm(&ni, p.smoother, pp, 1, p);
+            let den = ew2(11, &pos, &neg, 0.0);
+            let raw = ew2(6, &pos, &den, 0.0);
+            vec![ewc(15, &raw, &raw, &raw, pp as f32, 0.0)]
+        }
+        // Detrended synthetic price: `x - smoother(x)` over `period` (at least 2).
+        CubeFormula::DspComp => {
+            let src = lane_series(samples, p, p.lane);
+            let m = sm(&src, p.smoother, p.period.max(2), 0, p);
+            vec![ew2(2, &src, &m, 0.0)]
         }
         _ => Vec::new(),
     }

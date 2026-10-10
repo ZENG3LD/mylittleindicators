@@ -531,6 +531,18 @@ pub enum CubeFormula {
     StarcCols = 1020,
     /// Composite: Keltner on SMA(typical) upper/middle/lower. UNTESTED on GPU.
     VoKcCols = 1021,
+    /// Composite: CCI. UNTESTED on GPU.
+    CciComp = 1022,
+    /// Composite: Chaikin volatility. UNTESTED on GPU.
+    CvComp = 1023,
+    /// Composite: Mass index. UNTESTED on GPU.
+    MiComp = 1024,
+    /// Composite: Relative momentum index. UNTESTED on GPU.
+    RmiComp = 1025,
+    /// Composite: Relative volatility index. UNTESTED on GPU.
+    RviComp = 1026,
+    /// Composite: Detrended synthetic price. UNTESTED on GPU.
+    DspComp = 1027,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -973,6 +985,12 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Cci), Some(CubeFormula::CciComp));
+        assert_eq!(formula_of(IndicatorId::Cv), Some(CubeFormula::CvComp));
+        assert_eq!(formula_of(IndicatorId::Mi), Some(CubeFormula::MiComp));
+        assert_eq!(formula_of(IndicatorId::Rmi), Some(CubeFormula::RmiComp));
+        assert_eq!(formula_of(IndicatorId::Rvi), Some(CubeFormula::RviComp));
+        assert_eq!(formula_of(IndicatorId::Dsp), Some(CubeFormula::DspComp));
         assert_eq!(formula_of(IndicatorId::Kc), Some(CubeFormula::KcCols));
         assert_eq!(formula_of(IndicatorId::Kcmetrics), Some(CubeFormula::KcMetricsCols));
         assert_eq!(formula_of(IndicatorId::Atrc), Some(CubeFormula::AtrcCols));
