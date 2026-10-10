@@ -805,6 +805,50 @@ pub(crate) fn lr_all(x: &[f32], period: u32, zero_lag: bool) -> Vec<Vec<f32>> {
         .collect()
 }
 
+/// Residual std the way `RegressionChannels::calculate_residuals` walks the
+/// price ring: physical slot order, regressor `slot + 1`. A chronological
+/// window matches only until the ring wraps.
+fn ring_residual_std(prices: &[f32], slope: &[f32], icpt: &[f32], period: u32) -> Vec<f32> {
+    let n = prices.len();
+    let mut out = vec![0.0f32; n];
+    let p = period as usize;
+    if p < 2 || n == 0 {
+        return out;
+    }
+    let mut buf = vec![0.0f32; p];
+    let mut len = 0usize;
+    let mut idx = 0usize;
+    let mut filled = false;
+    for t in 0..n {
+        if filled {
+            buf[idx] = prices[t];
+        } else if len < p {
+            buf[len] = prices[t];
+            len += 1;
+        }
+        idx = (idx + 1) % p;
+        if len == p && !filled {
+            filled = true;
+        }
+        if filled {
+            let sl = slope[t];
+            let ic = icpt[t];
+            let mut sum = 0.0f32;
+            for i in 0..p {
+                sum += buf[i] - (sl * ((i + 1) as f32) + ic);
+            }
+            let mean = sum / (p as f32);
+            let mut vv = 0.0f32;
+            for i in 0..p {
+                let d = (buf[i] - (sl * ((i + 1) as f32) + ic)) - mean;
+                vv += d * d;
+            }
+            out[t] = (vv / (p as f32)).sqrt();
+        }
+    }
+    out
+}
+
 /// `BasicKalmanFilter` (2-state position / velocity filter, H = [[1,0],[0,0]], R = diag(r, 1e12),
 /// P0 = diag(1000, 100)), scalar form of the CPU matrix algebra. `pos` is the corrected
 /// position (`filtered_value`), `velp` the velocity right after the predict step (the CPU
@@ -1666,10 +1710,11 @@ pub fn launch_cube_comp(
             let r = lr_all(&src, per, false);
             let mid = r[0].clone();
             let g = per.max(1) as f32;
+            let std = ring_residual_std(&src, &r[1], &r[2], per);
             let band: Vec<f32> = match p.flag {
                 1 => mid.iter().map(|m| *m * (mult / 100.0)).collect(),
-                2 => ewc(52, &r[4], &r[3], &r[4], 0.0, 0.0).iter().map(|w| *w * mult).collect(),
-                _ => r[4].iter().map(|w| *w * mult).collect(),
+                2 => ewc(52, &std, &r[3], &std, 0.0, 0.0).iter().map(|w| *w * mult).collect(),
+                _ => std.iter().map(|w| *w * mult).collect(),
             };
             let up = ewc(15, &ewc(13, &mid, &band, &mid, 1.0, 0.0), &mid, &mid, g, 0.0);
             let lo = ewc(15, &ewc(14, &mid, &band, &mid, 1.0, 0.0), &mid, &mid, g, 0.0);

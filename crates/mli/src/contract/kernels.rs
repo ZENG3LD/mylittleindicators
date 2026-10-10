@@ -3355,10 +3355,13 @@ fn bar_scan_m(
                 }
                 upper = uw / range;
                 lower = lw / range;
-                if upper >= a {
+                // f32 wick/range sits about 4e-7 over the f64 ratio, enough to
+                // cross a threshold the f64 value is still under.
+                let slack = 1.0e-6f32;
+                if upper >= a + slack {
                     lu = 1.0f32;
                 }
-                if lower >= a {
+                if lower >= a + slack {
                     ll = 1.0f32;
                 }
             }
@@ -3890,10 +3893,12 @@ fn bar_scan_n(
             }
             ha_o = o_new;
             ha_c = c_new;
+            // f32 HA close sits an ulp under HA open when the f64 values are equal.
+            let d = c_new - o_new;
             let mut sig = 0.0f32;
-            if c_new > o_new {
+            if d > 1.0e-5f32 {
                 sig = 1.0f32;
-            } else if c_new < o_new {
+            } else if d < -1.0e-5f32 {
                 sig = -1.0f32;
             }
             output[i] = sig;
