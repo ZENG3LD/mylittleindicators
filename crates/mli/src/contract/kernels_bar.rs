@@ -6025,6 +6025,93 @@ fn bar_scan(
                 scr[5] = sig;
             }
             v0 = scr[5];
+        } else if formula == 1352u32 {
+            // rolling volume profile (poc, vah, val): period = window (>= 2), a = bucket size, b = value-area fraction.
+            // Distinct bucket keys of the window live sorted ascending in scr[0..w), their volumes in scr[w..2w),
+            // last published (poc, vah, val) in scr[2w..2w+3]. POC tie rule: lowest price bucket.
+            let mut w = period as usize;
+            if w < 2usize {
+                w = 2usize;
+            }
+            if t + 1usize >= w {
+                let lo = t + 1usize - w;
+                let mut nk = 0usize;
+                let mut tot = 0.0f32;
+                for i in lo..(t + 1usize) {
+                    let vol = v[i];
+                    if vol > 0.0f32 {
+                        tot = tot + vol;
+                        let key = (((h[i] + l[i] + c[i]) / 3.0f32) / a).floor();
+                        let mut pos = 0usize;
+                        let mut found = false;
+                        for q in 0..nk {
+                            let kq = scr[q];
+                            if kq == key {
+                                scr[w + q] = scr[w + q] + vol;
+                                found = true;
+                            } else if kq < key {
+                                pos = q + 1usize;
+                            }
+                        }
+                        if !found {
+                            for qq in 0..(nk - pos) {
+                                let src = nk - 1usize - qq;
+                                scr[src + 1usize] = scr[src];
+                                scr[w + src + 1usize] = scr[w + src];
+                            }
+                            scr[pos] = key;
+                            scr[w + pos] = vol;
+                            nk = nk + 1usize;
+                        }
+                    }
+                }
+                if nk > 0usize {
+                    let mut pp = 0usize;
+                    let mut best = scr[w];
+                    for q in 1..nk {
+                        if scr[w + q] > best {
+                            best = scr[w + q];
+                            pp = q;
+                        }
+                    }
+                    let target = tot * b;
+                    let mut inc = best;
+                    let mut lo_i = pp;
+                    let mut hi_i = pp;
+                    let mut done = false;
+                    for _s in 0..(2usize * w) {
+                        if !done {
+                            if inc >= target {
+                                done = true;
+                            } else {
+                                let has_lo = lo_i > 0usize;
+                                let has_hi = hi_i + 1usize < nk;
+                                if !has_lo && !has_hi {
+                                    done = true;
+                                } else if has_lo && !has_hi {
+                                    inc = inc + scr[w + lo_i - 1usize];
+                                    lo_i = lo_i - 1usize;
+                                } else if !has_lo && has_hi {
+                                    inc = inc + scr[w + hi_i + 1usize];
+                                    hi_i = hi_i + 1usize;
+                                } else if scr[w + lo_i - 1usize] >= scr[w + hi_i + 1usize] {
+                                    inc = inc + scr[w + lo_i - 1usize];
+                                    lo_i = lo_i - 1usize;
+                                } else {
+                                    inc = inc + scr[w + hi_i + 1usize];
+                                    hi_i = hi_i + 1usize;
+                                }
+                            }
+                        }
+                    }
+                    scr[2usize * w] = (scr[pp] + 0.5f32) * a;
+                    scr[2usize * w + 1usize] = (scr[hi_i] + 1.0f32) * a;
+                    scr[2usize * w + 2usize] = scr[lo_i] * a;
+                }
+            }
+            v0 = scr[2usize * w];
+            v1 = scr[2usize * w + 1usize];
+            v2 = scr[2usize * w + 2usize];
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -6588,6 +6675,15 @@ fn launch_cube_bar_x(
         };
         let flat = bar_run(formula.code(), [&atr, &h, &l, &c, &v], params, params.ext[0]);
         return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::RvpBar {
+        // period = rolling window, a = bucket size, b = value-area fraction. The matrix output `profile_grid`
+        // stays a host / CPU-side grid (as for the other `#grid` rows); the three price columns come from the kernel.
+        let mut p = params;
+        p.a = params.a.max(1e-9);
+        p.b = params.b.clamp(0.01, 0.99);
+        let flat = bar_run(formula.code(), [&o, &h, &l, &c, &v], p, 0);
+        return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec(), flat[2 * n..3 * n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

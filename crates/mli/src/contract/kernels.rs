@@ -10437,6 +10437,33 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Rolling volume profile (1352).
+    #[test]
+    fn lane_matches_cpu_bar_batch62() {
+        use crate::indicators::volume::rolling_volume_profile::RollingVolumeProfile;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        for (w, bs, pct) in [(20u32, 1.0f32, 0.7f32), (50, 0.5, 0.5), (8, 2.0, 0.9)] {
+            let mut p = CubeParams::period(w);
+            p.a = bs;
+            p.b = pct;
+            let mut m = RollingVolumeProfile::new(w as usize, bs as f64, pct as f64);
+            chk(&run_cols(CubeFormula::RvpBar, &bars, p), bars.iter().map(|b| { m.feed(&[b.high, b.low, b.close, b.volume]); vec![m.poc(), m.vah(), m.val()] }).collect());
+        }
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

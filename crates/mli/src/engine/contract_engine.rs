@@ -214,7 +214,7 @@ mli_contract_macros::contract_universe! {
         Vzo:             Fields      : _ +cube(vzo)             => crate::indicators::volume::vzo::Vzo,
         Vdelta:          Tick        : _ +cube(comp_vdelta_ev) => crate::indicators::volume::volume_delta::VolumeDelta,
         Volume:          Field       : _ +cube(identity) => crate::indicators::volume::volume::Volume,
-        Rvp:             Fields      : _             => crate::indicators::volume::rolling_volume_profile::RollingVolumeProfile { poc vah val #profile_grid },
+        Rvp:             Fields      : _ +cube(comp_rvp_bar) => crate::indicators::volume::rolling_volume_profile::RollingVolumeProfile { poc vah val #profile_grid },
         Shannon:         Field       : _ +cube(comp_shannon_bar)             => crate::indicators::entropy::shannon_entropy::ShannonEntropy,
         Apen:            Field       : _ +cube(comp_apen_bar)             => crate::indicators::entropy::approximate_entropy::ApproximateEntropy,
         Sampen:          Field       : _ +cube(comp_sampen_bar)             => crate::indicators::entropy::sample_entropy::SampleEntropy,
