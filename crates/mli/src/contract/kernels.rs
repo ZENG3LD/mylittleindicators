@@ -8989,6 +8989,37 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1265..=1266.
+    #[test]
+    fn lane_matches_cpu_bar_batch19() {
+        use crate::indicators::average::kaufman_adaptive_ma::KaufmanAdaptiveMA;
+        use crate::indicators::trend::kama_slope::KamaSlope;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(10);
+        p.fast = 2;
+        p.slow = 30;
+        let mut m = KaufmanAdaptiveMA::new(10, 2, 30);
+        chk(&run_cols(CubeFormula::KamaBar, &bars, p), close.iter().map(|c| {
+            let k = m.feed(*c);
+            vec![k, m.efficiency_ratio(), m.adaptive_period(), m.efficiency_variance(), m.trend_consistency(), m.smoothing_constant(), m.average_efficiency(), m.price_deviation_percent(), m.current_volatility(), m.current_direction()]
+        }).collect());
+        let mut m = KamaSlope::new(10);
+        chk(&run_cols(CubeFormula::KamaSlopeBar, &bars, CubeParams::period(10)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

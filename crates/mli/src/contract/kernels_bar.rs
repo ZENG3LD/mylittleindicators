@@ -521,6 +521,11 @@ fn bar_scan(
         let mut v2 = 0.0f32;
         let mut v3 = 0.0f32;
         let mut v4 = 0.0f32;
+        let mut v5 = 0.0f32;
+        let mut v6 = 0.0f32;
+        let mut v7 = 0.0f32;
+        let mut v8 = 0.0f32;
+        let mut v9 = 0.0f32;
         if formula == 1200u32 {
             let mut pk = period as usize;
             if pk < 1 {
@@ -2439,12 +2444,147 @@ fn bar_scan(
             if t >= 2usize {
                 v0 = (v[t] + a * o[t] * 10.0f32).max(0.0f32).min(100.0f32);
             }
+        } else if formula == 1265u32 {
+            // Kaufman adaptive MA with its ten read-outs; period = ER window (2..=200), fast
+            // 1..=50, slow fast+1..=200
+            let mut erp = period as usize;
+            if erp < 2 {
+                erp = 2;
+            }
+            if erp > 200 {
+                erp = 200;
+            }
+            let mut fp = p2 as usize;
+            if fp < 1 {
+                fp = 1;
+            }
+            if fp > 50 {
+                fp = 50;
+            }
+            let mut sp = p3 as usize;
+            if sp < fp + 1 {
+                sp = fp + 1;
+            }
+            if sp > 200 {
+                sp = 200;
+            }
+            let fast_sc = 2.0f32 / ((fp as f32) + 1.0f32);
+            let slow_sc = 2.0f32 / ((sp as f32) + 1.0f32);
+            let sc_diff = fast_sc - slow_sc;
+            let mut len = t + 1;
+            if len > 200usize {
+                len = 200usize;
+            }
+            if len > erp {
+                // ER of the current bar
+                let dirc = (c[t] - c[t - erp]).abs();
+                let mut volc = 0.0f32;
+                for i in (t - erp + 1)..(t + 1) {
+                    volc = volc + (c[i] - c[i - 1]).abs();
+                }
+                let mut er = 0.0f32;
+                if volc > 0.0f32 {
+                    er = (dirc / volc).max(0.0f32).min(1.0f32);
+                }
+                // statistics over the last (up to 100) ERs
+                let nb = t - erp + 1;
+                let mut cntr = nb;
+                if cntr > 100usize {
+                    cntr = 100usize;
+                }
+                let mut sm = 0.0f32;
+                for k in 0..cntr {
+                    let j = t - k;
+                    let dj = (c[j] - c[j - erp]).abs();
+                    let mut vj = 0.0f32;
+                    for i in (j - erp + 1)..(j + 1) {
+                        vj = vj + (c[i] - c[i - 1]).abs();
+                    }
+                    let mut ej = 0.0f32;
+                    if vj > 0.0f32 {
+                        ej = (dj / vj).max(0.0f32).min(1.0f32);
+                    }
+                    sm = sm + ej;
+                }
+                let avg = sm / (cntr as f32);
+                let mut vs = 0.0f32;
+                for k in 0..cntr {
+                    let j = t - k;
+                    let dj = (c[j] - c[j - erp]).abs();
+                    let mut vj = 0.0f32;
+                    for i in (j - erp + 1)..(j + 1) {
+                        vj = vj + (c[i] - c[i - 1]).abs();
+                    }
+                    let mut ej = 0.0f32;
+                    if vj > 0.0f32 {
+                        ej = (dj / vj).max(0.0f32).min(1.0f32);
+                    }
+                    vs = vs + (ej - avg) * (ej - avg);
+                }
+                let evar = vs / (cntr as f32);
+                // trend consistency from the last ten directions
+                let mut tc = 0.0f32;
+                if nb >= 10usize {
+                    let mut up = 0.0f32;
+                    let mut dn = 0.0f32;
+                    for i in 1..10 {
+                        let newer = (c[t + 1 - i] - c[t + 1 - i - erp]).abs();
+                        let older = (c[t - i] - c[t - i - erp]).abs();
+                        if newer < older {
+                            up = up + 1.0f32;
+                        } else if newer > older {
+                            dn = dn + 1.0f32;
+                        }
+                    }
+                    if up + dn > 0.0f32 {
+                        tc = up.max(dn) / (up + dn);
+                    }
+                }
+                let sc0 = er * sc_diff + slow_sc;
+                let sc = sc0 * sc0;
+                let mut ap = sp as f32;
+                if sc > 0.0f32 {
+                    ap = 2.0f32 / sc - 1.0f32;
+                }
+                if held0 == 0.0f32 {
+                    held0 = c[t];
+                } else {
+                    held0 = held0 + sc * (c[t] - held0);
+                }
+                v0 = held0;
+                v1 = er;
+                v2 = ap;
+                v3 = evar;
+                v4 = tc;
+                v5 = sc;
+                v6 = avg;
+                if held0 != 0.0f32 {
+                    v7 = ((c[t] - held0) / held0) * 100.0f32;
+                }
+                v8 = volc;
+                v9 = dirc;
+            } else {
+                held0 = c[t];
+                v0 = held0;
+            }
+        } else if formula == 1389u32 {
+            // stage: v[t] - v[t - 1] with a zero previous value on the first bar
+            if t > 0usize {
+                v0 = v[t] - v[t - 1];
+            } else {
+                v0 = v[t];
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
         out[2 * n + t] = v2;
         out[3 * n + t] = v3;
         out[4 * n + t] = v4;
+        out[5 * n + t] = v5;
+        out[6 * n + t] = v6;
+        out[7 * n + t] = v7;
+        out[8 * n + t] = v8;
+        out[9 * n + t] = v9;
     }
 }
 
@@ -2471,7 +2611,7 @@ fn bar_map(
 }
 
 /// Launch the bar scan for a raw code (also used by the internal stage codes 1390..=1399) over the
-/// five lanes; returns the flat `5 * n` output (column `k` at `k * n`).
+/// five lanes; returns the flat `10 * n` output (column `k` at `k * n`).
 pub(crate) fn bar_run(code: u32, ins: [&Vec<f32>; 5], params: CubeParams, flag: u32) -> Vec<f32> {
     bar_run_x(code, ins, &[], params, flag)
 }
@@ -2483,7 +2623,7 @@ pub(crate) fn bar_run_x(code: u32, ins: [&Vec<f32>; 5], extra: &[f32], params: C
     let client =
         cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
     let up = |s: &Vec<f32>| client.create_from_slice(f32::as_bytes(s));
-    let out = client.empty(5 * n * core::mem::size_of::<f32>());
+    let out = client.empty(10 * n * core::mem::size_of::<f32>());
     // scratch (histograms / rings / design matrices) sized from the largest window parameter
     let scr_len = ((params.period.max(params.fast).max(params.slow).max(params.signal)) as usize * 28 + (params.fast as usize + 2) * (params.fast as usize + 2) + 64).max(256);
     let scr_len = scr_len.max(extra.len() + 64);
@@ -2500,7 +2640,7 @@ pub(crate) fn bar_run_x(code: u32, ins: [&Vec<f32>; 5], extra: &[f32], params: C
             BufferArg::from_raw_parts(up(ins[2]), n),
             BufferArg::from_raw_parts(up(ins[3]), n),
             BufferArg::from_raw_parts(up(ins[4]), n),
-            BufferArg::from_raw_parts(out.clone(), 5 * n),
+            BufferArg::from_raw_parts(out.clone(), 10 * n),
             BufferArg::from_raw_parts(scr_buf, scr_len),
             code,
             params.period,
@@ -2687,6 +2827,14 @@ pub fn launch_cube_bar(
         let mut fp = params;
         fp.a = params.a.max(1.0e-6).min(1.0);
         return vec![bar_stage(1399, [&sm, &h, &l, &c, &rsi], fp, 0)];
+    }
+    if formula == CubeFormula::KamaSlopeBar {
+        let mut kp = params;
+        kp.period = params.period.max(2);
+        kp.fast = 2;
+        kp.slow = 30;
+        let k = launch_cube_bar(CubeFormula::KamaBar, samples, kp).swap_remove(0);
+        return vec![bar_stage(1389, [&o, &h, &l, &c, &k], params, 0)];
     }
     if formula == CubeFormula::DistLevelsBar {
         let mut mp = params;

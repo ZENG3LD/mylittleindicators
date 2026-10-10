@@ -302,6 +302,8 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "vov_pct_trend" => "VovPctTrend",
         "rsi_pct_rank" => "RsiPctRank",
         "roll_quart" => "RollQuart",
+        "comp_kama_bar" => "KamaBar",
+        "comp_kama_slope_bar" => "KamaSlopeBar",
         "comp_jma_bar" => "JmaBar",
         "comp_vidya_bar" => "VidyaBar",
         "comp_ehlers_rocket_bar" => "EhlersRocketBar",

@@ -645,6 +645,10 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: kaufman adaptive ma. UNTESTED on GPU.
+    KamaBar = 1265,
+    /// Composite: kama slope. UNTESTED on GPU.
+    KamaSlopeBar = 1266,
     /// Composite: jurik ma proxy. UNTESTED on GPU.
     JmaBar = 1262,
     /// Composite: vidya. UNTESTED on GPU.
@@ -1128,6 +1132,7 @@ impl CubeFormula {
             CubeFormula::StcBar => 2,
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
+            CubeFormula::KamaBar => 10,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1394,6 +1399,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Kama), Some(CubeFormula::KamaBar));
+        assert_eq!(formula_of(IndicatorId::KamaSlope), Some(CubeFormula::KamaSlopeBar));
         assert_eq!(formula_of(IndicatorId::Jma), Some(CubeFormula::JmaBar));
         assert_eq!(formula_of(IndicatorId::Vidya), Some(CubeFormula::VidyaBar));
         assert_eq!(formula_of(IndicatorId::EhlersRocket), Some(CubeFormula::EhlersRocketBar));
