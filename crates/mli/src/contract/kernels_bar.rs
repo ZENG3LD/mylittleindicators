@@ -480,6 +480,50 @@ fn chi2_sf_k(xv: f32, kk: f32) -> f32 {
 /// (lower stop: `period` lower window, `p2` upper window unused in the output, `a` offset, `flag`
 /// percentage), 1202 projection bands `[upper, middle, lower]` (`period` window clamped 2..=512,
 /// `a` k, ring-storage order like the CPU).
+/// Theil-Sen ring buffer value at ring position `i` (time order is rotated once the ring wrapped, like the CPU buffer).
+#[cube]
+fn ts_val(c: &[f32], t: usize, w: usize, i: usize) -> f32 {
+    c[i + w * ((t - i) / w)]
+}
+
+/// Number of pairwise slopes `(y[j] - y[i]) / (j - i)` (ring positions, i < j) that are `<= x`.
+#[cube]
+fn ts_cnt_le(c: &[f32], t: usize, w: usize, x: f32) -> usize {
+    let mut cnt = 0usize;
+    for i in 0..w {
+        let yi = ts_val(c, t, w, i);
+        for j in (i + 1)..w {
+            let s = (ts_val(c, t, w, j) - yi) / ((j - i) as f32);
+            if s <= x {
+                cnt = cnt + 1usize;
+            }
+        }
+    }
+    cnt
+}
+
+/// `k`-th smallest (0-based) of `scr[off..off + n]` by rank counting (ties broken by index).
+#[cube]
+fn ts_kth(scr: &mut [f32], off: usize, n: usize, k: usize) -> f32 {
+    let mut res = 0.0f32;
+    for i in 0..n {
+        let vi = scr[off + i];
+        let mut rank = 0usize;
+        for j in 0..n {
+            let vj = scr[off + j];
+            if vj < vi {
+                rank = rank + 1usize;
+            } else if vj == vi && j < i {
+                rank = rank + 1usize;
+            }
+        }
+        if rank == k {
+            res = vi;
+        }
+    }
+    res
+}
+
 #[cube]
 fn bar_scan(
     o: &[f32],
@@ -3784,6 +3828,84 @@ fn bar_scan(
             v0 = res;
             v1 = scr[3];
             v2 = sup;
+        } else if formula == 1302u32 {
+            // Theil-Sen channels `[upper, middle, lower]`: window = period (5..=10000), k = a (<= 0 means 2).
+            // Median slope by bisection over pairwise slopes, intercept / deviation medians by rank selection
+            // (scr[0..w] intercepts, scr[w..2w] deviations); ring positions like the CPU buffer.
+            let mut w = period as usize;
+            if w < 5usize {
+                w = 5usize;
+            }
+            if w > 10000usize {
+                w = 10000usize;
+            }
+            let mut kk = a;
+            if kk <= 0.0f32 {
+                kk = 2.0f32;
+            }
+            if t + 1 >= w {
+                let nsl = w * (w - 1) / 2;
+                let mid_rank = nsl / 2;
+                let mut lo = 3.4e38f32;
+                let mut hi = 0.0f32;
+                let mut first = 1u32;
+                for i in 0..w {
+                    let yi = ts_val(c, t, w, i);
+                    for j in (i + 1)..w {
+                        let sl = (ts_val(c, t, w, j) - yi) / ((j - i) as f32);
+                        if first == 1u32 {
+                            lo = sl;
+                            hi = sl;
+                            first = 0u32;
+                        } else {
+                            lo = lo.min(sl);
+                            hi = hi.max(sl);
+                        }
+                    }
+                }
+                for _ in 0..40 {
+                    let mid = 0.5f32 * (lo + hi);
+                    if ts_cnt_le(c, t, w, mid) >= mid_rank + 1usize {
+                        hi = mid;
+                    } else {
+                        lo = mid;
+                    }
+                }
+                // snap to the exact slope: largest slope that is <= hi
+                let mut slope = lo;
+                let mut got = 0u32;
+                for i in 0..w {
+                    let yi = ts_val(c, t, w, i);
+                    for j in (i + 1)..w {
+                        let sl = (ts_val(c, t, w, j) - yi) / ((j - i) as f32);
+                        if sl <= hi {
+                            if got == 0u32 || sl > slope {
+                                slope = sl;
+                                got = 1u32;
+                            }
+                        }
+                    }
+                }
+                for i in 0..w {
+                    scr[i] = ts_val(c, t, w, i) - slope * (i as f32);
+                }
+                let icpt = ts_kth(scr, 0usize, w, w / 2);
+                for i in 0..w {
+                    scr[w + i] = (ts_val(c, t, w, i) - (icpt + slope * (i as f32))).abs();
+                }
+                let mad = ts_kth(scr, w, w, w / 2);
+                let mid = icpt + slope * ((w as f32) - 1.0f32);
+                let sg = 1.4826f32 * mad;
+                v0 = mid + kk * sg;
+                v1 = mid;
+                v2 = mid - kk * sg;
+                held0 = v0;
+                held1 = v1;
+                held2 = v2;
+            }
+            v0 = held0;
+            v1 = held1;
+            v2 = held2;
         }
         out[t] = v0;
         out[n + t] = v1;

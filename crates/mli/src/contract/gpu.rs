@@ -691,6 +691,8 @@ pub enum CubeFormula {
     AlligatorBar = 1300,
     /// Composite: pivot channels. UNTESTED on GPU.
     PivotchanBar = 1301,
+    /// Composite: theil-sen channels. UNTESTED on GPU.
+    TheilsenchanBar = 1302,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1201,6 +1203,7 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::TheilsenchanBar => 3,
             CubeFormula::AlligatorBar => 3,
             CubeFormula::PivotchanBar => 3,
             CubeFormula::PivotBar => 10,
@@ -1503,6 +1506,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Demark), Some(CubeFormula::DemarkBar));
         assert_eq!(formula_of(IndicatorId::Alligator), Some(CubeFormula::AlligatorBar));
         assert_eq!(formula_of(IndicatorId::Pivotchan), Some(CubeFormula::PivotchanBar));
+        assert_eq!(formula_of(IndicatorId::Theilsenchan), Some(CubeFormula::TheilsenchanBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

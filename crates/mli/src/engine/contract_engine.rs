@@ -167,7 +167,7 @@ mli_contract_macros::contract_universe! {
         Percentilech:    Field       : Channel +cube(pct_channels)       => crate::indicators::channels::percentile_channels::PercentileChannels { upper middle lower },
         Projbands:       Field       : Channel +cube(comp_proj_bands_bar)       => crate::indicators::channels::projection_bands::ProjectionBands { upper middle lower },
         Qrchan:          Field       : Channel +cube(comp_qr_chan_bar)       => crate::indicators::channels::quantile_regression_channels::QuantileRegressionChannels { upper middle lower },
-        Theilsenchan:    Field       : Channel       => crate::indicators::channels::theil_sen_channels::TheilSenChannels { upper middle lower },
+        Theilsenchan:    Field       : Channel +cube(comp_theilsenchan_bar) => crate::indicators::channels::theil_sen_channels::TheilSenChannels { upper middle lower },
         Autocorr:        Field       : _ +cube(autocorr)             => crate::indicators::signal_processing::autocorr::Autocorr,
         Butter:          Field       : _ +cube(comp_butter_comp)             => crate::indicators::signal_processing::butterworth::ButterworthFilter,
         Cheby:           Field       : _             => crate::indicators::signal_processing::chebyshev::ChebyshevFilter,
