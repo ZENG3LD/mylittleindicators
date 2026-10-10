@@ -2574,6 +2574,260 @@ fn bar_scan(
             } else {
                 v0 = v[t];
             }
+        } else if formula == 1267u32 {
+            // relative volume `[rvol, percentile]` over min(t + 1, period) bars of the volume lane
+            let mut w = period as usize;
+            if w < 1 {
+                w = 1;
+            }
+            let mut n = t + 1;
+            if n > w {
+                n = w;
+            }
+            let mut sm = 0.0f32;
+            for j in (t + 1 - n)..(t + 1) {
+                sm = sm + v[j].max(0.0f32);
+            }
+            let cur = v[t].max(0.0f32);
+            let mut mean = 0.0f32;
+            if sm > 0.0f32 {
+                mean = sm / (n as f32);
+            }
+            if mean > 0.0f32 {
+                v0 = cur / mean;
+            }
+            let mut cnt = 0.0f32;
+            for j in (t + 1 - n)..(t + 1) {
+                if v[j].max(0.0f32) <= cur {
+                    cnt = cnt + 1.0f32;
+                }
+            }
+            v1 = cnt / (n as f32);
+        } else if formula == 1268u32 {
+            // cumulative (session) VWAP: held0 = sum pv, held1 = sum v
+            if v[t] > 0.0f32 {
+                held0 = held0 + (h[t] + l[t] + c[t]) / 3.0f32 * v[t];
+                held1 = held1 + v[t];
+            }
+            if held1 > 1.0e-9f32 {
+                v0 = held0 / held1;
+            } else {
+                v0 = c[t];
+            }
+        } else if formula == 1269u32 {
+            // FRAMA: flag 0 standard, 1 improved, 2 dynamic, 3 robust fractal dimension
+            let pr = period as usize;
+            if t + 1 < pr {
+                v0 = c[t];
+            } else {
+                let base = t + 1 - pr;
+                let n = pr as f32;
+                let mut mxh = h[base];
+                let mut mnl = l[base];
+                let mut tv = 0.0f32;
+                let mut mean = 0.0f32;
+                for j in 0..pr {
+                    if h[base + j] > mxh {
+                        mxh = h[base + j];
+                    }
+                    if l[base + j] < mnl {
+                        mnl = l[base + j];
+                    }
+                    if j > 0usize {
+                        tv = tv + (c[base + j] - c[base + j - 1]).abs();
+                    }
+                    mean = mean + c[base + j];
+                }
+                mean = mean / n;
+                let mut vol = 0.5f32;
+                if pr >= 2usize {
+                    let mut var = 0.0f32;
+                    for j in 0..pr {
+                        var = var + (c[base + j] - mean) * (c[base + j] - mean);
+                    }
+                    var = var / n;
+                    vol = (var.sqrt() / mean.abs().max(1.0e-12f32) * 100.0f32).max(0.0f32).min(1.0f32);
+                }
+                let mut dim = 1.0f32;
+                if flag == 2u32 {
+                    let mut ad = pr;
+                    if vol > 0.7f32 {
+                        ad = ((pr as f32) * 0.7f32) as usize;
+                    } else if vol < 0.3f32 {
+                        ad = ((pr as f32) * 1.3f32) as usize;
+                    }
+                    if ad > pr {
+                        ad = pr;
+                    }
+                    if ad < 2usize {
+                        ad = 2usize;
+                    }
+                    let st = base + pr - ad;
+                    let mut mx2 = h[st];
+                    let mut mn2 = l[st];
+                    let mut tv2 = 0.0f32;
+                    for j in st..(base + pr) {
+                        if h[j] > mx2 {
+                            mx2 = h[j];
+                        }
+                        if l[j] < mn2 {
+                            mn2 = l[j];
+                        }
+                        if j > st {
+                            tv2 = tv2 + (c[j] - c[j - 1]).abs();
+                        }
+                    }
+                    let n1 = (mx2 - mn2) / (ad as f32);
+                    let n2 = tv2 / ((ad - 1) as f32);
+                    if n1 > 1.0e-12f32 && n2 > 1.0e-12f32 {
+                        dim = ((n2 / n1).ln() / 0.6931472f32).max(1.0f32).min(2.0f32);
+                    }
+                } else {
+                    let n1 = (mxh - mnl) / n;
+                    let mut n2 = tv / (n - 1.0f32);
+                    if flag == 3u32 {
+                        // median absolute change
+                        let m = pr - 1;
+                        for j in 0..m {
+                            scr[j] = (c[base + j + 1] - c[base + j]).abs();
+                        }
+                        let mid = m / 2;
+                        let mut lo_v = scr[0];
+                        let mut hi_v = scr[0];
+                        for j in 0..m {
+                            let x = scr[j];
+                            let mut lt = 0usize;
+                            let mut le = 0usize;
+                            for q in 0..m {
+                                if scr[q] < x {
+                                    lt = lt + 1;
+                                }
+                                if scr[q] <= x {
+                                    le = le + 1;
+                                }
+                            }
+                            if lt <= mid && mid < le {
+                                hi_v = x;
+                            }
+                            if mid >= 1usize && lt <= mid - 1 && mid - 1 < le {
+                                lo_v = x;
+                            }
+                        }
+                        n2 = hi_v;
+                        if m % 2usize == 0usize && m > 0usize {
+                            n2 = (lo_v + hi_v) / 2.0f32;
+                        }
+                    }
+                    if n1 > 1.0e-12f32 && n2 > 1.0e-12f32 {
+                        dim = ((n2 / n1).ln() / 0.6931472f32).max(1.0f32).min(2.0f32);
+                    }
+                    if flag == 1u32 {
+                        dim = (dim * (1.0f32 + (vol - 0.5f32).max(0.0f32) * 0.2f32)).max(1.0f32).min(2.0f32);
+                    }
+                }
+                // smoothed dimension state in held1 (EMA for improved / dynamic)
+                if flag == 1u32 || flag == 2u32 {
+                    held1 = 0.2f32 * dim + 0.8f32 * held1;
+                } else {
+                    held1 = dim;
+                }
+                let alpha = (0.0f32 - 4.6f32 * (held1 - 1.0f32)).exp().max(0.01f32).min(1.0f32);
+                if held2 < 0.5f32 {
+                    held0 = c[t];
+                    held2 = 1.0f32;
+                } else {
+                    held0 = alpha * c[t] + (1.0f32 - alpha) * held0;
+                }
+                v0 = held0;
+            }
+        } else if formula == 1270u32 {
+            // ROC percentile `[roc, percentile]`: period = ROC lag, p2 = window
+            let pr = period as usize;
+            let mut w = p2 as usize;
+            if w < 1 {
+                w = 1;
+            }
+            let mut roc = 0.0f32;
+            if t >= pr && c[t - pr].abs() > 1.0e-12f32 {
+                roc = (c[t] - c[t - pr]) / c[t - pr];
+            }
+            v0 = roc;
+            let idx = t + 1;
+            if idx > pr {
+                let mut start = 0usize;
+                if idx > w {
+                    start = idx - w;
+                }
+                let mut cn = 0.0f32;
+                let mut cl = 0.0f32;
+                for j in start..idx {
+                    if j > pr {
+                        let mut rj = 0.0f32;
+                        if c[j - pr].abs() > 1.0e-12f32 {
+                            rj = (c[j] - c[j - pr]) / c[j - pr];
+                        }
+                        cn = cn + 1.0f32;
+                        if rj <= roc {
+                            cl = cl + 1.0f32;
+                        }
+                    }
+                }
+                if cn > 0.0f32 {
+                    v1 = cl / cn;
+                }
+            }
+        } else if formula == 1387u32 {
+            // stage: rolling std of log returns over min(t, period >= 2) returns
+            let mut w = period as usize;
+            if w < 2 {
+                w = 2;
+            }
+            let mut n = t;
+            if n > w {
+                n = w;
+            }
+            if t >= 1usize && n >= 2usize {
+                let mut sm = 0.0f32;
+                let mut sq = 0.0f32;
+                for j in (t + 1 - n)..(t + 1) {
+                    let r = (c[j] / c[j - 1]).ln();
+                    sm = sm + r;
+                    sq = sq + r * r;
+                }
+                let nf = n as f32;
+                let mean = sm / nf;
+                let var = sq / nf - mean * mean;
+                if var > 0.0f32 {
+                    v0 = var.sqrt();
+                }
+            }
+        } else if formula == 1386u32 {
+            // stage: z-score of `v` over min(t, p2 >= 2) values, first value at bar 1
+            let mut w = p2 as usize;
+            if w < 2 {
+                w = 2;
+            }
+            let mut m = t;
+            if m > w {
+                m = w;
+            }
+            if m >= 2usize {
+                let mut sm = 0.0f32;
+                let mut sq = 0.0f32;
+                for j in (t + 1 - m)..(t + 1) {
+                    sm = sm + v[j];
+                    sq = sq + v[j] * v[j];
+                }
+                let mf = m as f32;
+                let mean = sm / mf;
+                let var = sq / mf - mean * mean;
+                if var > 0.0f32 {
+                    let sd = var.sqrt();
+                    if sd > 1.0e-12f32 {
+                        v0 = (v[t] - mean) / sd;
+                    }
+                }
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -2835,6 +3089,13 @@ pub fn launch_cube_bar(
         kp.slow = 30;
         let k = launch_cube_bar(CubeFormula::KamaBar, samples, kp).swap_remove(0);
         return vec![bar_stage(1389, [&o, &h, &l, &c, &k], params, 0)];
+    }
+    if formula == CubeFormula::RvzBar {
+        let mut vp = params;
+        vp.period = params.period.max(2);
+        let vol = bar_stage(1387, [&o, &h, &l, &c, &v], vp, 0);
+        let z = bar_stage(1386, [&o, &h, &l, &c, &vol], CubeParams { fast: params.fast.max(2), ..params }, 0);
+        return vec![vol, z];
     }
     if formula == CubeFormula::DistLevelsBar {
         let mut mp = params;

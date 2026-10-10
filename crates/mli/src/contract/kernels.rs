@@ -9020,6 +9020,48 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1267..=1271.
+    #[test]
+    fn lane_matches_cpu_bar_batch20() {
+        use crate::indicators::average::frama::{FractalMethod, Frama};
+        use crate::indicators::momentum::roc_percentile::RocPercentile;
+        use crate::indicators::volatility::realized_vol_zscore::RealizedVolZscore;
+        use crate::indicators::volume::relative_volume::RelativeVolume;
+        use crate::indicators::volume::session_vwap::SessionVwap;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = RelativeVolume::new(20);
+        chk(&run_cols(CubeFormula::RvolBar, &bars, CubeParams::period(20)), lanes.iter().map(|l| { let (a, b) = m.feed(&[l[3]]); vec![a, b] }).collect());
+        let mut m = SessionVwap::new();
+        chk(&run_cols(CubeFormula::SessionVwapBar, &bars, CubeParams::period(1)), lanes.iter().map(|l| { m.feed(&[l[0], l[1], l[2], l[3]]); vec![m.value()] }).collect());
+        for (flag, meth) in [(0u32, FractalMethod::Standard), (1, FractalMethod::Improved), (2, FractalMethod::Dynamic), (3, FractalMethod::Robust)] {
+            let mut p = CubeParams::period(16);
+            p.flag = flag;
+            let mut m = Frama::with_method(16, meth);
+            chk(&run_cols(CubeFormula::FramaBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[2], l[0], l[1]])]).collect());
+        }
+        let mut p = CubeParams::period(5);
+        p.fast = 30;
+        let mut m = RocPercentile::new(5, 30);
+        chk(&run_cols(CubeFormula::RocPctBar, &bars, p), close.iter().map(|c| { let (a, b) = m.feed(*c); vec![a, b] }).collect());
+        let mut p = CubeParams::period(10);
+        p.fast = 20;
+        let mut m = RealizedVolZscore::new(10, 20);
+        chk(&run_cols(CubeFormula::RvzBar, &bars, p), close.iter().map(|c| { let (a, b) = m.feed(*c); vec![a, b] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
