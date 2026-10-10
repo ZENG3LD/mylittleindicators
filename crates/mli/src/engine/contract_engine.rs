@@ -379,7 +379,7 @@ mli_contract_macros::contract_universe! {
         HiddenLiquidityDetector: HybridTickBook : _ +cube(comp_hiddenliq_hy) => crate::indicators::book::hidden_liquidity_detector::HiddenLiquidityDetector { side last_hidden_vol cumulative_hidden_vol },
         TradeBookAbsorption: HybridTickBook : _ +cube(comp_tbabsorb_hy) => crate::indicators::book::trade_book_absorption::TradeBookAbsorption { side last_absorbed_vol cumulative_absorbed_vol },
         SweepImpactAnalyzer: HybridTickBook : _ +cube(comp_sweepimpact_hy) => crate::indicators::book::sweep_impact_analyzer::SweepImpactAnalyzer { side levels_swept slippage },
-        MarketMicro:   OrderBook : OrderBook => crate::indicators::clusters::market_microstructure::MarketMicrostructure,
+        MarketMicro:   OrderBook : OrderBook +cube(comp_market_micro_bk) => crate::indicators::clusters::market_microstructure::MarketMicrostructure,
         OrderFlowImb:  OrderBook : OrderBook => crate::indicators::clusters::order_flow_imbalance::OrderFlowImbalance { #profile_grid },
         ClQueueImb:    OrderBook : OrderBook +cube(book_imbalance) => crate::indicators::clusters::queue_imbalance::QueueImbalance,
         TickVolume:    Tick      : _ +cube(comp_tick_volume_ev)         => crate::indicators::clusters::tick_volume_analyzer::TickVolumeAnalyzer,

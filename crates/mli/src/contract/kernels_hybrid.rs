@@ -206,3 +206,73 @@ pub fn launch_cube_hybrid(formula: CubeFormula, fr: &GpuHybridFrame, params: Cub
     let flat = f32::from_bytes(&client.read_one_unchecked(out)).to_vec();
     vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec(), flat[2 * n..3 * n].to_vec()]
 }
+
+/// `MarketMicrostructure` on the order-book stream (1404): only the L2 liquidity block runs there (the
+/// bar-driven efficiency / execution blocks stay at their initial 0.5), so the score is
+/// `0.4 * liquidity + 0.3`. `spread_pct` keeps its last value while a side is empty. The frame must hold
+/// at least 10 levels per side.
+#[cube]
+fn mm_scan(bpx: &[f32], bsz: &[f32], apx: &[f32], asz: &[f32], nb: &[f32], na: &[f32], out: &mut [f32], n: u32, depth: u32) {
+    let nu = n as usize;
+    let du = depth as usize;
+    let mut spct = 0.0f32;
+    for i in 0..nu {
+        let kb = nb[i] as usize;
+        let ka = na[i] as usize;
+        if kb > 0usize && ka > 0usize {
+            let sp = apx[i * du] - bpx[i * du];
+            let mid = (apx[i * du] + bpx[i * du]) / 2.0f32;
+            if mid > 0.0f32 {
+                spct = (sp / mid) * 100.0f32;
+            }
+        }
+        let mut dep = 0.0f32;
+        for l in 0..10usize {
+            if l < kb {
+                dep = dep + bsz[i * du + l];
+            }
+            if l < ka {
+                dep = dep + asz[i * du + l];
+            }
+        }
+        let ss = (1.0f32 - spct.min(1.0f32)).max(0.0f32);
+        let ds = (dep / 10000.0f32).min(1.0f32);
+        let pi = (spct / 0.1f32).min(1.0f32);
+        let is = (1.0f32 - pi).max(0.0f32);
+        let liq = (ss + ds + is) / 3.0f32;
+        out[i] = liq * 0.4f32 + 0.3f32;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn mm_map(bpx: &[f32], bsz: &[f32], apx: &[f32], asz: &[f32], nb: &[f32], na: &[f32], out: &mut [f32], n: u32, depth: u32) {
+    mm_scan(bpx, bsz, apx, asz, nb, na, out, n, depth);
+}
+
+pub fn launch_market_micro(bk: &super::book_frame::GpuBookFrame) -> Vec<Vec<f32>> {
+    let n = bk.n;
+    if n == 0 {
+        return Vec::new();
+    }
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let up = |s: &Vec<f32>| client.create_from_slice(f32::as_bytes(s));
+    let out = client.empty(n * 4);
+    unsafe {
+        mm_map::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(up(&bk.bid_px), bk.bid_px.len()),
+            BufferArg::from_raw_parts(up(&bk.bid_sz), bk.bid_sz.len()),
+            BufferArg::from_raw_parts(up(&bk.ask_px), bk.ask_px.len()),
+            BufferArg::from_raw_parts(up(&bk.ask_sz), bk.ask_sz.len()),
+            BufferArg::from_raw_parts(up(&bk.nb), n),
+            BufferArg::from_raw_parts(up(&bk.na), n),
+            BufferArg::from_raw_parts(out.clone(), n),
+            n as u32,
+            bk.depth as u32,
+        );
+    }
+    vec![f32::from_bytes(&client.read_one_unchecked(out)).to_vec()]
+}

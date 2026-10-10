@@ -785,6 +785,8 @@ pub enum CubeFormula {
     QuoteLifecycleEv = 1402,
     /// IcebergDetector (keyed / profile / fit family). UNTESTED on GPU.
     IcebergLv = 1403,
+    /// MarketMicro (keyed / profile / fit family). UNTESTED on GPU.
+    MarketMicroBk = 1404,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1778,6 +1780,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::IndexCorrelationBreakdown), Some(CubeFormula::IndexCorrBreakKy));
         assert_eq!(formula_of(IndicatorId::QuoteLifecycleTracker), Some(CubeFormula::QuoteLifecycleEv));
         assert_eq!(formula_of(IndicatorId::IcebergDetector), Some(CubeFormula::IcebergLv));
+        assert_eq!(formula_of(IndicatorId::MarketMicro), Some(CubeFormula::MarketMicroBk));
         assert_eq!(formula_of(IndicatorId::WallDetector), Some(CubeFormula::WallDetectorBk));
         assert_eq!(formula_of(IndicatorId::BestLevelVolatility), Some(CubeFormula::BestLevelVolBk));
         assert_eq!(formula_of(IndicatorId::PriceLevelDensity), Some(CubeFormula::PriceLevelDensityBk));

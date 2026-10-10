@@ -12197,4 +12197,29 @@ mod tests {
         let g = launch_cube_levels(CubeFormula::IcebergLv, &fr, p);
         for k in 0..3 { assert_close(&g[k], &rows.iter().map(|r| r[k]).collect::<Vec<_>>()); }
     }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): MarketMicro on the book stream (1404).
+    #[test]
+    fn market_micro_book_matches_cpu() {
+        use crate::core::types::OrderBook;
+        use crate::engine::streams::order_book_consumer::OrderBookConsumer;
+        use crate::indicators::clusters::market_microstructure::MarketMicrostructure;
+        use super::super::book_frame::GpuBookFrame;
+        use super::super::kernels_book::launch_cube_book;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let books: Vec<OrderBook> = (0..80usize)
+            .map(|i| {
+                let mid = 100.0 + 2.0 * w(i, 0.21);
+                let kb = (w(i, 0.8) * 12.0) as usize;
+                let ka = (w(i, 0.6) * 12.0) as usize;
+                let bids = (0..kb).map(|l| (mid - 0.05 * (l as f64 + 1.0), 50.0 + 900.0 * w(i + l, 0.9))).collect();
+                let asks = (0..ka).map(|l| (mid + 0.05 * (l as f64 + 1.0), 50.0 + 900.0 * w(i + l, 1.1))).collect();
+                OrderBook::simple(bids, asks, 1_000 + i as i64 * 200)
+            })
+            .collect();
+        let fr = GpuBookFrame::from_books(&books, 12);
+        let mut m = MarketMicrostructure::new(14);
+        let c: Vec<f64> = books.iter().map(|b| { m.update_orderbook(b); m.value() }).collect();
+        assert_close(&launch_cube_book(CubeFormula::MarketMicroBk, &fr, CubeParams::period(14))[0], &c);
+    }
 }
