@@ -726,6 +726,10 @@ pub mod kernels_ev;
 pub mod kernels_evx;
 #[cfg(feature = "gpu")]
 pub mod kernels_bar;
+
+/// Cross-line combiner kernels (`LineCross`, `PriceLineCross`).
+#[cfg(feature = "gpu")]
+pub mod kernels_lines;
 #[cfg(feature = "gpu")]
 pub mod kernels_book;
 
