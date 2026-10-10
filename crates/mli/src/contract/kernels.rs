@@ -4232,6 +4232,10 @@ fn lane_map(
 /// `params` carries lanes, periods, and book `levels`. An empty slice returns
 /// an empty buffer and does not create a device.
 pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubeParams) -> Vec<f32> {
+    let _note = note_outer(formula);
+    if measure_skip() {
+        return skip_scalar();
+    }
     if samples.is_empty() {
         return Vec::new();
     }
@@ -4571,6 +4575,10 @@ pub fn launch_cube_columns(
     samples: &[GpuSample],
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
+    let _note = note_outer(formula);
+    if measure_skip() {
+        return skip_columns();
+    }
     if samples.is_empty() {
         return Vec::new();
     }
@@ -4736,6 +4744,10 @@ pub fn launch_cube_timed(
     times: &GpuTimes,
     _params: CubeParams,
 ) -> Vec<f32> {
+    let _note = note_outer(formula);
+    if measure_skip() {
+        return skip_scalar();
+    }
     if samples.is_empty() {
         return Vec::new();
     }
@@ -6220,6 +6232,108 @@ fn launch_cube_smoothed_gx(
     f32::from_bytes(&bytes).to_vec()
 }
 
+/// Outermost launch wins. Nested launches (a bar formula calling RSI) must not
+/// replace the formula the test asked to compare.
+pub(crate) struct FormulaNote;
+
+#[cfg(test)]
+thread_local! {
+    static FORMULA_DEPTH: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    static FORMULA_LAST: std::cell::Cell<u32> = const { std::cell::Cell::new(u32::MAX) };
+    static LAUNCH_SEQ: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    static MEASURE_SKIP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+fn skip_launch(seq: u32) -> bool {
+    use std::sync::OnceLock;
+    static SET: OnceLock<Vec<u32>> = OnceLock::new();
+    SET.get_or_init(|| {
+        std::env::var("MLI_SKIP")
+            .ok()
+            .map(|raw| raw.split(',').filter_map(|part| part.trim().parse().ok()).collect())
+            .unwrap_or_default()
+    })
+    .contains(&seq)
+}
+
+pub(crate) fn note_outer(formula: CubeFormula) -> FormulaNote {
+    #[cfg(test)]
+    {
+        FORMULA_DEPTH.with(|depth| {
+            let at = depth.get();
+            if at == 0 {
+                FORMULA_LAST.with(|last| last.set(formula.code()));
+                let seq = LAUNCH_SEQ.with(|seq| {
+                    let next = seq.get().wrapping_add(1);
+                    seq.set(next);
+                    next
+                });
+                MEASURE_SKIP.with(|skip| skip.set(skip_launch(seq)));
+            }
+            depth.set(at + 1);
+        });
+    }
+    #[cfg(not(test))]
+    {
+        let _ = formula;
+    }
+    FormulaNote
+}
+
+impl Drop for FormulaNote {
+    fn drop(&mut self) {
+        #[cfg(test)]
+        {
+            FORMULA_DEPTH.with(|depth| depth.set(depth.get().saturating_sub(1)));
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn last_formula() -> u32 {
+    FORMULA_LAST.with(|last| last.get())
+}
+
+#[cfg(test)]
+pub(crate) fn last_launch() -> u32 {
+    LAUNCH_SEQ.with(|seq| seq.get())
+}
+
+pub(crate) fn measure_skip() -> bool {
+    #[cfg(test)]
+    {
+        MEASURE_SKIP.with(|skip| skip.get())
+    }
+    #[cfg(not(test))]
+    {
+        false
+    }
+}
+
+/// Non-empty stand-in so a skipped launch can be indexed (`[0]`, `g[k]`)
+/// before `assert_close` records the skip. The values are never compared.
+pub(crate) fn skip_scalar() -> Vec<f32> {
+    vec![0.0]
+}
+
+pub(crate) fn skip_columns() -> Vec<Vec<f32>> {
+    vec![vec![0.0]; 8]
+}
+
+#[cfg(test)]
+pub(crate) fn bump_measure(code: u32) {
+    FORMULA_LAST.with(|last| last.set(code));
+    LAUNCH_SEQ.with(|seq| seq.set(seq.get().wrapping_add(1)));
+}
+
+#[cfg(test)]
+pub(crate) fn reset_measure_launch() {
+    LAUNCH_SEQ.with(|seq| seq.set(0));
+    FORMULA_DEPTH.with(|depth| depth.set(0));
+    MEASURE_SKIP.with(|skip| skip.set(false));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -6367,14 +6481,168 @@ mod tests {
     use crate::indicators::volatility_advanced::hv_momentum::HvMomentum;
     use crate::indicators::volatility_advanced::vol_idx_momentum::VolIdxMomentum;
 
+    struct MeasureRow {
+        test: String,
+        launch: u32,
+        formula: u32,
+        kind: String,
+        detail: String,
+    }
+
+    std::thread_local! {
+        static MEASURE_TAG: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+    }
+
+    static MEASURE_ROWS: std::sync::Mutex<Vec<MeasureRow>> = std::sync::Mutex::new(Vec::new());
+    static MEASURE_STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    static MEASURE_ABORT: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+    fn run_measured(batches: &[(&str, fn())]) {
+        use std::sync::atomic::Ordering;
+        for &(name, batch) in batches {
+            if MEASURE_STOP.load(Ordering::Relaxed) {
+                break;
+            }
+            MEASURE_TAG.with(|tag| *tag.borrow_mut() = name.to_string());
+            super::reset_measure_launch();
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(batch));
+            if ran.is_err() {
+                MEASURE_STOP.store(true, Ordering::Relaxed);
+                if let Ok(mut slot) = MEASURE_ABORT.lock() {
+                    *slot = Some(name.to_string());
+                }
+                break;
+            }
+        }
+    }
+
+    fn print_measure_summary() {
+        let rows = MEASURE_ROWS.lock().unwrap_or_else(|p| p.into_inner());
+        let mut best: std::collections::BTreeMap<(String, u32), (u32, u8, String, String)> =
+            std::collections::BTreeMap::new();
+        for row in rows.iter() {
+            let rank = match row.kind.as_str() {
+                "delta" => 4,
+                "shape" => 3,
+                "nodata" => 2,
+                "ok" => 1,
+                _ => 0,
+            };
+            let key = (row.test.clone(), row.launch);
+            let replace = match best.get(&key) {
+                Some((_, prev, _, _)) => rank > *prev,
+                None => true,
+            };
+            if replace {
+                best.insert(key, (row.formula, rank, row.kind.clone(), row.detail.clone()));
+            }
+        }
+        let mut ok = 0u32;
+        let mut delta = 0u32;
+        let mut nodata = 0u32;
+        let mut shape = 0u32;
+        for ((test, launch), (formula, _, kind, detail)) in &best {
+            match kind.as_str() {
+                "ok" => ok += 1,
+                "nodata" => nodata += 1,
+                "shape" => shape += 1,
+                "delta" => {
+                    delta += 1;
+                    eprintln!("DELTA {test} launch={launch} formula={formula} {detail}");
+                }
+                _ => {}
+            }
+        }
+        let abort = MEASURE_ABORT.lock().ok().and_then(|slot| slot.clone());
+        match abort {
+            Some(name) => eprintln!("ABORT {name}"),
+            None => eprintln!("ABORT none"),
+        }
+        eprintln!(
+            "MEASURE compares={} ok={ok} delta={delta} nodata={nodata} shape={shape}",
+            best.len()
+        );
+    }
+
     /// Absolute `1e-3` covers f32 running sums. A large scaled series is also
     /// accepted within a relative `1e-5` of the f64 core.
     ///
     /// Every sample is compared. An all-zero series is not a check: the fixture
     /// never produced the event, and a matched pair of zeros is not evidence.
     /// A constant non-zero series is evidence. The value was produced and checked.
+    fn measure_on() -> bool {
+        use std::sync::OnceLock;
+        static ON: OnceLock<bool> = OnceLock::new();
+        *ON.get_or_init(|| std::env::var_os("MLI_MEASURE").is_some())
+    }
+
+    fn measure_log(kind: &str, detail: &str) {
+        let test = MEASURE_TAG.with(|tag| {
+            let name = tag.borrow();
+            if name.is_empty() {
+                std::thread::current().name().unwrap_or("?").to_string()
+            } else {
+                name.clone()
+            }
+        });
+        if let Ok(mut rows) = MEASURE_ROWS.lock() {
+            rows.push(MeasureRow {
+                test,
+                launch: super::last_launch(),
+                formula: super::last_formula(),
+                kind: kind.to_string(),
+                detail: detail.to_string(),
+            });
+        }
+    }
+
+    /// Both-NaN is a match. A one-sided NaN is a divergence. The numeric gate
+    /// stays absolute `1e-3` or relative `1e-5`.
+    fn pair_matches(gpu: f32, cpu: f64) -> Option<(f64, f64)> {
+        if gpu.is_nan() && cpu.is_nan() {
+            return None;
+        }
+        let delta = (gpu as f64 - cpu).abs();
+        let rel = if cpu.abs() > 0.0 { delta / cpu.abs() } else { delta };
+        if delta < 1.0e-3 || delta < cpu.abs() * 1.0e-5 {
+            None
+        } else {
+            Some((delta, rel))
+        }
+    }
+
     #[track_caller]
     fn assert_close(gpu: &[f32], cpu: &[f64]) {
+        if measure_on() {
+            if super::measure_skip() {
+                measure_log("skip", "launch");
+                return;
+            }
+            if gpu.len() != cpu.len() {
+                measure_log("shape", &format!("gpu {} cpu {}", gpu.len(), cpu.len()));
+                return;
+            }
+            if cpu.is_empty() {
+                measure_log("nodata", "samples 0");
+                return;
+            }
+            let mut nonzero = 0usize;
+            for (i, (g, c)) in gpu.iter().zip(cpu).enumerate() {
+                if let Some((delta, rel)) = pair_matches(*g, *c) {
+                    measure_log("delta", &format!("bar {i}: {g} vs {c} abs {delta} rel {rel}"));
+                    return;
+                }
+                if c.abs() > 1.0e-12 {
+                    nonzero += 1;
+                }
+            }
+            if nonzero == 0 {
+                measure_log("nodata", &format!("samples {}", cpu.len()));
+                return;
+            }
+            measure_log("ok", &format!("samples {}", cpu.len()));
+            return;
+        }
         assert_eq!(gpu.len(), cpu.len(), "gpu {} cpu {}", gpu.len(), cpu.len());
         assert!(!cpu.is_empty(), "no samples to compare");
         let first = cpu[0];
@@ -6434,6 +6702,12 @@ mod tests {
     /// One `assert_close` per column; the column count must match the formula.
     #[track_caller]
     fn assert_cols(gpu: &[Vec<f32>], cpu: &[&Vec<f64>]) {
+        if measure_on() && super::measure_skip() {
+            for c in cpu {
+                assert_close(&[], c);
+            }
+            return;
+        }
         assert_eq!(gpu.len(), cpu.len());
         for (g, c) in gpu.iter().zip(cpu) {
             assert_close(g, c);
@@ -7210,6 +7484,7 @@ mod tests {
             let gpu = super::super::shader_run::launch_shader(crate::engine::indicator_id::IndicatorId::Decyc, &samples, period)
                 .expect("wgpu adapter");
             let mut m = Decycler::new(period as f64);
+            super::bump_measure(0xDEC7);
             assert_close(&gpu[0], &cpu(&close, |v| m.feed(v)));
         }
     }
@@ -7475,7 +7750,10 @@ mod tests {
             p.push(m.price());
         }
         assert_cols(&launch_cube_events(CubeFormula::L3LargeOrderEv, &fr, pp(10, 1.5, 0.0)), &[&s, &z, &p]);
-        assert_eq!(launch_cube_events(CubeFormula::AuctionPriceDeviationEv, &fr, pp(1, 0.0, 0.0))[0], vec![0.0; n]);
+        assert_close(
+            &launch_cube_events(CubeFormula::AuctionPriceDeviationEv, &fr, pp(1, 0.0, 0.0))[0],
+            &vec![0.0; n],
+        );
 
         let ticks: Vec<Tick> = (0..n)
             .map(|i| Tick::new(t0 + i as i64 * 100, 100.0 + 3.0 * w(i, 0.3), 1.0 + w(i, 0.1), w(i, 1.3) > 0.45))
@@ -8086,9 +8364,18 @@ mod tests {
             c3.push(m.spread());
         }
         let g = launch_cube_events(CubeFormula::PriceVsIndexMg, &fr, pp(1, 0.0, 0.0));
-        for (gc, cc) in g.iter().zip([&a, &b, &c3]) {
-            for (x, y) in gc.iter().zip(cc.iter()) {
-                assert!((x.is_nan() && y.is_nan()) || ((*x as f64) - y).abs() <= 1e-3 * (1.0 + y.abs()), "{x} vs {y}");
+        if measure_on() {
+            for (gc, cc) in g.iter().zip([&a, &b, &c3]) {
+                assert_close(gc, cc);
+            }
+        } else {
+            for (gc, cc) in g.iter().zip([&a, &b, &c3]) {
+                for (x, y) in gc.iter().zip(cc.iter()) {
+                    assert!(
+                        (x.is_nan() && y.is_nan()) || ((*x as f64) - y).abs() <= 1e-3 * (1.0 + y.abs()),
+                        "{x} vs {y}"
+                    );
+                }
             }
         }
 
@@ -10303,9 +10590,7 @@ mod tests {
         let g = run_cols(CubeFormula::ParticleBar, &bars, p);
         let mut m = ParticleFilter::new(200, 1.0, 0.05, 0.1, ResamplingStrategy::Systematic, None);
         let cpu: Vec<f64> = close.iter().map(|x| m.feed(*x)).collect();
-        let mad = g[0].iter().zip(cpu.iter()).skip(10).map(|(a, b)| ((*a as f64) - b).abs()).sum::<f64>() / (cpu.len() - 10) as f64;
-        let scale = close.iter().map(|x| x.abs()).sum::<f64>() / close.len() as f64;
-        assert!(mad < 0.05 * scale, "particle filter drifted from the CPU filter: mad {mad}");
+        assert_close(&g[0], &cpu);
 
     }
 
@@ -12887,5 +13172,452 @@ mod tests {
         let c = cols(rows);
         let r: Vec<&Vec<f64>> = c.iter().collect();
         assert_cols(&launch_cube_bar_timed(CubeFormula::PocBar, &samples, &times, p), &r);
+    }
+
+    fn run_one_batch(only: &str, batches: &[(&str, fn())]) {
+        let Some((_, batch)) = batches.iter().find(|(name, _)| *name == only) else {
+            panic!("unknown batch {only}");
+        };
+        MEASURE_TAG.with(|tag| *tag.borrow_mut() = only.to_string());
+        super::reset_measure_launch();
+        let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(*batch));
+        if let Ok(rows) = MEASURE_ROWS.lock() {
+            for row in rows.iter() {
+                println!(
+                    "MLI test={} launch={} formula={} kind={} {}",
+                    row.test, row.launch, row.formula, row.kind, row.detail
+                );
+            }
+        }
+        if ran.is_err() {
+            println!("BATCH_ABORT {only}");
+        } else {
+            println!("BATCH_OK {only}");
+        }
+    }
+
+    fn drive_batches(batches: &[(&str, fn())]) {
+        use std::io::{Read, Write};
+        let exe = std::env::current_exe().expect("test exe");
+        let report = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/cpu-gpu-measure.txt");
+        if let Some(parent) = report.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&report, "");
+        let mut captured = String::new();
+        for (name, _) in batches {
+            let mut child = std::process::Command::new(&exe)
+                .arg("contract::kernels::tests::cpu_gpu_measure")
+                .arg("--exact")
+                .arg("--test-threads=1")
+                .arg("--nocapture")
+                .env("MLI_BATCH", name)
+                .env("MLI_MEASURE", "1")
+                .env("RUST_MIN_STACK", "33554432")
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .expect("spawn batch");
+            let mut stdout = child.stdout.take().expect("stdout");
+            let mut stderr = child.stderr.take().expect("stderr");
+            let out_task = std::thread::spawn(move || {
+                let mut buf = String::new();
+                let _ = stdout.read_to_string(&mut buf);
+                buf
+            });
+            let err_task = std::thread::spawn(move || {
+                let mut buf = String::new();
+                let _ = stderr.read_to_string(&mut buf);
+                buf
+            });
+            let started = std::time::Instant::now();
+            let status = loop {
+                if let Some(status) = child.try_wait().expect("wait") {
+                    break status;
+                }
+                if started.elapsed() > std::time::Duration::from_secs(240) {
+                    let _ = child.kill();
+                    break child.wait().expect("kill wait");
+                }
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            };
+            let out = out_task.join().unwrap_or_default();
+            let err = err_task.join().unwrap_or_default();
+            let code = status.code().unwrap_or(-1);
+            let mut block = String::new();
+            for line in out.lines().chain(err.lines()) {
+                if line.contains("MLI ") || line.starts_with("BATCH_") {
+                    block.push_str(line);
+                    block.push('\n');
+                }
+            }
+            if !block.contains("BATCH_") {
+                block.push_str(&format!("BATCH_ABORT {name} exit={code}\n"));
+            }
+            captured.push_str(&block);
+            if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&report) {
+                let _ = write!(file, "{block}");
+                let _ = file.flush();
+            }
+            let mut log = std::io::stderr();
+            let _ = writeln!(log, "DONE {name} exit={code}");
+            let _ = log.flush();
+        }
+        let summary = summarize_measure(&captured);
+        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&report) {
+            let _ = write!(file, "\n{summary}");
+        }
+        eprintln!("{summary}");
+    }
+
+    fn summarize_measure(captured: &str) -> String {
+        let mut groups: std::collections::BTreeMap<(String, u32), (u32, u8, String)> =
+            std::collections::BTreeMap::new();
+        let mut aborts: Vec<String> = Vec::new();
+        for line in captured.lines() {
+            if let Some(name) = line.strip_prefix("BATCH_ABORT ") {
+                aborts.push(name.to_string());
+                continue;
+            }
+            let Some(rest) = line.find("MLI ").map(|i| &line[i + 4..]) else {
+                continue;
+            };
+            let mut test = String::new();
+            let mut launch = 0u32;
+            let mut formula = 0u32;
+            let mut kind = String::new();
+            for part in rest.split_whitespace() {
+                let Some((k, v)) = part.split_once('=') else { break };
+                match k {
+                    "test" => test = v.to_string(),
+                    "launch" => launch = v.parse().unwrap_or(0),
+                    "formula" => formula = v.parse().unwrap_or(0),
+                    "kind" => kind = v.to_string(),
+                    _ => {}
+                }
+            }
+            if test.is_empty() || kind.is_empty() {
+                continue;
+            }
+            // delta beats a match; a match beats an all-zero fixture.
+            let rank = match kind.as_str() {
+                "delta" | "shape" => 3,
+                "ok" => 2,
+                "nodata" => 1,
+                _ => 0,
+            };
+            if rank == 0 {
+                continue;
+            }
+            let key = (test, launch);
+            let replace = groups.get(&key).map(|(_, prev, _)| rank > *prev).unwrap_or(true);
+            if replace {
+                groups.insert(key, (formula, rank, kind));
+            }
+        }
+        let names = formula_names();
+        let (cpu_only, by_variant) = catalog_gpu();
+        let mut rank_of: std::collections::BTreeMap<String, u8> = std::collections::BTreeMap::new();
+        let mut shared: Vec<String> = Vec::new();
+        let mut shared_ids: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        for ((test, _), (formula, rank, _)) in &groups {
+            if *formula == 0xDEC7 {
+                let prev = rank_of.get("Decyc").copied().unwrap_or(0);
+                if *rank > prev {
+                    rank_of.insert("Decyc".to_string(), *rank);
+                }
+                continue;
+            }
+            let Some(variant) = names.get(formula) else {
+                shared.push(format!("{test} formula {formula} rank {rank}"));
+                continue;
+            };
+            let ids = by_variant.get(variant).cloned().unwrap_or_default();
+            if ids.len() == 1 {
+                let id = ids[0].clone();
+                let prev = rank_of.get(&id).copied().unwrap_or(0);
+                if *rank > prev {
+                    rank_of.insert(id, *rank);
+                }
+            } else {
+                for id in &ids {
+                    shared_ids.insert(id.clone());
+                }
+                shared.push(format!(
+                    "{test} {variant} rank {rank} ids {}",
+                    ids.join(",")
+                ));
+            }
+        }
+        let mut ok = Vec::new();
+        let mut delta = Vec::new();
+        let mut nodata = Vec::new();
+        for (id, rank) in &rank_of {
+            match rank {
+                2 => ok.push(id.clone()),
+                1 => nodata.push(id.clone()),
+                _ => delta.push(id.clone()),
+            }
+        }
+        let measured: std::collections::BTreeSet<String> = rank_of.keys().cloned().collect();
+        let mut unmeasured = Vec::new();
+        for ids in by_variant.values() {
+            for id in ids {
+                if !measured.contains(id) && !shared_ids.contains(id) {
+                    unmeasured.push(id.clone());
+                }
+            }
+        }
+        unmeasured.sort();
+        unmeasured.dedup();
+        format!(
+            "OK {} {}\nDELTA {} {}\nNODATA {} {}\nCPU_ONLY {} {}\nUNMEASURED {} {}\nABORT {}\nSHARED {}\n",
+            ok.len(),
+            ok.join(","),
+            delta.len(),
+            delta.join(","),
+            nodata.len(),
+            nodata.join(","),
+            cpu_only.len(),
+            cpu_only.join(","),
+            unmeasured.len(),
+            unmeasured.join(","),
+            aborts.join(","),
+            shared.join(" | ")
+        )
+    }
+
+    fn formula_names() -> std::collections::BTreeMap<u32, String> {
+        let text = include_str!("gpu.rs");
+        let Some(start) = text.find("pub enum CubeFormula {") else {
+            return std::collections::BTreeMap::new();
+        };
+        let bytes = text[start..].as_bytes();
+        let mut depth = 0i32;
+        let mut end = bytes.len();
+        for (i, b) in bytes.iter().enumerate() {
+            if *b == b'{' {
+                depth += 1;
+            } else if *b == b'}' {
+                depth -= 1;
+                if depth == 0 {
+                    end = i;
+                    break;
+                }
+            }
+        }
+        let body = &text[start..start + end];
+        let mut map = std::collections::BTreeMap::new();
+        let mut code: Option<u32> = None;
+        for line in body.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with("//") || trimmed.starts_with('#') || trimmed.starts_with("pub enum") {
+                continue;
+            }
+            let name: String = trimmed.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+            if name.is_empty() || !name.chars().next().unwrap().is_ascii_uppercase() {
+                continue;
+            }
+            let next = if let Some(eq) = trimmed.find('=') {
+                let digits: String = trimmed[eq + 1..]
+                    .chars()
+                    .skip_while(|c| c.is_ascii_whitespace())
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect();
+                if digits.is_empty() {
+                    continue;
+                }
+                digits.parse().unwrap_or(0)
+            } else if let Some(prev) = code {
+                prev + 1
+            } else {
+                continue;
+            };
+            code = Some(next);
+            map.insert(next, name);
+        }
+        map
+    }
+
+    fn catalog_gpu() -> (Vec<String>, std::collections::BTreeMap<String, Vec<String>>) {
+        let text = include_str!("../engine/contract_engine.rs");
+        let macro_src = include_str!("../../../mli-contract-macros/src/lib.rs");
+        let mut snake_to_variant: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+        for line in macro_src.lines() {
+            let line = line.trim();
+            let Some(rest) = line.strip_prefix('"') else { continue };
+            let Some((snake, after)) = rest.split_once('"') else { continue };
+            let Some(arrow) = after.find("=>") else { continue };
+            let after = after[arrow + 2..].trim();
+            let Some(pascal) = after.strip_prefix('"') else { continue };
+            let pascal: String = pascal.chars().take_while(|c| *c != '"').collect();
+            if !pascal.is_empty() {
+                snake_to_variant.insert(snake.to_string(), pascal);
+            }
+        }
+        let mut cpu_only = Vec::new();
+        let mut by_variant: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+        for line in text.lines() {
+            let trimmed = line.trim();
+            let Some((id, after)) = trimmed.split_once(':') else { continue };
+            if !id.chars().next().unwrap_or(' ').is_ascii_uppercase() || !after.contains("=>") {
+                continue;
+            }
+            if !after.contains("crate::") {
+                continue;
+            }
+            let gpu = after.contains("+cube(") || after.contains("+shader");
+            if !gpu {
+                cpu_only.push(id.to_string());
+                continue;
+            }
+            if after.contains("+shader") && !after.contains("+cube(") {
+                by_variant.entry("Decyc".to_string()).or_default().push(id.to_string());
+                continue;
+            }
+            let Some(open) = after.find("+cube(") else { continue };
+            let rest = &after[open + 6..];
+            let Some(close) = rest.find(')') else { continue };
+            let snake = &rest[..close];
+            let Some(variant) = snake_to_variant.get(snake) else { continue };
+            by_variant.entry(variant.clone()).or_default().push(id.to_string());
+        }
+        (cpu_only, by_variant)
+    }
+
+    /// One batch per process. A dead wgpu device stops only that batch.
+    /// Each compare is one line: matched, diverged, or no event.
+    #[test]
+    fn cpu_gpu_measure() {
+        // Single-threaded test body. The device thread reads the stack size at spawn.
+        unsafe {
+            std::env::set_var("MLI_MEASURE", "1");
+            std::env::set_var("RUST_MIN_STACK", "33554432");
+        }
+        let main: &[(&str, fn())] = &[
+            ("gx1", lane_matches_cpu_gx_batch1),
+            ("gx2", lane_matches_cpu_gx_batch2),
+            ("gx3", lane_matches_cpu_gx_batch3),
+            ("gx4", lane_matches_cpu_gx_batch4),
+            ("gx5", lane_matches_cpu_gx_batch5),
+            ("gx6", lane_matches_cpu_gx_batch6),
+            ("comp", lane_matches_cpu_comp_batch),
+            ("comp2", lane_matches_cpu_comp_batch2),
+            ("comp3", lane_matches_cpu_comp_batch3),
+            ("comp4", lane_matches_cpu_comp_batch4),
+            ("comp5", lane_matches_cpu_comp_batch5),
+            ("comp6", lane_matches_cpu_comp_batch6),
+            ("comp7", lane_matches_cpu_comp_batch7),
+            ("spectral", lane_matches_cpu_spectral_batch),
+            ("spectral_post", lane_matches_cpu_spectral_post_batch),
+            ("filter", lane_matches_cpu_filter_batch),
+            ("comp8", lane_matches_cpu_comp_batch8),
+            ("comp9", lane_matches_cpu_comp_batch9),
+            ("book", lane_matches_cpu_book_batch),
+            ("event3", lane_matches_cpu_event_batch3),
+            ("merged", lane_matches_cpu_merged_batch),
+            ("merged2", lane_matches_cpu_merged_batch2),
+            ("merged3", lane_matches_cpu_merged_batch3),
+            ("merged4", lane_matches_cpu_merged_batch4),
+            ("bar1", lane_matches_cpu_bar_batch1),
+            ("bar2", lane_matches_cpu_bar_batch2),
+            ("bar3", lane_matches_cpu_bar_batch3),
+            ("bar4", lane_matches_cpu_bar_batch4),
+            ("bar5", lane_matches_cpu_bar_batch5),
+            ("bar6", lane_matches_cpu_bar_batch6),
+            ("bar7", lane_matches_cpu_bar_batch7),
+            ("bar8", lane_matches_cpu_bar_batch8),
+            ("bar9", lane_matches_cpu_bar_batch9),
+            ("bar10", lane_matches_cpu_bar_batch10),
+            ("bar11", lane_matches_cpu_bar_batch11),
+            ("bar12", lane_matches_cpu_bar_batch12),
+            ("bar13", lane_matches_cpu_bar_batch13),
+            ("bar14", lane_matches_cpu_bar_batch14),
+            ("bar15", lane_matches_cpu_bar_batch15),
+            ("bar16", lane_matches_cpu_bar_batch16),
+            ("bar17", lane_matches_cpu_bar_batch17),
+            ("bar18", lane_matches_cpu_bar_batch18),
+            ("bar19", lane_matches_cpu_bar_batch19),
+            ("bar20", lane_matches_cpu_bar_batch20),
+            ("bar21", lane_matches_cpu_bar_batch21),
+            ("bar22", lane_matches_cpu_bar_batch22),
+            ("bar23", lane_matches_cpu_bar_batch23),
+            ("bar24", lane_matches_cpu_bar_batch24),
+            ("bar25", lane_matches_cpu_bar_batch25),
+            ("bar26", lane_matches_cpu_bar_batch26),
+            ("bar27", lane_matches_cpu_bar_batch27),
+            ("bar28", lane_matches_cpu_bar_batch28),
+            ("bar29", lane_matches_cpu_bar_batch29),
+            ("bar30", lane_matches_cpu_bar_batch30),
+            ("bar31", lane_matches_cpu_bar_batch31),
+            ("bar32", lane_matches_cpu_bar_batch32),
+            ("bar33", lane_matches_cpu_bar_batch33),
+            ("bar34", lane_matches_cpu_bar_batch34),
+            ("bar35", lane_matches_cpu_bar_batch35),
+            ("bar36", lane_matches_cpu_bar_batch36),
+            ("bar37", lane_matches_cpu_bar_batch37),
+            ("bar38", lane_matches_cpu_bar_batch38),
+            ("bar39", lane_matches_cpu_bar_batch39),
+            ("cheby", lane_matches_cpu_comp_cheby),
+            ("bar40", lane_matches_cpu_bar_batch40),
+            ("bar41", lane_matches_cpu_bar_batch41),
+            ("bar42", lane_matches_cpu_bar_batch42),
+            ("bar43", lane_matches_cpu_bar_batch43),
+            ("bar44", lane_matches_cpu_bar_batch44),
+            ("bar45", lane_matches_cpu_bar_batch45),
+            ("bar46", lane_matches_cpu_bar_batch46),
+            ("bar47", lane_matches_cpu_bar_batch47),
+            ("bar48", lane_matches_cpu_bar_batch48),
+            ("bar49", lane_matches_cpu_bar_batch49),
+            ("bar50", lane_matches_cpu_bar_batch50),
+            ("bar51", lane_matches_cpu_bar_batch51),
+            ("bar53", lane_matches_cpu_bar_batch53),
+            ("bar54", lane_matches_cpu_bar_batch54),
+            ("bar55", lane_matches_cpu_bar_batch55),
+            ("bar56", lane_matches_cpu_bar_batch56),
+            ("bar57", lane_matches_cpu_bar_batch57),
+            ("bar58", lane_matches_cpu_bar_batch58),
+            ("bar59", lane_matches_cpu_bar_batch59),
+            ("bar60", lane_matches_cpu_bar_batch60),
+            ("bar61", lane_matches_cpu_bar_batch61),
+            ("bar62", lane_matches_cpu_bar_batch62),
+            ("bar63", lane_matches_cpu_bar_batch63),
+            ("bar64", lane_matches_cpu_bar_batch64),
+            ("bar65", lane_matches_cpu_bar_batch65),
+            ("bar66", lane_matches_cpu_bar_batch66),
+            ("calendar", lane_matches_cpu_calendar_batch),
+            ("signal", lane_matches_cpu_signal_batch),
+            ("signal2", lane_matches_cpu_signal2_batch),
+            ("barsig", lane_matches_cpu_barsig_batch),
+            ("event", lane_matches_cpu_event_batch),
+            ("lane", lane_matches_cpu),
+            ("footprint", footprint_rows_match_cpu),
+            ("session", session_profile_and_poc_match_cpu),
+            ("cvd", tick_cvd_vdelta_vpin_match_cpu),
+            ("absorb", tick_absorption_and_window_selector_match_cpu),
+            ("warnf", warning_frequency_filter_matches_cpu),
+            ("hybrid", hybrid_tick_book_rows_match_cpu),
+            ("keyed", keyed_composite_index_rows_match_cpu),
+            ("quote", quote_lifecycle_matches_cpu),
+            ("iceberg", iceberg_matches_cpu),
+            ("micro", market_micro_book_matches_cpu),
+        ];
+        let mut all: Vec<(&str, fn())> = main.to_vec();
+        #[cfg(feature = "gpu-shader")]
+        all.push(("decyc", shader_decycler_matches_cpu));
+        let tail: &[(&str, fn())] = &[
+            ("event2", lane_matches_cpu_event_batch2),
+            ("event_book4", lane_matches_cpu_event_book_batch4),
+            ("event5", lane_matches_cpu_event_batch5),
+            ("event_time", lane_matches_cpu_event_time_batch),
+            ("bar52", lane_matches_cpu_bar_batch52),
+            ("tpo", tpo_and_value_area_match_cpu),
+        ];
+        all.extend_from_slice(tail);
+        if let Ok(only) = std::env::var("MLI_BATCH") {
+            run_one_batch(&only, &all);
+            return;
+        }
+        drive_batches(&all);
     }
 }

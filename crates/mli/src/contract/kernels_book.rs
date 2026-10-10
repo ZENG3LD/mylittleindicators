@@ -577,6 +577,10 @@ pub fn launch_cube_book(
     frame: &GpuBookFrame,
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     let n = frame.len();
     if n == 0 {
         return Vec::new();

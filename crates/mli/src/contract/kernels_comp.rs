@@ -1296,6 +1296,10 @@ pub fn launch_cube_comp(
     samples: &[GpuSample],
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     if samples.is_empty() {
         return Vec::new();
     }

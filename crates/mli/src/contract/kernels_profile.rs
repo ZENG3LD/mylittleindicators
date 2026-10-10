@@ -164,6 +164,10 @@ fn pf_map(
 }
 
 pub fn launch_cube_profile(formula: CubeFormula, fr: &GpuProfileFrame, params: CubeParams) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     let n = fr.n;
     if n == 0 {
         return Vec::new();
@@ -319,6 +323,10 @@ fn pw_map(
 /// Windowed profile rows (`1408`, `1409`); `params.a` = window ms, `params.b` = price bucket,
 /// `params.c` = value-area fraction.
 pub fn launch_cube_profile_window(formula: CubeFormula, fr: &GpuProfileFrame, params: CubeParams) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     let n = fr.n;
     if n == 0 {
         return Vec::new();

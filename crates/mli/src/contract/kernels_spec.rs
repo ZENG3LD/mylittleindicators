@@ -577,6 +577,10 @@ pub fn launch_cube_spectral(
     p: CubeParams,
 ) -> Vec<Vec<f32>> {
     use super::CubeFormula as F;
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     if samples.is_empty() {
         return Vec::new();
     }
@@ -802,6 +806,10 @@ pub fn launch_cube_spectral_post(
     p: CubeParams,
 ) -> Vec<Vec<f32>> {
     use super::CubeFormula as F;
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     if samples.is_empty() {
         return Vec::new();
     }

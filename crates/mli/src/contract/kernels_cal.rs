@@ -167,6 +167,10 @@ pub fn launch_cube_calendar(
     times: &GpuTimes,
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     let n = times.len();
     if n == 0 {
         return Vec::new();
@@ -210,5 +214,9 @@ pub fn launch_cube_timed_columns(
     times: &GpuTimes,
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     launch_cube_calendar(formula, times, params)
 }

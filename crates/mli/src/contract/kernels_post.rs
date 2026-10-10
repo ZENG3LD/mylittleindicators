@@ -311,6 +311,10 @@ pub fn launch_cube_post(
     samples: &[GpuSample],
     params: CubeParams,
 ) -> Vec<f32> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_scalar();
+    }
     if samples.is_empty() {
         return Vec::new();
     }
@@ -358,6 +362,10 @@ pub fn launch_cube_post_columns(
     samples: &[GpuSample],
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     if samples.is_empty() {
         return Vec::new();
     }
@@ -524,6 +532,10 @@ pub fn launch_cube_signal(
     samples: &[GpuSample],
     params: CubeParams,
 ) -> Vec<f32> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_scalar();
+    }
     if samples.is_empty() {
         return Vec::new();
     }
@@ -725,6 +737,10 @@ pub fn launch_cube_signal2(
     samples: &[GpuSample],
     params: CubeParams,
 ) -> Vec<f32> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_scalar();
+    }
     if samples.is_empty() {
         return Vec::new();
     }
@@ -866,6 +882,10 @@ pub fn launch_cube_barsig(
     samples: &[GpuSample],
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     let n = samples.len();
     if n == 0 {
         return Vec::new();

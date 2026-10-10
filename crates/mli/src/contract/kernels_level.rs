@@ -131,7 +131,10 @@ fn lv_map(
 
 /// `[side, price, count]` per delta; `params.period` = replenishment threshold (>= 1).
 pub fn launch_cube_levels(formula: CubeFormula, fr: &GpuLevelFrame, params: CubeParams) -> Vec<Vec<f32>> {
-    let _ = formula;
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     let n = fr.n;
     if n == 0 {
         return Vec::new();

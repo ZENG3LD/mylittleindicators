@@ -171,6 +171,10 @@ fn hy_map(
 
 /// Run a hybrid formula; returns `[side, last volume / levels swept, cumulative / slippage]`.
 pub fn launch_cube_hybrid(formula: CubeFormula, fr: &GpuHybridFrame, params: CubeParams) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     let n = fr.n;
     if n == 0 {
         return Vec::new();

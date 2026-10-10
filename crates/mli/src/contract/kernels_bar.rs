@@ -12888,6 +12888,10 @@ pub fn launch_cube_session(
     times: &super::gpu_sample::GpuTimes,
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     let n = samples.len();
     if n == 0 {
         return Vec::new();
@@ -12922,6 +12926,10 @@ pub fn launch_cube_bar(
     samples: &[GpuSample],
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     launch_cube_bar_x(formula, samples, params, None)
 }
 
@@ -12933,6 +12941,10 @@ pub fn launch_cube_bar_timed(
     times: &super::gpu_sample::GpuTimes,
     params: CubeParams,
 ) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     assert_eq!(times.mkey.len(), samples.len(), "one GpuTimes row per sample");
     if formula == CubeFormula::VprofileBar || formula == CubeFormula::PocBar {
         return launch_cube_session(formula, samples, times, params);

@@ -1103,6 +1103,10 @@ fn fit_map(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p:
 
 /// Launch a fit formula over a single source series.
 pub fn launch_cube_fit(formula: CubeFormula, x: &[f32], params: CubeParams) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     let n = x.len();
     if n == 0 {
         return Vec::new();

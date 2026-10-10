@@ -83,6 +83,10 @@ fn ky_map(val: &[f32], pres: &[f32], out: &mut [f32], n: u32, k: u32, formula: u
 }
 
 pub fn launch_cube_keyed(formula: CubeFormula, fr: &GpuKeyedFrame, params: CubeParams) -> Vec<Vec<f32>> {
+    let _note = super::kernels::note_outer(formula);
+    if super::kernels::measure_skip() {
+        return super::kernels::skip_columns();
+    }
     let n = fr.n;
     if n == 0 {
         return Vec::new();
