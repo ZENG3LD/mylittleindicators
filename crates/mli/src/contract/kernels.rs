@@ -8430,6 +8430,38 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1209..=1211.
+    #[test]
+    fn lane_matches_cpu_bar_batch4() {
+        use crate::indicators::channels::ichimoku_cloud::IchimokuCloud;
+        use crate::indicators::channels::ichimoku_cloud_position::IchimokuCloudPosition;
+        use crate::indicators::channels::ichimoku_cloud_thickness::IchimokuCloudThickness;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(9);
+        p.fast = 26;
+        p.slow = 52;
+        p.signal = 26;
+        let mut m = IchimokuCloud::new();
+        chk(&run_cols(CubeFormula::IchimokuBar, &bars, p), lanes.iter().map(|l| { let (a, b, c, d, e) = m.feed(&[l[0], l[1], l[2]]); vec![a, b, c, d, e] }).collect());
+        let mut m = IchimokuCloudPosition::new();
+        chk(&run_cols(CubeFormula::IchimokuPosBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]])]).collect());
+        let mut m = IchimokuCloudThickness::new();
+        chk(&run_cols(CubeFormula::IchimokuThickBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]])]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

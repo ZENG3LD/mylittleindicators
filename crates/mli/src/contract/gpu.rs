@@ -645,6 +645,12 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: ichimoku. UNTESTED on GPU.
+    IchimokuBar = 1209,
+    /// Composite: ichimoku pos. UNTESTED on GPU.
+    IchimokuPosBar = 1210,
+    /// Composite: ichimoku thick. UNTESTED on GPU.
+    IchimokuThickBar = 1211,
     /// Composite: vwap channels. UNTESTED on GPU.
     VwapChanBar = 1206,
     /// Composite: vwap channel width. UNTESTED on GPU.
@@ -1005,6 +1011,7 @@ impl CubeFormula {
             CubeFormula::QrChanBar => 3,
             CubeFormula::VwapChanBar => 3,
             CubeFormula::VprbBar => 3,
+            CubeFormula::IchimokuBar => 5,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1271,6 +1278,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Ichimoku), Some(CubeFormula::IchimokuBar));
+        assert_eq!(formula_of(IndicatorId::Ichimokupos), Some(CubeFormula::IchimokuPosBar));
+        assert_eq!(formula_of(IndicatorId::Ichimokuthick), Some(CubeFormula::IchimokuThickBar));
         assert_eq!(formula_of(IndicatorId::Vwapchan), Some(CubeFormula::VwapChanBar));
         assert_eq!(formula_of(IndicatorId::Vwapchanwidth), Some(CubeFormula::VwapChanWidthBar));
         assert_eq!(formula_of(IndicatorId::Vprb), Some(CubeFormula::VprbBar));

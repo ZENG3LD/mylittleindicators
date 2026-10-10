@@ -40,6 +40,42 @@ fn stoch_win(h: &[f32], l: &[f32], c: &[f32], t: usize, pk: usize, which: u32) -
     r
 }
 
+/// Midpoint of the highest high and lowest low over the `w` bars ending at `q` (needs `q + 1 >= w`).
+#[cube]
+fn hl_mid(h: &[f32], l: &[f32], q: usize, w: usize) -> f32 {
+    let mut hi = h[q + 1 - w];
+    let mut lo = l[q + 1 - w];
+    for j in (q + 1 - w)..(q + 1) {
+        if h[j] > hi {
+            hi = h[j];
+        }
+        if l[j] < lo {
+            lo = l[j];
+        }
+    }
+    (hi + lo) / 2.0f32
+}
+
+/// Senkou span A at bar `q` (0 until both Tenkan and Kijun windows are full).
+#[cube]
+fn ichi_a(h: &[f32], l: &[f32], q: usize, tp: usize, kp: usize) -> f32 {
+    let mut r = 0.0f32;
+    if q + 1 >= tp && q + 1 >= kp {
+        r = (hl_mid(h, l, q, tp) + hl_mid(h, l, q, kp)) / 2.0f32;
+    }
+    r
+}
+
+/// Senkou span B at bar `q` (0 until the window is full).
+#[cube]
+fn ichi_b(h: &[f32], l: &[f32], q: usize, sp: usize) -> f32 {
+    let mut r = 0.0f32;
+    if q + 1 >= sp {
+        r = hl_mid(h, l, q, sp);
+    }
+    r
+}
+
 /// Median (`len / 2` order statistic) of `|c[j] - mid|` over a window, by rank counting.
 #[cube]
 fn kth_dev(src: &[f32], start: usize, len: usize, k: u32, mid: f32) -> f32 {
@@ -79,6 +115,8 @@ fn bar_scan(
     formula: u32,
     period: u32,
     p2: u32,
+    p3: u32,
+    p4: u32,
     a: f32,
     _b: f32,
     _cc: f32,
@@ -97,6 +135,8 @@ fn bar_scan(
         let mut v0 = 0.0f32;
         let mut v1 = 0.0f32;
         let mut v2 = 0.0f32;
+        let mut v3 = 0.0f32;
+        let mut v4 = 0.0f32;
         if formula == 1200u32 {
             let mut pk = period as usize;
             if pk < 1 {
@@ -320,10 +360,66 @@ fn bar_scan(
                 v0 = c[t] + p80;
                 v2 = c[t] - p20;
             }
+        } else if formula >= 1209u32 && formula <= 1211u32 {
+            // Ichimoku cloud: period/p2/p3 = tenkan/kijun/senkou-B windows, p4 = displacement
+            let mut tp = period as usize;
+            let mut kp = p2 as usize;
+            let mut sp = p3 as usize;
+            let mut dp = p4 as usize;
+            if tp < 1 {
+                tp = 1;
+            }
+            if kp < 1 {
+                kp = 1;
+            }
+            if sp < 1 {
+                sp = 1;
+            }
+            if dp < 1 {
+                dp = 1;
+            }
+            let mut ten = 0.0f32;
+            let mut kij = 0.0f32;
+            if t + 1 >= tp {
+                ten = hl_mid(h, l, t, tp);
+            }
+            if t + 1 >= kp {
+                kij = hl_mid(h, l, t, kp);
+            }
+            let sa = ichi_a(h, l, t, tp, kp);
+            let sb = ichi_b(h, l, t, sp);
+            let mut top = 0.0f32;
+            let mut bot = 0.0f32;
+            let mut chi = 0.0f32;
+            if t + 1 >= dp {
+                let q = t + 1 - dp;
+                let pa = ichi_a(h, l, q, tp, kp);
+                let pb = ichi_b(h, l, q, sp);
+                top = pa.max(pb);
+                bot = pa.min(pb);
+                chi = c[q];
+            }
+            if formula == 1209u32 {
+                v0 = ten;
+                v1 = kij;
+                v2 = sa;
+                v3 = sb;
+                v4 = chi;
+            } else if formula == 1210u32 {
+                let width = (top - bot).abs();
+                v0 = 0.5f32;
+                if width > 0.0f32 {
+                    v0 = ((c[t] - bot) / width).max(0.0f32).min(1.0f32);
+                }
+            } else {
+                v0 = (top - bot).abs();
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
         out[2 * n + t] = v2;
+        out[3 * n + t] = v3;
+        out[4 * n + t] = v4;
     }
 }
 
@@ -338,12 +434,14 @@ fn bar_map(
     formula: u32,
     period: u32,
     p2: u32,
+    p3: u32,
+    p4: u32,
     a: f32,
     b: f32,
     cc: f32,
     flag: u32,
 ) {
-    bar_scan(o, h, l, c, v, out, formula, period, p2, a, b, cc, flag);
+    bar_scan(o, h, l, c, v, out, formula, period, p2, p3, p4, a, b, cc, flag);
 }
 
 /// Run a bar formula of codes 1200..=1399. One `Vec` per output column.
@@ -388,6 +486,8 @@ pub fn launch_cube_bar(
             formula.code(),
             params.period,
             params.fast,
+            params.slow,
+            params.signal,
             params.a,
             params.b,
             params.c,
