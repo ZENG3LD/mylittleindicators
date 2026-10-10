@@ -8394,6 +8394,42 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1206..=1208.
+    #[test]
+    fn lane_matches_cpu_bar_batch3() {
+        use crate::indicators::channels::volatility_percentile_rank_bands::VolatilityPercentileRankBands;
+        use crate::indicators::channels::vwap_channel_width::VwapChannelWidth;
+        use crate::indicators::channels::vwap_channels::{VwapChannelMode, VwapChannels};
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(9);
+        p.a = 2.0;
+        let mut m = VwapChannels::new(9, 2.0, VwapChannelMode::Standard);
+        chk(&run_cols(CubeFormula::VwapChanBar, &bars, p), lanes.iter().map(|l| { let (u, mi, lo) = m.feed(l); vec![u, mi, lo] }).collect());
+        let mut pp = p;
+        pp.flag = 1;
+        let mut m = VwapChannels::new(9, 2.0, VwapChannelMode::Percentage);
+        chk(&run_cols(CubeFormula::VwapChanBar, &bars, pp), lanes.iter().map(|l| { let (u, mi, lo) = m.feed(l); vec![u, mi, lo] }).collect());
+        let mut m = VwapChannelWidth::new(9, 2.0);
+        chk(&run_cols(CubeFormula::VwapChanWidthBar, &bars, p), lanes.iter().map(|l| vec![m.feed(l)]).collect());
+        let mut p = CubeParams::period(7);
+        p.fast = 12;
+        let mut m = VolatilityPercentileRankBands::new(7, 12);
+        chk(&run_cols(CubeFormula::VprbBar, &bars, p), lanes.iter().map(|l| { let (u, mi, lo) = m.feed(&[l[0], l[1], l[2]]); vec![u, mi, lo] }).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

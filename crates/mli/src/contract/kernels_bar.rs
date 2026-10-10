@@ -74,7 +74,7 @@ fn bar_scan(
     h: &[f32],
     l: &[f32],
     c: &[f32],
-    _v: &[f32],
+    v: &[f32],
     out: &mut [f32],
     formula: u32,
     period: u32,
@@ -89,6 +89,7 @@ fn bar_scan(
     let mut d = 0.0f32;
     let mut dh = 0.0f32;
     let mut dl = 0.0f32;
+    let mut vw = 0.0f32;
     let mut held0 = 0.0f32;
     let mut held1 = 0.0f32;
     let mut held2 = 0.0f32;
@@ -258,6 +259,67 @@ fn bar_scan(
             v0 = held0;
             v1 = held1;
             v2 = held2;
+        } else if formula == 1206u32 || formula == 1207u32 {
+            // windowed VWAP channels (1206: [upper, vwap, lower]; 1207: |upper - lower| width)
+            let mut w = period as usize;
+            if w < 1 {
+                w = 1;
+            }
+            let mut st = 0usize;
+            if t + 1 > w {
+                st = t + 1 - w;
+            }
+            let mut spv = 0.0f32;
+            let mut sv = 0.0f32;
+            for j in st..(t + 1) {
+                let tp = (h[j] + l[j] + c[j]) / 3.0f32;
+                spv = spv + tp * v[j];
+                sv = sv + v[j];
+            }
+            if sv > 0.0f32 {
+                vw = spv / sv;
+            }
+            let mut up = 0.0f32;
+            let mut lw = 0.0f32;
+            if t + 1 >= w {
+                if flag == 1u32 {
+                    let band = vw * (a / 100.0f32);
+                    up = vw + band;
+                    lw = vw - band;
+                } else {
+                    let mut var = 0.0f32;
+                    for j in st..(t + 1) {
+                        let tp = (h[j] + l[j] + c[j]) / 3.0f32;
+                        var = var + (tp - vw) * (tp - vw);
+                    }
+                    let sd = (var / (w as f32)).sqrt();
+                    up = vw + a * sd;
+                    lw = vw - a * sd;
+                }
+            }
+            if formula == 1206u32 {
+                v0 = up;
+                v1 = vw;
+                v2 = lw;
+            } else {
+                v0 = (up - lw).abs();
+            }
+        } else if formula == 1208u32 {
+            // volatility percentile-rank bands: the `volume` lane carries the ATR series
+            let mut w = p2 as usize;
+            if w < 5 {
+                w = 5;
+            }
+            if w > 10000 {
+                w = 10000;
+            }
+            v1 = c[t];
+            if t + 1 >= w {
+                let p20 = kth_in(v, t + 1 - w, w, ((w * 20) / 100) as u32);
+                let p80 = kth_in(v, t + 1 - w, w, ((w * 80) / 100) as u32);
+                v0 = c[t] + p80;
+                v2 = c[t] - p20;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -298,7 +360,16 @@ pub fn launch_cube_bar(
     let h = lane_series(samples, params, OhlcvField::High);
     let l = lane_series(samples, params, OhlcvField::Low);
     let c = lane_series(samples, params, params.lane);
-    let v = lane_series(samples, params, OhlcvField::Volume);
+    let mut v = lane_series(samples, params, OhlcvField::Volume);
+    if formula == CubeFormula::VprbBar {
+        // ATR (EMA smoothed) runs on the device first and rides in the volume slot
+        let mut ap = params;
+        ap.smoother = super::CubeSmoother::Ema;
+        v = super::kernels::launch_cube(CubeFormula::Atr, samples, ap)
+            .into_iter()
+            .map(|x| x.max(1e-12))
+            .collect();
+    }
     let client =
         cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
     let up = |s: &Vec<f32>| client.create_from_slice(f32::as_bytes(s));

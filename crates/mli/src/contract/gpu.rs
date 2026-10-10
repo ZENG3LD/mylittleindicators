@@ -645,6 +645,12 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: vwap channels. UNTESTED on GPU.
+    VwapChanBar = 1206,
+    /// Composite: vwap channel width. UNTESTED on GPU.
+    VwapChanWidthBar = 1207,
+    /// Composite: vol pct rank bands. UNTESTED on GPU.
+    VprbBar = 1208,
     /// Composite: price channels. UNTESTED on GPU.
     PriceChanBar = 1203,
     /// Composite: darvas box. UNTESTED on GPU.
@@ -997,6 +1003,8 @@ impl CubeFormula {
             CubeFormula::PriceChanBar => 3,
             CubeFormula::DarvasBar => 2,
             CubeFormula::QrChanBar => 3,
+            CubeFormula::VwapChanBar => 3,
+            CubeFormula::VprbBar => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1263,6 +1271,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Vwapchan), Some(CubeFormula::VwapChanBar));
+        assert_eq!(formula_of(IndicatorId::Vwapchanwidth), Some(CubeFormula::VwapChanWidthBar));
+        assert_eq!(formula_of(IndicatorId::Vprb), Some(CubeFormula::VprbBar));
         assert_eq!(formula_of(IndicatorId::Pricechan), Some(CubeFormula::PriceChanBar));
         assert_eq!(formula_of(IndicatorId::Darvas), Some(CubeFormula::DarvasBar));
         assert_eq!(formula_of(IndicatorId::Qrchan), Some(CubeFormula::QrChanBar));
