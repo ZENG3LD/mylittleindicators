@@ -5910,6 +5910,121 @@ fn bar_scan(
                     v0 = 6.0f32;
                 }
             }
+        } else if formula == 1351u32 {
+            // swing detection (value = last non-zero swing signal). lanes o = ATR (host, mode 1 only), h, l, c.
+            // flag: 0 percent (a = %), 1 ATR multiple (a = mult), 2 n-bar extreme, 3 lookahead, 4 time; period = n.
+            // scr: 0 last forced bar, 1 last extreme, 2 pivot high, 3 pivot low, 4 trend (0 none / 1 up / 2 down), 5 last swing
+            let nn = period as usize;
+            let mut sig = 0.0f32;
+            if t == 0usize {
+                scr[2] = -1.0e30f32;
+                scr[3] = 1.0e30f32;
+                scr[4] = 0.0f32;
+                scr[5] = 0.0f32;
+            }
+            if flag <= 1u32 {
+                if h[t] > scr[2] {
+                    scr[2] = h[t];
+                }
+                if l[t] < scr[3] {
+                    scr[3] = l[t];
+                }
+                let php = scr[2];
+                let mut delta = php.abs() * a / 100.0f32;
+                if flag == 1u32 {
+                    delta = o[t] * a;
+                }
+                if scr[4] > 1.5f32 {
+                    if h[t] >= scr[3] + delta {
+                        sig = -1.0f32;
+                        scr[4] = 1.0f32;
+                        scr[2] = h[t];
+                    }
+                } else if scr[4] > 0.5f32 {
+                    if l[t] <= scr[2] - delta {
+                        sig = 1.0f32;
+                        scr[4] = 2.0f32;
+                        scr[3] = l[t];
+                    }
+                } else if h[t] > l[t] {
+                    scr[4] = 1.0f32;
+                }
+            } else if flag == 2u32 {
+                let mut m = nn;
+                if m < 2usize {
+                    m = 2usize;
+                }
+                if t + 1usize >= m {
+                    let mut ws = t;
+                    if nn >= 2usize {
+                        ws = t + 1usize - nn;
+                    }
+                    let mut mx = 0.0f32;
+                    let mut mn = 0.0f32;
+                    let mut has = false;
+                    for k in ws..t {
+                        if !has || h[k] > mx {
+                            mx = h[k];
+                        }
+                        if !has || l[k] < mn {
+                            mn = l[k];
+                        }
+                        has = true;
+                    }
+                    if !has || h[t] > mx {
+                        sig = 1.0f32;
+                    } else if l[t] < mn {
+                        sig = -1.0f32;
+                    }
+                }
+            } else if flag == 3u32 {
+                let mut m = nn;
+                if m < 2usize {
+                    m = 2usize;
+                }
+                if t >= 2usize * m {
+                    let pv = t - nn;
+                    let mut is_max = true;
+                    let mut is_min = true;
+                    for k in (t - 2usize * nn)..(t + 1usize) {
+                        if k != pv {
+                            if h[k] > h[pv] {
+                                is_max = false;
+                            }
+                            if l[k] < l[pv] {
+                                is_min = false;
+                            }
+                        }
+                    }
+                    if is_max && !is_min {
+                        sig = 1.0f32;
+                    } else if is_min && !is_max {
+                        sig = -1.0f32;
+                    }
+                }
+            } else {
+                let mut m = nn;
+                if m < 1usize {
+                    m = 1usize;
+                }
+                let mf = m as f32;
+                if t == 0usize {
+                    scr[0] = 1.0f32;
+                    scr[1] = c[t];
+                } else if (t as f32) + 1.0f32 - scr[0] >= mf {
+                    if c[t] > scr[1] {
+                        sig = 1.0f32;
+                    } else {
+                        sig = -1.0f32;
+                    }
+                    scr[0] = (t as f32) + 1.0f32;
+                    scr[1] = c[t];
+                }
+            }
+            if sig != 0.0f32 {
+                scr[5] = sig;
+            }
+            v0 = scr[5];
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -6462,6 +6577,17 @@ fn launch_cube_bar_x(
             score[0] = 3.0;
         }
         return vec![score];
+    }
+    if formula == CubeFormula::SwingBar {
+        // flag = mode (0 percent, 1 ATR multiple, 2 n-bar extreme, 3 lookahead, 4 time), a = threshold / multiple,
+        // period = n; mode 1 resolves its ATR on the host (fast = ATR period, smoother = ATR smoother)
+        let atr = if params.ext[0] == 1 {
+            super::kernels_comp::atr_series(samples, params, params.smoother, params.fast.max(1), 0)
+        } else {
+            c.clone()
+        };
+        let flat = bar_run(formula.code(), [&atr, &h, &l, &c, &v], params, params.ext[0]);
+        return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {
         let fast = smooth_series(&c, params.smoother, params.fast.max(1), 0, params.a, params.b);

@@ -10401,6 +10401,42 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Swing detection, all five modes (1351).
+    #[test]
+    fn lane_matches_cpu_bar_batch61() {
+        use crate::indicators::swing::swing_detection::{SwingDetection, SwingMode};
+        use crate::indicators::volatility::atr::Atr;
+        use crate::engine::contract_engine::SmootherId as S;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let run = |mode: u32, a: f32, n: u32| {
+            let mut p = CubeParams::period(n);
+            p.a = a;
+            p.fast = 14;
+            p.smoother = CubeSmoother::Rma;
+            p.ext[0] = mode;
+            run_cols(CubeFormula::SwingBar, &bars, p)
+        };
+        let cpu = |mut m: SwingDetection| -> Vec<Vec<f64>> { bars.iter().map(|b| { m.feed(&[b.open, b.high, b.low, b.close, b.volume]); vec![m.value()] }).collect() };
+        chk(&run(0, 0.5, 1), cpu(SwingDetection::new(SwingMode::Percent { threshold_pct: 0.5 })));
+        chk(&run(1, 1.5, 1), cpu(SwingDetection::with_atr_source(SwingMode::AtrMultiple { mult: 1.5 }, Atr::from_smoother(14, S::Rma))));
+        chk(&run(2, 0.0, 5), cpu(SwingDetection::new(SwingMode::NBarExtreme { n: 5 })));
+        chk(&run(3, 0.0, 3), cpu(SwingDetection::new(SwingMode::Lookahead { n: 3 })));
+        chk(&run(4, 0.0, 7), cpu(SwingDetection::new(SwingMode::Time { n_bars: 7 })));
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

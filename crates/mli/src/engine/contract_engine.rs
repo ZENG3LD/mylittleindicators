@@ -239,7 +239,7 @@ mli_contract_macros::contract_universe! {
         RelPosition:     Fields      : _ +cube(rel_position_sig)             => crate::indicators::regime::relative_position::RelativePosition,
         LineCross:       Fields      : _ +time       => crate::indicators::signal_logic::line_cross::LineCross { left right signal #cross_grid },
         PriceLineCross:  Fields      : _ +time       => crate::indicators::signal_logic::price_line_cross::PriceLineCross { line close signal #cross_vector_grid },
-        SwingDetect:     Fields      : _             => crate::indicators::swing::swing_detection::SwingDetection,
+        SwingDetect:     Fields      : _ +cube(comp_swing_bar) => crate::indicators::swing::swing_detection::SwingDetection,
         RegimeGate:      Field       : _ +cube(regime_gate_sig)             => crate::indicators::regime::regime_gate::RegimeGate,
         ThreshEdge:      Field       : _ +cube(threshold_edge)             => crate::indicators::signal_logic::threshold::Threshold,
         VolRegimeDetect: Field       : _ +cube(vol_regime_sig)             => crate::indicators::regime::volatility_regime::VolatilityRegimeDetector,
