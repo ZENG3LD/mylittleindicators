@@ -535,7 +535,7 @@ mli_contract_macros::contract_universe! {
         Mrf: Fields : _ => crate::indicators::regime::market_regime_filter::MarketRegimeFilter,
         Avr: Fields : _ => crate::indicators::regime::adaptive_volatility_regime::AdaptiveVolatilityRegime,
         Dvr: Fields : _ => crate::indicators::regime::dynamic_volatility_regime::DynamicVolatilityRegime,
-        Rc:  Fields : _ => crate::indicators::regime::regime_composite::RegimeComposite,
+        Rc:  Fields : _ +cube(comp_rc_bar) => crate::indicators::regime::regime_composite::RegimeComposite,
         EgCoint: Field : _ +cube(comp_eg_coint_bar) => crate::indicators::statistics::engle_granger_proxy::EngleGrangerProxy,
         AdfKpss: Field : _ +cube(comp_adf_kpss_bar) => crate::indicators::statistics::adf_kpss_composite::AdfKpssComposite,
         Gmma: Field : Trend +cube(comp_gmma_bar) => crate::indicators::trend::gmma_compression::GmmaCompression { #ribbon_grid },

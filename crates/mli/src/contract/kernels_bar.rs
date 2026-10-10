@@ -5145,6 +5145,16 @@ fn bar_scan(
             // weights a / b / c = w_regime / w_atr / w_vov
             let den = (a + b + _cc).max(1.0e-9f32);
             v0 = (a * o[t] + b * (1.0f32 - h[t]) + _cc * (1.0f32 - l[t])) / den;
+        } else if formula == 1333u32 {
+            // regime composite: lanes o = Hurst, h = DFA alpha, l = spectral slope, c = spectral energy ratio,
+            // scratch [0, n) = vol-of-vol percentile, [n, 2n) = ATR percentile (all host-resolved)
+            let tr = (o[t] - 0.5f32) * 2.0f32;
+            let pe = (1.0f32 - h[t]).max(0.0f32).min(1.0f32) * 2.0f32 - 1.0f32;
+            let sp = (0.0f32 - l[t]).tanh();
+            let lb = (c[t] * 2.0f32 - 1.0f32).max(-1.0f32).min(1.0f32);
+            let vs = (scr[t] * 2.0f32 - 1.0f32).max(-1.0f32).min(1.0f32);
+            let at = (scr[n + t] * 2.0f32 - 1.0f32).max(-1.0f32).min(1.0f32);
+            v0 = 0.25f32 * tr + 0.15f32 * pe + 0.2f32 * sp + 0.15f32 * lb + 0.15f32 * vs + 0.1f32 * at;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -5473,7 +5483,33 @@ fn launch_cube_bar_x(
             series.push(vec![0.0; n]);
         }
         let p = CubeParams { fast: cnt as u32, slow: ready, ..params };
-        let flat = bar_run(formula.code(), [&series[0], &series[1], &series[2], &series[3], &series[4]], p, 0);
+        let flat = bar_run(formula.code(), [&series[0], &series[1], &series[2], &series[3], &series[4]], p, params.flag);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::RcBar {
+        // period = Hurst window, a = SER low cut, ext[0..4] = DFA scales, ext[4] = FFT window,
+        // ext[5] = vol-of-vol window, ext[6] = percentile window, ext[7] = ATR period (Rma)
+        let hurst = bar_run(CubeFormula::HurstBar.code(), [&o, &h, &l, &c, &v], CubeParams::period(params.period), 0);
+        let dp = CubeParams { period: params.ext[0], fast: params.ext[1], slow: params.ext[2], signal: params.ext[3], ..params };
+        let dfa = bar_run(CubeFormula::DfaBar.code(), [&o, &h, &l, &c, &v], dp, 0);
+        let fp = CubeParams { period: params.ext[4], ..params };
+        let sl = super::kernels::launch_cube(CubeFormula::SslopeComp, samples, fp);
+        let ser = super::kernels::launch_cube(CubeFormula::SerComp, samples, fp);
+        let vp = CubeParams { period: params.ext[5], slow: params.ext[6], ..params };
+        let vov = super::kernels::launch_cube(CubeFormula::VovPct, samples, vp);
+        let ap = CubeParams {
+            period: params.ext[7],
+            smoother: super::CubeSmoother::Rma,
+            smooth_period: params.ext[7],
+            slow: params.ext[6],
+            ..params
+        };
+        let atrp = super::kernels::launch_cube(CubeFormula::AtrPct, samples, ap);
+        let mut extra = vov;
+        extra.extend_from_slice(&atrp);
+        let hv = hurst[0..n].to_vec();
+        let dv = dfa[0..n].to_vec();
+        let flat = bar_run_x(formula.code(), [&hv, &dv, &sl, &ser, &v], &extra, params, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::KcompBar {
@@ -5510,7 +5546,7 @@ fn launch_cube_bar_x(
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::WaveBar {
-        let flat = bar_run(formula.code(), [&o, &h, &l, &c, &v], CubeParams { slow: params.slow.max(64), ..params }, 0);
+        let flat = bar_run(formula.code(), [&o, &h, &l, &c, &v], CubeParams { slow: params.slow.max(64), ..params }, params.flag);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::QqeBar {
