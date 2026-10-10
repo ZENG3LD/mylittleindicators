@@ -585,6 +585,10 @@ pub enum CubeFormula {
     SgComp = 1051,
     /// Composite: Roofing filter. UNTESTED on GPU.
     RoofComp = 1052,
+    /// Composite: TRIMA bands upper/middle/lower. UNTESTED on GPU.
+    TrimaBandsCols = 1053,
+    /// Composite: Keltner position. UNTESTED on GPU.
+    KpComp = 1054,
     /// Composite: Spectral flatness percentile. UNTESTED on GPU.
     SflatpComp = 1120,
     /// Composite: Spectral rolloff percentile. UNTESTED on GPU.
@@ -819,6 +823,7 @@ impl CubeFormula {
             CubeFormula::KslopeCols => 2,
             CubeFormula::AbgCols => 3,
             CubeFormula::SbpCols => 3,
+            CubeFormula::TrimaBandsCols => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1084,6 +1089,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Trimabands), Some(CubeFormula::TrimaBandsCols));
+        assert_eq!(formula_of(IndicatorId::Kp), Some(CubeFormula::KpComp));
         assert_eq!(formula_of(IndicatorId::Butter), Some(CubeFormula::ButterComp));
         assert_eq!(formula_of(IndicatorId::Sg), Some(CubeFormula::SgComp));
         assert_eq!(formula_of(IndicatorId::Roof), Some(CubeFormula::RoofComp));

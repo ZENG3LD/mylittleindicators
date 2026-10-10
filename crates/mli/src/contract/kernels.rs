@@ -7327,6 +7327,32 @@ mod tests {
         assert_close(&run(CubeFormula::RoofComp, &bars, ap), &cpu(&close, |v| m.feed(v)));
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): composites 1053..=1054.
+    #[test]
+    fn lane_matches_cpu_comp_batch8() {
+        use crate::indicators::channels::trima_bands::TrimaBands;
+        use crate::indicators::volatility::kp::Kp;
+
+        let bars = bars(140);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let mut p = CubeParams::period(10);
+        p.a = 2.0;
+        let mut m = TrimaBands::new(10, 2.0);
+        let (mut u, mut mi, mut l) = (Vec::new(), Vec::new(), Vec::new());
+        for c in &close {
+            let (a, b, d) = m.feed(*c);
+            u.push(a);
+            mi.push(b);
+            l.push(d);
+        }
+        assert_cols(&run_cols(CubeFormula::TrimaBandsCols, &bars, p), &[&u, &mi, &l]);
+        let mut kp = p;
+        kp.smoother = CubeSmoother::Rma;
+        let mut m = Kp::new(10, 2.0);
+        assert_close(&run(CubeFormula::KpComp, &bars, kp), &lanes.iter().map(|x| m.feed(x)).collect::<Vec<f64>>());
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

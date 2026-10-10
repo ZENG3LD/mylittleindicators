@@ -501,6 +501,31 @@ fn ew_scan(
         } else if op == 56u32 {
             // 0.5 * (tanh(x) + 1) = 1 / (1 + exp(-2x))
             v = 1.0f32 / (1.0f32 + (-2.0f32 * x[t]).exp());
+        } else if op == 57u32 {
+            // population std of the last a values about their own mean (partial until full)
+            let p = a as usize;
+            let mut lo = 0usize;
+            if t + 1 > p {
+                lo = t + 1 - p;
+            }
+            let nn = (t + 1 - lo) as f32;
+            let mut sum = 0.0f32;
+            for j in lo..(t + 1) {
+                sum = sum + x[j];
+            }
+            let mean = sum / nn;
+            let mut ss = 0.0f32;
+            for j in lo..(t + 1) {
+                let d = x[j] - mean;
+                ss = ss + d * d;
+            }
+            v = (ss / nn).sqrt();
+        } else if op == 58u32 {
+            // Keltner position: x = close, y = upper, z = lower, w = middle
+            let kw = (y[t] - z[t]) / 2.0f32;
+            if kw > 0.0f32 {
+                v = (x[t] - w[t]) / kw;
+            }
         } else if op == 29u32 {
             if z[t] != 0.0f32 {
                 v = (x[t] - y[t]) / z[t];
@@ -1588,6 +1613,26 @@ pub fn launch_cube_comp(
                 &[],
                 &[h0 as f32, h1 as f32, h2 as f32, sc1 as f32, sc2 as f32, sc3 as f32],
             )]
+        }
+        // TRIMA bands `[upper, middle, lower]`: TRIMA(`period`, at least 2) centre, population
+        // std over `clamp(period, 2, 512)` bars times `a` (non-positive -> 2); bands stay 0
+        // until the std window is full.
+        CubeFormula::TrimaBandsCols => {
+            let src = lane_series(samples, p, p.lane);
+            let mid = sm(&src, CubeSmoother::Tma, p.period.max(2), 0, p);
+            let w = p.period.clamp(2, 512);
+            let k = if p.a > 0.0 { p.a } else { 2.0 };
+            let sd = ewc(57, &src, &src, &src, w as f32, 0.0);
+            let up = ewc(15, &ewc(13, &mid, &sd, &mid, k, 0.0), &mid, &mid, w as f32, 0.0);
+            let lo = ewc(15, &ewc(14, &mid, &sd, &mid, k, 0.0), &mid, &mid, w as f32, 0.0);
+            vec![up, mid, lo]
+        }
+        // Keltner position of the SMA(typical) Keltner (`VoKcCols` inputs): `(close - middle) /
+        // ((upper - lower) / 2)`, 0 when the half width is not positive.
+        CubeFormula::KpComp => {
+            let c = lane_series(samples, p, OhlcvField::Close);
+            let k = launch_cube_comp(CubeFormula::VoKcCols, samples, p);
+            vec![ewb(58, &c, &k[0], &k[2], &k[1], 0.0, 0.0)]
         }
         _ => Vec::new(),
     }
