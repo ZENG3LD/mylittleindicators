@@ -4574,6 +4574,145 @@ fn bar_scan(
                 }
             }
             v0 = held0;
+        } else if formula == 1324u32 {
+            // wavelet entropy over the last min(t + 1, 512) closes (0 until 32 samples). `period` = max scales
+            // (<= 32, >= 2), `flag` = wavelet (0 Haar, 1 Db4, 2 Db6, 3 Morlet, 4 Mexican, 5 Biorthogonal).
+            // Morlet / Mexican: CWT energies over scales 64^(i / (ms - 1)); others: DWT detail energies for
+            // min(ms, 8) levels with circular convolution. Entropy = -sum p ln p of the energies.
+            // scratch: [0, 512) signal A, [512, 1024) signal B, [1024, 1030) low-pass, [1030, 1036) high-pass,
+            // [1040, 1072) energies
+            let mut nt = t + 1usize;
+            if nt > 512usize {
+                nt = 512usize;
+            }
+            let mut msc = period as usize;
+            if msc > 32usize {
+                msc = 32usize;
+            }
+            if nt >= 32usize && msc >= 2usize {
+                let mut tot = 0.0f32;
+                let mut nen = 0usize;
+                if flag == 3u32 || flag == 4u32 {
+                    for i in 0..msc {
+                        let frac = (i as f32) / ((msc - 1usize) as f32);
+                        let sc = (frac * 4.158883f32).exp();
+                        let mut en = 0.0f32;
+                        for pos in 0..nt {
+                            let mut cf = 0.0f32;
+                            for k in 0..nt {
+                                let tt = ((k as f32) - (pos as f32)) / sc;
+                                let g = (0.0f32 - tt * tt / 2.0f32).exp();
+                                let mut psi = (1.0f32 - tt * tt) * g;
+                                if flag == 3u32 {
+                                    psi = (6.0f32 * tt).cos() * g;
+                                }
+                                cf = cf + c[t + 1usize - nt + k] * psi;
+                            }
+                            cf = cf / sc.sqrt();
+                            en = en + cf * cf;
+                        }
+                        scr[1040 + i] = en;
+                        tot = tot + en;
+                    }
+                    nen = msc;
+                } else {
+                    let mut nl = 2usize;
+                    let mut ng = 2usize;
+                    scr[1024] = 0.70710677f32;
+                    scr[1025] = 0.70710677f32;
+                    scr[1030] = 0.0f32 - 0.70710677f32;
+                    scr[1031] = 0.70710677f32;
+                    if flag == 1u32 {
+                        nl = 4usize;
+                        ng = 4usize;
+                        scr[1024] = 0.6830127f32;
+                        scr[1025] = 1.1830127f32;
+                        scr[1026] = 0.3169873f32;
+                        scr[1027] = 0.0f32 - 0.18301270f32;
+                        // high-pass = alternating signs (even index -1) of h, reversed
+                        scr[1030] = 0.0f32 - 0.18301270f32;
+                        scr[1031] = 0.0f32 - 0.3169873f32;
+                        scr[1032] = 1.1830127f32;
+                        scr[1033] = 0.0f32 - 0.6830127f32;
+                    } else if flag == 2u32 {
+                        nl = 6usize;
+                        ng = 6usize;
+                        scr[1024] = 0.47046721f32;
+                        scr[1025] = 1.14111692f32;
+                        scr[1026] = 0.650365f32;
+                        scr[1027] = 0.0f32 - 0.19093442f32;
+                        scr[1028] = 0.0f32 - 0.12083221f32;
+                        scr[1029] = 0.0498175f32;
+                        scr[1030] = 0.0498175f32;
+                        scr[1031] = 0.12083221f32;
+                        scr[1032] = 0.0f32 - 0.19093442f32;
+                        scr[1033] = 0.0f32 - 0.650365f32;
+                        scr[1034] = 1.14111692f32;
+                        scr[1035] = 0.0f32 - 0.47046721f32;
+                    } else if flag == 5u32 {
+                        nl = 5usize;
+                        ng = 3usize;
+                        scr[1024] = 0.0f32 - 0.125f32;
+                        scr[1025] = 0.25f32;
+                        scr[1026] = 0.75f32;
+                        scr[1027] = 0.25f32;
+                        scr[1028] = 0.0f32 - 0.125f32;
+                        scr[1030] = 0.5f32;
+                        scr[1031] = 1.0f32;
+                        scr[1032] = 0.5f32;
+                    }
+                    for k in 0..nt {
+                        scr[k] = c[t + 1usize - nt + k];
+                    }
+                    let mut m = nt;
+                    let mut src_off = 0usize;
+                    let mut lv = msc;
+                    if lv > 8usize {
+                        lv = 8usize;
+                    }
+                    let mut go = true;
+                    for _l in 0..lv {
+                        if go && m >= 4usize {
+                            let dst_off = 512usize - src_off;
+                            let mut en = 0.0f32;
+                            let mut oi = 0usize;
+                            let mut i = 0usize;
+                            while i < m {
+                                let mut asum = 0.0f32;
+                                let mut dsum = 0.0f32;
+                                for j in 0..nl {
+                                    asum = asum + scr[1024 + j] * scr[src_off + (i + j) % m];
+                                }
+                                for j in 0..ng {
+                                    dsum = dsum + scr[1030 + j] * scr[src_off + (i + j) % m];
+                                }
+                                scr[dst_off + oi] = asum;
+                                en = en + dsum * dsum;
+                                oi = oi + 1usize;
+                                i = i + 2usize;
+                            }
+                            scr[1040 + nen] = en;
+                            tot = tot + en;
+                            nen = nen + 1usize;
+                            m = oi;
+                            src_off = dst_off;
+                        } else {
+                            go = false;
+                        }
+                    }
+                }
+                let mut ent = 0.0f32;
+                if tot > 0.0f32 {
+                    for i in 0..nen {
+                        let p = scr[1040 + i] / tot;
+                        if p > 0.0f32 {
+                            ent = ent - p * p.ln();
+                        }
+                    }
+                }
+                held0 = ent;
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -4842,6 +4981,10 @@ fn launch_cube_bar_x(
         let atr = super::kernels_comp::atr_series(samples, params, super::CubeSmoother::Rma, params.fast.max(1), 0);
         let base = smooth_series(&atr, params.smoother, params.slow.max(1), 0, params.a, params.b);
         let flat = bar_run(formula.code(), [&base, &h, &l, &c, &atr], params, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::WaveBar {
+        let flat = bar_run(formula.code(), [&o, &h, &l, &c, &v], CubeParams { slow: params.slow.max(64), ..params }, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::QqeBar {

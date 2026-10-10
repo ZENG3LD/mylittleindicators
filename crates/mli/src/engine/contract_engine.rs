@@ -182,7 +182,7 @@ mli_contract_macros::contract_universe! {
         Roof:            Field       : _ +cube(comp_roof_comp)             => crate::indicators::signal_processing::roofing_filter::RoofingFilter,
         Sg:              Field       : _ +cube(comp_sg_comp)             => crate::indicators::signal_processing::savitzky_golay::SavitzkyGolayFilter,
         Stft:            Field       : _ +cube(comp_stft_comp)             => crate::indicators::signal_processing::stft_features::StftBandEnergyRatio,
-        Wave:            Field       : _             => crate::indicators::signal_processing::wavelet::WaveletTransform { #scalogram_grid },
+        Wave:            Field       : _ +cube(comp_wave_bar) => crate::indicators::signal_processing::wavelet::WaveletTransform { #scalogram_grid },
         VoDc:            Fields      : Volatility +cube(donchian_bands)    => crate::indicators::volatility::dc::Dc { upper middle lower },
         Nr:              Fields      : _ +cube(comp_nr_bar) => crate::indicators::volatility::nr_range::NrRange,
         Pgry:            Fields      : Volatility +cube(comp_pgry_bar) => crate::indicators::volatility::park_gk_rs_yz::VolatilityEstimators,

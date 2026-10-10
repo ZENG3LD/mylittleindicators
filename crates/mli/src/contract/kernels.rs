@@ -9789,6 +9789,32 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): Wavelet entropy (1324), all wavelet types.
+    #[test]
+    fn lane_matches_cpu_bar_batch41() {
+        use crate::indicators::signal_processing::wavelet::{WaveletTransform, WaveletType};
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        for (flag, ty) in [(0u32, WaveletType::Haar), (1, WaveletType::Daubechies4), (2, WaveletType::Daubechies6), (3, WaveletType::Morlet), (4, WaveletType::Mexican), (5, WaveletType::Biorthogonal)] {
+            let mut p = CubeParams::period(8);
+            p.flag = flag;
+            let mut m = WaveletTransform::new(ty, 8);
+            chk(&run_cols(CubeFormula::WaveBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        }
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
