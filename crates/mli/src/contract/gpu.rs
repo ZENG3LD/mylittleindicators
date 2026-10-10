@@ -617,6 +617,16 @@ pub enum CubeFormula {
     MarkVsLastMg = 1076,
     /// Composite: index tracking error. UNTESTED on GPU.
     IndexTrackingMg = 1077,
+    /// Composite: OI price correlation. UNTESTED on GPU.
+    OiPriceCorrMg = 1078,
+    /// Composite: price vs index spread price/index/spread. UNTESTED on GPU.
+    PriceVsIndexMg = 1079,
+    /// Composite: vol regime entry. UNTESTED on GPU.
+    VolRegimeEntryMg = 1080,
+    /// Composite: settlement vs mark settlement/mark/spread. UNTESTED on GPU.
+    SettleVsMarkMg = 1081,
+    /// Composite: squeeze probability prob/direction. UNTESTED on GPU.
+    SqueezeProbMg = 1082,
     /// Composite: book churn rate. UNTESTED on GPU.
     BookChurnEv = 980,
     /// Composite: level replenishment rate. UNTESTED on GPU.
@@ -947,6 +957,9 @@ impl CubeFormula {
             CubeFormula::FundingPriceDivMg => 3,
             CubeFormula::IvHvSpreadMg => 3,
             CubeFormula::MarkVsLastMg => 2,
+            CubeFormula::PriceVsIndexMg => 3,
+            CubeFormula::SettleVsMarkMg => 3,
+            CubeFormula::SqueezeProbMg => 2,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1213,6 +1226,11 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::OiPriceCorrelation), Some(CubeFormula::OiPriceCorrMg));
+        assert_eq!(formula_of(IndicatorId::PriceVsIndexSpread), Some(CubeFormula::PriceVsIndexMg));
+        assert_eq!(formula_of(IndicatorId::VolRegimeEntry), Some(CubeFormula::VolRegimeEntryMg));
+        assert_eq!(formula_of(IndicatorId::SettlementVsMarkSpread), Some(CubeFormula::SettleVsMarkMg));
+        assert_eq!(formula_of(IndicatorId::SqueezeProbability), Some(CubeFormula::SqueezeProbMg));
         assert_eq!(formula_of(IndicatorId::FundingDrift), Some(CubeFormula::FundingDriftMg));
         assert_eq!(formula_of(IndicatorId::FundingOiPressure), Some(CubeFormula::FundingOiPressureMg));
         assert_eq!(formula_of(IndicatorId::FundingPriceDivergence), Some(CubeFormula::FundingPriceDivMg));

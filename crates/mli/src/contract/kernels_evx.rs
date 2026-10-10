@@ -58,6 +58,9 @@ fn evx_scan(
     let mut pa = 0.0f32;
     let mut pb = 0.0f32;
     let mut cs = 0.0f32;
+    let mut lv = 0usize;
+    let mut lm = 0usize;
+    let mut ll = 0usize;
     for i in 0..n {
         let mut v0 = 0.0f32;
         let mut v1 = 0.0f32;
@@ -757,6 +760,248 @@ fn evx_scan(
                 }
                 v0 = (ss / (cnt as f32)).sqrt();
             }
+        } else if formula == 1078u32 {
+            // OI / price correlation: slot 1 open interest (x0), slot 2 mark (x1); a pair is
+            // pushed on every row once both streams have been seen; Pearson over the last
+            // `period` (>= 2) pairs, clamped to [-1, 1], needs 2 pairs
+            let mut w = period as usize;
+            if w < 2 {
+                w = 2;
+            }
+            if side[i] == 1.0f32 && pa == 0.0f32 {
+                pa = 1.0f32;
+                h0 = i as f32;
+            }
+            if side[i] == 2.0f32 && pb == 0.0f32 {
+                pb = 1.0f32;
+                h1 = i as f32;
+            }
+            if pa > 0.0f32 && pb > 0.0f32 {
+                let mut st = h0 as usize;
+                if (h1 as usize) > st {
+                    st = h1 as usize;
+                }
+                let mut lo = st;
+                if i + 1 > w && i + 1 - w > lo {
+                    lo = i + 1 - w;
+                }
+                let cnt = i + 1 - lo;
+                if cnt >= 2 {
+                    let nf = cnt as f32;
+                    let mut sx = 0.0f32;
+                    let mut sy = 0.0f32;
+                    for j in lo..(i + 1) {
+                        sx = sx + x[j];
+                        sy = sy + x[n + j];
+                    }
+                    let mx = sx / nf;
+                    let my = sy / nf;
+                    let mut cov = 0.0f32;
+                    let mut vx = 0.0f32;
+                    let mut vy = 0.0f32;
+                    for j in lo..(i + 1) {
+                        let dx = x[j] - mx;
+                        let dy = x[n + j] - my;
+                        cov = cov + dx * dy;
+                        vx = vx + dx * dx;
+                        vy = vy + dy * dy;
+                    }
+                    let den = (vx * vy).sqrt();
+                    if den > 0.0f32 {
+                        v0 = cov / den;
+                        if v0 > 1.0f32 {
+                            v0 = 1.0f32;
+                        }
+                        if v0 < -1.0f32 {
+                            v0 = -1.0f32;
+                        }
+                    }
+                }
+                cs = v0;
+            }
+            v0 = cs;
+        } else if formula == 1079u32 {
+            // price vs index spread `[price, index, spread]`: slot 1 mark (x0), slot 2 index
+            // (x1). The CPU outputs NaN until a stream was seen; the launcher patches those
+            // rows to NaN on the host, the kernel writes 0 there.
+            v0 = x[i];
+            v1 = x[n + i];
+            v2 = x[i] - x[n + i];
+        } else if formula == 1080u32 {
+            // vol regime entry: slot 1 volatility index (x0), slot 2 mark price (x1);
+            // `period` history length (>= 4). History = the positive vol values seen before the
+            // latest vol event (last `period` of them); 75th percentile of that history.
+            let mut hl = period as usize;
+            if hl < 4 {
+                hl = 4;
+            }
+            if side[i] == 1.0f32 {
+                lv = i + 1;
+            } else {
+                h1 = h0;
+                h0 = x[n + i];
+            }
+            let mut sig = 0.0f32;
+            if lv > 0 {
+                let l = lv - 1;
+                // lower bound row of the history window
+                let mut cnt = 0usize;
+                let mut lb = 0usize;
+                let mut j = l;
+                while cnt < hl && j > 0 {
+                    j = j - 1;
+                    if side[j] == 1.0f32 && x[j] > 0.0f32 {
+                        cnt = cnt + 1;
+                        lb = j;
+                    }
+                }
+                if cnt >= 4 && x[l] > 0.0f32 {
+                    let mut k = (cnt as f32 * 0.75f32) as usize;
+                    if k > cnt - 1 {
+                        k = cnt - 1;
+                    }
+                    let mut p75 = 0.0f32;
+                    for q in lb..l {
+                        if side[q] == 1.0f32 && x[q] > 0.0f32 {
+                            let mut lt = 0usize;
+                            let mut le = 0usize;
+                            for r in lb..l {
+                                if side[r] == 1.0f32 && x[r] > 0.0f32 {
+                                    if x[r] < x[q] {
+                                        lt = lt + 1;
+                                    }
+                                    if x[r] <= x[q] {
+                                        le = le + 1;
+                                    }
+                                }
+                            }
+                            if lt <= k && k < le {
+                                p75 = x[q];
+                            }
+                        }
+                    }
+                    let is_high = x[l] >= p75;
+                    let falling = h1 > 0.0f32 && h0 < h1;
+                    if is_high && h2 == 0.0f32 && falling {
+                        sig = 1.0f32;
+                    } else if !is_high && h2 > 0.0f32 {
+                        sig = -1.0f32;
+                    }
+                    if is_high {
+                        h2 = 1.0f32;
+                    } else {
+                        h2 = 0.0f32;
+                    }
+                }
+            }
+            v0 = sig;
+        } else if formula == 1081u32 {
+            // settlement vs mark spread `[settlement, mark, spread]`: slot 1 settlement price
+            // (x0), slot 2 mark (x1)
+            v0 = x[i];
+            v1 = x[n + i];
+            v2 = x[i] - x[n + i];
+        } else if formula == 1082u32 {
+            // squeeze probability `[prob, direction]`: slot 1 open interest (x0), slot 2 mark
+            // (x1), slot 3 liquidation (x2, counted); `a` window ms, `b` max expected
+            // liquidations (>= 1). Each stream's window ends at its own latest event.
+            if side[i] == 1.0f32 {
+                lv = i + 1;
+            } else if side[i] == 2.0f32 {
+                lm = i + 1;
+            } else {
+                ll = i + 1;
+            }
+            let mut oi_score = 0.0f32;
+            if lv > 0 {
+                let l = lv - 1;
+                let mut cnt = 1usize;
+                let mut old = x[l];
+                let mut j = l;
+                let mut go = true;
+                while go && j > 0 {
+                    j = j - 1;
+                    if side[j] == 1.0f32 {
+                        if ts[l] - ts[j] <= a {
+                            cnt = cnt + 1;
+                            old = x[j];
+                        } else {
+                            go = false;
+                        }
+                    }
+                }
+                if cnt >= 2 && old > 0.0f32 {
+                    let mut d = x[l] - old;
+                    if d < 0.0f32 {
+                        d = 0.0f32 - d;
+                    }
+                    oi_score = d / old * 10.0f32;
+                    if oi_score > 1.0f32 {
+                        oi_score = 1.0f32;
+                    }
+                }
+            }
+            let mut pr_score = 0.0f32;
+            if lm > 0 {
+                let l = lm - 1;
+                let mut cnt = 1usize;
+                let mut old = x[n + l];
+                let mut j = l;
+                let mut go = true;
+                while go && j > 0 {
+                    j = j - 1;
+                    if side[j] == 2.0f32 {
+                        if ts[l] - ts[j] <= a {
+                            cnt = cnt + 1;
+                            old = x[n + j];
+                        } else {
+                            go = false;
+                        }
+                    }
+                }
+                if cnt >= 2 && old > 0.0f32 {
+                    let rel = (x[n + l] - old) / old;
+                    let mut ar = rel;
+                    if ar < 0.0f32 {
+                        ar = 0.0f32 - ar;
+                    }
+                    pr_score = ar * 100.0f32;
+                    if pr_score > 1.0f32 {
+                        pr_score = 1.0f32;
+                    }
+                    if rel > 0.0f32 {
+                        v1 = 1.0f32;
+                    } else if rel < 0.0f32 {
+                        v1 = -1.0f32;
+                    }
+                }
+            }
+            let mut liq_score = 0.0f32;
+            if ll > 0 {
+                let l = ll - 1;
+                let mut cnt = 1.0f32;
+                let mut j = l;
+                let mut go = true;
+                while go && j > 0 {
+                    j = j - 1;
+                    if side[j] == 3.0f32 {
+                        if ts[l] - ts[j] <= a {
+                            cnt = cnt + 1.0f32;
+                        } else {
+                            go = false;
+                        }
+                    }
+                }
+                let mut mx = b;
+                if mx < 1.0f32 {
+                    mx = 1.0f32;
+                }
+                liq_score = cnt / mx;
+                if liq_score > 1.0f32 {
+                    liq_score = 1.0f32;
+                }
+            }
+            v0 = 0.4f32 * oi_score + 0.3f32 * pr_score + 0.3f32 * liq_score;
         }
         out[i] = v0;
         out[n + i] = v1;
@@ -815,5 +1060,26 @@ pub fn launch_cube_events_x(
     let bytes = client.read_one_unchecked(out);
     let flat = f32::from_bytes(&bytes).to_vec();
     let cols = formula.output_count() as usize;
-    (0..cols).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect()
+    let mut res: Vec<Vec<f32>> = (0..cols).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect();
+    if formula == CubeFormula::PriceVsIndexMg {
+        // CPU: price / index are NaN until their stream was seen, spread until both were.
+        let (mut sp, mut si) = (false, false);
+        for i in 0..n {
+            if frame.side[i] == 1.0 {
+                sp = true;
+            } else if frame.side[i] == 2.0 {
+                si = true;
+            }
+            if !sp {
+                res[0][i] = f32::NAN;
+            }
+            if !si {
+                res[1][i] = f32::NAN;
+            }
+            if !(sp && si) {
+                res[2][i] = f32::NAN;
+            }
+        }
+    }
+    res
 }

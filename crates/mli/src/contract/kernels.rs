@@ -7994,6 +7994,108 @@ mod tests {
         let _ = Ev::F(&fund[0]);
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): merged multi-stream rows 1078..=1082.
+    #[test]
+    fn lane_matches_cpu_merged_batch2() {
+        use super::super::event_frame::{GpuEventFrame, MergedStream};
+        use super::super::kernels_ev::launch_cube_events;
+        use crate::core::types::{IndexPrice, Liquidation, MarkPrice, OpenInterest, SettlementEvent, VolatilityIndex};
+        use crate::engine::streams::index_price_consumer::IndexPriceConsumer;
+        use crate::engine::streams::liquidation_consumer::LiquidationConsumer;
+        use crate::engine::streams::mark_price_consumer::MarkPriceConsumer;
+        use crate::engine::streams::open_interest_consumer::OpenInterestConsumer;
+        use crate::engine::streams::settlement_event_consumer::SettlementEventConsumer;
+        use crate::engine::streams::volatility_index_consumer::VolatilityIndexConsumer;
+        use crate::indicators::composites::squeeze_probability::SqueezeProbability;
+        use crate::indicators::composites::vol_regime_entry::VolRegimeEntry;
+        use crate::indicators::index_basis::price_vs_index_spread::PriceVsIndexSpread;
+        use crate::indicators::open_interest::oi_price_correlation::OiPriceCorrelation;
+        use crate::indicators::settlement::settlement_vs_mark_spread::SettlementVsMarkSpread;
+
+        let n = 50usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let t0 = 1_700_000_000_000i64;
+        let pp = |p: u32, a: f32, b: f32| { let mut c = CubeParams::period(p); c.a = a; c.b = b; c };
+        let mk = |lists: Vec<Vec<i64>>| -> Vec<(i64, usize, usize)> {
+            let mut v: Vec<(i64, usize, usize)> = lists.iter().enumerate().flat_map(|(s, l)| l.iter().enumerate().map(move |(k, t)| (*t, s, k))).collect();
+            v.sort();
+            v
+        };
+        let oi: Vec<OpenInterest> = (0..n).map(|i| OpenInterest { open_interest: 1000.0 + 100.0 * w(i, 0.6), timestamp: t0 + i as i64 * 1700 + 20, ..Default::default() }).collect();
+        let marks: Vec<MarkPrice> = (0..n).map(|i| MarkPrice { mark_price: 100.0 + 3.0 * w(i, 0.5), timestamp: t0 + i as i64 * 900 + 10, ..Default::default() }).collect();
+        let ts_o: Vec<i64> = oi.iter().map(|f| f.timestamp).collect();
+        let ts_m: Vec<i64> = marks.iter().map(|f| f.timestamp).collect();
+        let so = MergedStream::scalar(&oi, |f| f.timestamp, |f| f.open_interest);
+        let sm = MergedStream::scalar(&marks, |f| f.timestamp, |f| f.mark_price);
+
+        let fr = GpuEventFrame::merged(&[so.clone(), sm.clone()]);
+        let mut m = OiPriceCorrelation::new(8);
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![ts_o.clone(), ts_m.clone()]) {
+            if s == 0 { m.update_oi(&oi[k]); } else { m.update_mark(&marks[k]); }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::OiPriceCorrMg, &fr, pp(8, 0.0, 0.0))[0], &c);
+
+        // Price vs index: [mark, index] (NaN rows compare as equal in assert_close only when both NaN).
+        let ip: Vec<IndexPrice> = (0..n).map(|i| IndexPrice { price: 100.0 + 2.0 * w(i, 0.4), timestamp: t0 + i as i64 * 1000 + 300, ..Default::default() }).collect();
+        let ti: Vec<i64> = ip.iter().map(|f| f.timestamp).collect();
+        let fr = GpuEventFrame::merged(&[sm.clone(), MergedStream::scalar(&ip, |f| f.timestamp, |f| f.price)]);
+        let mut m = PriceVsIndexSpread::new();
+        let (mut a, mut b, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        for (_, s, k) in mk(vec![ts_m.clone(), ti]) {
+            if s == 0 { m.update_mark(&marks[k]); } else { m.update_index_price(&ip[k]); }
+            a.push(m.price());
+            b.push(m.index());
+            c3.push(m.spread());
+        }
+        let g = launch_cube_events(CubeFormula::PriceVsIndexMg, &fr, pp(1, 0.0, 0.0));
+        for (gc, cc) in g.iter().zip([&a, &b, &c3]) {
+            for (x, y) in gc.iter().zip(cc.iter()) {
+                assert!((x.is_nan() && y.is_nan()) || ((*x as f64) - y).abs() <= 1e-3 * (1.0 + y.abs()), "{x} vs {y}");
+            }
+        }
+
+        // Vol regime entry: [vol index, mark].
+        let vi: Vec<VolatilityIndex> = (0..n).map(|i| { let mut v = VolatilityIndex::default(); v.value = 0.3 + 0.1 * w(i, 0.9); v.timestamp = t0 + i as i64 * 1200 + 7; v }).collect();
+        let tv: Vec<i64> = vi.iter().map(|f| f.timestamp).collect();
+        let fr = GpuEventFrame::merged(&[MergedStream::scalar(&vi, |f| f.timestamp, |f| f.value), sm.clone()]);
+        let mut m = VolRegimeEntry::new(10);
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![tv, ts_m.clone()]) {
+            if s == 0 { m.update_volatility_index(&vi[k]); } else { m.update_mark(&marks[k]); }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::VolRegimeEntryMg, &fr, pp(10, 0.0, 0.0))[0], &c);
+
+        // Settlement vs mark: [settlement, mark].
+        let st: Vec<SettlementEvent> = (0..n / 5).map(|i| SettlementEvent { settlement_price: 100.0 + w(i, 0.8), settlement_time: 0, timestamp: t0 + i as i64 * 4000 + 100, ..Default::default() }).collect();
+        let tt: Vec<i64> = st.iter().map(|f| f.timestamp).collect();
+        let fr = GpuEventFrame::merged(&[MergedStream::scalar(&st, |f| f.timestamp, |f| f.settlement_price), sm.clone()]);
+        let mut m = SettlementVsMarkSpread::new();
+        let (mut a, mut b, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        for (_, s, k) in mk(vec![tt, ts_m.clone()]) {
+            if s == 0 { m.update_settlement(&st[k]); } else { m.update_mark(&marks[k]); }
+            a.push(m.settlement());
+            b.push(m.mark());
+            c3.push(m.spread());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::SettleVsMarkMg, &fr, pp(1, 0.0, 0.0)), &[&a, &b, &c3]);
+
+        // Squeeze probability: [open interest, mark, liquidation].
+        let liqs: Vec<Liquidation> = (0..n).map(|i| Liquidation { price: 100.0, quantity: 1.0, timestamp: t0 + i as i64 * 700 + 40, ..Default::default() }).collect();
+        let tl: Vec<i64> = liqs.iter().map(|f| f.timestamp).collect();
+        let fr = GpuEventFrame::merged(&[so, sm, MergedStream::scalar(&liqs, |f| f.timestamp, |f| f.quantity)]);
+        let mut m = SqueezeProbability::new(6000, 10.0);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for (_, s, k) in mk(vec![ts_o, ts_m, tl]) {
+            match s { 0 => m.update_oi(&oi[k]), 1 => m.update_mark(&marks[k]), _ => m.update_liquidation(&liqs[k]) }
+            a.push(m.prob());
+            b.push(m.dir());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::SqueezeProbMg, &fr, pp(1, 6000.0, 10.0)), &[&a, &b]);
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
