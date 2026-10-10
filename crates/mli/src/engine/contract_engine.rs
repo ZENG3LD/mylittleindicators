@@ -443,7 +443,7 @@ mli_contract_macros::contract_universe! {
         AdaptiveWindowSelector: Tick : _ => crate::indicators::composites::adaptive_window_selector::AdaptiveWindowSelector,
         Kscr: Field : _ +cube(comp_kscr_comp) => crate::indicators::kalman::kalman_regime_score::KalmanRegimeScore,
         VwapDist: Fields : _ +cube(vwap_distance) => crate::indicators::levels::vwap_distance::VwapDistance,
-        ConnorsRsi: Field : Oscillator => crate::indicators::momentum::connors_rsi::ConnorsRsi,
+        ConnorsRsi: Field : Oscillator +cube(comp_connors_rsi_bar) => crate::indicators::momentum::connors_rsi::ConnorsRsi,
         IftRsi:     Field : Oscillator +cube(comp_ift_rsi_bar) => crate::indicators::momentum::ift_rsi::IftRsi,
         RsiZscore:  Field : Oscillator +cube(comp_rsi_zscore_bar) => crate::indicators::momentum::rsi_zscore::RsiZscore,
         RsiPctBands: Field : Oscillator +cube(rsi_pct_bands) => crate::indicators::momentum::rsi_percentile_bands::RsiPercentileBands { upper middle lower },

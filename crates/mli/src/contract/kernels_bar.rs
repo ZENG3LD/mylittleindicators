@@ -4296,6 +4296,100 @@ fn bar_scan(
             }
             v0 = held2;
             v1 = f1;
+        } else if formula == 1318u32 {
+            // Connors RSI: (RSI + streak RSI + ROC percentile rank) / 3. Lane o = RSI fed from bar 1 (host
+            // pass), p2 = streak RSI period, p3 = ROC window. scr ring (p2 + 1) of streak lengths;
+            // held0 = streak length, held1 = last direction, held2 = avg gain, f0 = avg loss, f1 = streak RSI
+            v0 = 50.0f32;
+            if t >= 1usize {
+                let up = p2 as usize;
+                let rp = p3 as usize;
+                let wr = up + 1usize;
+                let dir = c[t] - c[t - 1];
+                let mut dv = 0.0f32;
+                if dir > 0.0f32 {
+                    dv = 1.0f32;
+                } else if dir < 0.0f32 {
+                    dv = 0.0f32 - 1.0f32;
+                }
+                if dv != 0.0f32 {
+                    if dv == held1 {
+                        if held0 > 0.0f32 && dv > 0.0f32 {
+                            held0 = held0 + 1.0f32;
+                        } else if held0 < 0.0f32 && dv < 0.0f32 {
+                            held0 = held0 - 1.0f32;
+                        } else {
+                            held0 = dv;
+                        }
+                    } else {
+                        held0 = dv;
+                    }
+                    held1 = dv;
+                }
+                scr[t % wr] = held0;
+                let mut udv = 50.0f32;
+                if t >= 2usize {
+                    let chg = scr[t % wr] - scr[(t - 1) % wr];
+                    if t >= up + 1usize {
+                        if held2 == 0.0f32 && f0 == 0.0f32 {
+                            let mut sg = 0.0f32;
+                            let mut sl = 0.0f32;
+                            for k2 in 0..up {
+                                let q = t - k2;
+                                let cq = scr[q % wr] - scr[(q - 1) % wr];
+                                if cq > 0.0f32 {
+                                    sg = sg + cq;
+                                }
+                                if cq < 0.0f32 {
+                                    sl = sl - cq;
+                                }
+                            }
+                            held2 = sg / (up as f32);
+                            f0 = sl / (up as f32);
+                        } else {
+                            let al = 1.0f32 / (up as f32);
+                            let mut g = 0.0f32;
+                            let mut ls = 0.0f32;
+                            if chg > 0.0f32 {
+                                g = chg;
+                            }
+                            if chg < 0.0f32 {
+                                ls = 0.0f32 - chg;
+                            }
+                            held2 = al * g + (1.0f32 - al) * held2;
+                            f0 = al * ls + (1.0f32 - al) * f0;
+                        }
+                        if f0 == 0.0f32 {
+                            udv = 100.0f32;
+                        } else {
+                            udv = 100.0f32 - 100.0f32 / (1.0f32 + held2 / f0);
+                        }
+                    }
+                }
+                let mut rocp = 50.0f32;
+                if rp >= 1usize && t >= rp {
+                    let mut pr = 0.0f32;
+                    if c[t - 1] != 0.0f32 {
+                        pr = (c[t] - c[t - 1]) / c[t - 1] * 100.0f32;
+                    }
+                    let mut below = 0.0f32;
+                    let mut eq = 0.0f32;
+                    for k2 in 0..rp {
+                        let q = t - k2;
+                        let mut rq = 0.0f32;
+                        if c[q - 1] != 0.0f32 {
+                            rq = (c[q] - c[q - 1]) / c[q - 1] * 100.0f32;
+                        }
+                        if rq < pr {
+                            below = below + 1.0f32;
+                        } else if (rq - pr).abs() < 1.0e-9f32 {
+                            eq = eq + 1.0f32;
+                        }
+                    }
+                    rocp = (below + 0.5f32 * eq) / (rp as f32) * 100.0f32;
+                }
+                v0 = (o[t] + udv + rocp) / 3.0f32;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -4617,6 +4711,15 @@ fn launch_cube_bar_x(
         }
         let kp = CubeParams { signal: params.ext[4], ..params };
         let flat = bar_run(formula.code(), [&sers[0], &sers[1], &sers[2], &c, &c], kp, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::ConnorsRsiBar {
+        // the CPU RSI is first fed on bar 1, so run it on the shifted series
+        let mut rsi = vec![0.0f32];
+        if n > 1 {
+            rsi.extend(super::kernels::launch_cube(CubeFormula::Rsi, &samples[1..], params));
+        }
+        let flat = bar_run(formula.code(), [&rsi, &h, &l, &c, &v], params, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {

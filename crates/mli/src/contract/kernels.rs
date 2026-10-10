@@ -9631,6 +9631,31 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formula 1318 (ConnorsRsi).
+    #[test]
+    fn lane_matches_cpu_bar_batch36() {
+        use crate::indicators::momentum::connors_rsi::ConnorsRsi;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(3);
+        p.fast = 2;
+        p.slow = 100;
+        let mut m = ConnorsRsi::with_periods(3, 2, 100);
+        chk(&run_cols(CubeFormula::ConnorsRsiBar, &bars, p), close.iter().map(|c| vec![m.feed(*c).connors_rsi]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

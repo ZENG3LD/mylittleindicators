@@ -723,6 +723,8 @@ pub enum CubeFormula {
     WickspikeBar = 1316,
     /// Composite: swing stop. UNTESTED on GPU.
     TsSwingsBar = 1317,
+    /// Composite: connors rsi. UNTESTED on GPU.
+    ConnorsRsiBar = 1318,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1556,6 +1558,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Fvgrev), Some(CubeFormula::FvgrevBar));
         assert_eq!(formula_of(IndicatorId::Wickspike), Some(CubeFormula::WickspikeBar));
         assert_eq!(formula_of(IndicatorId::TsSwings), Some(CubeFormula::TsSwingsBar));
+        assert_eq!(formula_of(IndicatorId::ConnorsRsi), Some(CubeFormula::ConnorsRsiBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
