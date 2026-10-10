@@ -49,6 +49,7 @@ fn evx_scan(
     period: u32,
     a: f32,
     b: f32,
+    c: f32,
 ) {
     let n = side.len();
     let mut h0 = 0.0f32;
@@ -61,6 +62,7 @@ fn evx_scan(
     let mut lv = 0usize;
     let mut lm = 0usize;
     let mut ll = 0usize;
+    let mut li = 0usize;
     for i in 0..n {
         let mut v0 = 0.0f32;
         let mut v1 = 0.0f32;
@@ -1002,6 +1004,248 @@ fn evx_scan(
                 }
             }
             v0 = 0.4f32 * oi_score + 0.3f32 * pr_score + 0.3f32 * liq_score;
+        } else if formula == 1083u32 {
+            // risk-off detector: slots [vol index (x0), liquidation (x1), funding (x2),
+            // insurance fund balance (x3)]; `a` window ms, `b` vol threshold, `period` liq count
+            // threshold, `c` funding threshold (percent). Liquidations older than the current
+            // event's window are dropped on every event.
+            if side[i] == 4.0f32 {
+                li = i + 1;
+            }
+            let mut liqn = 0.0f32;
+            let mut j = i + 1;
+            let mut go = true;
+            while go && j > 0 {
+                j = j - 1;
+                if side[j] == 2.0f32 {
+                    if ts[i] - ts[j] <= a {
+                        liqn = liqn + 1.0f32;
+                    } else {
+                        go = false;
+                    }
+                }
+            }
+            let mut depleting = false;
+            if li > 0 {
+                let l = li - 1;
+                let mut cnt = 1usize;
+                let mut first = l;
+                let mut q = l;
+                while cnt < 10 && q > 0 {
+                    q = q - 1;
+                    if side[q] == 4.0f32 {
+                        cnt = cnt + 1;
+                        first = q;
+                    }
+                }
+                if cnt >= 2 && x[3 * n + l] < x[3 * n + first] {
+                    depleting = true;
+                }
+            }
+            let mut fa = x[2 * n + i];
+            if fa < 0.0f32 {
+                fa = 0.0f32 - fa;
+            }
+            let mut act = 0.0f32;
+            if x[i] > b {
+                act = act + 1.0f32;
+            }
+            if liqn >= (period as f32) {
+                act = act + 1.0f32;
+            }
+            if fa * 100.0f32 > c {
+                act = act + 1.0f32;
+            }
+            if depleting {
+                act = act + 1.0f32;
+            }
+            if act >= 2.0f32 {
+                v0 = 1.0f32;
+            }
+        } else if formula == 1084u32 {
+            // market stress composite: same slots; `a` window ms (liquidations, ends at the
+            // latest liquidation), `b` max expected liquidations (>= 1), `period` vol history
+            // cap (>= 4), `c` depletion slope threshold (per ms)
+            let mut cap = period as usize;
+            if cap < 4 {
+                cap = 4;
+            }
+            if side[i] == 1.0f32 {
+                lv = i + 1;
+            } else if side[i] == 2.0f32 {
+                ll = i + 1;
+            } else if side[i] == 4.0f32 {
+                li = i + 1;
+            }
+            // vol score
+            let mut vol_score = 0.0f32;
+            if lv > 0 {
+                let l = lv - 1;
+                let mut cnt = 1usize;
+                let mut lb = l;
+                let mut q = l;
+                while cnt < cap && q > 0 {
+                    q = q - 1;
+                    if side[q] == 1.0f32 {
+                        cnt = cnt + 1;
+                        lb = q;
+                    }
+                }
+                let mut k = (cnt as f32 * 0.95f32) as usize;
+                if k > cnt - 1 {
+                    k = cnt - 1;
+                }
+                let mut p95 = 0.0f32;
+                for r in lb..(l + 1) {
+                    if side[r] == 1.0f32 {
+                        let mut lt = 0usize;
+                        let mut le = 0usize;
+                        for u in lb..(l + 1) {
+                            if side[u] == 1.0f32 {
+                                if x[u] < x[r] {
+                                    lt = lt + 1;
+                                }
+                                if x[u] <= x[r] {
+                                    le = le + 1;
+                                }
+                            }
+                        }
+                        if lt <= k && k < le {
+                            p95 = x[r];
+                        }
+                    }
+                }
+                if p95 < 1.0e-12f32 {
+                    p95 = 1.0e-12f32;
+                }
+                vol_score = x[l] / p95;
+                if vol_score > 1.0f32 {
+                    vol_score = 1.0f32;
+                }
+                if vol_score < 0.0f32 {
+                    vol_score = 0.0f32;
+                }
+            } else {
+                // empty history: p95 = 1.0, current vol 0
+                vol_score = 0.0f32;
+            }
+            let mut liq_score = 0.0f32;
+            if ll > 0 {
+                let l = ll - 1;
+                let mut cnt = 1.0f32;
+                let mut j = l;
+                let mut go = true;
+                while go && j > 0 {
+                    j = j - 1;
+                    if side[j] == 2.0f32 {
+                        if ts[l] - ts[j] <= a {
+                            cnt = cnt + 1.0f32;
+                        } else {
+                            go = false;
+                        }
+                    }
+                }
+                let mut mx = b;
+                if mx < 1.0f32 {
+                    mx = 1.0f32;
+                }
+                liq_score = cnt / mx;
+                if liq_score > 1.0f32 {
+                    liq_score = 1.0f32;
+                }
+            }
+            let mut fa = x[2 * n + i];
+            if fa < 0.0f32 {
+                fa = 0.0f32 - fa;
+            }
+            let mut fund_score = fa * 100.0f32;
+            if fund_score > 1.0f32 {
+                fund_score = 1.0f32;
+            }
+            let mut dep = 0.0f32;
+            if li > 0 {
+                let l = li - 1;
+                let mut cnt = 1usize;
+                let mut first = l;
+                let mut q = l;
+                while cnt < 10 && q > 0 {
+                    q = q - 1;
+                    if side[q] == 4.0f32 {
+                        cnt = cnt + 1;
+                        first = q;
+                    }
+                }
+                if cnt >= 2 {
+                    let mut dt = ts[l] - ts[first];
+                    if dt < 1.0f32 {
+                        dt = 1.0f32;
+                    }
+                    let slope = (x[3 * n + l] - x[3 * n + first]) / dt;
+                    if slope < c {
+                        dep = 1.0f32;
+                    }
+                }
+            }
+            v0 = 0.3f32 * vol_score + 0.3f32 * liq_score + 0.2f32 * fund_score + 0.2f32 * dep;
+        } else if formula == 1085u32 {
+            // sentiment composite: slots [long/short ratio (x0), agg trade (x1 price, x2
+            // quantity, x3 is_buy), funding (x4)]; `a` window ms (agg trades, ends at the
+            // latest agg trade). Mean of ratio norm, taker flow imbalance, funding norm.
+            if side[i] == 1.0f32 {
+                pa = 1.0f32;
+            } else if side[i] == 2.0f32 {
+                ll = i + 1;
+            }
+            let mut lsn = 0.0f32;
+            if pa > 0.0f32 {
+                lsn = (x[i] - 0.5f32) * 2.0f32;
+                if lsn > 1.0f32 {
+                    lsn = 1.0f32;
+                }
+                if lsn < -1.0f32 {
+                    lsn = -1.0f32;
+                }
+            }
+            let mut fl = 0.0f32;
+            if ll > 0 {
+                let l = ll - 1;
+                let mut buy = 0.0f32;
+                let mut tot = 0.0f32;
+                let mut j = l + 1;
+                let mut go = true;
+                while go && j > 0 {
+                    j = j - 1;
+                    if side[j] == 2.0f32 {
+                        if ts[l] - ts[j] <= a {
+                            let q = x[n + j] * x[2 * n + j];
+                            tot = tot + q;
+                            // CPU stores `!is_buy` and counts those as "buy" volume
+                            if x[3 * n + j] < 0.5f32 {
+                                buy = buy + q;
+                            }
+                        } else {
+                            go = false;
+                        }
+                    }
+                }
+                if tot >= 1.0e-12f32 {
+                    fl = buy / tot * 2.0f32 - 1.0f32;
+                    if fl > 1.0f32 {
+                        fl = 1.0f32;
+                    }
+                    if fl < -1.0f32 {
+                        fl = -1.0f32;
+                    }
+                }
+            }
+            let mut fnn = x[4 * n + i] * 1000.0f32;
+            if fnn > 1.0f32 {
+                fnn = 1.0f32;
+            }
+            if fnn < -1.0f32 {
+                fnn = -1.0f32;
+            }
+            v0 = (lsn + fl + fnn) / 3.0f32;
         }
         out[i] = v0;
         out[n + i] = v1;
@@ -1019,8 +1263,9 @@ fn evx_map(
     period: u32,
     a: f32,
     b: f32,
+    c: f32,
 ) {
-    evx_scan(x, side, ts, out, formula, period, a, b);
+    evx_scan(x, side, ts, out, formula, period, a, b, c);
 }
 
 /// Run an event formula of codes 940..=999. One `Vec` per output column.
@@ -1055,6 +1300,7 @@ pub fn launch_cube_events_x(
             params.period,
             params.a,
             params.b,
+            params.c,
         );
     }
     let bytes = client.read_one_unchecked(out);

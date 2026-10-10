@@ -8096,6 +8096,89 @@ mod tests {
         assert_cols(&launch_cube_events(CubeFormula::SqueezeProbMg, &fr, pp(1, 6000.0, 10.0)), &[&a, &b]);
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): merged multi-stream rows 1083..=1085.
+    #[test]
+    fn lane_matches_cpu_merged_batch3() {
+        use super::super::event_frame::{GpuEventFrame, MergedStream};
+        use super::super::kernels_ev::launch_cube_events;
+        use crate::core::types::{AggTrade, FundingRate, InsuranceFund, Liquidation, LongShortRatio, VolatilityIndex};
+        use crate::engine::streams::agg_trade_consumer::AggTradeConsumer;
+        use crate::engine::streams::funding_rate_consumer::FundingRateConsumer;
+        use crate::engine::streams::insurance_fund_consumer::InsuranceFundConsumer;
+        use crate::engine::streams::liquidation_consumer::LiquidationConsumer;
+        use crate::engine::streams::long_short_ratio_consumer::LongShortRatioConsumer;
+        use crate::engine::streams::volatility_index_consumer::VolatilityIndexConsumer;
+        use crate::indicators::composites::market_stress_composite::MarketStressComposite;
+        use crate::indicators::composites::risk_off_detector::RiskOffDetector;
+        use crate::indicators::composites::sentiment_composite::SentimentComposite;
+
+        let n = 50usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let t0 = 1_700_000_000_000i64;
+        let mk = |lists: Vec<Vec<i64>>| -> Vec<(i64, usize, usize)> {
+            let mut v: Vec<(i64, usize, usize)> = lists.iter().enumerate().flat_map(|(s, l)| l.iter().enumerate().map(move |(k, t)| (*t, s, k))).collect();
+            v.sort();
+            v
+        };
+        let vi: Vec<VolatilityIndex> = (0..n).map(|i| { let mut v = VolatilityIndex::default(); v.value = 0.3 + 0.4 * w(i, 0.5); v.timestamp = t0 + i as i64 * 1200 + 7; v }).collect();
+        let liqs: Vec<Liquidation> = (0..n).map(|i| Liquidation { price: 100.0, quantity: 1.0, timestamp: t0 + i as i64 * 700 + 40, ..Default::default() }).collect();
+        let fund: Vec<FundingRate> = (0..n).map(|i| FundingRate { rate: (w(i, 0.9) - 0.5) * 0.004, timestamp: t0 + i as i64 * 1900 + 3, ..Default::default() }).collect();
+        let ins: Vec<InsuranceFund> = (0..n).map(|i| InsuranceFund { balance: 1.0e6 - 3.0e3 * i as f64 * w(i, 0.3) + 1.0e4 * w(i, 1.7), timestamp: t0 + i as i64 * 1500 + 11 }).collect();
+        let tv: Vec<i64> = vi.iter().map(|f| f.timestamp).collect();
+        let tl: Vec<i64> = liqs.iter().map(|f| f.timestamp).collect();
+        let tf: Vec<i64> = fund.iter().map(|f| f.timestamp).collect();
+        let ti: Vec<i64> = ins.iter().map(|f| f.timestamp).collect();
+        let streams = [
+            MergedStream::scalar(&vi, |f| f.timestamp, |f| f.value),
+            MergedStream::scalar(&liqs, |f| f.timestamp, |f| f.quantity),
+            MergedStream::scalar(&fund, |f| f.timestamp, |f| f.rate),
+            MergedStream::scalar(&ins, |f| f.timestamp, |f| f.balance),
+        ];
+        let fr = GpuEventFrame::merged(&streams);
+        let mut p = CubeParams::period(2);
+        p.a = 5000.0;
+        p.b = 0.5;
+        p.c = 0.1;
+        let mut m = RiskOffDetector::new(5000, 0.5, 2, 0.1);
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![tv.clone(), tl.clone(), tf.clone(), ti.clone()]) {
+            match s { 0 => m.update_volatility_index(&vi[k]), 1 => m.update_liquidation(&liqs[k]), 2 => m.update_funding(&fund[k]), _ => m.update_insurance_fund(&ins[k]) }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::RiskOffMg, &fr, p)[0], &c);
+
+        let mut p = CubeParams::period(8);
+        p.a = 5000.0;
+        p.b = 6.0;
+        p.c = -0.001;
+        let mut m = MarketStressComposite::new(5000, 6.0, 8, -0.001);
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![tv, tl, tf.clone(), ti]) {
+            match s { 0 => m.update_volatility_index(&vi[k]), 1 => m.update_liquidation(&liqs[k]), 2 => m.update_funding(&fund[k]), _ => m.update_insurance_fund(&ins[k]) }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::MarketStressMg, &fr, p)[0], &c);
+
+        let lsr: Vec<LongShortRatio> = (0..n).map(|i| LongShortRatio { long_ratio: 0.3 + 0.4 * w(i, 0.8), timestamp: t0 + i as i64 * 2100 + 30, ..Default::default() }).collect();
+        let aggs: Vec<AggTrade> = (0..n).map(|i| AggTrade { price: 100.0 + w(i, 0.3), quantity: 0.2 + w(i, 0.77), timestamp: t0 + i as i64 * 400, is_buy: w(i, 1.1) > 0.5, ..Default::default() }).collect();
+        let tls: Vec<i64> = lsr.iter().map(|f| f.timestamp).collect();
+        let tag: Vec<i64> = aggs.iter().map(|f| f.timestamp).collect();
+        let fr = GpuEventFrame::merged(&[
+            MergedStream::scalar(&lsr, |f| f.timestamp, |f| f.long_ratio),
+            MergedStream::from_fn(&aggs, 3, |f| f.timestamp, |f| vec![f.price, f.quantity, if f.is_buy { 1.0 } else { 0.0 }]),
+            MergedStream::scalar(&fund, |f| f.timestamp, |f| f.rate),
+        ]);
+        let mut p = CubeParams::period(1);
+        p.a = 3000.0;
+        let mut m = SentimentComposite::new(3000);
+        let mut c = Vec::new();
+        for (_, s, k) in mk(vec![tls, tag, tf]) {
+            match s { 0 => m.update_long_short_ratio(&lsr[k]), 1 => m.update_agg_trade(&aggs[k]), _ => m.update_funding(&fund[k]) }
+            c.push(m.indicator_value());
+        }
+        assert_close(&launch_cube_events(CubeFormula::SentimentCompMg, &fr, p)[0], &c);
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

@@ -627,6 +627,12 @@ pub enum CubeFormula {
     SettleVsMarkMg = 1081,
     /// Composite: squeeze probability prob/direction. UNTESTED on GPU.
     SqueezeProbMg = 1082,
+    /// Composite: risk-off detector. UNTESTED on GPU.
+    RiskOffMg = 1083,
+    /// Composite: market stress composite. UNTESTED on GPU.
+    MarketStressMg = 1084,
+    /// Composite: sentiment composite. UNTESTED on GPU.
+    SentimentCompMg = 1085,
     /// Composite: book churn rate. UNTESTED on GPU.
     BookChurnEv = 980,
     /// Composite: level replenishment rate. UNTESTED on GPU.
@@ -1226,6 +1232,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::RiskOffDetector), Some(CubeFormula::RiskOffMg));
+        assert_eq!(formula_of(IndicatorId::MarketStressComposite), Some(CubeFormula::MarketStressMg));
+        assert_eq!(formula_of(IndicatorId::SentimentComposite), Some(CubeFormula::SentimentCompMg));
         assert_eq!(formula_of(IndicatorId::OiPriceCorrelation), Some(CubeFormula::OiPriceCorrMg));
         assert_eq!(formula_of(IndicatorId::PriceVsIndexSpread), Some(CubeFormula::PriceVsIndexMg));
         assert_eq!(formula_of(IndicatorId::VolRegimeEntry), Some(CubeFormula::VolRegimeEntryMg));
