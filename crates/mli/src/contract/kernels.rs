@@ -113,6 +113,19 @@ fn depth_sum(sz: &[f32], nside: &[f32], i: usize, depth: usize, levels: usize) -
     acc
 }
 
+/// Newton square root. Zero for a non-positive input.
+#[cube]
+fn sqrt_f(x: f32) -> f32 {
+    let mut y = 0.0f32;
+    if x > 0.0f32 {
+        y = x;
+        for _step in 0..12 {
+            y = 0.5f32 * (y + x / y);
+        }
+    }
+    y
+}
+
 /// `slot` 0..3 reads `s0`..`s3`. Anything else is `s0`.
 #[cube]
 fn slot_at(s0: &[f32], s1: &[f32], s2: &[f32], s3: &[f32], i: usize, slot: u32) -> f32 {
@@ -641,6 +654,87 @@ fn scan_lane(
                 }
             }
         }
+    } else if formula == 31u32 {
+        let mut win = p;
+        if win < 2 {
+            win = 2;
+        }
+        for i in 0..n {
+            let mut cnt = i + 1;
+            if cnt > win {
+                cnt = win;
+            }
+            if cnt < 2 {
+                output[i] = 0.0f32;
+            } else {
+                let start = i + 1 - cnt;
+                let mut sum = 0.0f32;
+                for k in 0..cnt {
+                    sum = sum + slot_at(s0, s1, s2, s3, start + k, slot);
+                }
+                let mean = sum / (cnt as f32);
+                let mut var = 0.0f32;
+                for k in 0..cnt {
+                    let d = slot_at(s0, s1, s2, s3, start + k, slot) - mean;
+                    var = var + d * d;
+                }
+                output[i] = sqrt_f(var / (cnt as f32));
+            }
+        }
+    } else if formula == 32u32 {
+        let win = p;
+        for i in 0..n {
+            let mut cnt = i;
+            if cnt > win {
+                cnt = win;
+            }
+            if cnt == 0 {
+                output[i] = 0.0f32;
+            } else {
+                let start = i - cnt;
+                let cur = slot_at(s0, s1, s2, s3, i, slot);
+                let mut below = 0.0f32;
+                for k in 0..cnt {
+                    if slot_at(s0, s1, s2, s3, start + k, slot) < cur {
+                        below = below + 1.0f32;
+                    }
+                }
+                output[i] = below / (cnt as f32);
+            }
+        }
+    } else if formula == 33u32 {
+        let win = p;
+        for i in 0..n {
+            let mut cnt = i + 1;
+            if cnt > win {
+                cnt = win;
+            }
+            let start = i + 1 - cnt;
+            let mut sum = 0.0f32;
+            for k in 0..cnt {
+                sum = sum + slot_at(s0, s1, s2, s3, start + k, slot);
+            }
+            let mean = sum / (cnt as f32);
+            if mean == 0.0f32 {
+                output[i] = 1.0f32;
+            } else {
+                output[i] = slot_at(s0, s1, s2, s3, i, slot) / mean;
+            }
+        }
+    } else if formula == 34u32 {
+        let mut ep = p;
+        if ep < 2 {
+            ep = 2;
+        }
+        let alpha = 2.0f32 / ((ep as f32) + 1.0f32);
+        let mut prev = slot_at(s0, s1, s2, s3, 0, slot);
+        output[0] = 0.0f32;
+        for k in 1..n {
+            let x = slot_at(s0, s1, s2, s3, k, slot);
+            let ema = alpha * x + (1.0f32 - alpha) * prev;
+            output[k] = ema - prev;
+            prev = ema;
+        }
     }
 }
 
@@ -881,15 +975,18 @@ mod tests {
     use crate::indicators::volatility::atr::Atr;
     use crate::indicators::volatility::true_range::TrueRange;
     use crate::core::types::{
-        Basis, FundingRate, FundingSettlement, HistoricalVolatility, InsuranceFund, MarkPrice,
-        OpenInterest, OptionGreeks, OrderBook, SettlementEvent, Ticker, VolatilityIndex,
+        AuctionEvent, Basis, FundingRate, FundingSettlement, HistoricalVolatility, InsuranceFund,
+        LongShortRatio, MarkPrice, OpenInterest, OptionGreeks, OrderBook, SettlementEvent, Ticker,
+        VolatilityIndex,
     };
     use crate::engine::streams::order_book_consumer::OrderBookConsumer;
     use crate::engine::streams::{
-        BasisConsumer, FundingRateConsumer, FundingSettlementConsumer, HistoricalVolatilityConsumer,
-        InsuranceFundConsumer, MarkPriceConsumer, OpenInterestConsumer, OptionGreeksConsumer,
-        SettlementEventConsumer, TickerConsumer, VolatilityIndexConsumer,
+        AuctionEventConsumer, BasisConsumer, FundingRateConsumer, FundingSettlementConsumer,
+        HistoricalVolatilityConsumer, InsuranceFundConsumer, LongShortRatioConsumer,
+        MarkPriceConsumer, OpenInterestConsumer, OptionGreeksConsumer, SettlementEventConsumer,
+        TickerConsumer, VolatilityIndexConsumer,
     };
+    use crate::indicators::auction::auction_imbalance::AuctionImbalance;
     use crate::indicators::funding_advanced::annualized_funding_rate::AnnualizedFundingRate;
     use crate::indicators::funding_advanced::funding_z_score::FundingZScore;
     use crate::indicators::funding_advanced::settled_funding_momentum::SettledFundingMomentum;
@@ -898,10 +995,14 @@ mod tests {
     use crate::indicators::index_basis::basis_momentum::BasisMomentum;
     use crate::indicators::index_basis::basis_z_score::BasisZScore;
     use crate::indicators::mark_price_advanced::mark_price_momentum::MarkPriceMomentum;
+    use crate::indicators::mark_price_advanced::mark_price_volatility::MarkPriceVolatility;
     use crate::indicators::open_interest::oi_momentum::OiMomentum;
+    use crate::indicators::open_interest::oi_percentile::OiPercentile;
     use crate::indicators::open_interest::oi_z_score::OiZScore;
+    use crate::indicators::sentiment::long_short_ratio_momentum::LongShortRatioMomentum;
     use crate::indicators::settlement::settlement_price_momentum::SettlementPriceMomentum;
     use crate::indicators::stress::fund_depletion_rate::FundDepletionRate;
+    use crate::indicators::stress::insurance_fund_momentum::InsuranceFundMomentum;
     use crate::indicators::ticker_advanced::volume_24h_momentum::Volume24hMomentum;
     use crate::indicators::ticker_advanced::volume_24h_z_score::Volume24hZScore;
     use crate::indicators::volatility_advanced::hv_momentum::HvMomentum;
@@ -1600,6 +1701,101 @@ mod tests {
         assert_close(
             &launch_cube(CubeFormula::PopZScore, &fund_z_samples, slot0),
             &cpu_fund_z,
+        );
+
+        let mut ls = LongShortRatioMomentum::new(period as usize);
+        let ls_samples: Vec<GpuSample> = xs
+            .iter()
+            .map(|v| {
+                let mut r = LongShortRatio::default();
+                r.long_ratio = *v;
+                r.short_ratio = 0.5;
+                GpuSample::from(&r)
+            })
+            .collect();
+        let cpu_ls: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let mut r = LongShortRatio::default();
+                r.long_ratio = *v;
+                r.short_ratio = 0.5;
+                ls.update_long_short_ratio(&r);
+                ls.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EndpointSlope, &ls_samples, slot0),
+            &cpu_ls,
+        );
+
+        let mut mark_v = MarkPriceVolatility::new(period as usize);
+        let cpu_mark_v: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let mut mp = MarkPrice::default();
+                mp.mark_price = *v;
+                mark_v.update_mark(&mp);
+                mark_v.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::PopStd, &mark_samples, slot0),
+            &cpu_mark_v,
+        );
+
+        let mut oi_p = OiPercentile::new(period as usize);
+        let cpu_oi_p: Vec<f64> = xs
+            .iter()
+            .map(|v| {
+                let mut oi = OpenInterest::default();
+                oi.open_interest = *v;
+                oi_p.update_oi(&oi);
+                oi_p.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::PercentileRank, &oi_samples, slot0),
+            &cpu_oi_p,
+        );
+
+        let mut fund_step = InsuranceFundMomentum::new(period as usize);
+        let cpu_step: Vec<f64> = funds
+            .iter()
+            .map(|f| {
+                fund_step.update_insurance_fund(f);
+                fund_step.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::EmaStep, &fund_samples, slot0),
+            &cpu_step,
+        );
+
+        let mut slot1 = CubeParams::period(period);
+        slot1.slot = 1;
+        let qty = [0.0_f64, 0.0, 4.0, 2.0, 6.0, 1.0, 3.0];
+        let auctions: Vec<AuctionEvent> = qty
+            .iter()
+            .map(|v| AuctionEvent {
+                auction_id: String::new(),
+                indicative_price: 50.0,
+                indicative_qty: *v,
+                state: String::new(),
+                timestamp: 0,
+            })
+            .collect();
+        let auction_samples: Vec<GpuSample> = auctions.iter().map(GpuSample::from).collect();
+        let mut auction = AuctionImbalance::new(period as usize);
+        let cpu_auction: Vec<f64> = auctions
+            .iter()
+            .map(|a| {
+                auction.update_auction(a);
+                auction.value()
+            })
+            .collect();
+        assert_close(
+            &launch_cube(CubeFormula::RatioToMean, &auction_samples, slot1),
+            &cpu_auction,
         );
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());

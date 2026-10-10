@@ -185,6 +185,10 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "endpoint_slope" => "EndpointSlope",
         "pop_zscore" => "PopZScore",
         "scale" => "Scale",
+        "pop_std" => "PopStd",
+        "percentile_rank" => "PercentileRank",
+        "ratio_to_mean" => "RatioToMean",
+        "ema_step" => "EmaStep",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

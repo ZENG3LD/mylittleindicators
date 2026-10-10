@@ -97,6 +97,18 @@ pub enum CubeFormula {
     PopZScore = 29,
     /// `output[i] = s0[i] * a`. Stateless scale of the primary number.
     Scale = 30,
+    /// Population standard deviation of the [`CubeParams::slot`] window.
+    /// Zero until two samples. `period` below 2 is 2.
+    PopStd = 31,
+    /// Share of the previous window strictly below the current sample.
+    /// The current sample is not in that window. Zero on the first sample.
+    PercentileRank = 32,
+    /// Current slot value over the mean of the window that includes it.
+    /// `1` when that mean is zero.
+    RatioToMean = 33,
+    /// One-step change of an EMA. Alpha is `2 / (period + 1)`. The first
+    /// sample is zero. `period` below 2 is 2.
+    EmaStep = 34,
 }
 
 /// Scalar axes a cube launch reads beside the OHLCV columns.
@@ -222,6 +234,11 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::BasisZScore), Some(CubeFormula::PopZScore));
         assert_eq!(formula_of(IndicatorId::Volume24hZScore), Some(CubeFormula::PopZScore));
         assert_eq!(formula_of(IndicatorId::AnnualizedFundingRate), Some(CubeFormula::Scale));
+        assert_eq!(formula_of(IndicatorId::LongShortRatioMomentum), Some(CubeFormula::EndpointSlope));
+        assert_eq!(formula_of(IndicatorId::MarkPriceVolatility), Some(CubeFormula::PopStd));
+        assert_eq!(formula_of(IndicatorId::OiPercentile), Some(CubeFormula::PercentileRank));
+        assert_eq!(formula_of(IndicatorId::AuctionImbalance), Some(CubeFormula::RatioToMean));
+        assert_eq!(formula_of(IndicatorId::InsuranceFundMomentum), Some(CubeFormula::EmaStep));
     }
 
     #[cfg(feature = "gpu-shader")]
