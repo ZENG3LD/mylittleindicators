@@ -266,6 +266,7 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "session_effect" => "SessionEffect",
         "month_effect" => "MonthEffect",
         "day_of_month_effect" => "DayOfMonthEffect",
+        "hampel" => "Hampel",
         _ => {
             return Err(syn::Error::new(
                 name.span(),

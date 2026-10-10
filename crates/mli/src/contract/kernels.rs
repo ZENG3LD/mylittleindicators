@@ -4009,6 +4009,93 @@ fn bar_map_t(
     bar_scan_t(close, weekday, hour, month, dom, state, output, formula);
 }
 
+/// Bar formula 94, Hampel filter. Own entry: the median and MAD are rank scans,
+/// O(window^2) per bar. `period` is the window (3..=512), `a` is k (3 when not positive).
+/// The feed uses the upper median (`len / 2`) for both the median and the MAD.
+#[cube]
+fn bar_scan_o(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    a: f32,
+    formula: u32,
+) {
+    let n = open.len();
+    let mut win = period as usize;
+    if win < 3 {
+        win = 3;
+    }
+    if win > 512 {
+        win = 512;
+    }
+    let mut k = a;
+    if k <= 0.0f32 {
+        k = 3.0f32;
+    }
+    let mut half = 0usize;
+    let mut left = win;
+    for _step in 0..win {
+        if left >= 2 {
+            left = left - 2;
+            half = half + 1;
+        }
+    }
+    if formula == 94u32 {
+        for i in 0..n {
+            if i + 1 < win {
+                output[i] = 0.0f32;
+            } else {
+                let start = i + 1 - win;
+                let x = fld(open, high, low, close, volume, i, lane);
+                let med = window_rank(open, high, low, close, volume, start, win, half, lane);
+                let mad = window_dev_rank(
+                    open, high, low, close, volume, start, win, half, lane, med,
+                );
+                let sigma = 1.4826f32 * mad;
+                let mut denom = sigma;
+                if denom < 1.0e-9f32 {
+                    denom = 1.0e-9f32;
+                }
+                let z = (x - med) / denom;
+                let mut az = z;
+                if az < 0.0f32 {
+                    az = -az;
+                }
+                if az > k {
+                    if z > 0.0f32 {
+                        output[i] = med + k * sigma;
+                    } else {
+                        output[i] = med - k * sigma;
+                    }
+                } else {
+                    output[i] = x;
+                }
+            }
+        }
+    }
+}
+
+#[cube(launch_unchecked)]
+fn bar_map_o(
+    open: &[f32],
+    high: &[f32],
+    low: &[f32],
+    close: &[f32],
+    volume: &[f32],
+    output: &mut [f32],
+    lane: u32,
+    period: u32,
+    a: f32,
+    formula: u32,
+) {
+    bar_scan_o(open, high, low, close, volume, output, lane, period, a, formula);
+}
+
 #[cube(launch_unchecked)]
 fn lane_map(
     open: &[f32],
@@ -4184,7 +4271,23 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     let cubes = (n as u32).div_ceil(dim);
     let book_len = c.bid_px.len();
     unsafe {
-        if formula.code() >= 91 {
+        if formula.code() >= 94 && formula.code() < 100 {
+            bar_map_o::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(open_b, n),
+                BufferArg::from_raw_parts(high_b, n),
+                BufferArg::from_raw_parts(low_b, n),
+                BufferArg::from_raw_parts(close_b, n),
+                BufferArg::from_raw_parts(volume_b, n),
+                BufferArg::from_raw_parts(output.clone(), n),
+                params.lane.code(),
+                params.period,
+                params.a,
+                formula.code(),
+            );
+        } else if formula.code() >= 91 {
             bar_map_n::launch_unchecked(
                 &client,
                 CubeCount::new_1d(1),
@@ -4610,6 +4713,7 @@ mod tests {
     use super::*;
     use crate::engine::ohlcv_field::OhlcvField;
     use crate::indicators::accumulation::accumulation_distribution::AccumulationDistribution;
+    use crate::indicators::signal_processing::hampel_filter::HampelFilter;
     use crate::contract::gpu_sample::GpuTimes;
     use crate::indicators::volume::vroc::VolumeRateOfChange;
     use crate::indicators::channels::donchian_breakout::DonchianBreakout;
@@ -6226,6 +6330,13 @@ mod tests {
             &launch_cube_timed(CubeFormula::DayOfMonthEffect, &tsamples, &tcols, CubeParams::period(1)),
             &cpu_dw,
         );
+
+        // UNTESTED on GPU (no GPU on the authoring box): Hampel filter, code 94.
+        let mut hampel = HampelFilter::new(7, 2.0);
+        let cpu_hampel: Vec<f64> = bars.iter().map(|b| hampel.feed(b.close)).collect();
+        let mut hampel_params = CubeParams::period(7);
+        hampel_params.a = 2.0;
+        assert_close(&run(CubeFormula::Hampel, &bars, hampel_params), &cpu_hampel);
 
         assert!(run(CubeFormula::WindowMean, &[], CubeParams::period(5)).is_empty());
     }

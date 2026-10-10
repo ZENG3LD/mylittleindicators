@@ -6,7 +6,7 @@
 //! not implement [`GpuCube`] to join that table.
 //!
 //! [`GpuShader`] is the escape hatch for a formula the cube subset cannot
-//! express. No catalog member uses it. Feature `gpu-shader` is the wgpu
+//! express. `+shader` on a manifest row marks it and [`shader_of`] names its WGSL. Feature `gpu-shader` is the wgpu
 //! submitter for that text.
 
 /// How an indicator may leave the CPU.
@@ -275,6 +275,8 @@ pub enum CubeFormula {
     DonchianBreakout = 92,
     /// Heikin Ashi trend packed as f32: `+1` HA close above HA open, `-1` below, else `0`.
     HeikinAshiTrend = 93,
+    /// Hampel filter: the sample, or `median +- k * 1.4826 * MAD` when it lies more than `k` robust sigmas out. `period` is the window (3..=512), [`CubeParams::a`] is `k` (3 when not positive). Zero until the window is full. Upper median for both statistics, as the feed.
+    Hampel = 94,
     /// Weekday effect: running mean log return of the current weekday bucket (`GpuTimes::weekday`). Calendar formula: use `launch_cube_timed`. Zero on the first bar.
     WeekdayEffect = 140,
     /// Session effect: running mean log return of the current session bucket (hour < 6 overnight, < 12 Asia, < 18 Europe, else US). Use `launch_cube_timed`.
@@ -464,6 +466,40 @@ pub trait GpuShader: super::Indicator {
     fn shader_entry() -> &'static str;
 }
 
+/// A catalog row backed by hand-written WGSL: the text and its entry point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShaderSpec {
+    pub source: &'static str,
+    pub entry: &'static str,
+}
+
+/// The WGSL behind a `+shader` catalog row, or `None` for every other id.
+/// A row joins this table in two places: `+shader` on its manifest line (which
+/// makes `gpu_of` answer [`GpuMode::Shader`]) and an arm here that names its
+/// [`GpuShader`] impl. A formula that fits the cube subset stays `+cube`.
+pub fn shader_of(id: crate::engine::indicator_id::IndicatorId) -> Option<ShaderSpec> {
+    use crate::engine::indicator_id::IndicatorId;
+    match id {
+        IndicatorId::Decyc => Some(ShaderSpec {
+            source: <crate::indicators::signal_processing::decycler::Decycler as GpuShader>::shader_source(),
+            entry: <crate::indicators::signal_processing::decycler::Decycler as GpuShader>::shader_entry(),
+        }),
+        _ => None,
+    }
+}
+
+/// Decycler needs `cos` and `sqrt` of its period for the high-pass coefficients,
+/// so it is the first `+shader` row. See `shaders/decycler.wgsl` for the bindings.
+impl GpuShader for crate::indicators::signal_processing::decycler::Decycler {
+    fn shader_source() -> &'static str {
+        include_str!("shaders/decycler.wgsl")
+    }
+
+    fn shader_entry() -> &'static str {
+        "decycler"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -605,6 +641,20 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Session), Some(CubeFormula::SessionEffect));
         assert_eq!(formula_of(IndicatorId::MonthQtr), Some(CubeFormula::MonthEffect));
         assert_eq!(formula_of(IndicatorId::DomWoq), Some(CubeFormula::DayOfMonthEffect));
+        assert_eq!(formula_of(IndicatorId::Hampel), Some(CubeFormula::Hampel));
+        assert_eq!(gpu_of(IndicatorId::Decyc), GpuMode::Shader);
+        assert_eq!(formula_of(IndicatorId::Decyc), None);
+        let spec = shader_of(IndicatorId::Decyc).expect("decycler shader");
+        assert_eq!(spec.entry, "decycler");
+        assert!(spec.source.contains("fn decycler"));
+        assert!(shader_of(IndicatorId::Sma).is_none());
+    }
+
+    #[cfg(feature = "gpu-shader")]
+    #[test]
+    fn decycler_shader_parses() {
+        let spec = shader_of(IndicatorId::Decyc).expect("decycler shader");
+        naga::front::wgsl::parse_str(spec.source).expect("decycler shader");
     }
 
     #[cfg(feature = "gpu-shader")]
