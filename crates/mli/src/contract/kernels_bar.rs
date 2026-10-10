@@ -4113,6 +4113,90 @@ fn bar_scan(
                     v0 = (mean - mu) / sd;
                 }
             }
+        } else if formula == 1313u32 {
+            // FVG hit rate over max(period, 20) triplets (hit = bull or bear fair value gap), 0 until full
+            let mut w = period as usize;
+            if w < 20usize {
+                w = 20usize;
+            }
+            if t >= w + 1usize {
+                let mut s = 0.0f32;
+                for k2 in 0..w {
+                    let q = t - k2;
+                    let bull = l[q - 1] > h[q - 2] && l[q - 1] > h[q];
+                    let bear = h[q - 1] < l[q - 2] && h[q - 1] < l[q];
+                    if bull || bear {
+                        s = s + 1.0f32;
+                    }
+                }
+                held0 = s / (w as f32);
+            }
+            v0 = held0;
+        } else if formula == 1314u32 {
+            // FVG intensity: EMA (alpha in `a`, clamped 0..1) of the gap size at every triplet
+            if t >= 2usize {
+                let al = a.max(0.0f32).min(1.0f32);
+                let bull = l[t - 1] > h[t - 2] && l[t - 1] > h[t];
+                let bear = h[t - 1] < l[t - 2] && h[t - 1] < l[t];
+                let mut gap = 0.0f32;
+                if bull {
+                    gap = (l[t - 1] - h[t - 2]).max(l[t - 1] - h[t]).max(0.0f32);
+                } else if bear {
+                    gap = (l[t - 2] - h[t - 1]).min(l[t] - h[t - 1]).abs();
+                }
+                held0 = al * gap + (1.0f32 - al) * held0;
+            }
+            v0 = held0;
+        } else if formula == 1315u32 {
+            // FVG reversion probability: pending gaps (upper, lower, remaining bars) live in scr[3 * i];
+            // held0 = total gaps, held1 = gaps revisited by the next close, cnt_a = pending count
+            if t >= 3usize {
+                let mut hz = period as usize;
+                if hz < 1usize {
+                    hz = 1usize;
+                }
+                if hz > 50usize {
+                    hz = 50usize;
+                }
+                let b0 = t - 3;
+                let b1 = t - 2;
+                let b2 = t - 1;
+                let bull = l[b1] > h[b0] && l[b1] > h[b2];
+                let bear = h[b1] < l[b0] && h[b1] < l[b2];
+                if bull {
+                    scr[3 * cnt_a] = l[b1];
+                    scr[3 * cnt_a + 1] = h[b0].max(h[b2]);
+                    scr[3 * cnt_a + 2] = hz as f32;
+                    cnt_a = cnt_a + 1usize;
+                    held0 = held0 + 1.0f32;
+                } else if bear {
+                    scr[3 * cnt_a] = l[b0].min(h[b2]);
+                    scr[3 * cnt_a + 1] = h[b1];
+                    scr[3 * cnt_a + 2] = hz as f32;
+                    cnt_a = cnt_a + 1usize;
+                    held0 = held0 + 1.0f32;
+                }
+                let nc = c[t];
+                let mut dst = 0usize;
+                for i in 0..cnt_a {
+                    let up = scr[3 * i];
+                    let lo = scr[3 * i + 1];
+                    let rem = scr[3 * i + 2];
+                    if nc <= up && nc >= lo {
+                        held1 = held1 + 1.0f32;
+                    } else if rem > 1.0f32 {
+                        scr[3 * dst] = up;
+                        scr[3 * dst + 1] = lo;
+                        scr[3 * dst + 2] = rem - 1.0f32;
+                        dst = dst + 1usize;
+                    }
+                }
+                cnt_a = dst;
+                if held0 > 0.0f32 {
+                    held2 = held1 / held0;
+                }
+            }
+            v0 = held2;
         }
         out[t] = v0;
         out[n + t] = v1;

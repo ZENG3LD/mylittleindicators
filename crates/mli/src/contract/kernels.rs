@@ -9567,6 +9567,36 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1313..=1315 (Fvgdur, Fvgalt, Fvgrev).
+    #[test]
+    fn lane_matches_cpu_bar_batch34() {
+        use crate::indicators::statistical_scoring::fvg_duration_intensity_score::FvgDurationIntensityScore;
+        use crate::indicators::statistical_scoring::fvg_intensity_alt_score::FvgIntensityAltScore;
+        use crate::indicators::statistical_scoring::fvg_reversion_probability::FvgReversionProbability;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = FvgDurationIntensityScore::new(20, 20);
+        chk(&run_cols(CubeFormula::FvgdurBar, &bars, CubeParams::period(20)), bars.iter().map(|b| vec![m.feed(&[b.open, b.high, b.low, b.close])]).collect());
+        let mut p = CubeParams::period(1);
+        p.a = 0.1;
+        let mut m = FvgIntensityAltScore::new(0.1);
+        chk(&run_cols(CubeFormula::FvgaltBar, &bars, p), bars.iter().map(|b| vec![m.feed(&[b.open, b.high, b.low, b.close])]).collect());
+        let mut m = FvgReversionProbability::new(10);
+        chk(&run_cols(CubeFormula::FvgrevBar, &bars, CubeParams::period(10)), bars.iter().map(|b| vec![m.feed(&[b.open, b.high, b.low, b.close])]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

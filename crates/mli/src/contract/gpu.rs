@@ -713,6 +713,12 @@ pub enum CubeFormula {
     VrAggBar = 1311,
     /// Composite: variance ratio z aggregate. UNTESTED on GPU.
     VrZAggBar = 1312,
+    /// Composite: fvg hit rate. UNTESTED on GPU.
+    FvgdurBar = 1313,
+    /// Composite: fvg intensity. UNTESTED on GPU.
+    FvgaltBar = 1314,
+    /// Composite: fvg reversion probability. UNTESTED on GPU.
+    FvgrevBar = 1315,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1539,6 +1545,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::BpCusum), Some(CubeFormula::BpCusumBar));
         assert_eq!(formula_of(IndicatorId::VrAgg), Some(CubeFormula::VrAggBar));
         assert_eq!(formula_of(IndicatorId::VrZAgg), Some(CubeFormula::VrZAggBar));
+        assert_eq!(formula_of(IndicatorId::Fvgdur), Some(CubeFormula::FvgdurBar));
+        assert_eq!(formula_of(IndicatorId::Fvgalt), Some(CubeFormula::FvgaltBar));
+        assert_eq!(formula_of(IndicatorId::Fvgrev), Some(CubeFormula::FvgrevBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
