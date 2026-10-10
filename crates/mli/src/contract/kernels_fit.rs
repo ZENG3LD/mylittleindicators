@@ -8,6 +8,9 @@
 //!   AR(1) mean model, residuals, Nelder-Mead (1500 / 2000 iterations, step 0.3) on the (E)GARCH negative
 //!   log-likelihood over reflected-bound parameters, conditional variance recursion; output = last volatility
 //!   (initial 0.1 / 0.316 before the first fit at `max(p + q + 10, 50)` returns).
+//! - `1340` PolyReg (`period` = degree 1..=8): the CPU "normal equations" are diagonal-only (`coef_i = sum(x^i y) /
+//!   sum(x^2i)`) over window positions x = 0..len-1; the forecast at x = len is evaluated in the scaled variable
+//!   x' = x / len (identical value, avoids f32 overflow of x^16). Forecast holds 0 until `max(degree + 2, 10)` points.
 //! - `1337` Arima (`period` = p, `fast` = d, `slow` = q): differencing, OLS AR fit (normal equations + pivoted
 //!   Gaussian elimination, pivot threshold 1e-30 instead of 1e-300), constant, MA fit by Nelder-Mead (<= 8 params,
 //!   max 1500 iterations, step 0.3, ftol = xtol = 1e-10) on the conditional sum of squares, fitted residuals and
@@ -851,6 +854,48 @@ fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p
             }
             out[t] = vol;
         }
+    } else if formula == 1340u32 {
+        let mut deg = pu;
+        if deg < 1usize {
+            deg = 1usize;
+        }
+        if deg > 8usize {
+            deg = 8usize;
+        }
+        let mut mo = deg + 2usize;
+        if mo < 10usize {
+            mo = 10usize;
+        }
+        let mut fcst = 0.0f32;
+        for t in 0..nu {
+            let mut ws = 0usize;
+            if t + 1usize > 512usize {
+                ws = t + 1usize - 512usize;
+            }
+            let len = t + 1usize - ws;
+            if len >= mo {
+                let lf = len as f32;
+                let mut acc = 0.0f32;
+                for i in 0..(deg + 1usize) {
+                    let mut sxy = 0.0f32;
+                    let mut sxx = 0.0f32;
+                    for j in 0..len {
+                        let xs = (j as f32) / lf;
+                        let mut pw = 1.0f32;
+                        for _e in 0..i {
+                            pw = pw * xs;
+                        }
+                        sxy = sxy + pw * x[ws + j];
+                        sxx = sxx + pw * pw;
+                    }
+                    if sxx.abs() > 0.0f32 {
+                        acc = acc + sxy / sxx;
+                    }
+                }
+                fcst = acc;
+            }
+            out[t] = fcst;
+        }
     }
 }
 
@@ -870,7 +915,7 @@ pub fn launch_cube_fit(formula: CubeFormula, x: &[f32], params: CubeParams) -> V
     let xb = client.create_from_slice(f32::as_bytes(x));
     let scr = client.create_from_slice(f32::as_bytes(&vec![0.0f32; FIT_SCR]));
     let out = client.empty(n * 4);
-    let (p, d, q) = if formula == CubeFormula::ArimaBar { (params.period.min(16), params.fast.min(3), params.slow.min(16)) } else { (params.period.min(8), 0, params.fast.min(8)) };
+    let (p, d, q) = if formula == CubeFormula::PolyRegBar { (params.period.min(8), 0, 0) } else if formula == CubeFormula::ArimaBar { (params.period.min(16), params.fast.min(3), params.slow.min(16)) } else { (params.period.min(8), 0, params.fast.min(8)) };
     unsafe {
         fit_map::launch_unchecked(
             &client,

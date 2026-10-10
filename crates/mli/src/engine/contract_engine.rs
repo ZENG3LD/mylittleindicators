@@ -268,7 +268,7 @@ mli_contract_macros::contract_universe! {
         Arima:           Field       : _ +cube(comp_arima_bar) => crate::indicators::regression::arima::Arima,
         Garch:           Field       : Volatility +cube(comp_garch_bar) => crate::indicators::regression::garch::Garch,
         Egarch:          Field       : Volatility +cube(comp_egarch_bar) => crate::indicators::regression::garch::EGarch,
-        PolyReg:         Field       : _             => crate::indicators::regression::polynomial::PolynomialRegression,
+        PolyReg:         Field       : _ +cube(comp_polyreg_bar) => crate::indicators::regression::polynomial::PolynomialRegression,
         RSquared:        Field       : _ +cube(r_squared)             => crate::indicators::regression::r_squared::RSquared,
         Dfa:             Field       : _ +cube(comp_dfa_bar)             => crate::indicators::chaos::dfa::Dfa,
         Hurst:           Field       : _ +cube(comp_hurst_bar)             => crate::indicators::chaos::hurst_exponent::HurstExponent,

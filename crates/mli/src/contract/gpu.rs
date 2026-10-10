@@ -809,6 +809,8 @@ pub enum CubeFormula {
     GarchBar = 1338,
     /// Egarch (keyed / profile / fit family). UNTESTED on GPU.
     EgarchBar = 1339,
+    /// PolyReg (keyed / profile / fit family). UNTESTED on GPU.
+    PolyRegBar = 1340,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1819,6 +1821,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Arima), Some(CubeFormula::ArimaBar));
         assert_eq!(formula_of(IndicatorId::Garch), Some(CubeFormula::GarchBar));
         assert_eq!(formula_of(IndicatorId::Egarch), Some(CubeFormula::EgarchBar));
+        assert_eq!(formula_of(IndicatorId::PolyReg), Some(CubeFormula::PolyRegBar));
         assert_eq!(formula_of(IndicatorId::WallDetector), Some(CubeFormula::WallDetectorBk));
         assert_eq!(formula_of(IndicatorId::BestLevelVolatility), Some(CubeFormula::BestLevelVolBk));
         assert_eq!(formula_of(IndicatorId::PriceLevelDensity), Some(CubeFormula::PriceLevelDensityBk));
