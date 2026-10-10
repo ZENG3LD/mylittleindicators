@@ -4248,6 +4248,9 @@ pub fn launch_cube(formula: CubeFormula, samples: &[GpuSample], params: CubePara
     if formula.code() >= 400 && formula.code() < 500 && formula.output_count() == 1 {
         return launch_cube_smoothed_gx(formula, samples, params);
     }
+    if formula.code() >= 800 && formula.code() < 900 {
+        return super::kernels_post::launch_cube_signal(formula, samples, params);
+    }
     if formula.code() >= 500 && formula.code() < 700 && formula.output_count() == 1 {
         return super::kernels_post::launch_cube_post(formula, samples, params);
     }
@@ -5957,7 +5960,7 @@ fn gx_comb_scan(
             if f > 1.0e-12f32 {
                 v = raw1[i] / f;
             }
-        } else if formula == 419u32 {
+        } else if formula == 419u32 || formula == 423u32 {
             v = f;
         } else if formula >= 420u32 && formula <= 422u32 {
             v = raw1[i];
@@ -6086,10 +6089,10 @@ fn launch_cube_smoothed_gx(
             code,
         );
         let first = params.smoother.code();
-        if code < 420 {
+        if code < 420 || code == 423 {
             smooth!(raw0, sm0, first, params.smooth_period);
         }
-        if code == 419 || code >= 420 {
+        if code >= 419 {
             // Single smoother (419) or no smoother at all (420..): nothing more to run.
         } else if code == 413 {
             // Twiggs money flow: the same smoother over volume.
@@ -6781,6 +6784,70 @@ mod tests {
         let g = col(CubeFormula::StartEndWeek, 2);
         assert_close(&g[0], &s);
         assert_close(&g[1], &en);
+    }
+
+    /// UNTESTED on GPU (no GPU on the authoring box): signal formulas 800..=806 (-1 / 0 / 1 as f32).
+    #[test]
+    fn lane_matches_cpu_signal_batch() {
+        use crate::indicators::regime::regime_gate::{GateDirection, RegimeGate};
+        use crate::indicators::signal_logic::direction_detector::DirectionDetector;
+        use crate::indicators::signal_logic::hysteresis_gate::HysteresisGate;
+        use crate::indicators::signal_logic::threshold::{Threshold, ThresholdKind};
+        use crate::indicators::signal_logic::threshold_gate::ThresholdGate;
+        use crate::indicators::trend::slope_direction_line::SlopeDirectionLine;
+        use crate::indicators::volume::volume_event::VolumeEventDetector;
+
+        let bars = bars(120);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lo = close.iter().cloned().fold(f64::MAX, f64::min);
+        let hi = close.iter().cloned().fold(f64::MIN, f64::max);
+        let mid = 0.5 * (lo + hi);
+
+        let mut m = DirectionDetector::new();
+        assert_close(&run(CubeFormula::DirDetect, &bars, CubeParams::period(1)), &cpu(&close, |v| { m.feed(v); m.value() }));
+
+        let mut g = RegimeGate::new(mid, GateDirection::Above);
+        let mut gp = CubeParams::period(1);
+        gp.a = mid as f32;
+        assert_close(&run(CubeFormula::RegimeGateSig, &bars, gp), &cpu(&close, |v| { g.feed(v); g.value() }));
+
+        for (kind, flag) in [
+            (ThresholdKind::Above, 0u32),
+            (ThresholdKind::Below, 1),
+            (ThresholdKind::InRange, 2),
+            (ThresholdKind::OutOfRange, 3),
+        ] {
+            let up = mid + 0.25 * (hi - lo);
+            let dn = mid - 0.25 * (hi - lo);
+            let mut t = Threshold::new(kind, up, dn);
+            let mut tp = CubeParams::period(1);
+            tp.a = up as f32;
+            tp.b = dn as f32;
+            tp.flag = flag;
+            assert_close(&run(CubeFormula::ThresholdEdge, &bars, tp), &cpu(&close, |v| { t.feed(v); t.value() }));
+        }
+
+        let mut rp = CubeParams::period(5);
+        rp.a = 70.0;
+        rp.b = 30.0;
+        let mut t = ThresholdGate::with_rsi_period(30.0, 70.0, 5);
+        assert_close(&run(CubeFormula::ThresholdGateSig, &bars, rp), &cpu(&close, |v| { t.feed(v); t.value() }));
+        let mut h = HysteresisGate::with_rsi_period(30.0, 70.0, 5);
+        assert_close(&run(CubeFormula::HysteresisGateSig, &bars, rp), &cpu(&close, |v| { h.feed(v); h.value() }));
+
+        let vols: Vec<f64> = bars.iter().map(|b| b.volume).collect();
+        let mut ve = VolumeEventDetector::new(5, 1.1);
+        let cpu_ve: Vec<f64> = vols.iter().map(|v| { ve.feed(&[*v]); ve.value() }).collect();
+        let mut vp = CubeParams::period(5);
+        vp.a = 1.1;
+        vp.lane = crate::engine::ohlcv_field::OhlcvField::Volume;
+        assert_close(&run(CubeFormula::VolEventSig, &bars, vp), &cpu_ve);
+
+        let mut sd = SlopeDirectionLine::from_smoother(5, SmootherId::Ema);
+        let mut sp = CubeParams::period(5);
+        sp.smoother = CubeSmoother::Ema;
+        sp.smooth_period = 5;
+        assert_close(&run(CubeFormula::SlopeDirLine, &bars, sp), &cpu(&close, |v| { sd.feed(v); sd.value() }));
     }
 
     #[test]

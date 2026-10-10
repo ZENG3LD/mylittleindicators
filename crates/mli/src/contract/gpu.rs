@@ -341,6 +341,8 @@ pub enum CubeFormula {
     AbsLogRet = 421,
     /// `(high + low) / 2`. UNTESTED on GPU.
     Hl2 = 422,
+    /// A smoother (first smoother, `smooth_period`) of the lane. Used as an inner series. UNTESTED on GPU.
+    SmoothLane = 423,
     /// Composite (post stage): share of the last `slow` |ATR| values `<=` the current one. Inner: [`CubeFormula::AtrSm`]. UNTESTED on GPU.
     AtrPct = 500,
     /// Composite: `p - ema(p)` of [`CubeFormula::AtrPct`]; `a` is alpha (clamped to 0.01..1). UNTESTED on GPU.
@@ -379,6 +381,20 @@ pub enum CubeFormula {
     StartEndWeek = 708,
     /// Hour sin / cos encoding. UNTESTED on GPU.
     TimeEnc = 709,
+    /// Direction of change of the lane: 1 / -1 / 0 (0 on the first bar). Signal path. UNTESTED on GPU.
+    DirDetect = 800,
+    /// Regime gate on the lane: threshold `a`, `flag` 0 above / 1 below; +1 entry, -1 exit. UNTESTED on GPU.
+    RegimeGateSig = 801,
+    /// Threshold edge on the lane: `a` upper, `b` lower, `flag` kind 0 above / 1 below / 2 in range / 3 out of range. UNTESTED on GPU.
+    ThresholdEdge = 802,
+    /// RSI(`period`) threshold gate: `a` upper (50..100), `b` lower (0..50), sticky. UNTESTED on GPU.
+    ThresholdGateSig = 803,
+    /// RSI(`period`) hysteresis gate with the same thresholds. UNTESTED on GPU.
+    HysteresisGateSig = 804,
+    /// Volume spike: volume lane above `a` times its mean over `period` bars. UNTESTED on GPU.
+    VolEventSig = 805,
+    /// Slope direction of a smoother of the lane (first smoother, `smooth_period`). UNTESTED on GPU.
+    SlopeDirLine = 806,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -787,6 +803,13 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::DirDetect), Some(CubeFormula::DirDetect));
+        assert_eq!(formula_of(IndicatorId::RegimeGate), Some(CubeFormula::RegimeGateSig));
+        assert_eq!(formula_of(IndicatorId::ThreshEdge), Some(CubeFormula::ThresholdEdge));
+        assert_eq!(formula_of(IndicatorId::Thresh), Some(CubeFormula::ThresholdGateSig));
+        assert_eq!(formula_of(IndicatorId::Hyst), Some(CubeFormula::HysteresisGateSig));
+        assert_eq!(formula_of(IndicatorId::VolEvent), Some(CubeFormula::VolEventSig));
+        assert_eq!(formula_of(IndicatorId::Sdl), Some(CubeFormula::SlopeDirLine));
         assert_eq!(formula_of(IndicatorId::HourDay), Some(CubeFormula::HourOfDay));
         assert_eq!(formula_of(IndicatorId::WeekMonth), Some(CubeFormula::WeekInMonth));
         assert_eq!(formula_of(IndicatorId::DayWeekMonth), Some(CubeFormula::WeekdayOccurrence));

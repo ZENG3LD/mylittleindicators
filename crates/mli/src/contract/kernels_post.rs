@@ -364,3 +364,186 @@ pub fn launch_cube_post_columns(
     let (series, op, w, a, b, rf, cols) = plan2(formula, samples, params);
     run_post2(&series, op, w, a, b, rf, cols)
 }
+
+/// Signal stage over one series: outputs -1 / 0 / 1 (the i8 signals packed as f32).
+/// Ops: 20 direction of change (0 on bar 0 and on ties); 21 regime gate (`flag` 0 above / 1 below
+/// the threshold `a`; +1 on entry, -1 on exit, 0 on bar 0 and otherwise); 22 threshold edge
+/// (`flag` 0 above `b`... see below, `a` upper, `b` lower); 23 RSI threshold gate (`a` upper,
+/// `b` lower, ready from bar `rf`, sticky between bars); 24 hysteresis gate (same
+/// thresholds, sticky state); 25 volume spike (`w` window, `a` multiplier); 26 slope direction
+/// (compares with the previous value, previous starts at 0).
+/// Threshold kinds for op 22 in `flag`: 0 above `a`, 1 below `b`, 2 in `[b, a]`, 3 outside.
+#[cube]
+fn post_scan3(src: &[f32], out: &mut [f32], op: u32, w: u32, a: f32, b: f32, rf: u32, flag: u32) {
+    let n = src.len();
+    let mut wi = w as usize;
+    if wi < 1 {
+        wi = 1;
+    }
+    let mut in_regime = false;
+    let mut last_state = false;
+    let mut sticky = 0.0f32;
+    let mut prev_v = 0.0f32;
+    for i in 0..n {
+        let v = src[i];
+        let mut res = 0.0f32;
+        if op == 20u32 {
+            if i > 0 {
+                let p = src[i - 1];
+                if v > p {
+                    res = 1.0f32;
+                } else if v < p {
+                    res = -1.0f32;
+                }
+            }
+        } else if op == 21u32 {
+            let mut now_in = v > a;
+            if flag == 1u32 {
+                now_in = v < a;
+            }
+            if i > 0 {
+                if !in_regime && now_in {
+                    res = 1.0f32;
+                } else if in_regime && !now_in {
+                    res = -1.0f32;
+                }
+            }
+            in_regime = now_in;
+        } else if op == 22u32 {
+            let mut cur = v > a;
+            if flag == 1u32 {
+                cur = v < b;
+            } else if flag == 2u32 {
+                cur = v >= b && v <= a;
+            } else if flag == 3u32 {
+                cur = v < b || v > a;
+            }
+            if i > 0 {
+                if !last_state && cur {
+                    res = -1.0f32;
+                    if v >= b {
+                        res = 1.0f32;
+                    }
+                } else if last_state && !cur {
+                    res = 1.0f32;
+                    if v < b {
+                        res = -1.0f32;
+                    }
+                }
+            }
+            last_state = cur;
+        } else if op == 23u32 {
+            if (i as u32) >= rf {
+                if v >= a {
+                    sticky = 1.0f32;
+                } else if v <= b {
+                    sticky = -1.0f32;
+                } else {
+                    sticky = 0.0f32;
+                }
+            }
+            res = sticky;
+        } else if op == 24u32 {
+            if (i as u32) >= rf {
+                if sticky <= 0.0f32 && v >= a {
+                    sticky = 1.0f32;
+                } else if sticky >= 0.0f32 && v <= b {
+                    sticky = -1.0f32;
+                }
+            }
+            res = sticky;
+        } else if op == 25u32 {
+            if i + 1 >= wi {
+                let start = i + 1 - wi;
+                let mut sum = 0.0f32;
+                for j in start..(i + 1) {
+                    sum = sum + src[j];
+                }
+                let mean = sum / (wi as f32);
+                if mean > 0.0f32 && v > a * mean {
+                    res = 1.0f32;
+                }
+            }
+        } else if op == 26u32 {
+            if v > prev_v {
+                res = 1.0f32;
+            } else if v < prev_v {
+                res = -1.0f32;
+            }
+            prev_v = v;
+        }
+        out[i] = res;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn post_map3(src: &[f32], out: &mut [f32], op: u32, w: u32, a: f32, b: f32, rf: u32, flag: u32) {
+    post_scan3(src, out, op, w, a, b, rf, flag);
+}
+
+pub(crate) fn run_post3(
+    series: &[f32],
+    op: u32,
+    w: u32,
+    a: f32,
+    b: f32,
+    rf: u32,
+    flag: u32,
+) -> Vec<f32> {
+    let n = series.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let src = client.create_from_slice(f32::as_bytes(series));
+    let out = client.empty(n * core::mem::size_of::<f32>());
+    unsafe {
+        post_map3::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(src, n),
+            BufferArg::from_raw_parts(out.clone(), n),
+            op,
+            w,
+            a,
+            b,
+            rf,
+            flag,
+        );
+    }
+    let bytes = client.read_one_unchecked(out);
+    f32::from_bytes(&bytes).to_vec()
+}
+
+/// Launch a signal formula (codes 800..=899): inner series, then [`post_scan3`].
+/// Inner series: the lane (`Identity`), RSI(`period`), or a smoother of the lane (`SmoothLane`).
+pub fn launch_cube_signal(
+    formula: CubeFormula,
+    samples: &[GpuSample],
+    params: CubeParams,
+) -> Vec<f32> {
+    if samples.is_empty() {
+        return Vec::new();
+    }
+    let ident = || launch_cube(CubeFormula::Identity, samples, params);
+    let rsi = || launch_cube(CubeFormula::Rsi, samples, params);
+    // RSI thresholds are clamped as the CPU gates clamp them: upper 50..=100, lower 0..=50.
+    let (up, lo) = (params.a.clamp(50.0, 100.0), params.b.clamp(0.0, 50.0));
+    match formula {
+        CubeFormula::DirDetect => run_post3(&ident(), 20, 1, 0.0, 0.0, 0, 0),
+        CubeFormula::RegimeGateSig => run_post3(&ident(), 21, 1, params.a, 0.0, 0, params.flag),
+        CubeFormula::ThresholdEdge => {
+            run_post3(&ident(), 22, 1, params.a, params.b, 0, params.flag)
+        }
+        CubeFormula::ThresholdGateSig => run_post3(&rsi(), 23, 1, up, lo, params.period, 0),
+        CubeFormula::HysteresisGateSig => run_post3(&rsi(), 24, 1, up, lo, params.period, 0),
+        CubeFormula::VolEventSig => run_post3(&ident(), 25, params.period.max(1), params.a, 0.0, 0, 0),
+        CubeFormula::SlopeDirLine => {
+            let s = launch_cube(CubeFormula::SmoothLane, samples, params);
+            run_post3(&s, 26, 1, 0.0, 0.0, 0, 0)
+        }
+        _ => Vec::new(),
+    }
+}
