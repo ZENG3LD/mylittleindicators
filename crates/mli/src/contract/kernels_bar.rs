@@ -5007,6 +5007,103 @@ fn bar_scan(
                     }
                 }
             }
+        } else if formula == 1328u32 {
+            // oscillator with volume weight `[line, signal, strength]`: lane o = inner oscillator (host-resolved
+            // RSI / CMO / PSL / Bias), period = baseline window (>= 2), a = spike threshold (>= 1.01).
+            // Signal is 0 until the volume window is full and one more bar has been seen
+            let mut bp = period as usize;
+            if bp < 2usize {
+                bp = 2usize;
+            }
+            let th = a.max(1.01f32);
+            v0 = o[t];
+            if t + 1usize > bp {
+                let mut bs = 0.0f32;
+                for k2 in 1..bp {
+                    bs = bs + v[t - k2];
+                }
+                let bc = (bp - 1usize) as f32;
+                let bv = bs / bc;
+                let mut vr = 1.0f32;
+                if bv > 1.0e-9f32 {
+                    vr = v[t] / bv;
+                }
+                let mut dir = 0.0f32;
+                if c[t] > c[t - 1] + 1.0e-9f32 {
+                    dir = 1.0f32;
+                } else if c[t] < c[t - 1] - 1.0e-9f32 {
+                    dir = 0.0f32 - 1.0f32;
+                }
+                if dir != 0.0f32 {
+                    if vr >= th {
+                        v1 = dir * 3.0f32;
+                    } else if vr > 1.0f32 {
+                        v1 = dir * 2.0f32;
+                    } else {
+                        v1 = dir;
+                    }
+                }
+                v2 = ((vr - 1.0f32) / (th - 1.0f32)).max(0.0f32).min(1.0f32);
+            }
+        } else if formula == 1329u32 {
+            // confluence of up to 5 host-resolved oscillators (lanes o, h, l, c, v): p2 = input count, p3 = first
+            // bar at which every input is ready, p4 = Sum threshold, flag = mode (0 All, 1 Any, 2 Majority, 3 Sum)
+            if t >= (p3 as usize) {
+                let mut pos = 0.0f32;
+                let mut neg = 0.0f32;
+                let mut first = 0.0f32;
+                let mut got = 0u32;
+                for i in 0..5usize {
+                    if i < (p2 as usize) {
+                        let mut x = o[t];
+                        if i == 1usize {
+                            x = h[t];
+                        } else if i == 2usize {
+                            x = l[t];
+                        } else if i == 3usize {
+                            x = c[t];
+                        } else if i == 4usize {
+                            x = v[t];
+                        }
+                        let mut sg = 0.0f32;
+                        if x > 0.0f32 {
+                            sg = 1.0f32;
+                            pos = pos + 1.0f32;
+                        } else if x < 0.0f32 {
+                            sg = 0.0f32 - 1.0f32;
+                            neg = neg + 1.0f32;
+                        }
+                        if sg != 0.0f32 && got == 0u32 {
+                            first = sg;
+                            got = 1u32;
+                        }
+                    }
+                }
+                let nin = p2 as f32;
+                if flag == 0u32 {
+                    if pos == nin {
+                        v0 = 1.0f32;
+                    } else if neg == nin {
+                        v0 = 0.0f32 - 1.0f32;
+                    }
+                } else if flag == 1u32 {
+                    v0 = first;
+                } else if flag == 2u32 {
+                    if pos > neg {
+                        v0 = 1.0f32;
+                    } else if neg > pos {
+                        v0 = 0.0f32 - 1.0f32;
+                    }
+                } else {
+                    let sm = pos - neg;
+                    let th = p4 as f32;
+                    if sm >= th {
+                        v0 = 1.0f32;
+                    } else if sm <= 0.0f32 - th {
+                        v0 = 0.0f32 - 1.0f32;
+                    }
+                }
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -5047,6 +5144,42 @@ fn bar_map(
 /// five lanes; returns the flat `10 * n` output (column `k` at `k * n`).
 pub(crate) fn bar_run(code: u32, ins: [&Vec<f32>; 5], params: CubeParams, flag: u32) -> Vec<f32> {
     bar_run_x(code, ins, &[], params, flag)
+}
+
+/// Narrow order of a scalar-slot oscillator (`+oscillator` members): `0` Rsi, `1` Cmo, `2` Psl, `3` Bias.
+fn osc_order(kind: u32, period: usize) -> crate::engine::contract_engine::OscillatorSlotOrder {
+    use crate::engine::contract_engine::OscillatorSlotOrder as O;
+    use crate::indicators::average::moving_average::PeriodConfig as P;
+    let p = P { period: period.max(1) };
+    match kind {
+        1 => O::Cmo(p),
+        2 => O::Psl(p),
+        3 => O::Bias(p),
+        _ => O::Rsi(p),
+    }
+}
+
+/// Inner oscillator series from the GPU cube formula of the slot member.
+fn osc_series(samples: &[GpuSample], params: CubeParams, kind: u32, period: u32) -> Vec<f32> {
+    let f = match kind {
+        1 => CubeFormula::Cmo,
+        2 => CubeFormula::Psl,
+        3 => CubeFormula::Bias,
+        _ => CubeFormula::Rsi,
+    };
+    super::kernels::launch_cube(f, samples, CubeParams { period: period.max(1), ..params })
+}
+
+/// First bar index at which the CPU slot reports `is_ready` (readiness depends on the bar count only).
+fn osc_ready_index(kind: u32, period: usize) -> u32 {
+    let mut s = osc_order(kind, period).into_slot();
+    for i in 0..100_000usize {
+        s.feed(100.0 + ((i * 7) % 13) as f64);
+        if s.is_ready() {
+            return i as u32;
+        }
+    }
+    100_000
 }
 
 /// [`bar_run`] with extra input series copied to the start of the scratch buffer (read-only for the
@@ -5275,6 +5408,31 @@ fn launch_cube_bar_x(
         let atr = super::kernels_comp::atr_series(samples, params, super::CubeSmoother::Rma, params.fast.max(1), 0);
         let base = smooth_series(&atr, params.smoother, params.slow.max(1), 0, params.a, params.b);
         let flat = bar_run(formula.code(), [&base, &h, &l, &c, &atr], params, 0);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::OscVolWeightBar {
+        let inner = osc_series(samples, params, params.flag, params.fast);
+        let flat = bar_run(formula.code(), [&inner, &h, &l, &c, &v], params, 0);
+        return vec![flat[0..n].to_vec(), flat[n..2 * n].to_vec(), flat[2 * n..3 * n].to_vec()];
+    }
+    if formula == CubeFormula::ConfluenceBar {
+        // `ext[i]` = kind * 1_000_000 + period + 1 per input (0 = absent), at most 5
+        let mut series: Vec<Vec<f32>> = Vec::new();
+        let mut ready = 0u32;
+        for e in params.ext.iter().take(5) {
+            if *e == 0 {
+                continue;
+            }
+            let (kind, period) = (*e / 1_000_000, (*e % 1_000_000) - 1);
+            series.push(osc_series(samples, params, kind, period));
+            ready = ready.max(osc_ready_index(kind, period as usize));
+        }
+        let cnt = series.len();
+        while series.len() < 5 {
+            series.push(vec![0.0; n]);
+        }
+        let p = CubeParams { fast: cnt as u32, slow: ready, ..params };
+        let flat = bar_run(formula.code(), [&series[0], &series[1], &series[2], &series[3], &series[4]], p, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::MinfoBar || formula == CubeFormula::TeBar {

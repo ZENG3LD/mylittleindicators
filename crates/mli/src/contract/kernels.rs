@@ -9882,6 +9882,63 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): OscVolWeight and Confluence with host-resolved inner oscillators (1328-1329).
+    #[test]
+    fn lane_matches_cpu_bar_batch44() {
+        use crate::engine::contract_engine::IndicatorOrder;
+        use crate::indicators::composites::confluence::{Confluence, ConfluenceMode};
+        use crate::indicators::composites::oscillator_with_volume_weight::OscillatorWithVolumeWeight;
+        use crate::indicators::average::moving_average::PeriodConfig;
+        use crate::engine::contract_engine::OscillatorSlotOrder as OSO;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(10);
+        p.fast = 14;
+        p.a = 1.5;
+        p.flag = 0;
+        let mut m = OscillatorWithVolumeWeight::new(OSO::Rsi(PeriodConfig { period: 14 }).into_slot(), 10, 1.5);
+        let rows: Vec<Vec<f64>> = bars
+            .iter()
+            .map(|b| {
+                m.feed(&[b.open, b.high, b.low, b.close, b.volume]);
+                vec![m.line(), m.signal(), m.strength()]
+            })
+            .collect();
+        chk(&run_cols(CubeFormula::OscVolWeightBar, &bars, p), rows);
+        for (mode, flag, th) in [(ConfluenceMode::All, 0u32, 0u32), (ConfluenceMode::Any, 1, 0), (ConfluenceMode::Majority, 2, 0), (ConfluenceMode::Sum { threshold: 2 }, 3, 2)] {
+            let mut p = CubeParams::period(1);
+            p.flag = flag;
+            p.signal = th;
+            p.ext[0] = 0 * 1_000_000 + 14 + 1;
+            p.ext[1] = 1 * 1_000_000 + 10 + 1;
+            p.ext[2] = 3 * 1_000_000 + 12 + 1;
+            let mut m = Confluence::new(
+                vec![OSO::Rsi(PeriodConfig { period: 14 }).into_slot(), OSO::Cmo(PeriodConfig { period: 10 }).into_slot(), OSO::Bias(PeriodConfig { period: 12 }).into_slot()],
+                mode,
+            );
+            let rows: Vec<Vec<f64>> = bars
+                .iter()
+                .map(|b| {
+                    m.feed(&[b.open, b.high, b.low, b.close, b.volume]);
+                    vec![m.value()]
+                })
+                .collect();
+            chk(&run_cols(CubeFormula::ConfluenceBar, &bars, p), rows);
+        }
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
