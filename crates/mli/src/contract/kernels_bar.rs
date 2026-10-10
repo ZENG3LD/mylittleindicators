@@ -4057,6 +4057,62 @@ fn bar_scan(
                 let wgt = (dv / (b.max(1.0e-12f32) * at)).min(1.0f32);
                 v0 = sig * wgt;
             }
+        } else if formula == 1310u32 {
+            // Bai-Perron CUSUM: the CUSUM break detector restarted every max(period, 50) bars.
+            // threshold = a, kappa = b. held0 = pos, held1 = neg, held2 = value, cnt_a = bars since restart.
+            let mut sw = period as usize;
+            if sw < 50usize {
+                sw = 50usize;
+            }
+            if cnt_a > 0usize {
+                let r = (c[t] / c[t - 1]).ln();
+                held0 = (b * (held0 + r)).max(0.0f32);
+                held1 = (b * (held1 - r)).max(0.0f32);
+                let hp = (held0 - a).max(0.0f32);
+                let hn = (held1 - a).max(0.0f32);
+                held2 = hp.max(hn);
+                if hp > 0.0f32 {
+                    held0 = 0.0f32;
+                }
+                if hn > 0.0f32 {
+                    held1 = 0.0f32;
+                }
+            }
+            v0 = held2;
+            cnt_a = cnt_a + 1usize;
+            if cnt_a >= sw {
+                held0 = 0.0f32;
+                held1 = 0.0f32;
+                held2 = 0.0f32;
+                cnt_a = 0usize;
+            }
+        } else if formula == 1311u32 || formula == 1312u32 {
+            // variance-ratio aggregate: mean of the three VR series in lanes o / h / l;
+            // 1312 additionally z-scores that mean over max(ext[4], 20) bars (0 until the window is full)
+            let mean = (o[t] + h[t] + l[t]) / 3.0f32;
+            if formula == 1311u32 {
+                v0 = mean;
+            } else {
+                let mut w = p4 as usize;
+                if w < 20usize {
+                    w = 20usize;
+                }
+                scr[t % w] = mean;
+                if t + 1 >= w {
+                    let mut sm = 0.0f32;
+                    for k2 in 0..w {
+                        sm = sm + scr[k2];
+                    }
+                    let mu = sm / (w as f32);
+                    let mut ss = 0.0f32;
+                    for k2 in 0..w {
+                        let dd = scr[k2] - mu;
+                        ss = ss + dd * dd;
+                    }
+                    let sd = (ss / (w as f32)).sqrt().max(1.0e-9f32);
+                    v0 = (mean - mu) / sd;
+                }
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -4361,6 +4417,23 @@ fn launch_cube_bar_x(
     if formula == CubeFormula::SweepRevBar {
         let atr = super::kernels_comp::atr_series(samples, params, params.smoother, params.fast.max(1), 0);
         let flat = bar_run(formula.code(), [&o, &h, &l, &c, &atr], params, params.flag);
+        return vec![flat[0..n].to_vec()];
+    }
+    if formula == CubeFormula::VrAggBar || formula == CubeFormula::VrZAggBar {
+        let mut vp = [params; 3];
+        let (ws, ms): ([u32; 3], [u32; 3]) = if formula == CubeFormula::VrAggBar {
+            ([params.period; 3], [params.fast, params.slow, params.signal])
+        } else {
+            ([params.period, params.ext[0], params.ext[2]], [params.fast, params.ext[1], params.ext[3]])
+        };
+        let mut sers: Vec<Vec<f32>> = Vec::new();
+        for i in 0..3 {
+            vp[i].period = ws[i];
+            vp[i].fast = ms[i];
+            sers.push(super::kernels::launch_cube(CubeFormula::VarianceRatio, samples, vp[i]));
+        }
+        let kp = CubeParams { signal: params.ext[4], ..params };
+        let flat = bar_run(formula.code(), [&sers[0], &sers[1], &sers[2], &c, &c], kp, 0);
         return vec![flat[0..n].to_vec()];
     }
     if formula == CubeFormula::EwmacRobustBar {

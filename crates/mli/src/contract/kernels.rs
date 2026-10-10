@@ -9525,6 +9525,48 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1310..=1312 (BpCusum, VrAgg, VrZAgg).
+    #[test]
+    fn lane_matches_cpu_bar_batch33() {
+        use crate::indicators::statistics::bai_perron_cusum::BaiPerronCusum;
+        use crate::indicators::statistics::variance_ratio_aggregate::VarianceRatioAggregate;
+        use crate::indicators::statistics::variance_ratio_z_aggregate::VarianceRatioZAggregate;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(60);
+        p.a = 0.02;
+        p.b = 0.95;
+        let mut m = BaiPerronCusum::new(0.02, 0.95, 60);
+        chk(&run_cols(CubeFormula::BpCusumBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(20);
+        p.fast = 2;
+        p.slow = 4;
+        p.signal = 5;
+        let mut m = VarianceRatioAggregate::new(&[(20, 2), (20, 4), (20, 5)]);
+        chk(&run_cols(CubeFormula::VrAggBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(20);
+        p.fast = 2;
+        p.ext[0] = 24;
+        p.ext[1] = 4;
+        p.ext[2] = 30;
+        p.ext[3] = 5;
+        p.ext[4] = 25;
+        let mut m = VarianceRatioZAggregate::new(&[(20, 2), (24, 4), (30, 5)], 25);
+        chk(&run_cols(CubeFormula::VrZAggBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

@@ -707,6 +707,12 @@ pub enum CubeFormula {
     RelTrendPosBar = 1308,
     /// Composite: sweep reversion. UNTESTED on GPU.
     SweepRevBar = 1309,
+    /// Composite: bai-perron cusum. UNTESTED on GPU.
+    BpCusumBar = 1310,
+    /// Composite: variance ratio aggregate. UNTESTED on GPU.
+    VrAggBar = 1311,
+    /// Composite: variance ratio z aggregate. UNTESTED on GPU.
+    VrZAggBar = 1312,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1530,6 +1536,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::MoFisher), Some(CubeFormula::MoFisherBar));
         assert_eq!(formula_of(IndicatorId::RelTrendPos), Some(CubeFormula::RelTrendPosBar));
         assert_eq!(formula_of(IndicatorId::SweepRev), Some(CubeFormula::SweepRevBar));
+        assert_eq!(formula_of(IndicatorId::BpCusum), Some(CubeFormula::BpCusumBar));
+        assert_eq!(formula_of(IndicatorId::VrAgg), Some(CubeFormula::VrAggBar));
+        assert_eq!(formula_of(IndicatorId::VrZAgg), Some(CubeFormula::VrZAggBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));
