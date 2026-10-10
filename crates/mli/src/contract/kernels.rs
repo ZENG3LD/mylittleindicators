@@ -9062,6 +9062,38 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1272..=1274.
+    #[test]
+    fn lane_matches_cpu_bar_batch21() {
+        use crate::indicators::average::ehlers_fractal_adaptive_ma::EhlersFractalAdaptiveMa;
+        use crate::indicators::signal_processing::ehlers_sinewave::EhlersSinewave;
+        use crate::indicators::signal_processing::ehlers_super_smoother::EhlersSuperSmoother;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(1);
+        p.a = 0.3;
+        let mut m = EhlersSinewave::new(0.3);
+        chk(&run_cols(CubeFormula::EsineBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(1);
+        p.a = 10.0;
+        let mut m = EhlersSuperSmoother::new();
+        chk(&run_cols(CubeFormula::EssBar, &bars, p), close.iter().map(|c| vec![m.feed(*c).value]).collect());
+        let mut m = EhlersFractalAdaptiveMa::new(16);
+        chk(&run_cols(CubeFormula::EhlersfaBar, &bars, CubeParams::period(16)), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

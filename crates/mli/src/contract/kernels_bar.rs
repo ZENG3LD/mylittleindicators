@@ -2828,6 +2828,82 @@ fn bar_scan(
                     }
                 }
             }
+        } else if formula == 1272u32 {
+            // Ehlers sinewave: phase += tanh(diff) * alpha, value = sin(phase); alpha in `a`
+            let al = a.max(0.0f32).min(1.0f32);
+            let mut prev = 0.0f32;
+            if t > 0usize {
+                prev = c[t - 1];
+            }
+            let d = c[t] - prev;
+            let ad = d.abs();
+            let th = 1.0f32 - 2.0f32 / ((2.0f32 * ad).exp() + 1.0f32);
+            if d < 0.0f32 {
+                held0 = held0 - th * al;
+            } else {
+                held0 = held0 + th * al;
+            }
+            v0 = held0.sin();
+        } else if formula == 1273u32 {
+            // Ehlers super smoother (value); the cutoff period (float) is in `a`
+            let pi = 3.1415927f32;
+            let cw = (2.0f32 * pi / a).cos();
+            let alpha = 1.0f32 - cw;
+            let b2 = 0.0f32 - alpha * alpha / 4.0f32;
+            let prev_price = if t >= 1usize { c[t - 1] } else { c[t] };
+            let mut p1 = c[t];
+            let mut p2v = c[t];
+            if t >= 1usize {
+                p1 = held0;
+            }
+            if t >= 2usize {
+                p2v = held1;
+            } else if t == 1usize {
+                p2v = c[t];
+            }
+            let ss = 0.5f32 * c[t] + 0.5f32 * prev_price + cw * p1 + b2 * p2v;
+            held1 = held0;
+            held0 = ss;
+            v0 = ss;
+        } else if formula == 1274u32 {
+            // Ehlers fractal adaptive MA (fama): period capped by the 512-sample history
+            let pr = period as usize;
+            let mut minp = pr / 4;
+            if minp < 2usize {
+                minp = 2usize;
+            }
+            let maxp = pr * 2;
+            let mut len = t + 1;
+            if len > 512usize {
+                len = 512usize;
+            }
+            let mut alpha = 2.0f32 / ((pr as f32) + 1.0f32);
+            if len >= pr {
+                let st = t + 1 - pr;
+                let mut tl = 0.0f32;
+                for i in 1..pr {
+                    tl = tl + (c[st + i] - c[st + i - 1]).abs();
+                }
+                let dd = (c[t] - c[st]).abs();
+                let mut fd = 1.5f32;
+                if dd != 0.0f32 && tl != 0.0f32 {
+                    fd = ((tl / dd).ln() / (pr as f32).ln()).max(1.0f32).min(2.0f32);
+                }
+                let mut er = 0.0f32;
+                if tl != 0.0f32 {
+                    er = dd / tl;
+                }
+                let sp = er / fd;
+                let ap = ((maxp as f32) - sp * ((maxp - minp) as f32)).max(minp as f32).min(maxp as f32);
+                alpha = (2.0f32 / (ap + 1.0f32)).max(0.0f32).min(1.0f32);
+            }
+            if held2 < 0.5f32 {
+                held0 = c[t];
+                held2 = 1.0f32;
+            } else {
+                held0 = alpha * c[t] + (1.0f32 - alpha) * held0;
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;

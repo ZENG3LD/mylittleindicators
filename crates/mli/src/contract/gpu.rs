@@ -645,6 +645,12 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: ehlers sinewave. UNTESTED on GPU.
+    EsineBar = 1272,
+    /// Composite: ehlers super smoother. UNTESTED on GPU.
+    EssBar = 1273,
+    /// Composite: ehlers fractal adaptive ma. UNTESTED on GPU.
+    EhlersfaBar = 1274,
     /// Composite: relative volume. UNTESTED on GPU.
     RvolBar = 1267,
     /// Composite: session vwap. UNTESTED on GPU.
@@ -1412,6 +1418,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Esine), Some(CubeFormula::EsineBar));
+        assert_eq!(formula_of(IndicatorId::Ess), Some(CubeFormula::EssBar));
+        assert_eq!(formula_of(IndicatorId::Ehlersfa), Some(CubeFormula::EhlersfaBar));
         assert_eq!(formula_of(IndicatorId::Rvol), Some(CubeFormula::RvolBar));
         assert_eq!(formula_of(IndicatorId::SessionVwap), Some(CubeFormula::SessionVwapBar));
         assert_eq!(formula_of(IndicatorId::Frama), Some(CubeFormula::FramaBar));
