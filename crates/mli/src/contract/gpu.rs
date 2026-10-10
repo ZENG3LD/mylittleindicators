@@ -645,6 +645,14 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: ehlers zero-lag ema. UNTESTED on GPU.
+    EhlerszBar = 1278,
+    /// Composite: ultimate oscillator. UNTESTED on GPU.
+    UoBar = 1279,
+    /// Composite: nr range. UNTESTED on GPU.
+    NrBar = 1280,
+    /// Composite: ehlers instantaneous trendline. UNTESTED on GPU.
+    EitBar = 1281,
     /// Composite: hilbert transform (3 cols). UNTESTED on GPU.
     HilbBar = 1275,
     /// Composite: hilbert dominant cycle. UNTESTED on GPU.
@@ -1155,6 +1163,7 @@ impl CubeFormula {
             CubeFormula::NviPviBar => 2,
             CubeFormula::TdiBar => 3,
             CubeFormula::KamaBar => 10,
+            CubeFormula::HilbBar => 3,
             CubeFormula::RvolBar => 2,
             CubeFormula::RocPctBar => 2,
             CubeFormula::RvzBar => 2,
@@ -1424,6 +1433,10 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Ehlersz), Some(CubeFormula::EhlerszBar));
+        assert_eq!(formula_of(IndicatorId::Uo), Some(CubeFormula::UoBar));
+        assert_eq!(formula_of(IndicatorId::Nr), Some(CubeFormula::NrBar));
+        assert_eq!(formula_of(IndicatorId::Eit), Some(CubeFormula::EitBar));
         assert_eq!(formula_of(IndicatorId::Hilb), Some(CubeFormula::HilbBar));
         assert_eq!(formula_of(IndicatorId::Hdc), Some(CubeFormula::HdcBar));
         assert_eq!(formula_of(IndicatorId::Mama), Some(CubeFormula::MamaBar));

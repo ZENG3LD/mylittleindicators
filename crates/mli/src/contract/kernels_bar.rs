@@ -3075,6 +3075,89 @@ fn bar_scan(
                 }
                 v0 = scr[7];
             }
+        } else if formula == 1278u32 {
+            // Ehlers zero-lag EMA: ema + (ema - ema[lag]); lag = p2 or (period-1)/2 (min 1); the ring keeps 16 emas
+            let pr = period as f32;
+            let al = 2.0f32 / (pr + 1.0f32);
+            let mut lag = p2 as usize;
+            if lag == 0usize {
+                lag = ((period as usize) - 1) / 2;
+                if lag < 1usize {
+                    lag = 1usize;
+                }
+            }
+            if t == 0usize {
+                held0 = c[t];
+            } else {
+                held0 = al * c[t] + (1.0f32 - al) * held0;
+            }
+            scr[t % 16usize] = held0;
+            let mut lagged = held0;
+            let mut have = t + 1;
+            if have > 16usize {
+                have = 16usize;
+            }
+            if have > lag {
+                lagged = scr[(t - lag) % 16usize];
+            }
+            v0 = held0 + (held0 - lagged);
+        } else if formula == 1279u32 {
+            // Ultimate oscillator over rescanned buying-pressure / true-range windows (period, p2, p3)
+            let p3u = p3 as usize;
+            if t >= p3u && t >= 1usize {
+                let mut sb1 = 0.0f32;
+                let mut st1 = 0.0f32;
+                let mut sb2 = 0.0f32;
+                let mut st2 = 0.0f32;
+                let mut sb3 = 0.0f32;
+                let mut st3 = 0.0f32;
+                for k in 0..p3u {
+                    let q = t - k;
+                    let pc = c[q - 1];
+                    let lo = l[q].min(pc);
+                    let bp = c[q] - lo;
+                    let tr = (h[q] - l[q]).max((h[q] - pc).abs()).max((l[q] - pc).abs());
+                    sb3 = sb3 + bp;
+                    st3 = st3 + tr;
+                    if k < p2 as usize {
+                        sb2 = sb2 + bp;
+                        st2 = st2 + tr;
+                    }
+                    if k < period as usize {
+                        sb1 = sb1 + bp;
+                        st1 = st1 + tr;
+                    }
+                }
+                let mut a1 = 0.0f32;
+                let mut a2 = 0.0f32;
+                let mut a3 = 0.0f32;
+                if st1.abs() >= 1.0e-12f32 {
+                    a1 = sb1 / st1;
+                }
+                if st2.abs() >= 1.0e-12f32 {
+                    a2 = sb2 / st2;
+                }
+                if st3.abs() >= 1.0e-12f32 {
+                    a3 = sb3 / st3;
+                }
+                v0 = (100.0f32 * (4.0f32 * a1 + 2.0f32 * a2 + a3) / 7.0f32).max(0.0f32).min(100.0f32);
+            }
+        } else if formula == 1280u32 {
+            // NR range: the exposed output is the clamped bar range
+            v0 = (h[t] - l[t]).max(0.0f32);
+        } else if formula == 1281u32 {
+            // Ehlers instantaneous trendline (alpha in `a`), live from the 8th bar
+            if t >= 7usize {
+                let a2 = a * a;
+                let mut prev = c[t];
+                if cnt_a > 0usize {
+                    prev = held0;
+                }
+                let tl = (a - a2 / 4.0f32) * c[t] + (a2 / 2.0f32) * c[t - 1] - (a - 3.0f32 * a2 / 4.0f32) * prev;
+                held0 = tl;
+                cnt_a = cnt_a + 1usize;
+            }
+            v0 = held0;
         }
         out[t] = v0;
         out[n + t] = v1;

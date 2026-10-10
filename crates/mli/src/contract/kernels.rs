@@ -9130,6 +9130,43 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1278..=1281 (Ehlersz, Uo, Nr, Eit).
+    #[test]
+    fn lane_matches_cpu_bar_batch23() {
+        use crate::indicators::average::ehlers_zero_lag_ema::EhlersZeroLagEma;
+        use crate::indicators::momentum::ultimate_oscillator::UltimateOscillator;
+        use crate::indicators::trend::ehlers_instantaneous_trendline::EhlersInstantaneousTrendline;
+        use crate::indicators::volatility::nr_range::NrRange;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut m = EhlersZeroLagEma::with_period(21);
+        chk(&run_cols(CubeFormula::EhlerszBar, &bars, CubeParams::period(21)), close.iter().map(|c| vec![m.feed(*c).zlema]).collect());
+        let mut p = CubeParams::period(7);
+        p.fast = 14;
+        p.slow = 28;
+        let _ = p;
+        let mut m = UltimateOscillator::with_periods(7, 14, 28);
+        chk(&run_cols(CubeFormula::UoBar, &bars, p), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1], l[2]])]).collect());
+        let mut m = NrRange::new(7);
+        chk(&run_cols(CubeFormula::NrBar, &bars, CubeParams::period(7)), lanes.iter().map(|l| vec![m.feed(&[l[0], l[1]]).0]).collect());
+        let mut p = CubeParams::period(1);
+        p.a = 0.07;
+        let mut m = EhlersInstantaneousTrendline::new();
+        chk(&run_cols(CubeFormula::EitBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {
