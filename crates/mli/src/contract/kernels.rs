@@ -7680,6 +7680,103 @@ mod tests {
         assert_cols(&launch_cube_events(CubeFormula::MarkGapEv, &fr, pp(10, 2.0)), &[&a, &b, &c3]);
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): rows 957..=959 (events) and 967..=969 (books).
+    #[test]
+    fn lane_matches_cpu_event_book_batch4() {
+        use super::super::book_frame::GpuBookFrame;
+        use super::super::event_frame::GpuEventFrame;
+        use super::super::kernels_book::launch_cube_book;
+        use super::super::kernels_ev::launch_cube_events;
+        use crate::core::types::{AggTrade, Liquidation, OrderBook, Tick};
+        use crate::engine::streams::agg_trade_consumer::AggTradeConsumer;
+        use crate::engine::streams::liquidation_consumer::LiquidationConsumer;
+        use crate::engine::streams::order_book_consumer::OrderBookConsumer;
+        use crate::engine::streams::tick_consumer::TickConsumer;
+        use crate::indicators::book::order_book_velocity::OrderBookVelocity;
+        use crate::indicators::book::spread_distribution::SpreadDistribution;
+        use crate::indicators::book_advanced::layer_concentration::LayerConcentration;
+        use crate::indicators::liquidations::liquidation_cluster_detector::LiquidationClusterDetector;
+        use crate::indicators::sentiment::agg_trade_size_distribution::AggTradeSizeDistribution;
+        use crate::indicators::tick_advanced::large_trade_filter::LargeTradeFilter;
+
+        let n = 80usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let t0 = 1_700_000_000_000i64;
+        let pp = |p: u32, a: f32, b: f32| { let mut c = CubeParams::period(p); c.a = a; c.b = b; c };
+        let ticks: Vec<Tick> = (0..n)
+            .map(|i| Tick::new(t0 + i as i64 * 100, 100.0 + 3.0 * w(i, 0.3), 0.5 + 3.0 * w(i, 0.7) * w(i, 0.13), w(i, 1.3) > 0.45))
+            .collect();
+        let fr = GpuEventFrame::from_ticks(&ticks);
+        let mut m = LargeTradeFilter::new(10, 1.3);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for t in &ticks {
+            m.update_tick(t);
+            a.push(m.signal());
+            b.push(m.ratio());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::LargeTradeFilterEv, &fr, pp(10, 1.3, 0.0)), &[&a, &b]);
+
+        let aggs: Vec<AggTrade> = (0..n)
+            .map(|i| AggTrade { price: 100.0 + w(i, 0.3), quantity: 0.2 + 5.0 * w(i, 0.77), timestamp: t0 + i as i64 * 100, is_buy: w(i, 1.1) > 0.5, ..Default::default() })
+            .collect();
+        let fr = GpuEventFrame::from_agg_trades(&aggs);
+        let mut m = AggTradeSizeDistribution::new(12);
+        let (mut a, mut b, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        for t in &aggs {
+            m.update_agg_trade(t);
+            a.push(m.median());
+            b.push(m.p95());
+            c3.push(m.current());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::AggSizeDistEv, &fr, pp(12, 0.0, 0.0)), &[&a, &b, &c3]);
+
+        let liqs: Vec<Liquidation> = (0..n)
+            .map(|i| Liquidation { price: 100.0 + 2.0 * w(i, 0.3), quantity: 1.0 + w(i, 0.5), timestamp: t0 + i as i64 * 100, ..Default::default() })
+            .collect();
+        let fr = GpuEventFrame::from_liquidations(&liqs);
+        let mut m = LiquidationClusterDetector::new(0.5, 1000, 3);
+        let (mut a, mut b, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        for t in &liqs {
+            m.update_liquidation(t);
+            a.push(m.price());
+            b.push(m.count());
+            c3.push(m.volume());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::LiqClusterEv, &fr, pp(3, 1000.0, 0.5)), &[&a, &b, &c3]);
+
+        let books: Vec<OrderBook> = (0..n)
+            .map(|i| {
+                let mid = 100.0 + 2.0 * w(i, 0.21);
+                let kb = 4 + (w(i, 0.8) * 4.0) as usize;
+                let ka = 4 + (w(i, 0.6) * 4.0) as usize;
+                let bids = (0..kb).map(|l| (((mid - 0.1 * (l as f64 + 1.0)) * 10.0).round() / 10.0, 1.0 + 5.0 * w(i / 2 + l, 0.9))).collect();
+                let asks = (0..ka).map(|l| (((mid + 0.1 * (l as f64 + 1.0)) * 10.0).round() / 10.0, 1.0 + 5.0 * w(i / 2 + l, 1.1))).collect();
+                OrderBook::simple(bids, asks, t0 + i as i64 * 200)
+            })
+            .collect();
+        let fr = GpuBookFrame::from_books(&books, 16);
+        let mut m = SpreadDistribution::new(9);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for k in &books {
+            m.update_orderbook(k);
+            a.push(m.spread());
+            b.push(m.percentile());
+        }
+        assert_cols(&launch_cube_book(CubeFormula::SpreadDistributionBk, &fr, CubeParams::period(9)), &[&a, &b]);
+        let mut m = LayerConcentration::new(5);
+        let (mut a, mut b, mut c3) = (Vec::new(), Vec::new(), Vec::new());
+        for k in &books {
+            m.update_orderbook(k);
+            a.push(m.gini_bid());
+            b.push(m.gini_ask());
+            c3.push(m.max());
+        }
+        assert_cols(&launch_cube_book(CubeFormula::LayerConcentrationBk, &fr, CubeParams::period(5)), &[&a, &b, &c3]);
+        let mut m = OrderBookVelocity::new(6);
+        let c: Vec<f64> = books.iter().map(|k| { m.update_orderbook(k); m.value() }).collect();
+        assert_close(&launch_cube_book(CubeFormula::OrderBookVelocityBk, &fr, CubeParams::period(6))[0], &c);
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

@@ -439,6 +439,79 @@ fn evx_scan(
             v0 = mean;
             v1 = sd;
             v2 = mean + a * sd;
+        } else if formula == 957u32 {
+            // large trade filter `[signal, ratio]`: window `period` >= 2, multiplier `a`
+            // (non-positive -> 2); outputs stay 0 until the window is full
+            let mut w = period as usize;
+            if w < 2 {
+                w = 2;
+            }
+            let mut m = a;
+            if m <= 0.0f32 {
+                m = 2.0f32;
+            }
+            if i + 1 >= w {
+                let med = med_in(x, n + i + 1 - w, w);
+                let mut ratio = 0.0f32;
+                if med > 1.0e-12f32 {
+                    ratio = x[n + i] / med;
+                }
+                h1 = ratio;
+                h0 = 0.0f32;
+                if ratio >= m {
+                    if side[i] > 0.0f32 {
+                        h0 = 1.0f32;
+                    } else {
+                        h0 = -1.0f32;
+                    }
+                }
+            }
+            v0 = h0;
+            v1 = h1;
+        } else if formula == 958u32 {
+            // agg-trade size distribution `[median, p95, current]` over the last `period`
+            // (>= 1) quantities (x1): sorted[len / 2] and sorted[(len - 1) * 0.95]
+            let mut w = period as usize;
+            if w < 1 {
+                w = 1;
+            }
+            let mut lo = 0usize;
+            if i + 1 > w {
+                lo = i + 1 - w;
+            }
+            let len = i + 1 - lo;
+            v0 = kth_in(x, n + lo, len, (len / 2) as u32);
+            v1 = kth_in(x, n + lo, len, ((len - 1) * 95 / 100) as u32);
+            v2 = x[n + i];
+        } else if formula == 959u32 {
+            // liquidation cluster detector `[price, count, volume]`: `a` window ms, `b` price
+            // bucket, `period` min count. The CPU picks the max-count bucket through a HashMap
+            // (tie order is arbitrary there); this takes the earliest event's bucket on ties.
+            let s = win_start(ts, i, a);
+            let mut best_cnt = 0.0f32;
+            let mut best_vol = 0.0f32;
+            let mut best_bucket = 0.0f32;
+            for j in s..(i + 1) {
+                let bj = (x[j] / b).floor();
+                let mut cnt = 0.0f32;
+                let mut vol = 0.0f32;
+                for k in s..(i + 1) {
+                    if (x[k] / b).floor() == bj {
+                        cnt = cnt + 1.0f32;
+                        vol = vol + x[2 * n + k];
+                    }
+                }
+                if cnt > best_cnt {
+                    best_cnt = cnt;
+                    best_vol = vol;
+                    best_bucket = bj;
+                }
+            }
+            if best_cnt >= (period as f32) {
+                v0 = best_bucket * b + b * 0.5f32;
+                v1 = best_cnt;
+                v2 = best_vol;
+            }
         }
         out[i] = v0;
         out[n + i] = v1;

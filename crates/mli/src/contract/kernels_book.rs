@@ -402,6 +402,148 @@ fn book_scan(
             }
             v0 = h0;
             v1 = h1;
+        } else if formula == 967u32 {
+            // spread distribution `[spread, percentile]`: only books with both sides and a
+            // positive spread count; window `period` >= 2 of those spreads
+            let mut w = period as usize;
+            if w < 2 {
+                w = 2;
+            }
+            if nbi > 0 && nai > 0 {
+                let sp = apx[i * d] - bpx[i * d];
+                if sp > 0.0f32 {
+                    h0 = sp;
+                    let mut cnt = 0usize;
+                    let mut ge = 0.0f32;
+                    let mut j = i + 1;
+                    while cnt < w && j > 0 {
+                        j = j - 1;
+                        if nb[j] > 0.0f32 && na[j] > 0.0f32 {
+                            let sj = apx[j * d] - bpx[j * d];
+                            if sj > 0.0f32 {
+                                cnt = cnt + 1;
+                                if sj >= sp {
+                                    ge = ge + 1.0f32;
+                                }
+                            }
+                        }
+                    }
+                    h1 = ge / (cnt as f32) * 100.0f32;
+                }
+            }
+            v0 = h0;
+            v1 = h1;
+        } else if formula == 968u32 {
+            // layer concentration: Gini of the top `period` (>= 2) level sizes per side
+            let mut tn = period as usize;
+            if tn < 2 {
+                tn = 2;
+            }
+            let kb = if nbi < tn { nbi } else { tn };
+            if kb >= 2 {
+                let mut sum = 0.0f32;
+                for l in 0..kb {
+                    sum = sum + bsz[i * d + l];
+                }
+                if sum > 0.0f32 {
+                    let mut ws = 0.0f32;
+                    for l in 0..kb {
+                        let xv = bsz[i * d + l];
+                        let mut rank = 1.0f32;
+                        for m in 0..kb {
+                            let y = bsz[i * d + m];
+                            if y < xv {
+                                rank = rank + 1.0f32;
+                            } else if y == xv && m < l {
+                                rank = rank + 1.0f32;
+                            }
+                        }
+                        ws = ws + (2.0f32 * rank - (kb as f32) - 1.0f32) * xv;
+                    }
+                    v0 = ws / ((kb as f32) * sum);
+                }
+            }
+            let ka = if nai < tn { nai } else { tn };
+            if ka >= 2 {
+                let mut sum = 0.0f32;
+                for l in 0..ka {
+                    sum = sum + asz[i * d + l];
+                }
+                if sum > 0.0f32 {
+                    let mut ws = 0.0f32;
+                    for l in 0..ka {
+                        let xv = asz[i * d + l];
+                        let mut rank = 1.0f32;
+                        for m in 0..ka {
+                            let y = asz[i * d + m];
+                            if y < xv {
+                                rank = rank + 1.0f32;
+                            } else if y == xv && m < l {
+                                rank = rank + 1.0f32;
+                            }
+                        }
+                        ws = ws + (2.0f32 * rank - (ka as f32) - 1.0f32) * xv;
+                    }
+                    v1 = ws / ((ka as f32) * sum);
+                }
+            }
+            v2 = v0;
+            if v1 > v2 {
+                v2 = v1;
+            }
+        } else if formula == 969u32 {
+            // order book velocity: mean number of changed levels per snapshot over the last
+            // `period` (>= 1) snapshot pairs
+            let mut w = period as usize;
+            if w < 1 {
+                w = 1;
+            }
+            if i > 0 {
+                let mut lo = 1usize;
+                if i + 1 > w {
+                    lo = i + 1 - w;
+                }
+                let mut total = 0.0f32;
+                for j in lo..(i + 1) {
+                    let pbn = nb[j - 1] as usize;
+                    let cbn = nb[j] as usize;
+                    let pan = na[j - 1] as usize;
+                    let can = na[j] as usize;
+                    let mb = if pbn > cbn { pbn } else { cbn };
+                    for l in 0..mb {
+                        if l >= pbn || l >= cbn {
+                            total = total + 1.0f32;
+                        } else if bpx[(j - 1) * d + l] != bpx[j * d + l] {
+                            total = total + 1.0f32;
+                        } else {
+                            let mut df = bsz[(j - 1) * d + l] - bsz[j * d + l];
+                            if df < 0.0f32 {
+                                df = 0.0f32 - df;
+                            }
+                            if df > 1.0e-9f32 {
+                                total = total + 1.0f32;
+                            }
+                        }
+                    }
+                    let ma = if pan > can { pan } else { can };
+                    for l in 0..ma {
+                        if l >= pan || l >= can {
+                            total = total + 1.0f32;
+                        } else if apx[(j - 1) * d + l] != apx[j * d + l] {
+                            total = total + 1.0f32;
+                        } else {
+                            let mut df = asz[(j - 1) * d + l] - asz[j * d + l];
+                            if df < 0.0f32 {
+                                df = 0.0f32 - df;
+                            }
+                            if df > 1.0e-9f32 {
+                                total = total + 1.0f32;
+                            }
+                        }
+                    }
+                }
+                v0 = total / ((i + 1 - lo) as f32);
+            }
         }
         out[i] = v0;
         out[n + i] = v1;

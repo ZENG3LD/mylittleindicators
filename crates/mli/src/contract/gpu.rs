@@ -601,6 +601,18 @@ pub enum CubeFormula {
     PressureComp = 1059,
     /// Composite: MACD histogram z-score. UNTESTED on GPU.
     MacdHistZComp = 1060,
+    /// Composite: liquidation cluster detector price/count/volume. UNTESTED on GPU.
+    LiqClusterEv = 959,
+    /// Composite: large trade filter signal/ratio. UNTESTED on GPU.
+    LargeTradeFilterEv = 957,
+    /// Composite: agg trade size distribution median/p95/current. UNTESTED on GPU.
+    AggSizeDistEv = 958,
+    /// Composite: spread distribution spread/percentile. UNTESTED on GPU.
+    SpreadDistributionBk = 967,
+    /// Composite: layer concentration gini bid/ask/max. UNTESTED on GPU.
+    LayerConcentrationBk = 968,
+    /// Composite: order book velocity. UNTESTED on GPU.
+    OrderBookVelocityBk = 969,
     /// Composite: tick volume delta. UNTESTED on GPU.
     TickVolumeEv = 949,
     /// Composite: trade flow imbalance/volume. UNTESTED on GPU.
@@ -901,6 +913,11 @@ impl CubeFormula {
             CubeFormula::IndexPriceMomEv => 2,
             CubeFormula::MarkGapEv => 3,
             CubeFormula::AdaptiveThresholdEv => 3,
+            CubeFormula::LargeTradeFilterEv => 2,
+            CubeFormula::AggSizeDistEv => 3,
+            CubeFormula::SpreadDistributionBk => 2,
+            CubeFormula::LayerConcentrationBk => 3,
+            CubeFormula::LiqClusterEv => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -1167,6 +1184,12 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::LiquidationClusterDetector), Some(CubeFormula::LiqClusterEv));
+        assert_eq!(formula_of(IndicatorId::LargeTradeFilter), Some(CubeFormula::LargeTradeFilterEv));
+        assert_eq!(formula_of(IndicatorId::AggTradeSizeDistribution), Some(CubeFormula::AggSizeDistEv));
+        assert_eq!(formula_of(IndicatorId::SpreadDistribution), Some(CubeFormula::SpreadDistributionBk));
+        assert_eq!(formula_of(IndicatorId::LayerConcentration), Some(CubeFormula::LayerConcentrationBk));
+        assert_eq!(formula_of(IndicatorId::OrderBookVelocity), Some(CubeFormula::OrderBookVelocityBk));
         assert_eq!(formula_of(IndicatorId::TickVolume), Some(CubeFormula::TickVolumeEv));
         assert_eq!(formula_of(IndicatorId::TradeFlowImbalance), Some(CubeFormula::TradeFlowImbEv));
         assert_eq!(formula_of(IndicatorId::UptickDowntickVolume), Some(CubeFormula::UpDownTickVolEv));
