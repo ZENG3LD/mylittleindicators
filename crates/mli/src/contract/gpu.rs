@@ -645,6 +645,12 @@ pub enum CubeFormula {
     RatioVsPriceMg = 1090,
     /// Composite: funding settlement impact. UNTESTED on GPU.
     FundingSettleImpactMg = 1091,
+    /// Composite: jurik ma proxy. UNTESTED on GPU.
+    JmaBar = 1262,
+    /// Composite: vidya. UNTESTED on GPU.
+    VidyaBar = 1263,
+    /// Composite: ehlers rocket rsi. UNTESTED on GPU.
+    EhlersRocketBar = 1264,
     /// Composite: supertrend stop. UNTESTED on GPU.
     SuptsBar = 1256,
     /// Composite: keltner stop. UNTESTED on GPU.
@@ -1388,6 +1394,9 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::Jma), Some(CubeFormula::JmaBar));
+        assert_eq!(formula_of(IndicatorId::Vidya), Some(CubeFormula::VidyaBar));
+        assert_eq!(formula_of(IndicatorId::EhlersRocket), Some(CubeFormula::EhlersRocketBar));
         assert_eq!(formula_of(IndicatorId::Supts), Some(CubeFormula::SuptsBar));
         assert_eq!(formula_of(IndicatorId::Kelts), Some(CubeFormula::KeltsBar));
         assert_eq!(formula_of(IndicatorId::NviPvi), Some(CubeFormula::NviPviBar));

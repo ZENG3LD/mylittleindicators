@@ -8953,6 +8953,42 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1262..=1264.
+    #[test]
+    fn lane_matches_cpu_bar_batch18() {
+        use crate::indicators::average::jurik_ma::JurikMa;
+        use crate::indicators::average::vidya::Vidya;
+        use crate::indicators::momentum::ehlers_rocket_rsi::EhlersRocketRsi;
+
+        let bars = bars(150);
+        let close: Vec<f64> = bars.iter().map(|b| b.close).collect();
+        let lanes: Vec<[f64; 4]> = bars.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let _ = (&close, &lanes);
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        let mut p = CubeParams::period(8);
+        p.c = 25.0;
+        let mut m = JurikMa::new(8, 25.0);
+        chk(&run_cols(CubeFormula::JmaBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(9);
+        p.smoother = CubeSmoother::Sma;
+        let mut m = Vidya::new(9);
+        chk(&run_cols(CubeFormula::VidyaBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+        let mut p = CubeParams::period(14);
+        p.fast = 8;
+        p.a = 0.1;
+        p.smoother = CubeSmoother::Ema;
+        let mut m = EhlersRocketRsi::new();
+        chk(&run_cols(CubeFormula::EhlersRocketBar, &bars, p), close.iter().map(|c| vec![m.feed(*c)]).collect());
+
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

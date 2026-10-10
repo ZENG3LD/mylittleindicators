@@ -2385,6 +2385,60 @@ fn bar_scan(
                 sm = sm + v[j];
             }
             v0 = sm / (n as f32);
+        } else if formula == 1263u32 {
+            // VIDYA: v = CMO series (percent), ready from bar `period`
+            let pr = period as usize;
+            let alpha = 2.0f32 / ((pr as f32) + 1.0f32);
+            let pct = (v[t] / 100.0f32).abs();
+            if held1 > 0.5f32 {
+                held0 = (alpha * pct) * c[t] + (1.0f32 - alpha * pct) * held0;
+            }
+            if held1 < 0.5f32 && t >= pr {
+                held1 = 1.0f32;
+                held0 = c[t];
+            }
+            v0 = held0;
+        } else if formula == 1396u32 {
+            // stage: weighted blend a * o + (1 - a) * v
+            v0 = a * o[t] + (1.0f32 - a) * v[t];
+        } else if formula == 1397u32 {
+            // stage: Ehlers rocket regular RSI of the smoothed price (`v`), Wilder seeded by the mean
+            let pr = period as usize;
+            v0 = 50.0f32;
+            if t >= pr && pr >= 1usize {
+                let gt = (v[t] - v[t - 1]).max(0.0f32);
+                let lt = (v[t - 1] - v[t]).max(0.0f32);
+                if held0 == 0.0f32 && held1 == 0.0f32 {
+                    let mut sg = 0.0f32;
+                    let mut sl = 0.0f32;
+                    for j in (t + 1 - pr)..(t + 1) {
+                        sg = sg + (v[j] - v[j - 1]).max(0.0f32);
+                        sl = sl + (v[j - 1] - v[j]).max(0.0f32);
+                    }
+                    held0 = sg / (pr as f32);
+                    held1 = sl / (pr as f32);
+                } else {
+                    let al = 1.0f32 / (pr as f32);
+                    held0 = al * gt + (1.0f32 - al) * held0;
+                    held1 = al * lt + (1.0f32 - al) * held1;
+                }
+                if held1 == 0.0f32 {
+                    v0 = 100.0f32;
+                } else {
+                    v0 = 100.0f32 - 100.0f32 / (1.0f32 + held0 / held1);
+                }
+            }
+        } else if formula == 1398u32 {
+            // stage: first difference of `v`
+            if t > 0usize {
+                v0 = v[t] - v[t - 1];
+            }
+        } else if formula == 1399u32 {
+            // stage: rocket RSI = clamp(rsi + a * smoothed momentum * 10, 0, 100) from bar 2
+            v0 = v[t];
+            if t >= 2usize {
+                v0 = (v[t] + a * o[t] * 10.0f32).max(0.0f32).min(100.0f32);
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -2611,6 +2665,28 @@ pub fn launch_cube_bar(
         bp.fast = params.fast.max(1);
         let basis = bar_stage(1261, [&o, &h, &l, &c, &rsi], CubeParams { slow: params.fast, ..params }, 0);
         return vec![rsi, sig, basis];
+    }
+    if formula == CubeFormula::JmaBar {
+        let pp = params.period.max(1);
+        let fast = smooth_series(&c, super::CubeSmoother::Ema, pp, 0, params.a, params.b);
+        let slow = smooth_series(&c, super::CubeSmoother::Ema, (pp * 2).max(2), 0, params.a, params.b);
+        let mut sp = params;
+        sp.a = (params.c.max(-100.0).min(100.0) + 100.0) / 200.0;
+        return vec![bar_stage(1396, [&fast, &h, &l, &c, &slow], sp, 0)];
+    }
+    if formula == CubeFormula::VidyaBar {
+        let mut cp = params;
+        cp.smoother = params.smoother;
+        v = super::kernels::launch_cube(CubeFormula::Cmo, samples, cp);
+    }
+    if formula == CubeFormula::EhlersRocketBar {
+        let sp = smooth_series(&c, super::CubeSmoother::Ema, 3, 0, params.a, params.b);
+        let rsi = bar_stage(1397, [&o, &h, &l, &c, &sp], params, 0);
+        let mom = bar_stage(1398, [&o, &h, &l, &c, &rsi], params, 0);
+        let sm = smooth_series(&mom, params.smoother, params.fast.max(1), 2, params.a, params.b);
+        let mut fp = params;
+        fp.a = params.a.max(1.0e-6).min(1.0);
+        return vec![bar_stage(1399, [&sm, &h, &l, &c, &rsi], fp, 0)];
     }
     if formula == CubeFormula::DistLevelsBar {
         let mut mp = params;
