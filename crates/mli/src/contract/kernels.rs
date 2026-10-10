@@ -7108,6 +7108,136 @@ mod tests {
         assert_close(&ev(CubeFormula::AuctionLiq, &fr, CubeParams::period(6))[0], &c);
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): time-window event formulas 920..=936.
+    #[test]
+    fn lane_matches_cpu_event_time_batch() {
+        use super::super::event_frame::GpuEventFrame;
+        use super::super::kernels_ev::launch_cube_events;
+        use crate::core::types::{AggTrade, BlockTrade, Liquidation, OpenInterest, Tick, TradeSide};
+        use crate::engine::streams::agg_trade_consumer::AggTradeConsumer;
+        use crate::engine::streams::block_trade_consumer::BlockTradeConsumer;
+        use crate::engine::streams::liquidation_consumer::LiquidationConsumer;
+        use crate::engine::streams::open_interest_consumer::OpenInterestConsumer;
+        use crate::engine::streams::tick_consumer::TickConsumer;
+
+        let n = 80usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let t0 = 1_700_000_000_000i64;
+        // Irregular but increasing times (ms), at most a few seconds apart.
+        let times: Vec<i64> = (0..n).scan(t0, |t, i| { *t += 50 + (w(i, 1.7) * 900.0) as i64; Some(*t) }).collect();
+        let pw = |ms: f32| { let mut p = CubeParams::period(1); p.a = ms; p };
+
+        let liqs: Vec<Liquidation> = (0..n)
+            .map(|i| Liquidation {
+                side: if w(i, 0.9) > 0.5 { TradeSide::Buy } else { TradeSide::Sell },
+                price: 100.0 + w(i, 0.3),
+                quantity: 1.0 + 5.0 * w(i, 0.5),
+                timestamp: times[i],
+                ..Default::default()
+            })
+            .collect();
+        let fr = GpuEventFrame::from_liquidations(&liqs);
+        let mut m = crate::indicators::liquidations::liquidation_rate::LiquidationRate::new(4000);
+        let c: Vec<f64> = liqs.iter().map(|t| { m.update_liquidation(t); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::LiqRate, &fr, pw(4000.0))[0], &c);
+        let mut m = crate::indicators::liquidations::liquidation_cooldown::LiquidationCooldown::new();
+        let c: Vec<f64> = liqs.iter().map(|t| { m.update_liquidation(t); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::LiqCooldown, &fr, pw(1.0))[0], &c);
+        let mut m = crate::indicators::liquidations::liquidation_volume_velocity::LiquidationVolumeVelocity::new(4000);
+        let c: Vec<f64> = liqs.iter().map(|t| { m.update_liquidation(t); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::LiqVolVelocity, &fr, pw(4000.0))[0], &c);
+        let mut m = crate::indicators::liquidations::liquidation_volume_imbalance::LiquidationVolumeImbalance::new(4000);
+        let (mut a, mut b, mut cc) = (Vec::new(), Vec::new(), Vec::new());
+        for t in &liqs {
+            m.update_liquidation(t);
+            a.push(m.imbalance());
+            b.push(m.long_vol());
+            cc.push(m.short_vol());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::LiqVolImbalance, &fr, pw(4000.0)), &[&a, &b, &cc]);
+        let mut m = crate::indicators::liquidations::liquidation_cascade::LiquidationCascade::new(4000, 5);
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for t in &liqs {
+            m.update_liquidation(t);
+            a.push(m.flag());
+            b.push(m.count());
+        }
+        let mut cp = pw(4000.0);
+        cp.period = 5;
+        assert_cols(&launch_cube_events(CubeFormula::LiqCascade, &fr, cp), &[&a, &b]);
+
+        let aggs: Vec<AggTrade> = (0..n)
+            .map(|i| AggTrade {
+                aggregate_id: i as i64,
+                price: 100.0,
+                quantity: 1.0 + w(i, 0.4),
+                first_trade_id: 0,
+                last_trade_id: 0,
+                is_buy: w(i, 1.1) > 0.5,
+                timestamp: times[i],
+                is_best_match: None,
+                non_rpi_qty: None,
+                quote_qty: None,
+            })
+            .collect();
+        let fr = GpuEventFrame::from_agg_trades(&aggs);
+        let mut m = crate::indicators::sentiment::agg_trade_flow_imbalance::AggTradeFlowImbalance::new(3000);
+        let c: Vec<f64> = aggs.iter().map(|t| { m.update_agg_trade(t); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::AggFlowImb, &fr, pw(3000.0))[0], &c);
+
+        let blocks: Vec<BlockTrade> = (0..n)
+            .map(|i| BlockTrade { block_id: String::new(), price: 100.0, quantity: 10.0 + 5.0 * w(i, 0.77), is_buy: i % 3 != 0, timestamp: times[i], is_iv: false })
+            .collect();
+        let fr = GpuEventFrame::from_block_trades(&blocks);
+        let mut m = crate::indicators::microstructure::block_trade_flow::BlockTradeFlow::new(5000);
+        let c: Vec<f64> = blocks.iter().map(|t| { m.update_block_trade(t); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::BlockFlow, &fr, pw(5000.0))[0], &c);
+        let mut m = crate::indicators::microstructure::block_trade_impact::BlockTradeImpact::new(5000);
+        let c: Vec<f64> = blocks.iter().map(|t| { m.update_block_trade(t); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::BlockRate, &fr, pw(5000.0))[0], &c);
+
+        let ois: Vec<OpenInterest> = (0..n)
+            .map(|i| OpenInterest {
+                open_interest: 1000.0 + 50.0 * w(i, 0.2),
+                timestamp: times[i],
+                ..Default::default()
+            })
+            .collect();
+        let fr = GpuEventFrame::from_open_interest(&ois);
+        let mut m = crate::indicators::open_interest::oi_change_rate::OiChangeRate::new();
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for t in &ois {
+            m.update_oi(t);
+            a.push(m.rate());
+            b.push(m.current());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::OiChangeRateEv, &fr, pw(1.0)), &[&a, &b]);
+
+        let ticks: Vec<Tick> = (0..n)
+            .map(|i| Tick::new(times[i], 100.0 + w(i, 0.3), 0.5 + 3.0 * w(i, 0.13), w(i, 1.3) > 0.45))
+            .collect();
+        let fr = GpuEventFrame::from_ticks(&ticks);
+        let mut m = crate::indicators::tick_advanced::tick_frequency_anomaly::TickFrequencyAnomaly::new(1500, 6000);
+        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
+        let mut fp = pw(1500.0);
+        fp.b = 6000.0;
+        assert_close(&launch_cube_events(CubeFormula::TickFreqAnomaly, &fr, fp)[0], &c);
+        let mut m = crate::indicators::tick_advanced::aggressor_burst_detector::AggressorBurstDetector::new(3000, 4, 0.7);
+        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
+        let mut bp = pw(3000.0);
+        bp.period = 4;
+        bp.c = 0.7;
+        assert_close(&launch_cube_events(CubeFormula::AggBurst, &fr, bp)[0], &c);
+        let mut m = crate::indicators::tick_advanced::large_tick_momentum::LargeTickMomentum::new(1.5, 3000);
+        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
+        let mut lp = pw(3000.0);
+        lp.b = 1.5;
+        assert_close(&launch_cube_events(CubeFormula::LargeTickMom, &fr, lp)[0], &c);
+        let mut m = crate::indicators::tick_advanced::size_weighted_directional_momentum::SizeWeightedDirectionalMomentum::new(3000);
+        let c: Vec<f64> = ticks.iter().map(|t| { m.update_tick(t); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::SizeWtMom, &fr, pw(3000.0))[0], &c);
+    }
+
     #[test]
     fn lane_matches_cpu() {
         let bars = bars(70);

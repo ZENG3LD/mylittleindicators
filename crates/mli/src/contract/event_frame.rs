@@ -13,9 +13,9 @@
 //! | OptionGreeks      | delta      | gamma       | vega      | theta     | rho      | mark_iv     | bid_iv     | ask_iv    |
 //! | RiskLimit         | tier       | max_leverage| max_pos   | mmr       | imr      |             |            |           |
 //! | Funding           | rate       | mark        | index     | realized  | estimated| premium     | prev_index |           |
-//! | PredictedFunding  | rate       |             |           |           |          |             |            |           |
+//! | PredictedFunding  | rate       | countdown_ms| ts>0      |           |          |             |            |           |
 //! | LongShortRatio    | long       | short       | ratio     | buy_ratio | sell_ratio|            |            |           |
-//! | Liquidation       | price      | quantity    | value     |           |          |             |            |           |
+//! | Liquidation       | price      | quantity    | quote_value|           |          |             |            |           |
 //! | OpenInterest      | oi         | oi_value    |           |           |          |             |            |           |
 //! | MarkPrice         | mark       | index       | funding   |           |          |             |            |           |
 //! | AggTrade          | price      | quantity    | quote_qty |           |          |             |            |           |
@@ -24,17 +24,18 @@
 //! | InsuranceFund     | balance    |             |           |           |          |             |            |           |
 //! | HistoricalVol     | volatility |             |           |           |          |             |            |           |
 //! | VolatilityIndex   | value      | open        | high      | low       | close    |             |            |           |
-//! | Settlement        | price      | time_s      |           |           |          |             |            |           |
+//! | Settlement        | price      | countdown_ms| ts>0      |           |          |             |            |           |
 //!
 //! `side` is `1` buy / `-1` sell (ticks, agg trades, block trades, liquidations: the
-//! `TradeSide`), `0` when the stream has no side. `ts` is seconds since the first event of the
-//! frame as `f32` (milliseconds do not fit f32; relative seconds keep 1 ms resolution for about
-//! 4.6 hours of span and 0.25 s resolution out to a week). UNTESTED on GPU.
+//! `TradeSide`), `0` when the stream has no side. `ts` is MILLISECONDS since the first event of the
+//! frame as `f32`: exact for spans up to 16,777,216 ms (4.66 hours); beyond that consecutive
+//! integers round to even, so window-edge membership can differ by 1-2 ms from the CPU. Chunk
+//! longer series into frames, or accept that jitter. UNTESTED on GPU.
 
 use crate::core::types::{
     AggTrade, AuctionEvent, BlockTrade, FundingRate, HistoricalVolatility, InsuranceFund,
     Liquidation, LongShortRatio, MarkPrice, OpenInterest, OptionGreeks, PredictedFunding,
-    RiskLimit, Ticker, TradeSide, VolatilityIndex,
+    MarketWarning, RiskLimit, SettlementEvent, Ticker, TradeSide, VolatilityIndex,
 };
 use crate::core::types::Tick;
 
@@ -70,7 +71,7 @@ impl GpuEventFrame {
                 f.x[c * n + i] = v[c] as f32;
             }
             f.side.push(*s);
-            f.ts.push(((*t - t0) as f64 / 1000.0) as f32);
+            f.ts.push((*t - t0) as f32);
         }
         f
     }
@@ -195,7 +196,22 @@ impl GpuEventFrame {
     pub fn from_predicted_funding(v: &[PredictedFunding]) -> Self {
         let r: Vec<_> = v
             .iter()
-            .map(|g| ([g.predicted_rate, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 0.0, g.timestamp))
+            .map(|g| {
+                (
+                    [
+                        g.predicted_rate,
+                        (g.next_funding_time - g.timestamp).max(0) as f64,
+                        if g.timestamp > 0 { 1.0 } else { 0.0 },
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                    ],
+                    0.0,
+                    g.timestamp,
+                )
+            })
             .collect();
         Self::from_rows(&r)
     }
@@ -228,7 +244,7 @@ impl GpuEventFrame {
             .iter()
             .map(|g| {
                 (
-                    [g.price, g.quantity, o(g.value), 0.0, 0.0, 0.0, 0.0, 0.0],
+                    [g.price, g.quantity, g.quote_value(), 0.0, 0.0, 0.0, 0.0, 0.0],
                     if matches!(g.side, TradeSide::Buy) { 1.0 } else { -1.0 },
                     g.timestamp,
                 )
@@ -343,6 +359,34 @@ impl GpuEventFrame {
                 )
             })
             .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_settlements(v: &[SettlementEvent]) -> Self {
+        let r: Vec<_> = v
+            .iter()
+            .map(|g| {
+                (
+                    [
+                        g.settlement_price,
+                        (g.settlement_time - g.timestamp).max(0) as f64,
+                        if g.timestamp > 0 { 1.0 } else { 0.0 },
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                    ],
+                    0.0,
+                    g.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
+    pub fn from_market_warnings(v: &[MarketWarning]) -> Self {
+        let r: Vec<_> = v.iter().map(|g| ([0.0; EVENT_COLS], 0.0, g.timestamp)).collect();
         Self::from_rows(&r)
     }
 }

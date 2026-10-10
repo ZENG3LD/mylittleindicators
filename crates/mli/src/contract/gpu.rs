@@ -453,6 +453,40 @@ pub enum CubeFormula {
     BlockSizeZ = 916,
     /// Event frame: `[side, run_length]` of the current same-side run. UNTESTED on GPU.
     TradeRun = 917,
+    /// Event frame (time window): liquidations per second over `a` ms. UNTESTED on GPU.
+    LiqRate = 920,
+    /// Event frame (time window): seconds since the previous liquidation. UNTESTED on GPU.
+    LiqCooldown = 921,
+    /// Event frame (time window): quote value per minute over `a` ms. UNTESTED on GPU.
+    LiqVolVelocity = 922,
+    /// Event frame (time window): `[imbalance, long, short]` over `a` ms. UNTESTED on GPU.
+    LiqVolImbalance = 923,
+    /// Event frame (time window): `[flag, count]` over `a` ms, threshold `period`. UNTESTED on GPU.
+    LiqCascade = 924,
+    /// Event frame (time window): agg-trade buy/sell imbalance over `a` ms. UNTESTED on GPU.
+    AggFlowImb = 925,
+    /// Event frame (time window): `[rate per s, current]` open interest. UNTESTED on GPU.
+    OiChangeRateEv = 926,
+    /// Event frame (time window): block-trade net flow over `a` ms. UNTESTED on GPU.
+    BlockFlow = 927,
+    /// Event frame (time window): block trades per minute over `a` ms. UNTESTED on GPU.
+    BlockRate = 928,
+    /// Event frame (time window): 1 - countdown / `a` ms, held when invalid. UNTESTED on GPU.
+    FundingTimeDecayEv = 929,
+    /// Event frame (time window): 1 - countdown / `a` ms, held when invalid. UNTESTED on GPU.
+    SettleApproach = 930,
+    /// Event frame (time window): delta change per second. UNTESTED on GPU.
+    Charm = 931,
+    /// Event frame (time window): warnings per minute over `a` ms. UNTESTED on GPU.
+    WarnRate = 932,
+    /// Event frame (time window): short (`a` ms) over long (`b` ms) tick rate. UNTESTED on GPU.
+    TickFreqAnomaly = 933,
+    /// Event frame (time window): directional burst over `a` ms: `period` min count, `c` threshold. UNTESTED on GPU.
+    AggBurst = 934,
+    /// Event frame (time window): momentum of ticks above size `b` over `a` ms. UNTESTED on GPU.
+    LargeTickMom = 935,
+    /// Event frame (time window): size-weighted directional momentum over `a` ms. UNTESTED on GPU.
+    SizeWtMom = 936,
 }
 
 /// Smoother a smoothed cube formula applies to its pre-smoother series.
@@ -608,6 +642,8 @@ impl CubeFormula {
             CubeFormula::Vortex => 2,
             CubeFormula::Fractals => 2,
             CubeFormula::TradeRun => 2,
+            CubeFormula::LiqVolImbalance => 3,
+            CubeFormula::LiqCascade | CubeFormula::OiChangeRateEv => 2,
             CubeFormula::StartEndMonth
             | CubeFormula::StartEndQuarter
             | CubeFormula::StartEndWeek
@@ -863,6 +899,23 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::LiquidationRate), Some(CubeFormula::LiqRate));
+        assert_eq!(formula_of(IndicatorId::LiquidationCooldown), Some(CubeFormula::LiqCooldown));
+        assert_eq!(formula_of(IndicatorId::LiquidationVolumeVelocity), Some(CubeFormula::LiqVolVelocity));
+        assert_eq!(formula_of(IndicatorId::LiquidationVolumeImbalance), Some(CubeFormula::LiqVolImbalance));
+        assert_eq!(formula_of(IndicatorId::LiquidationCascade), Some(CubeFormula::LiqCascade));
+        assert_eq!(formula_of(IndicatorId::AggTradeFlowImbalance), Some(CubeFormula::AggFlowImb));
+        assert_eq!(formula_of(IndicatorId::OiChangeRate), Some(CubeFormula::OiChangeRateEv));
+        assert_eq!(formula_of(IndicatorId::BlockTradeFlow), Some(CubeFormula::BlockFlow));
+        assert_eq!(formula_of(IndicatorId::BlockTradeImpact), Some(CubeFormula::BlockRate));
+        assert_eq!(formula_of(IndicatorId::FundingTimeDecay), Some(CubeFormula::FundingTimeDecayEv));
+        assert_eq!(formula_of(IndicatorId::SettlementApproachSignal), Some(CubeFormula::SettleApproach));
+        assert_eq!(formula_of(IndicatorId::CharmTracker), Some(CubeFormula::Charm));
+        assert_eq!(formula_of(IndicatorId::WarningRate), Some(CubeFormula::WarnRate));
+        assert_eq!(formula_of(IndicatorId::TickFrequencyAnomaly), Some(CubeFormula::TickFreqAnomaly));
+        assert_eq!(formula_of(IndicatorId::AggressorBurstDetector), Some(CubeFormula::AggBurst));
+        assert_eq!(formula_of(IndicatorId::LargeTickMomentum), Some(CubeFormula::LargeTickMom));
+        assert_eq!(formula_of(IndicatorId::SizeWeightedDirectionalMomentum), Some(CubeFormula::SizeWtMom));
         assert_eq!(formula_of(IndicatorId::FundingDirectionShift), Some(CubeFormula::FundingDirShift));
         assert_eq!(formula_of(IndicatorId::LongShortExtremeDetector), Some(CubeFormula::LsExtreme));
         assert_eq!(formula_of(IndicatorId::PredictedFundingExtreme), Some(CubeFormula::PredFundingExtreme));
