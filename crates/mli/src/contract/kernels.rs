@@ -7387,6 +7387,113 @@ mod tests {
         assert_close(&run(CubeFormula::PressureComp, &bars, p), &lanes.iter().map(|x| m.feed(x)).collect::<Vec<f64>>());
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): L3, tick-window and vol-index event rows 940..=948, MacdHistZ 1060.
+    #[test]
+    fn lane_matches_cpu_event_batch2() {
+        use super::super::event_frame::GpuEventFrame;
+        use super::super::kernels_ev::launch_cube_events;
+        use crate::core::types::{L3Action, OrderBookSide, OrderbookL3Event, Tick, VolatilityIndex};
+        use crate::engine::streams::orderbook_l3_consumer::OrderbookL3Consumer;
+        use crate::engine::streams::tick_consumer::TickConsumer;
+        use crate::engine::streams::volatility_index_consumer::VolatilityIndexConsumer;
+        use crate::indicators::clusters::trade_cluster_detector::TradeClusterDetector;
+        use crate::indicators::microstructure::l3_cancel_ratio::L3CancelRatio;
+        use crate::indicators::microstructure::l3_large_order_tracker::L3LargeOrderTracker;
+        use crate::indicators::microstructure::l3_order_rate::L3OrderRate;
+        use crate::indicators::microstructure::l3_spoofer_score::L3SpooferScore;
+        use crate::indicators::momentum::macd_hist_zscore::MacdHistZscore;
+        use crate::indicators::tick_advanced::volume_imbalance_zone::VolumeImbalanceZone;
+        use crate::indicators::tick_advanced::vwap_deviation::VwapDeviation;
+        use crate::indicators::volatility_advanced::vol_idx_spike::VolIdxSpike;
+
+        let n = 80usize;
+        let w = |i: usize, k: f64| ((i as f64 * k).sin() * 0.5 + 0.5);
+        let t0 = 1_700_000_000_000i64;
+        let l3: Vec<OrderbookL3Event> = (0..n)
+            .map(|i| OrderbookL3Event {
+                side: if w(i, 0.9) > 0.5 { OrderBookSide::Bid } else { OrderBookSide::Ask },
+                order_id: i.to_string(),
+                price: 100.0 + w(i, 0.3),
+                quantity: 0.5 + 3.0 * w(i, 0.7) * w(i, 0.11),
+                action: match (w(i, 1.3) * 3.0) as u32 { 0 => L3Action::Add, 1 => L3Action::Modify, _ => L3Action::Delete },
+                timestamp: t0 + i as i64 * 120,
+            })
+            .collect();
+        let fr = GpuEventFrame::from_l3(&l3);
+        let pp = |p: u32, a: f32, b: f32| { let mut c = CubeParams::period(p); c.a = a; c.b = b; c };
+        let mut m = L3CancelRatio::new(12);
+        let c: Vec<f64> = l3.iter().map(|e| { m.update_orderbook_l3(e); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::L3CancelRatioEv, &fr, pp(12, 0.0, 0.0))[0], &c);
+        let mut m = L3OrderRate::new(1500);
+        let c: Vec<f64> = l3.iter().map(|e| { m.update_orderbook_l3(e); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::L3OrderRateEv, &fr, pp(1, 1500.0, 0.0))[0], &c);
+        let mut m = L3SpooferScore::new(10, 2.0);
+        let c: Vec<f64> = l3.iter().map(|e| { m.update_orderbook_l3(e); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::L3SpooferScoreEv, &fr, pp(10, 2.0, 0.0))[0], &c);
+        let mut m = L3LargeOrderTracker::new(10, 1.5);
+        let (mut s, mut z, mut p) = (Vec::new(), Vec::new(), Vec::new());
+        for e in &l3 {
+            m.update_orderbook_l3(e);
+            s.push(m.side());
+            z.push(m.size());
+            p.push(m.price());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::L3LargeOrderEv, &fr, pp(10, 1.5, 0.0)), &[&s, &z, &p]);
+        assert_eq!(launch_cube_events(CubeFormula::AuctionPriceDeviationEv, &fr, pp(1, 0.0, 0.0))[0], vec![0.0; n]);
+
+        let ticks: Vec<Tick> = (0..n)
+            .map(|i| Tick::new(t0 + i as i64 * 100, 100.0 + 3.0 * w(i, 0.3), 1.0 + w(i, 0.1), w(i, 1.3) > 0.45))
+            .collect();
+        let fr = GpuEventFrame::from_ticks(&ticks);
+        let mut m = TradeClusterDetector::new(0.5, 3, 1000);
+        let (mut a, mut b, mut cc) = (Vec::new(), Vec::new(), Vec::new());
+        for t in &ticks {
+            m.update_tick(t);
+            a.push(m.signal());
+            b.push(m.cluster_price());
+            cc.push(m.cluster_size());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::TradeClusterEv, &fr, pp(3, 0.5, 1000.0)), &[&a, &b, &cc]);
+        let mut m = VolumeImbalanceZone::new(1000, 0.3);
+        let (mut a, mut b, mut cc) = (Vec::new(), Vec::new(), Vec::new());
+        for t in &ticks {
+            m.update_tick(t);
+            a.push(m.side());
+            b.push(m.low());
+            cc.push(m.high());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::VolImbZoneEv, &fr, pp(1, 1000.0, 0.3)), &[&a, &b, &cc]);
+        let mut m = VwapDeviation::new(1000);
+        let (mut a, mut b, mut cc) = (Vec::new(), Vec::new(), Vec::new());
+        for t in &ticks {
+            m.update_tick(t);
+            a.push(m.price());
+            b.push(m.vwap());
+            cc.push(m.deviation());
+        }
+        assert_cols(&launch_cube_events(CubeFormula::VwapDevEv, &fr, pp(1, 1000.0, 0.0)), &[&a, &b, &cc]);
+
+        let vis: Vec<VolatilityIndex> = (0..n)
+            .map(|i| { let mut v = VolatilityIndex::default(); v.value = 20.0 + 10.0 * w(i, 0.37); v.timestamp = t0 + i as i64 * 1000; v })
+            .collect();
+        let fr = GpuEventFrame::from_vol_index(&vis);
+        let mut m = VolIdxSpike::new(15);
+        let c: Vec<f64> = vis.iter().map(|v| { m.update_volatility_index(v); m.value() }).collect();
+        assert_close(&launch_cube_events(CubeFormula::VolIdxSpikeEv, &fr, pp(15, 0.0, 0.0))[0], &c);
+
+        let bars = bars(120);
+        let mut mp = CubeParams::period(10);
+        mp.fast = 4;
+        mp.slow = 9;
+        mp.signal = 3;
+        mp.smoother = CubeSmoother::Ema;
+        mp.smoother2 = CubeSmoother::Ema;
+        mp.smoother3 = CubeSmoother::Ema;
+        let mut m = MacdHistZscore::new(4, 9, 3, 10);
+        let c: Vec<f64> = bars.iter().map(|b| m.feed(b.close)).collect();
+        assert_close(&run(CubeFormula::MacdHistZComp, &bars, mp), &c);
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): calendar formulas 700..=709.
     #[test]
     fn lane_matches_cpu_calendar_batch() {

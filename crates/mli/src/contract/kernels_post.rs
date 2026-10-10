@@ -127,7 +127,7 @@ pub(crate) fn run_post(series: &[f32], op: u32, w: u32, a: f32) -> Vec<f32> {
 /// k-th smallest (0-based, clamped to the last) of `src[start..start + len]`.
 /// O(len^2) rank count: the value `x` with `count(< x) <= k < count(<= x)`.
 #[cube]
-fn kth_in(src: &[f32], start: usize, len: usize, k: u32) -> f32 {
+pub(crate) fn kth_in(src: &[f32], start: usize, len: usize, k: u32) -> f32 {
     let mut kk = k;
     if kk >= len as u32 {
         kk = (len - 1) as u32;

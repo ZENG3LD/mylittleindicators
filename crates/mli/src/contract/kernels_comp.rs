@@ -597,6 +597,31 @@ fn ew_scan(
                     v = x[t] / y[t] * (z[t] / w[t]);
                 }
             }
+        } else if op == 65u32 {
+            // population z-score of x[t] over the last a values (partial window, n >= 2),
+            // variance as E[x^2] - mean^2, 0 when std <= 1e-12
+            let p = a as usize;
+            let mut lo = 0usize;
+            if t + 1 > p {
+                lo = t + 1 - p;
+            }
+            let nn = (t + 1 - lo) as f32;
+            if nn >= 2.0f32 {
+                let mut sum = 0.0f32;
+                let mut sq = 0.0f32;
+                for j in lo..(t + 1) {
+                    sum = sum + x[j];
+                    sq = sq + x[j] * x[j];
+                }
+                let mean = sum / nn;
+                let var = sq / nn - mean * mean;
+                if var > 0.0f32 {
+                    let sd = var.sqrt();
+                    if sd > 1.0e-12f32 {
+                        v = (x[t] - mean) / sd;
+                    }
+                }
+            }
         } else if op == 29u32 {
             if z[t] != 0.0f32 {
                 v = (x[t] - y[t]) / z[t];
@@ -1756,6 +1781,18 @@ pub fn launch_cube_comp(
             let c2 = ewc(13, &c, &c, &c, 1.0, 0.0);
             let n = ew2(2, &ew2(2, &c2, &l, 0.0), &h, 0.0);
             vec![ewb(64, &n, &atr, &v, &av, pp as f32, 0.0)]
+        }
+        // MACD histogram z-score: histogram of (fast, slow, signal) smoothers (`smoother`,
+        // `smoother2`, `smoother3`) z-scored over `period` bars.
+        CubeFormula::MacdHistZComp => {
+            let src = lane_series(samples, p, p.lane);
+            let fast = sm(&src, p.smoother, p.fast, 0, p);
+            let slow = sm(&src, p.smoother2, p.slow, 0, p);
+            let line = ew2(2, &fast, &slow, 0.0);
+            let rdy = p.fast.max(1).max(p.slow.max(1)) - 1;
+            let sig = sm(&line, p.smoother3, p.signal, rdy, p);
+            let hist = ew2(2, &line, &sig, 0.0);
+            vec![ewc(65, &hist, &hist, &hist, p.period.max(2) as f32, 0.0)]
         }
         _ => Vec::new(),
     }

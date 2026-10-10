@@ -721,6 +721,7 @@ pub mod kernels_spec;
 /// Event-frame formulas, codes 900..=999. UNTESTED on GPU.
 #[cfg(feature = "gpu")]
 pub mod kernels_ev;
+pub mod kernels_evx;
 
 pub mod axis;
 pub use axis::{sweep_f64, CubeIter, Param, ParamScalar};

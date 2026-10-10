@@ -279,7 +279,7 @@ fn ev_map(
 
 /// Number of events `j <= i` with `ts[i] - ts[j] <= w_ms` (the CPU deque after eviction).
 #[cube]
-fn win_start(ts: &[f32], i: usize, w_ms: f32) -> usize {
+pub(crate) fn win_start(ts: &[f32], i: usize, w_ms: f32) -> usize {
     let mut start = i;
     let mut go = true;
     while go {
@@ -573,6 +573,9 @@ pub fn launch_cube_events(
     let n = frame.len();
     if n == 0 {
         return Vec::new();
+    }
+    if formula.code() >= 940 {
+        return super::kernels_evx::launch_cube_events_x(formula, frame, params);
     }
     if formula.code() >= 920 {
         return launch_events_timed(formula, frame, params);

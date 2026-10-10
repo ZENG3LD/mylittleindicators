@@ -599,6 +599,26 @@ pub enum CubeFormula {
     GannHiloCols = 1058,
     /// Composite: Buy/sell pressure. UNTESTED on GPU.
     PressureComp = 1059,
+    /// Composite: MACD histogram z-score. UNTESTED on GPU.
+    MacdHistZComp = 1060,
+    /// Composite: L3 cancel ratio. UNTESTED on GPU.
+    L3CancelRatioEv = 940,
+    /// Composite: auction price deviation (always 0). UNTESTED on GPU.
+    AuctionPriceDeviationEv = 941,
+    /// Composite: L3 order rate. UNTESTED on GPU.
+    L3OrderRateEv = 942,
+    /// Composite: L3 spoofer score. UNTESTED on GPU.
+    L3SpooferScoreEv = 943,
+    /// Composite: L3 large order side/size/price. UNTESTED on GPU.
+    L3LargeOrderEv = 944,
+    /// Composite: trade cluster signal/price/size. UNTESTED on GPU.
+    TradeClusterEv = 945,
+    /// Composite: volume imbalance zone side/low/high. UNTESTED on GPU.
+    VolImbZoneEv = 946,
+    /// Composite: VWAP deviation price/vwap/deviation. UNTESTED on GPU.
+    VwapDevEv = 947,
+    /// Composite: vol-index spike. UNTESTED on GPU.
+    VolIdxSpikeEv = 948,
     /// Composite: Spectral flatness percentile. UNTESTED on GPU.
     SflatpComp = 1120,
     /// Composite: Spectral rolloff percentile. UNTESTED on GPU.
@@ -835,6 +855,10 @@ impl CubeFormula {
             CubeFormula::SbpCols => 3,
             CubeFormula::TrimaBandsCols => 3,
             CubeFormula::GannHiloCols => 2,
+            CubeFormula::L3LargeOrderEv => 3,
+            CubeFormula::TradeClusterEv => 3,
+            CubeFormula::VolImbZoneEv => 3,
+            CubeFormula::VwapDevEv => 3,
             CubeFormula::PpoCols => 3,
             CubeFormula::PvoCols => 3,
             CubeFormula::TrixCols => 2,
@@ -949,6 +973,7 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::BookMicroprice), Some(CubeFormula::Microprice));
         assert_eq!(formula_of(IndicatorId::BookImb), Some(CubeFormula::BookImbalance));
         assert_eq!(formula_of(IndicatorId::BidAskAsymmetry), Some(CubeFormula::BookImbalance));
+        assert_eq!(formula_of(IndicatorId::ClQueueImb), Some(CubeFormula::BookImbalance));
         assert_eq!(formula_of(IndicatorId::BookPressure), Some(CubeFormula::BookPressure));
         assert_eq!(formula_of(IndicatorId::OiMomentum), Some(CubeFormula::EndpointSlope));
         assert_eq!(formula_of(IndicatorId::MarkPriceMomentum), Some(CubeFormula::EndpointSlope));
@@ -1100,6 +1125,16 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Vovp), Some(CubeFormula::VovPct));
         assert_eq!(formula_of(IndicatorId::Vovpt), Some(CubeFormula::VovPctTrend));
         assert_eq!(formula_of(IndicatorId::Rp), Some(CubeFormula::HlRange));
+        assert_eq!(formula_of(IndicatorId::MacdHistZ), Some(CubeFormula::MacdHistZComp));
+        assert_eq!(formula_of(IndicatorId::L3CancelRatio), Some(CubeFormula::L3CancelRatioEv));
+        assert_eq!(formula_of(IndicatorId::AuctionPriceDeviation), Some(CubeFormula::AuctionPriceDeviationEv));
+        assert_eq!(formula_of(IndicatorId::L3OrderRate), Some(CubeFormula::L3OrderRateEv));
+        assert_eq!(formula_of(IndicatorId::L3SpooferScore), Some(CubeFormula::L3SpooferScoreEv));
+        assert_eq!(formula_of(IndicatorId::L3LargeOrderTracker), Some(CubeFormula::L3LargeOrderEv));
+        assert_eq!(formula_of(IndicatorId::TradeClusterDetector), Some(CubeFormula::TradeClusterEv));
+        assert_eq!(formula_of(IndicatorId::VolumeImbalanceZone), Some(CubeFormula::VolImbZoneEv));
+        assert_eq!(formula_of(IndicatorId::VwapDeviation), Some(CubeFormula::VwapDevEv));
+        assert_eq!(formula_of(IndicatorId::VolIdxSpike), Some(CubeFormula::VolIdxSpikeEv));
         assert_eq!(formula_of(IndicatorId::Chand), Some(CubeFormula::ChandComp));
         assert_eq!(formula_of(IndicatorId::Cks), Some(CubeFormula::CksComp));
         assert_eq!(formula_of(IndicatorId::Atrts), Some(CubeFormula::AtrtsComp));

@@ -84,6 +84,27 @@ impl GpuEventFrame {
         self.n == 0
     }
 
+    /// L3 events: `x0` price, `x1` quantity, `x2` action (1 add, 2 modify, 3 delete), side 1 bid / -1 ask.
+    pub fn from_l3(v: &[crate::core::types::OrderbookL3Event]) -> Self {
+        use crate::core::types::{L3Action, OrderBookSide};
+        let r: Vec<_> = v
+            .iter()
+            .map(|e| {
+                let act = match e.action {
+                    L3Action::Add => 1.0,
+                    L3Action::Modify => 2.0,
+                    L3Action::Delete => 3.0,
+                };
+                (
+                    [e.price, e.quantity, act, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    if e.side == OrderBookSide::Bid { 1.0 } else { -1.0 },
+                    e.timestamp,
+                )
+            })
+            .collect();
+        Self::from_rows(&r)
+    }
+
     pub fn from_ticks(v: &[Tick]) -> Self {
         let r: Vec<_> = v
             .iter()
