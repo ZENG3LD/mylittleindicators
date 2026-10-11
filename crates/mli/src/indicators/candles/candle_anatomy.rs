@@ -96,8 +96,8 @@ pub struct CandleAnatomyConfig {
 
 impl Indicator for CandleAnatomy {
     const ID: IndicatorId = IndicatorId::Candleanatomy;
-    /// Not a pluggable family member — an anatomical decomposer (ratios + flags).
-    const FAMILY: &'static [Family] = &[];
+    /// Candlestick-geometry reader. Its discrete flags are a strategy-layer pool.
+    const FAMILY: &'static [Family] = &[Family::Candle];
     const INPUT: &'static [StreamKind] = &[StreamKind::Bar];
     const SOURCE: Option<SourceAxis> = Some(SourceAxis::KlineSlice(&[
         OhlcvField::Open,

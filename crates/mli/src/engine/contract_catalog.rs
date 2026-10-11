@@ -53,6 +53,26 @@ pub fn output_domain(
     outputs_of(id)?.iter().find(|o| o.id == output).map(|o| o.domain)
 }
 
+/// Every output of every `family` member whose own domain is `domain`.
+/// Scalar series only: a matrix output is not a strategy-layer candidate.
+pub fn family_domain_pool(
+    family: Family,
+    domain: crate::contract::ValueDomain,
+) -> Vec<IndicatorOutputId> {
+    let members = family_members(family);
+    outputs_in_domain(domain)
+        .into_iter()
+        .filter(|oid| members.contains(&oid.indicator()) && output_is_scalar(oid.indicator(), *oid))
+        .collect()
+}
+
+/// `true` when `id`'s `output` is a scalar series.
+pub fn output_is_scalar(id: IndicatorId, output: IndicatorOutputId) -> bool {
+    outputs_of(id)
+        .and_then(|os| os.iter().find(|o| o.id == output))
+        .is_some_and(|o| o.shape == crate::contract::OutputShape::Scalar)
+}
+
 /// Every named output the contract exposes in `domain` — the strategy layer's candidate
 /// pool for one comparability class, read STRAIGHT from the self-describing contract
 /// (`IndicatorId::all()` × `output_ids_of` × `output_domain`). No separate catalog: the

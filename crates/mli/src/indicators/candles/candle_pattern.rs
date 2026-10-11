@@ -996,7 +996,7 @@ pub struct CandlePatternConfig {
 impl Indicator for CandlePatternDetector {
     const ID: IndicatorId = IndicatorId::CandlePattern;
     /// No family — an atomic pattern DETECTOR, consumed by name, not a pluggable member.
-    const FAMILY: &'static [Family] = &[];
+    const FAMILY: &'static [Family] = &[Family::Candle];
     const INPUT: &'static [StreamKind] = &[StreamKind::Bar];
     /// Fixed O/H/L/C — pattern geometry reads the whole candle body + wicks (volume unused).
     const SOURCE: Option<SourceAxis> = Some(SourceAxis::KlineSlice(&[

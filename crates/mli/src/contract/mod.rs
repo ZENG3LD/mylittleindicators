@@ -53,6 +53,9 @@ pub enum Family {
     OpenInterest,
     /// Liquidation-stream indicators (rate, intensity, …).
     Liquidations,
+    /// Candlestick-geometry readers (pattern detection, anatomy, fuzzy
+    /// classification).
+    Candle,
 }
 
 /// Per-bar update complexity as a function of the indicator's period/window.

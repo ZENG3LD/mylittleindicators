@@ -312,7 +312,7 @@ pub struct FuzzyCandlesticksConfig {
 impl Indicator for FuzzyCandlesticks {
     const ID: IndicatorId = IndicatorId::Fuzzy;
     /// Not a pluggable family member — a fuzzy bar classifier.
-    const FAMILY: &'static [Family] = &[];
+    const FAMILY: &'static [Family] = &[Family::Candle];
     const INPUT: &'static [StreamKind] = &[StreamKind::Bar];
     const SOURCE: Option<SourceAxis> = Some(SourceAxis::KlineSlice(&[
         OhlcvField::Open,
