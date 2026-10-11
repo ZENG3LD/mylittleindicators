@@ -1300,7 +1300,9 @@ dependencies = [
 
 [[package]]
 name = "digdigdig3-core"
-version = "0.3.31"
+version = "0.3.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "084aa794d2435a970113113d8888039969cd480129861c633abae088d3859306"
 dependencies = [
  "serde",
  "serde_json",

@@ -3,9 +3,8 @@
 #
 # Not in this tree, on purpose: `mli-strategies`, `mli-validator`,
 # `mli-barometer`, and `validator_data`. Those stay in the private
-# `mylittleindicators-contract` repo. `mli-contract-macros` is here only
-# because `crates/mli` does not build without `contract_universe!`. It stays
-# `publish = false` until that boundary is decided.
+# `mylittleindicators-contract` repo. `mli-contract-macros` is published:
+# `crates/mli` does not build without `contract_universe!`.
 [workspace]
 resolver = "2"
 members = ["crates/*"]
