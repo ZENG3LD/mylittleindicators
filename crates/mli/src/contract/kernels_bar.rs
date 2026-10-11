@@ -158,21 +158,6 @@ fn sampen_count(c: &[f32], base: usize, n: usize, len: usize, r: f32) -> f32 {
     m
 }
 
-/// Population std of the window `[base, base + n)`.
-#[cube]
-fn win_std(c: &[f32], base: usize, n: usize) -> f32 {
-    let mut sm = 0.0f32;
-    for j in 0..n {
-        sm = sm + c[base + j];
-    }
-    let mean = sm / (n as f32);
-    let mut var = 0.0f32;
-    for j in 0..n {
-        var = var + (c[base + j] - mean) * (c[base + j] - mean);
-    }
-    (var / (n as f32)).sqrt()
-}
-
 /// Log return held in ring slot `i` of a `w`-slot return ring (first return at bar 1 goes to slot 0)
 /// after bar `t` (needs `t >= w`).
 #[cube]
@@ -1440,8 +1425,13 @@ fn bar_scan_w4(
                 need = pr;
             }
             if n >= need {
-                if n >= 2usize && rstate < 0.01f32 {
-                    rstate = 0.15f32 * win_std(c, base, n);
+                // CPU `new` clamps `r` to [0.01, 1] before the 0.15*std branch,
+                // so that branch never runs. A passed 0 stayed under 0.01 here
+                // and became 0.15*std, which is a different tolerance.
+                if rstate < 0.01f32 {
+                    rstate = 0.01f32;
+                } else if rstate > 1.0f32 {
+                    rstate = 1.0f32;
                 }
                 if n >= m + 1 {
                     if formula == 1220u32 {
