@@ -2,10 +2,11 @@
 //! buckets (`floor(price / bucket)`) of the whole stream to ids in ASCENDING bucket order, so the kernel can
 //! keep bounded per-bucket `buy` / `sell` arrays and scan them in ascending price order.
 //!
-//! Tie rule (documented, deterministic): the CPU iterates a `HashMap`, whose order is random; the kernel
-//! therefore resolves exact ties in favour of the LOWEST price bucket (first strictly-greater wins while
-//! scanning ascending). Formulas (state accumulates over the whole tick stream, the tick path never calls
-//! `close_bar`):
+//! Tie rule (documented, deterministic): FootprintPoc keeps the lowest bucket on an exact volume tie.
+//! FootprintImbalance matches the CPU: strongest `|imbalance|`, and on a tie the higher-volume bucket.
+//! Two pure levels are both 100 in f64, but f32 `|pct|` can differ by an ulp, so the tie band is
+//! `1e-3` of a percent (still far below a real imbalance gap). State accumulates over the
+//! whole tick stream. The tick path never calls `close_bar`:
 //! - `1405` FootprintPoc: price of the max-total-volume bucket after every tick.
 //! - `1406` FootprintImbalance (`a` = threshold %): `[direction, imb_price, imb_pct]`.
 //! - `1407` FootprintChart: `[net_delta, poc_price (0 on the tick path), total_volume]`.
@@ -120,12 +121,23 @@ fn pf_scan(
                 let tot = b + s;
                 if tot > 0.0f32 {
                     let sp = ((b - s) / tot) * 100.0f32;
-                    let stronger = sp.abs() > mpct.abs() + 1.0e-9f32;
-                    let tie = sp.abs() > 1.0e-9f32 && (sp.abs() - mpct.abs()).abs() <= 1.0e-9f32 && tot > mtot;
-                    if stronger || tie {
+                    let ap = sp.abs();
+                    let am = mpct.abs();
+                    // Direct stores, same shape as the POC scan. A 1e-9 tie misses when f32
+                    // rounds two pure 100% levels a ulp apart and then keeps the lower bucket.
+                    if ap > am + 1.0e-3f32 {
                         mpct = sp;
                         mprice = kprice[q];
                         mtot = tot;
+                    }
+                    if ap + 1.0e-3f32 >= am {
+                        if am + 1.0e-3f32 >= ap {
+                            if tot > mtot {
+                                mpct = sp;
+                                mprice = kprice[q];
+                                mtot = tot;
+                            }
+                        }
                     }
                 }
             }
