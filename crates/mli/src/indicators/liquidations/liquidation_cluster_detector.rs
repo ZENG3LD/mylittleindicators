@@ -8,7 +8,8 @@
 //! 1. Old events outside `window_ms` are evicted.
 //! 2. Remaining events are grouped by `floor(price / price_bucket)`.
 //! 3. The bucket with the highest event count is returned if its count
-//!    reaches `min_cluster_count`.
+//!    reaches `min_cluster_count`. A count tie keeps the bucket of the
+//!    earliest event still in the window.
 //!
 //! # Output
 //! `Triple(cluster_price, cluster_count, cluster_volume)`:
@@ -115,12 +116,23 @@ impl LiquidationClusterDetector {
             *bucket_volume.entry(bucket).or_insert(0.0) += vol;
         }
 
-        // Find bucket with max count.
-        let best = bucket_count
-            .iter()
-            .max_by_key(|&(_, &cnt)| cnt);
+        // Highest count. On a tie, the bucket of the earliest event still
+        // in the window. HashMap iteration order is not that rule.
+        let mut best_bucket = 0i64;
+        let mut best_cnt = 0usize;
+        let mut seen = false;
+        for &(_, bucket, _) in &self.events {
+            let count = bucket_count.get(&bucket).copied().unwrap_or(0);
+            if !seen || count > best_cnt {
+                seen = true;
+                best_cnt = count;
+                best_bucket = bucket;
+            }
+        }
 
-        if let Some((&bucket_key, &count)) = best {
+        if seen {
+            let bucket_key = best_bucket;
+            let count = best_cnt;
             if count >= self.min_cluster_count {
                 let vol = bucket_volume.get(&bucket_key).copied().unwrap_or(0.0);
                 // Mid-point of the bucket as representative price.

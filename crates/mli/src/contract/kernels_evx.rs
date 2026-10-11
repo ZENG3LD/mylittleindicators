@@ -1784,6 +1784,125 @@ fn evx_scan(
     }
 }
 
+/// 959 liquidation cluster and 982 quote stuffing. `evx_scan` reaches both
+/// through `win_start` (and 982 through a usize span cast). That launch
+/// stores garbage and then the device is gone. Count by adding `1.0`.
+/// Keep an event while `ts[i] - ts[j] <= a` (CPU evicts only when the age
+/// is strictly greater than the window).
+#[cube]
+fn evx_win_scan(
+    x: &[f32],
+    ts: &[f32],
+    out: &mut [f32],
+    formula: u32,
+    period: u32,
+    a: f32,
+    b: f32,
+) {
+    let n = ts.len();
+    for i in 0..n {
+        let mut v0 = 0.0f32;
+        let mut v1 = 0.0f32;
+        let mut v2 = 0.0f32;
+        if formula == 959u32 {
+            // `[price, count, volume]`: `a` window ms, `b` price bucket,
+            // `period` min count. Ties keep the earliest event's bucket.
+            let mut best_cnt = 0.0f32;
+            let mut best_vol = 0.0f32;
+            let mut best_bucket = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    let bj = (x[j] / b).floor();
+                    let mut cnt = 0.0f32;
+                    let mut vol = 0.0f32;
+                    for k in 0..(i + 1) {
+                        if ts[i] - ts[k] <= a {
+                            if (x[k] / b).floor() == bj {
+                                cnt = cnt + 1.0f32;
+                                vol = vol + x[2 * n + k];
+                            }
+                        }
+                    }
+                    if cnt > best_cnt {
+                        best_cnt = cnt;
+                        best_vol = vol;
+                        best_bucket = bj;
+                    }
+                }
+            }
+            if best_cnt >= (period as f32) {
+                v0 = best_bucket * b + b * 0.5f32;
+                v1 = best_cnt;
+                v2 = best_vol;
+            }
+        } else if formula == 982u32 {
+            // `[rate, signal]`: deltas in the last `a` ms, per second.
+            // `b` is the rate threshold.
+            let mut cnt = 0.0f32;
+            for j in 0..(i + 1) {
+                if ts[i] - ts[j] <= a {
+                    cnt = cnt + 1.0f32;
+                }
+            }
+            v0 = cnt / (a / 1000.0f32);
+            let mut th = b;
+            if th < 0.0f32 {
+                th = 0.0f32;
+            }
+            if v0 > th {
+                v1 = 1.0f32;
+            }
+        }
+        out[i] = v0;
+        out[n + i] = v1;
+        out[2 * n + i] = v2;
+    }
+}
+
+#[cube(launch_unchecked)]
+fn evx_win_map(
+    x: &[f32],
+    ts: &[f32],
+    out: &mut [f32],
+    formula: u32,
+    period: u32,
+    a: f32,
+    b: f32,
+) {
+    evx_win_scan(x, ts, out, formula, period, a, b);
+}
+
+fn launch_evx_window(
+    formula: CubeFormula,
+    frame: &GpuEventFrame,
+    params: CubeParams,
+) -> Vec<Vec<f32>> {
+    let n = frame.len();
+    let client =
+        cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
+    let xb = client.create_from_slice(f32::as_bytes(&frame.x));
+    let tb = client.create_from_slice(f32::as_bytes(&frame.ts));
+    let out = client.empty(3 * n * core::mem::size_of::<f32>());
+    unsafe {
+        evx_win_map::launch_unchecked(
+            &client,
+            CubeCount::new_1d(1),
+            CubeDim::new_1d(1),
+            BufferArg::from_raw_parts(xb, frame.x.len()),
+            BufferArg::from_raw_parts(tb, n),
+            BufferArg::from_raw_parts(out.clone(), 3 * n),
+            formula.code(),
+            params.period,
+            params.a,
+            params.b,
+        );
+    }
+    let bytes = client.read_one_unchecked(out);
+    let flat = f32::from_bytes(&bytes).to_vec();
+    let cols = formula.output_count() as usize;
+    (0..cols).map(|k| flat[k * n..(k + 1) * n].to_vec()).collect()
+}
+
 #[cube(launch_unchecked)]
 fn evx_map(
     x: &[f32],
@@ -1815,6 +1934,9 @@ pub fn launch_cube_events_x(
     }
     if formula == CubeFormula::AuctionPriceDeviationEv {
         return vec![vec![0.0; n]];
+    }
+    if formula.code() == 959 || formula.code() == 982 {
+        return launch_evx_window(formula, frame, params);
     }
     let client =
         cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(&Default::default());
