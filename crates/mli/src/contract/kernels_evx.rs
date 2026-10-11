@@ -907,11 +907,13 @@ fn evx_scan(
             // squeeze probability `[prob, direction]`: slot 1 open interest (x0), slot 2 mark
             // (x1), slot 3 liquidation (x2, counted); `a` window ms, `b` max expected
             // liquidations (>= 1). Each stream's window ends at its own latest event.
+            // Side 4 is funding on the compound row. Counting it as a liquidation
+            // makes the first funding event print 0.025.
             if side[i] == 1.0f32 {
                 lv = i + 1;
             } else if side[i] == 2.0f32 {
                 lm = i + 1;
-            } else {
+            } else if side[i] == 3.0f32 {
                 ll = i + 1;
             }
             let mut oi_score = 0.0f32;
