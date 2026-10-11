@@ -13551,10 +13551,11 @@ fn launch_cube_bar_x(
         }
     }
     if formula == CubeFormula::VprbBar {
-        // ATR (EMA smoothed) runs on the device first and rides in the volume slot
-        let mut ap = params;
-        ap.smoother = super::CubeSmoother::Ema;
-        v = super::kernels::launch_cube(CubeFormula::Atr, samples, ap)
+        // CPU ATR is an EMA of true range. Formula 19 is Wilder's RMA and
+        // ignores `smoother`, so the percentile was taken on the wrong series.
+        let tr = super::kernels::launch_cube(CubeFormula::TrueRange, samples, params);
+        let per = params.period.max(1);
+        v = super::kernels::smooth_series(&tr, super::CubeSmoother::Ema, per, 0, params.a, params.b)
             .into_iter()
             .map(|x| x.max(1e-12))
             .collect();
