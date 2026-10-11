@@ -106,10 +106,15 @@ impl RollingVolumeProfile {
             return;
         }
 
-        // POC = bucket with max volume.
+        // POC = bucket with max volume. HashMap order is not a tie-break:
+        // an equal volume keeps the lowest price key (the GPU rule).
         let poc_key = buckets
             .iter()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.1.partial_cmp(b.1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| b.0.cmp(a.0))
+            })
             .map(|(&k, _)| k)
             .unwrap_or(0);
 
