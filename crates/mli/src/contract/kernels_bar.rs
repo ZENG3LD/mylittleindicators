@@ -400,7 +400,11 @@ fn lngam(x: f32) -> f32 {
         - 1.231739572450155f32 / (x + 4.0f32)
         + 0.001208650973866179f32 / (x + 5.0f32)
         - 0.000005395239384953f32 / (x + 6.0f32);
-    (x - 0.5f32) * (x + 4.5f32).ln() - (x + 4.5f32) + (2.5066282746310005f32 * ser / x).ln()
+    // Numerical Recipes `gammln`: (x+0.5)*ln(x+5.5) - (x+5.5) + ln(sqrt(2π)*ser/x).
+    // The previous shift (x-0.5, x+4.5) made ln Gamma(1.5) ≈ -1.22 instead of
+    // -0.121, and the chi-square tail then printed 0.331 where the CPU prints 0.777.
+    let xp = x + 5.5f32;
+    (x + 0.5f32) * xp.ln() - xp + (2.5066282746310005f32 * ser / x).ln()
 }
 
 /// Chi-square survival function `1 - cdf(x; k)` (regularised incomplete gamma, series / continued fraction).
