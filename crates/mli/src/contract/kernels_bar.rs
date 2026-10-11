@@ -6268,7 +6268,17 @@ fn bar_scan_w30(
             }
             let avgv = vs / (vc as f32);
             if avgv > 0.0f32 {
-                held0 = ((h[t] - l[t]) / avgv).max(0.5f32).min(2.0f32);
+                // CPU reads `volatility_buffer.last()`, the vec's end. After
+                // the 100-slot ring fills, that slot stays on bars 99, 199, ...
+                // until the write index lands on it again.
+                let mut cur = h[t] - l[t];
+                if t >= 100usize {
+                    let r = t % 100usize;
+                    if r != 99usize {
+                        cur = h[t - r - 1usize] - l[t - r - 1usize];
+                    }
+                }
+                held0 = (cur / avgv).max(0.5f32).min(2.0f32);
             } else if t == 0usize {
                 held0 = 1.0f32;
             }
