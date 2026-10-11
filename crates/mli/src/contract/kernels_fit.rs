@@ -602,8 +602,10 @@ fn garch_nm(scr: &mut [f32], n: usize, p: usize, q: usize, nres: usize, uvar: f3
     }
 }
 
+/// One bar per dispatch. One launch over the whole series came back as the
+/// close whenever the bar entered Nelder-Mead, so the CPU seed never landed.
 #[cube]
-fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p: u32, d: u32, q: u32, pf_a: f32, pf_b: f32, pf_c: f32) {
+fn fit_arima(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, p: u32, d: u32, q: u32, t_only: u32) {
     let nu = n as usize;
     let pu = p as usize;
     let du = d as usize;
@@ -612,9 +614,13 @@ fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p
     if min_obs < 30usize {
         min_obs = 30usize;
     }
+    let only = t_only as usize;
+    let mut stop = only + 1usize;
+    if stop > nu {
+        stop = nu;
+    }
     let mut forecast = 0.0f32;
-    if formula == 1337u32 {
-        for t in 0..nu {
+    for t in only..stop {
             let mut ws = 0usize;
             if t + 1usize > 512usize {
                 ws = t + 1usize - 512usize;
@@ -785,10 +791,16 @@ fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p
             }
             out[t] = forecast;
         }
-    } else if formula == 1338u32 || formula == 1339u32 {
-        // returns window at 2100.. (<= 512), cond. variance / log variance results at 2700.., z at 3300..
-        let kind = formula - 1338u32;
-        let mut min_obs2 = pu + qu + 10usize;
+}
+
+/// GARCH (`kind == 0`, seed volatility 0.1) and EGARCH (`kind == 1`, seed 0.316).
+#[cube]
+fn fit_vol(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, p: u32, q: u32, kind: u32, t_only: u32) {
+    let nu = n as usize;
+    let pu = p as usize;
+    let qu = q as usize;
+    // returns window at 2100.. (<= 512), cond. variance / log variance results at 2700.., z at 3300..
+    let mut min_obs2 = pu + qu + 10usize;
         if min_obs2 < 50usize {
             min_obs2 = 50usize;
         }
@@ -798,7 +810,12 @@ fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p
         }
         let mut rcount = 0usize;
         let mut rlast = 0.0f32;
-        for t in 0..nu {
+        let t_end = t_only as usize;
+        let mut end = t_end + 1usize;
+        if end > nu {
+            end = nu;
+        }
+        for t in 0..end {
             // return recursion r = ln(price / (price / (1 + r_prev))) = ln(1 + r_prev)
             let mut r = 0.0f32;
             if rcount > 0usize {
@@ -814,7 +831,7 @@ fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p
             scr[2100usize + rcount] = r;
             rcount = rcount + 1usize;
             rlast = r;
-            if rcount >= min_obs2 {
+            if t == t_end && rcount >= min_obs2 {
                 // AR(1) mean model
                 let mut phi = 0.0f32;
                 let mut mu = 0.0f32;
@@ -951,10 +968,17 @@ fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p
                     }
                 }
             }
-            out[t] = vol;
+            if t == t_end {
+                out[t] = vol;
+            }
         }
-    } else if formula == 1340u32 {
-        let mut deg = pu;
+}
+
+#[cube]
+fn fit_poly(x: &[f32], out: &mut [f32], n: u32, p: u32) {
+    let nu = n as usize;
+    let pu = p as usize;
+    let mut deg = pu;
         if deg < 1usize {
             deg = 1usize;
         }
@@ -995,10 +1019,15 @@ fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p
             }
             out[t] = fcst;
         }
-    } else if formula == 1343u32 {
-        // particles: pos [0, 1000), vel [1000, 2000), weight [2000, 3000), resample pos / vel [3000, 5000),
-        // rng limbs at 5000.. (8 + cache flag + cache)
-        let mut np = pu;
+}
+
+#[cube]
+fn fit_particle(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, p: u32, pf_a: f32, pf_b: f32, pf_c: f32) {
+    let nu = n as usize;
+    let pu = p as usize;
+    // particles: pos [0, 1000), vel [1000, 2000), weight [2000, 3000), resample pos / vel [3000, 5000),
+    // rng limbs at 5000.. (8 + cache flag + cache)
+    let mut np = pu;
         if np < 10usize {
             np = 10usize;
         }
@@ -1093,12 +1122,31 @@ fn fit_scan(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p
             }
             out[t] = filtered;
         }
-    }
 }
 
 #[cube(launch_unchecked)]
-fn fit_map(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, formula: u32, p: u32, d: u32, q: u32, pf_a: f32, pf_b: f32, pf_c: f32) {
-    fit_scan(x, scr, out, n, formula, p, d, q, pf_a, pf_b, pf_c);
+fn fit_arima_map(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, p: u32, d: u32, q: u32, t_only: u32) {
+    fit_arima(x, scr, out, n, p, d, q, t_only);
+}
+
+#[cube(launch_unchecked)]
+fn fit_garch_map(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, p: u32, q: u32, t_only: u32) {
+    fit_vol(x, scr, out, n, p, q, 0u32, t_only);
+}
+
+#[cube(launch_unchecked)]
+fn fit_egarch_map(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, p: u32, q: u32, t_only: u32) {
+    fit_vol(x, scr, out, n, p, q, 1u32, t_only);
+}
+
+#[cube(launch_unchecked)]
+fn fit_poly_map(x: &[f32], out: &mut [f32], n: u32, p: u32) {
+    fit_poly(x, out, n, p);
+}
+
+#[cube(launch_unchecked)]
+fn fit_particle_map(x: &[f32], scr: &mut [f32], out: &mut [f32], n: u32, p: u32, pf_a: f32, pf_b: f32, pf_c: f32) {
+    fit_particle(x, scr, out, n, p, pf_a, pf_b, pf_c);
 }
 
 /// Launch a fit formula over a single source series.
@@ -1116,24 +1164,89 @@ pub fn launch_cube_fit(formula: CubeFormula, x: &[f32], params: CubeParams) -> V
     let xb = client.create_from_slice(f32::as_bytes(x));
     let scr = client.create_from_slice(f32::as_bytes(&vec![0.0f32; FIT_SCR]));
     let out = client.empty(n * 4);
-    let (p, d, q) = if formula == CubeFormula::ParticleBar { (params.period.clamp(10, 1000), 0, 0) } else if formula == CubeFormula::PolyRegBar { (params.period.min(8), 0, 0) } else if formula == CubeFormula::ArimaBar { (params.period.min(16), params.fast.min(3), params.slow.min(16)) } else { (params.period.min(8), 0, params.fast.min(8)) };
+    let (p, d, q) = if formula == CubeFormula::ParticleBar {
+        (params.period.clamp(10, 1000), 0, 0)
+    } else if formula == CubeFormula::PolyRegBar {
+        (params.period.min(8), 0, 0)
+    } else if formula == CubeFormula::ArimaBar {
+        (params.period.min(16), params.fast.min(3), params.slow.min(16))
+    } else {
+        (params.period.min(8), 0, params.fast.min(8))
+    };
     unsafe {
-        fit_map::launch_unchecked(
-            &client,
-            CubeCount::new_1d(1),
-            CubeDim::new_1d(1),
-            BufferArg::from_raw_parts(xb, n),
-            BufferArg::from_raw_parts(scr, FIT_SCR),
-            BufferArg::from_raw_parts(out.clone(), n),
-            n as u32,
-            formula.code(),
-            p,
-            d,
-            q,
-            params.a,
-            params.b,
-            params.c,
-        );
+        if formula == CubeFormula::ArimaBar {
+            for t in 0..n {
+                fit_arima_map::launch_unchecked(
+                    &client,
+                    CubeCount::new_1d(1),
+                    CubeDim::new_1d(1),
+                    BufferArg::from_raw_parts(xb.clone(), n),
+                    BufferArg::from_raw_parts(scr.clone(), FIT_SCR),
+                    BufferArg::from_raw_parts(out.clone(), n),
+                    n as u32,
+                    p,
+                    d,
+                    q,
+                    t as u32,
+                );
+            }
+        } else if formula == CubeFormula::GarchBar {
+            for t in 0..n {
+                fit_garch_map::launch_unchecked(
+                    &client,
+                    CubeCount::new_1d(1),
+                    CubeDim::new_1d(1),
+                    BufferArg::from_raw_parts(xb.clone(), n),
+                    BufferArg::from_raw_parts(scr.clone(), FIT_SCR),
+                    BufferArg::from_raw_parts(out.clone(), n),
+                    n as u32,
+                    p,
+                    q,
+                    t as u32,
+                );
+            }
+        } else if formula == CubeFormula::EgarchBar {
+            for t in 0..n {
+                fit_egarch_map::launch_unchecked(
+                    &client,
+                    CubeCount::new_1d(1),
+                    CubeDim::new_1d(1),
+                    BufferArg::from_raw_parts(xb.clone(), n),
+                    BufferArg::from_raw_parts(scr.clone(), FIT_SCR),
+                    BufferArg::from_raw_parts(out.clone(), n),
+                    n as u32,
+                    p,
+                    q,
+                    t as u32,
+                );
+            }
+        } else if formula == CubeFormula::PolyRegBar {
+            fit_poly_map::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(xb.clone(), n),
+                BufferArg::from_raw_parts(out.clone(), n),
+                n as u32,
+                p,
+            );
+        } else if formula == CubeFormula::ParticleBar {
+            fit_particle_map::launch_unchecked(
+                &client,
+                CubeCount::new_1d(1),
+                CubeDim::new_1d(1),
+                BufferArg::from_raw_parts(xb.clone(), n),
+                BufferArg::from_raw_parts(scr.clone(), FIT_SCR),
+                BufferArg::from_raw_parts(out.clone(), n),
+                n as u32,
+                p,
+                params.a,
+                params.b,
+                params.c,
+            );
+        } else {
+            panic!("fit formula {} has no scan entry", formula.code());
+        }
     }
     vec![f32::from_bytes(&client.read_one_unchecked(out)).to_vec()]
 }
