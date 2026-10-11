@@ -83,27 +83,32 @@ fn lv_scan(
     let mut lc = 0.0f32;
     let mut r = 0usize;
     for d in 0..ndu {
-        let mut go = true;
-        while go {
-            if r < nru && (delta[r] as usize) == d {
-                let id = key[r] as usize;
-                let sz = size[r];
-                if sz == 0.0f32 {
-                    st[id] = 0.0f32;
-                } else if st[id] == 0.0f32 && sz > 0.0f32 {
-                    st[ku + id] = st[ku + id] + 1.0f32;
-                    st[id] = sz;
-                    if st[ku + id] >= thr {
-                        ls = side[r];
-                        lp = price[r];
-                        lc = st[ku + id];
+        // Bounded scan. `while` plus a flag did not consume later deltas, so the
+        // published state stayed 0 after the CPU had already counted a replenishment.
+        for _s in 0..nru {
+            if r < nru {
+                if (delta[r] as u32) == (d as u32) {
+                    let id = key[r] as usize;
+                    let sz = size[r];
+                    if sz == 0.0f32 {
+                        st[id] = 0.0f32;
+                    } else {
+                        if st[id] == 0.0f32 {
+                            if sz > 0.0f32 {
+                                st[ku + id] = st[ku + id] + 1.0f32;
+                                st[id] = sz;
+                                if st[ku + id] >= thr {
+                                    ls = side[r];
+                                    lp = price[r];
+                                    lc = st[ku + id];
+                                }
+                            }
+                        } else {
+                            st[id] = sz;
+                        }
                     }
-                } else {
-                    st[id] = sz;
+                    r = r + 1usize;
                 }
-                r = r + 1usize;
-            } else {
-                go = false;
             }
         }
         out[d] = ls;
