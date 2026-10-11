@@ -1,5 +1,7 @@
 # mylittleindicators
 
+Pull requests are not accepted. Please open an Issue.
+
 Multi-stream indicator library. The cargo name is `mylittleindicators`.
 
 This repository is a virtual workspace. The published library is `crates/mli`. `crates/mli-contract-macros` is the `contract_universe!` proc-macro that generates the engine. Strategies, the validator, and the barometer are not in this repository.
