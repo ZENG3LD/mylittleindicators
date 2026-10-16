@@ -381,6 +381,7 @@ fn cube_formula_variant(name: &Ident) -> syn::Result<Ident> {
         "comp_ehlersfa_bar" => "EhlersfaBar",
         "comp_rvol_bar" => "RvolBar",
         "comp_session_vwap_bar" => "SessionVwapBar",
+        "comp_session_vwap_bands_bar" => "SessionVwapBandsBar",
         "comp_frama_bar" => "FramaBar",
         "comp_roc_pct_bar" => "RocPctBar",
         "comp_rvz_bar" => "RvzBar",

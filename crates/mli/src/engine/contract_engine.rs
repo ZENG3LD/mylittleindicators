@@ -211,6 +211,7 @@ mli_contract_macros::contract_universe! {
         Vz:              Fields      : _ +cube(volume_z) => crate::indicators::volume::volume_zscore::VolumeZscore,
         Rvol:            Fields      : _ +cube(comp_rvol_bar)             => crate::indicators::volume::relative_volume::RelativeVolume { rvol percentile },
         SessionVwap:     Fields      : _ +cube(comp_session_vwap_bar)             => crate::indicators::volume::session_vwap::SessionVwap,
+        SessionVwapBands: Fields    : _ +time +cube(comp_session_vwap_bands_bar) => crate::indicators::volume::session_vwap_bands::SessionVwapBands { center upper lower },
         Vzo:             Fields      : _ +cube(vzo)             => crate::indicators::volume::vzo::Vzo,
         Vdelta:          Tick        : _ +cube(comp_vdelta_ev) => crate::indicators::volume::volume_delta::VolumeDelta,
         Volume:          Field       : _ +cube(identity) => crate::indicators::volume::volume::Volume,

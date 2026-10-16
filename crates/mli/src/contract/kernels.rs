@@ -9384,6 +9384,60 @@ mod tests {
 
     }
 
+    /// UNTESTED on GPU (no GPU on the authoring box): session VWAP bands, code 1359.
+    /// Open lane is the UTC day. `flag` 0 is hl2, 1 is hlc3. `a` is the multiplier.
+    #[test]
+    fn lane_matches_cpu_session_vwap_bands() {
+        use crate::contract::gpu_sample::GpuTimes;
+        use crate::contract::kernels_bar::launch_cube_bar_timed;
+        use crate::indicators::volume::session_vwap_bands::{SessionVwapBands, SessionVwapBandsSource};
+
+        let raw = bars(48);
+        let mut series: Vec<ResearchBar> = raw
+            .iter()
+            .enumerate()
+            .map(|(i, b)| {
+                let day = (i / 4) as i64;
+                let slot = (i % 4) as i64;
+                ResearchBar::new(
+                    1_728_000_000_000 + day * 86_400_000 + slot * 60_000,
+                    b.open,
+                    b.high,
+                    b.low,
+                    b.close,
+                    b.volume,
+                )
+            })
+            .collect();
+        series[5].volume = 0.0;
+        let samples: Vec<GpuSample> = series.iter().map(GpuSample::from).collect();
+        let times = GpuTimes::from_bars(&series);
+        let lanes: Vec<[f64; 4]> = series.iter().map(|b| [b.high, b.low, b.close, b.volume]).collect();
+        let cols = |rows: Vec<Vec<f64>>| -> Vec<Vec<f64>> {
+            (0..rows[0].len()).map(|k| rows.iter().map(|r| r[k]).collect()).collect()
+        };
+        let chk = |g: &[Vec<f32>], rows: Vec<Vec<f64>>| {
+            let c = cols(rows);
+            let r: Vec<&Vec<f64>> = c.iter().collect();
+            assert_cols(g, &r);
+        };
+        for source in [SessionVwapBandsSource::Hl2, SessionVwapBandsSource::Hlc3] {
+            let mut p = CubeParams::period(1);
+            p.a = 2.0;
+            p.flag = source.cube_flag();
+            let mut m = SessionVwapBands::new(source, 2.0);
+            let rows: Vec<Vec<f64>> = series
+                .iter()
+                .zip(&lanes)
+                .map(|(b, l)| {
+                    m.feed(b.time, l);
+                    vec![m.center(), m.upper(), m.lower()]
+                })
+                .collect();
+            chk(&launch_cube_bar_timed(CubeFormula::SessionVwapBandsBar, &samples, &times, p), rows);
+        }
+    }
+
     /// UNTESTED on GPU (no GPU on the authoring box): bar formulas 1272..=1274.
     #[test]
     fn lane_matches_cpu_bar_batch21() {

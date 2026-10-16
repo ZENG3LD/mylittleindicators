@@ -602,6 +602,9 @@ pub struct GpuTimes {
     pub qnear: Vec<f32>,
     /// Monthly anchor key of `AnchoredVwap::calc_month_key` (`(unix_days / 30.436875) as i64`), exact in f32.
     pub mkey: Vec<f32>,
+    /// UTC day index `time_ms.div_euclid(86_400_000)`. Exact in f32 while the day
+    /// number fits in 24 bits. `SessionVwapBandsBar` reads this lane.
+    pub day: Vec<f32>,
     /// Seconds since the first bar (`(time_ms - first_time_ms) / 1000`), the session clock of `VolumeProfile`.
     pub trel: Vec<f32>,
     /// `PocDetector` host columns, `7n` floats: day id, session id (both relative, equality is all that matters),
@@ -632,6 +635,7 @@ impl GpuTimes {
             let qv = crate::indicators::calendar::quarter_turn_effect::QuarterTurnEffect::new(15)
                 .feed(ms);
             out.mkey.push(((secs / 86_400) as f64 / 30.436875) as i64 as f32);
+            out.day.push(ms.div_euclid(86_400_000) as f32);
             out.qnear.push(if qv > 0.0 { ((1.0 - qv) * 15.0).round() as f32 } else { 99.0 });
         }
         out

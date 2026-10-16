@@ -857,6 +857,10 @@ pub enum CubeFormula {
     RvolBar = 1267,
     /// Composite: session vwap. UNTESTED on GPU.
     SessionVwapBar = 1268,
+    /// UTC-day VWAP bands. `a` is the multiplier. `flag == 0` is hl2, `flag == 1`
+    /// is hlc3. The open lane is [`crate::contract::gpu_sample::GpuTimes::day`],
+    /// not the open price. Columns are center, upper, lower. UNTESTED on GPU.
+    SessionVwapBandsBar = 1359,
     /// Composite: frama. UNTESTED on GPU.
     FramaBar = 1269,
     /// Composite: roc percentile. UNTESTED on GPU.
@@ -1264,7 +1268,7 @@ impl CubeFormula {
     /// `true` for the calendar formulas (code 140..=149). They need the time
     /// adapter and run through `launch_cube_timed`.
     pub const fn needs_time(self) -> bool {
-        (self.code() >= 140 && self.code() < 150) || (self.code() >= 700 && self.code() < 710) || (self.code() >= 1303 && self.code() < 1307)
+        (self.code() >= 140 && self.code() < 150) || (self.code() >= 700 && self.code() < 710) || (self.code() >= 1303 && self.code() < 1307) || self.code() == 1359
     }
 
     pub const fn output_count(self) -> u32 {
@@ -1385,6 +1389,7 @@ impl CubeFormula {
             CubeFormula::SqmomBar => 2,
             CubeFormula::HilbBar => 3,
             CubeFormula::RvolBar => 2,
+            CubeFormula::SessionVwapBandsBar => 3,
             CubeFormula::RocPctBar => 2,
             CubeFormula::RvzBar => 2,
             CubeFormula::PpoCols => 3,
@@ -1740,6 +1745,8 @@ mod tests {
         assert_eq!(formula_of(IndicatorId::Ehlersfa), Some(CubeFormula::EhlersfaBar));
         assert_eq!(formula_of(IndicatorId::Rvol), Some(CubeFormula::RvolBar));
         assert_eq!(formula_of(IndicatorId::SessionVwap), Some(CubeFormula::SessionVwapBar));
+        assert_eq!(formula_of(IndicatorId::SessionVwapBands), Some(CubeFormula::SessionVwapBandsBar));
+        assert_eq!(gpu_of(IndicatorId::SessionVwapBands), GpuMode::Cube);
         assert_eq!(formula_of(IndicatorId::Frama), Some(CubeFormula::FramaBar));
         assert_eq!(formula_of(IndicatorId::RocPct), Some(CubeFormula::RocPctBar));
         assert_eq!(formula_of(IndicatorId::Rvz), Some(CubeFormula::RvzBar));

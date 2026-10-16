@@ -297,6 +297,7 @@ pub enum IndicatorId {
     Rvol,  // RVOL
     Rvp,  // RVP — Rolling Volume Profile (POC/VAH/VAL, Triple)
     SessionVwap,  // SESSION_VWAP
+    SessionVwapBands,  // SESSION_VWAP_BANDS — UTC-day VWAP ± mult * volume-weighted dev
     Vdelta,  // VDELTA
     Volume,  // VOLUME — raw per-bar volume histogram
     Vfi,  // VFI

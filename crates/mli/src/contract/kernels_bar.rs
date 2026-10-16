@@ -4214,6 +4214,42 @@ fn bar_scan_w19(
             } else {
                 v0 = c[t];
             }
+        } else if formula == 1359u32 {
+            // UTC-day VWAP bands. Lane o is the day key. flag 0 = hl2, else hlc3.
+            // a = multiplier. held0 = sum v, held1 = sum p*v, held2 = sum p*p*v.
+            let mut reset = 0u32;
+            if t == 0usize {
+                reset = 1u32;
+            } else if o[t] != o[t - 1] {
+                reset = 1u32;
+            }
+            if reset == 1u32 {
+                held0 = 0.0f32;
+                held1 = 0.0f32;
+                held2 = 0.0f32;
+            }
+            let mut src = (h[t] + l[t]) / 2.0f32;
+            if flag != 0u32 {
+                src = (h[t] + l[t] + c[t]) / 3.0f32;
+            }
+            if v[t] > 0.0f32 {
+                held0 = held0 + v[t];
+                held1 = held1 + src * v[t];
+                held2 = held2 + src * src * v[t];
+                let vwap = held1 / held0;
+                let mut var = held2 / held0 - vwap * vwap;
+                if var < 0.0f32 {
+                    var = 0.0f32;
+                }
+                let dev = var.sqrt();
+                v0 = vwap;
+                v1 = vwap + a * dev;
+                v2 = vwap - a * dev;
+            } else {
+                v0 = src;
+                v1 = src;
+                v2 = src;
+            }
         }
         out[t] = v0;
         out[n + t] = v1;
@@ -12088,7 +12124,7 @@ match code {
             params.c,
             flag,
         ),
-        1267 | 1268 => bar_map_w19::launch_unchecked(
+        1267 | 1268 | 1359 => bar_map_w19::launch_unchecked(
             &client,
             CubeCount::new_1d(1),
             CubeDim::new_1d(1),
@@ -12975,7 +13011,8 @@ pub fn launch_cube_bar(
 }
 
 /// Bar formulas that read the calendar adapter: the open lane carries `GpuTimes::mkey` (the monthly
-/// anchor key). Codes 1303..=1306. UNTESTED on GPU.
+/// anchor key) for codes 1303..=1306. `SessionVwapBandsBar` carries `GpuTimes::day` instead.
+/// UNTESTED on GPU.
 pub fn launch_cube_bar_timed(
     formula: CubeFormula,
     samples: &[GpuSample],
@@ -12989,6 +13026,10 @@ pub fn launch_cube_bar_timed(
     assert_eq!(times.mkey.len(), samples.len(), "one GpuTimes row per sample");
     if formula == CubeFormula::VprofileBar || formula == CubeFormula::PocBar {
         return launch_cube_session(formula, samples, times, params);
+    }
+    if formula == CubeFormula::SessionVwapBandsBar {
+        assert_eq!(times.day.len(), samples.len(), "one GpuTimes day per sample");
+        return launch_cube_bar_x(formula, samples, params, Some(&times.day));
     }
     launch_cube_bar_x(formula, samples, params, Some(&times.mkey))
 }
@@ -13010,6 +13051,9 @@ fn launch_cube_bar_x(
     let mut h = lane_series(samples, params, OhlcvField::High);
     let mut l = lane_series(samples, params, OhlcvField::Low);
     let c = lane_series(samples, params, params.lane);
+    if formula == CubeFormula::SessionVwapBandsBar && okey.is_none() {
+        panic!("{:?} reads the UTC day: call launch_cube_bar_timed with a GpuTimes", formula);
+    }
     if formula == CubeFormula::ArimaBar || formula == CubeFormula::GarchBar || formula == CubeFormula::EgarchBar || formula == CubeFormula::PolyRegBar || formula == CubeFormula::ParticleBar {
         return super::kernels_fit::launch_cube_fit(formula, &c, params);
     }

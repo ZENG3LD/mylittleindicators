@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 — 2026-10-17
+
+`SessionVwapBands`: UTC-day VWAP and volume-weighted deviation bands. Source is hl2 or hlc3. Outputs are center, upper, and lower. `mli-contract-macros` 0.1.1 names the cube formula. `IndicatorId::Vwap` stays one line.
+
 ## 0.2.1 — 2026-10-11
 
 `Family::Candle` tags candle anatomy, candle pattern, and fuzzy candles. `family_domain_pool` and `output_is_scalar` are on the contract catalog.
